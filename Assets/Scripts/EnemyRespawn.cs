@@ -19,11 +19,14 @@ public class EnemyRespawn : MonoBehaviour
 {
     public static EnemyRespawn Instance;
 
+    [Header("이 프리랩이 따라갈 이동 경로")]
+    public Transform[] spawnWaypoints; 
+    
     [SerializeField] private GameObject enemyPrefab;
     [SerializeField] private GameObject bossPrefab; // 추후 인라인 보스 방식 확장용
 
     [Tooltip("일반 몬스터 처치 후 다음 소환까지 대기 시간 (초)")]
-    [SerializeField] private float respawnDelay = 5f;
+    [SerializeField] private float respawnDelay = 1f;
 
     // ──────────────────────────────────────────────
     //  Unity 생명 주기
@@ -52,17 +55,21 @@ public class EnemyRespawn : MonoBehaviour
     /// 일반 몬스터를 즉시 소환합니다.
     /// 호출 전에 반드시 이벤트 구독이 완료된 상태여야 합니다.
     /// </summary>
-    public void SpawnEnemy()
+    void SpawnEnemy()
     {
-        if (enemyPrefab == null)
+        if (enemyPrefab == null || spawnWaypoints.Length == 0) return;
+
+        // 1. 현재 스포너 위치에 프리랩 실시간 생성
+        GameObject newEnemy = Instantiate(enemyPrefab, transform.position, Quaternion.identity);
+
+        // 2. 생성된 객체에서 이동 스크립트를 컴포넌트로 가져옴
+        TargetMove moveScript = newEnemy.GetComponent<TargetMove>();
+
+        // 3. 스포너가 들고 있던 경로 배열을 생성된 객체에게 주입
+        if (moveScript != null)
         {
-            Debug.LogError("[EnemyRespawn] enemyPrefab이 연결되지 않았습니다!");
-            return;
+            moveScript.SetupPath(spawnWaypoints);
         }
-
-        var enemy = Instantiate(enemyPrefab, transform.position, Quaternion.identity);
-        GameManager.Instance?.SetEnemy(enemy);
-
     }
 
     // ──────────────────────────────────────────────

@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class EnemyStat : MonoBehaviour
 {
-    public float Health = 100f;
+   
     
     void Awake()
     {
