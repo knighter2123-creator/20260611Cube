@@ -3,10 +3,10 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class Player : MonoBehaviour // DontOnDestroy 삭제
+public class Player : MonoBehaviour
 {
     private static Player _instance;
-
+    
     [Header("Player 스탯")]
     [SerializeField] private PlayerStat playerStat;
 
@@ -34,7 +34,7 @@ public class Player : MonoBehaviour // DontOnDestroy 삭제
             return;
         }
         _instance      = this;
-        //DontDestroyOnLoad(gameObject);
+        
     }
 
     void Start()
@@ -61,7 +61,7 @@ public class Player : MonoBehaviour // DontOnDestroy 삭제
     // ──────────────────────────────────────────────
     void FindTarget() // 수정필요
     {
-        if (currentTarget != null && !currentTarget.IsDead)
+        if (currentTarget != null && !currentTarget.isDead)
             return;
 
         currentTarget = null;

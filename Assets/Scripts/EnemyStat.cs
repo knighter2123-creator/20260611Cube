@@ -2,7 +2,12 @@ using UnityEngine;
 
 public class EnemyStat : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    public float Health = 100f;
+    
+    void Awake()
+    {
+        
+    }
     void Start()
     {
         
