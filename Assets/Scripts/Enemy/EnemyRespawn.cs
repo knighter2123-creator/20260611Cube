@@ -31,6 +31,7 @@ public class EnemyRespawn : MonoBehaviour
 
     void Awake()
     {
+        
         Instance = this;
     }
 
@@ -43,14 +44,14 @@ public class EnemyRespawn : MonoBehaviour
     // ──────────────────────────────────────────────
     //  스폰 API
     // ──────────────────────────────────────────────
-
+    
     /// <summary>
     /// 일반 몬스터를 조건(최대 수량 미달) 확인 후 소환합니다.
     /// </summary>
     void SpawnEnemy()
     {
         if (enemyPrefab == null || spawnWaypoints.Length == 0) return;
-
+        
         // 1. 리스트에서 이미 파괴된(죽은) 적들을 제거하여 현재 마리 수 최신화
         activeEnemies.RemoveAll(item => item == null);
 
@@ -63,6 +64,7 @@ public class EnemyRespawn : MonoBehaviour
 
         // 3. 현재 스포너 위치에 프리랩 실시간 생성
         GameObject newEnemy = Instantiate(enemyPrefab, transform.position, Quaternion.identity);
+        FindObjectOfType<HpBar>().RegisterEnemy(newEnemy);
 
         // 4. 생성된 적을 추적 리스트에 추가
         activeEnemies.Add(newEnemy);

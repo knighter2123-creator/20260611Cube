@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4756420320834213243}
   - component: {fileID: 5669499353156956205}
+  - component: {fileID: 3629307870393272675}
   m_Layer: 5
   m_Name: Hp Bar
   m_TagString: Untagged
@@ -35,8 +36,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -274.12994, y: 37.034576}
-  m_SizeDelta: {x: 160, y: 20}
+  m_AnchoredPosition: {x: -275.8, y: -141}
+  m_SizeDelta: {x: 50, y: 20}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &5669499353156956205
 MonoBehaviour:
@@ -89,6 +90,19 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3629307870393272675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2302188127071317768}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cb4a3cab8ad1f74699d3776a95c07e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyHpBar
+  slider: {fileID: 5669499353156956205}
 --- !u!1 &2486151783073755012
 GameObject:
   m_ObjectHideFlags: 0

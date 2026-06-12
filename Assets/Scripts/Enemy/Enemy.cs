@@ -1,22 +1,26 @@
 using UnityEngine;
-
 public class Enemy : MonoBehaviour, ITakeDamage
 {
     [Header("Enemy 스탯")]
+    [SerializeField] protected float currentHealth;
     [SerializeField] protected float maxHealth = 100f;
     [SerializeField] private int rewardGold = 10;
     [SerializeField] private int rewardExp = 5;
-    
-    protected float currentHealth;
-    
+
     public bool isDead { get; set; }
 
-    void Awake()
+    // HP바 참조 추가
+    private GameObject hpBarObject;
+    private EnemyHpBar hpBarController; // HP바 슬라이더 제어용
+
+    public void SetHpBar(GameObject hpBar)
     {
-        InitStats();
+        hpBarObject = hpBar;
+        hpBarController = hpBar.GetComponentInChildren<EnemyHpBar>();
     }
 
-// virtual로 분리 — 자식에서 override 가능
+    void Awake() { InitStats(); }
+
     protected virtual void InitStats()
     {
         currentHealth = maxHealth;
@@ -26,11 +30,12 @@ public class Enemy : MonoBehaviour, ITakeDamage
     public void TakeDamage(float damage)
     {
         if (isDead) return;
-
         currentHealth -= damage;
 
-        if (currentHealth <= 0f)
-            Die();
+        // HP바 슬라이더 갱신
+        hpBarController?.UpdateHp(currentHealth, maxHealth);
+
+        if (currentHealth <= 0f) Die();
     }
 
     protected virtual void Die()
@@ -38,10 +43,21 @@ public class Enemy : MonoBehaviour, ITakeDamage
         if (isDead) return;
         isDead = true;
 
+        // HP바는 즉시 제거
+        if (hpBarObject != null)
+            Destroy(hpBarObject);
+
         CurrencyManager.Instance?.AddGold(rewardGold);
         LevelUpManager.Instance?.AddExp(rewardExp);
-        StageCount.Instance?.ReportEnemyKill();
+        StageManager.Instance?.ReportEnemyKill();
 
         Destroy(gameObject);
+    }
+
+// 자식에서 공통으로 쓸 수 있도록 분리
+    protected void RemoveHpBar()
+    {
+        if (hpBarObject != null)
+            Destroy(hpBarObject);
     }
 }

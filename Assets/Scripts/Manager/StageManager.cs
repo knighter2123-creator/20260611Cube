@@ -2,9 +2,9 @@ using System;
 using UnityEngine;
 using TMPro;
 
-public class StageCount : MonoBehaviour
+public class StageManager : MonoBehaviour
 {
-    public static StageCount Instance;
+    public static StageManager Instance;
 
     [Header("UI")]
     [SerializeField] private TextMeshProUGUI killCountText;  // "처치 0 / 20"
@@ -12,7 +12,7 @@ public class StageCount : MonoBehaviour
 
     [Header("스테이지 설정")]
     [SerializeField] private int killGoal    = 20;
-    [SerializeField] private float timeLimit = 120f;         // 2분
+    [SerializeField] private float timeLimit = 124f;         // 2분
 
     public event Action OnStageClear;
     public event Action OnStageFail;

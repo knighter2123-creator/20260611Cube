@@ -18,14 +18,16 @@ public class BossMonster : Enemy
     
     protected override void Die()
     {
-        if (isDead) return;   // Enemy.isDead 참조
+        if (isDead) return;
         isDead = true;
+
+        RemoveHpBar(); // HP바만 부모에서 가져와서 즉시 제거
 
         StopAllCoroutines();
 
         CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(100 * bossCurrencyMultiplier));
         LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(baseRewardExp * bossExpMultiplier));
-        StageCount.Instance?.ReportBossKill();
+        StageManager.Instance?.ReportBossKill();
 
         Destroy(gameObject, 1.5f);
     }
