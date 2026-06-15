@@ -12,7 +12,7 @@ public class PlayerName : MonoBehaviour
 
     public void Refresh()
     {
-        string savedName = PlayerPrefs.GetString("이름 : " + "PlayerName", "이름 : " + "플레이어");
+        string savedName = PlayerPrefs.GetString("유저 : " + "PlayerName", "유저 : " + "플레이어");
         if (nickNameText != null)
             nickNameText.text = savedName;
     }

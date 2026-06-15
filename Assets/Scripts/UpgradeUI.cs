@@ -2,26 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// Stat Upgrade Canvas의 UI를 담당합니다.
-/// LevelUpManager의 로직을 호출하고, 결과를 텍스트로 표시합니다.
-///
-/// ┌─── Hierarchy 구조 ───────────────────────────────────────────┐
-/// │  Stat Upgrade Canvas                                         │
-/// │    └── Panel (UpgradeUI.cs 부착)                              │
-/// │          ├── Max Health            ← statRows[0]             │
-/// │          │     ├── StatNameText                              │
-/// │          │     ├── StatValueText                             │
-/// │          │     ├── UpgradeLevelText                          │
-/// │          │     ├── CostText                                  │
-/// │          │     ├── Button_x1   → OnClick: OnClickUpgrade1()  │
-/// │          │     ├── Button_x10  → OnClick: OnClickUpgrade10() │
-/// │          │     └── Button_x100 → OnClick: OnClickUpgrade100()│
-/// │          ├── Damage  / Defence / CritDamage / CritChance     │
-/// │          │     (동일 구조 반복)                                │
-/// │          └── Close Button  → OnClick: OnClickClose()         │
-/// └──────────────────────────────────────────────────────────────┘
-/// </summary>
 public class UpgradeUI : MonoBehaviour
 {
     // ══════════════════════════════════════════════
@@ -58,7 +38,7 @@ public class UpgradeUI : MonoBehaviour
     [Header("공통 UI")]
     [SerializeField] private GameObject upgradePanel;   // 패널 전체 (열기/닫기용)
 
-    [Header("스탯 행 (순서: Damage / CritDamage / CritChance)")]
+    [Header("스탯 행")]
     [SerializeField] private StatRow[] statRows;        // 인스펙터에서 3개 배열로 설정
 
     // ══════════════════════════════════════════════
@@ -225,6 +205,7 @@ public class UpgradeUI : MonoBehaviour
             LevelUpManager.StatType.Damage     => $"{player.stat.baseDamage} ATK",
             LevelUpManager.StatType.CritChance => $"{player.stat.Critical:F1} %",
             LevelUpManager.StatType.CritDamage => $"{player.stat.CriticalMultiplier:F2} x",
+            LevelUpManager.StatType.attackspd  => $"{player.stat.AttackSpd} SPD",
             _                                  => "-"
         };
     }

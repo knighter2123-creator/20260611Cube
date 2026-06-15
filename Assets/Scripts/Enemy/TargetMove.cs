@@ -13,6 +13,17 @@ public class TargetMove : MonoBehaviour
     private float initialZ;             // Z축 고정용 변수
     private bool isInitialized = false; // 경로가 설정 되었는 지 확인
     
+    // 기존 코드에 아래 메서드만 추가
+    // 기존 코드에 아래 두 메서드만 추가
+    public float GetSpeed()
+    {
+        return speed;
+    }
+
+    public void SetSpeed(float newSpeed)
+    {
+        speed = newSpeed;
+    }
     // [중요] 생성 시 스포너가 이 함수를 호출하여 경로를 넘겨줍니다.
     public void SetupPath(Transform[] paths)
     {

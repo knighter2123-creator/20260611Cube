@@ -37,17 +37,4 @@ public class GameManager : MonoBehaviour
         if (levelUpManager == null)
             levelUpManager = FindAnyObjectByType<LevelUpManager>();
     }
-
-    // public void SetEnemy(GameObject inobject)
-    // {
-    //     if (inobject == null) { enemy = null; return; }
-    //
-    //     if (inobject.TryGetComponent<Enemy>(out var e))
-    //         enemy = e;
-    //     else
-    //     {
-    //         Debug.LogWarning($"SetEnemy: '{inobject.name}'에 Enemy 컴포넌트가 없습니다.");
-    //         enemy = null;
-    //     }
-    // }
 }

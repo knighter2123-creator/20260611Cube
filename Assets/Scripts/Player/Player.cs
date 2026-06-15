@@ -8,8 +8,7 @@ public class Player : MonoBehaviour
     [SerializeField] private PlayerStat playerStat;
 
     [Header("세부 설정")]
-    [SerializeField] private GameObject damageTextPrefab;
-    [SerializeField] private LayerMask  enemyLayer;
+    [SerializeField] private LayerMask enemyLayer;
 
     [Header("적 탐지 범위")]
     [SerializeField] private float detectRange = 10f;
@@ -22,9 +21,6 @@ public class Player : MonoBehaviour
 
     public PlayerStat stat => playerStat;
 
-    // ──────────────────────────────────────────────
-    //  Unity 생명 주기
-    // ──────────────────────────────────────────────
     void Awake()
     {
         if (_instance != null && _instance != this)
@@ -43,8 +39,6 @@ public class Player : MonoBehaviour
             isFirstLoad = false;
         }
 
-        // attackTimer를 쿨다운 직전으로 초기화하면 게임 시작 즉시 한 발 발사됨
-        // 0으로 두면 첫 발사까지 attackCooldown만큼 대기
         attackTimer = 0f;
 
         if (LevelUpManager.Instance != null)
@@ -57,9 +51,6 @@ public class Player : MonoBehaviour
         HandleAttack();
     }
 
-    // ──────────────────────────────────────────────
-    //  적 탐지 — "Enemy" 태그 중 가장 가까운 대상
-    // ──────────────────────────────────────────────
     void FindTarget()
     {
         currentTarget = null;
@@ -72,7 +63,9 @@ public class Player : MonoBehaviour
         foreach (GameObject enemyObj in enemies)
         {
             float dist = Vector3.Distance(transform.position, enemyObj.transform.position);
-            if (dist > detectRange) continue;
+
+            // ✅ detectRange → stat.attackRange 로 교체
+            if (dist > stat.attackRange) continue;
 
             Enemy e = enemyObj.GetComponent<Enemy>();
             if (e == null || e.isDead) continue;
@@ -87,20 +80,15 @@ public class Player : MonoBehaviour
         currentTarget = closestEnemy;
     }
 
-    // ──────────────────────────────────────────────
-    //  공격 쿨다운 처리
-    // ──────────────────────────────────────────────
     void HandleAttack()
     {
         if (isDead) return;
-
-        // 타겟이 없으면 타이머만 누적하지 않음
         if (currentTarget == null) return;
 
         attackTimer += Time.deltaTime;
 
-        // attackCooldown이 0 이하면 1초로 강제 보정 (무한 발사 방지)
-        float cooldown = Mathf.Max(stat.attackCooldown, 1f);
+        // ✅ AttackSpd를 쿨다운(초)으로 변환 — 최소 0.1초 보장
+        float cooldown = Mathf.Max(stat.attackCooldown, 0.1f);
 
         if (attackTimer >= cooldown)
         {
@@ -109,9 +97,6 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  Bullet 발사 (ObjectPool 사용)
-    // ──────────────────────────────────────────────
     void FireBullet()
     {
         if (currentTarget == null || isDead) return;
@@ -124,17 +109,12 @@ public class Player : MonoBehaviour
         Vector2 spawnPos = firePoint != null ? firePoint.position : (Vector2)transform.position;
         Vector2 dir      = ((Vector2)currentTarget.transform.position - spawnPos).normalized;
 
-        // ① 비활성 상태로 꺼냄
         GameObject bulletObj = ObjectPoolManager.Instance.GetBulletInactive();
-
-        // ② 위치 확정 (SetActive 이전)
         bulletObj.transform.position = (Vector3)spawnPos;
 
-        // 2D에서 Bullet이 진행 방향을 바라보도록 Z축 회전
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
         bulletObj.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
-        // ③ 방향·데미지 주입
         Bullet bullet = bulletObj.GetComponent<Bullet>();
         if (bullet == null)
         {
@@ -143,19 +123,13 @@ public class Player : MonoBehaviour
             return;
         }
 
-        // ④ 활성화
         bulletObj.SetActive(true);
-
-        // ⑤ Init은 SetActive 이후 → Rigidbody가 활성 상태에서 velocity 적용
         bullet.Init(dir, playerStat.baseDamage);
     }
 
-    // ──────────────────────────────────────────────
-    //  디버그용 탐지 범위 시각화
-    // ──────────────────────────────────────────────
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, detectRange);
+        Gizmos.DrawWireSphere(transform.position, stat != null ? stat.attackRange : 10f);
     }
 }

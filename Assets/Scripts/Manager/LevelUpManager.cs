@@ -42,7 +42,8 @@ public class LevelUpManager : MonoBehaviour
     {
         Damage,
         CritChance,
-        CritDamage
+        CritDamage,
+        attackspd,
     }
     
     // ══════════════════════════════════════════════
@@ -70,10 +71,11 @@ public class LevelUpManager : MonoBehaviour
     //  치명타피해: 강화당 +0.1배율    비용 120 → 레벨당 +25
     // ──────────────────────────────────────────────
     [Header("스탯별 강화 설정")]
-    [SerializeField] private UpgradeConfig damageConfig      = new UpgradeConfig { baseCost = 10,  costPerLevel = 15,  gainPerUpgrade = 2f   };
-    [SerializeField] private UpgradeConfig critChanceConfig  = new UpgradeConfig { baseCost = 50, costPerLevel = 20,  gainPerUpgrade = 0.5f };
-    [SerializeField] private UpgradeConfig critDamageConfig  = new UpgradeConfig { baseCost = 30, costPerLevel = 25,  gainPerUpgrade = 0.1f };
-   
+    [Header("스탯별 강화 설정")]
+    [SerializeField] private UpgradeConfig damageConfig     = new UpgradeConfig { baseCost = 10, costPerLevel = 15, gainPerUpgrade = 5f   };
+    [SerializeField] private UpgradeConfig attackspdConfig  = new UpgradeConfig { baseCost = 30, costPerLevel = 15, gainPerUpgrade = 5f   }; // ✅ gain 양수로 변경
+    [SerializeField] private UpgradeConfig critChanceConfig = new UpgradeConfig { baseCost = 50, costPerLevel = 20, gainPerUpgrade = 0.5f };
+    [SerializeField] private UpgradeConfig critDamageConfig = new UpgradeConfig { baseCost = 30, costPerLevel = 25, gainPerUpgrade = 0.1f };
     // ══════════════════════════════════════════════
     //  프로퍼티
     // ══════════════════════════════════════════════
@@ -98,9 +100,8 @@ public class LevelUpManager : MonoBehaviour
             playerStat.MaxExperience = stat.MaxExperience;
             
             // 강화 레벨 복원
-            playerStat.UpgradeLevelMaxHealth = stat.UpgradeLevelMaxHealth;
             playerStat.UpgradeLevelDamage = stat.UpgradeLevelDamage;
-            playerStat.UpgradeLevelDefence = stat.UpgradeLevelDefence;
+            playerStat.UpgradeLevelAttackSpd = stat.UpgradeLevelAttackSpd;
             playerStat.UpgradeLevelCritChance = stat.UpgradeLevelCritChance;
             playerStat.UpgradeLevelCritDamage = stat.UpgradeLevelCritDamage;
             
@@ -189,11 +190,20 @@ public class LevelUpManager : MonoBehaviour
             case StatType.Damage:
                 stat.baseDamage += Mathf.RoundToInt(gain);
                 break;
+
             case StatType.CritChance:
-                stat.Critical = Mathf.Min(stat.Critical + gain, 100f); // 최대 100%
+                stat.Critical = Mathf.Min(stat.Critical + gain, 100f);
                 break;
+
             case StatType.CritDamage:
                 stat.CriticalMultiplier += gain;
+                break;
+
+            case StatType.attackspd:
+                // ✅ AttackSpd(ms) 감소 → 쿨다운 감소 → 공격속도 증가
+                // 최소 100ms(0.1초) 아래로 내려가지 않도록 클램프
+                stat.AttackSpd = Mathf.Max(stat.AttackSpd - Mathf.RoundToInt(gain), 100);
+                Debug.Log($"[LevelUpManager] AttackSpd: {stat.AttackSpd}ms → cooldown: {stat.AttackSpd / 1000f:F3}초");
                 break;
         }
     }
@@ -232,6 +242,7 @@ public class LevelUpManager : MonoBehaviour
             StatType.Damage     => (damageConfig,     stat.UpgradeLevelDamage),
             StatType.CritChance => (critChanceConfig, stat.UpgradeLevelCritChance),
             StatType.CritDamage => (critDamageConfig, stat.UpgradeLevelCritDamage),
+            StatType.attackspd => (attackspdConfig, stat.UpgradeLevelAttackSpd),
             _                   => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }
@@ -243,6 +254,7 @@ public class LevelUpManager : MonoBehaviour
             StatType.Damage     => stat.UpgradeLevelDamage,
             StatType.CritChance => stat.UpgradeLevelCritChance,
             StatType.CritDamage => stat.UpgradeLevelCritDamage,
+            StatType.attackspd => stat.UpgradeLevelAttackSpd,
             _                   => 0
         };
     }
@@ -254,6 +266,7 @@ public class LevelUpManager : MonoBehaviour
             case StatType.Damage:     stat.UpgradeLevelDamage      = value; break;
             case StatType.CritChance: stat.UpgradeLevelCritChance  = value; break;
             case StatType.CritDamage: stat.UpgradeLevelCritDamage  = value; break;
+            case StatType.attackspd: stat.UpgradeLevelAttackSpd = value; break;
         }
     }
     

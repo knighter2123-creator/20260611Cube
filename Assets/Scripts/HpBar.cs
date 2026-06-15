@@ -5,10 +5,10 @@ public class HpBar : MonoBehaviour
 {
     [SerializeField] GameObject _monsterHPbar;
 
-    List<Transform> monsterTransforms = new List<Transform>();
-    List<GameObject> multipleMonsterHPbars = new List<GameObject>();
+    List<Transform>  monsterTransforms      = new List<Transform>();
+    List<GameObject> multipleMonsterHPbars  = new List<GameObject>();
 
-    Camera mainCamera;
+    Camera        mainCamera;
     RectTransform canvasRect;
 
     void Start()
@@ -16,18 +16,21 @@ public class HpBar : MonoBehaviour
         mainCamera = Camera.main;
         canvasRect = GetComponent<RectTransform>();
 
-        foreach (GameObject monster in GameObject.FindGameObjectsWithTag("Enemy"))
-            RegisterEnemy(monster);
+        // ✅ EnemyRespawn이 RegisterEnemy()를 호출하므로 여기서 중복 등록 제거
+        // (씬에 미리 배치된 Enemy가 있을 때만 필요하면 아래 주석 해제)
+        // foreach (GameObject monster in GameObject.FindGameObjectsWithTag("Enemy"))
+        //     RegisterEnemy(monster);
     }
 
-    // 동적 스폰된 Enemy 등록용
     public void RegisterEnemy(GameObject monster)
     {
+        // ✅ 이미 등록된 Enemy면 스킵 (중복 방지)
+        if (monsterTransforms.Contains(monster.transform)) return;
+
         monsterTransforms.Add(monster.transform);
         GameObject hpbar = Instantiate(_monsterHPbar, transform);
         multipleMonsterHPbars.Add(hpbar);
 
-        // Enemy에 HP바 연결
         monster.GetComponent<Enemy>()?.SetHpBar(hpbar);
     }
 
@@ -35,7 +38,6 @@ public class HpBar : MonoBehaviour
     {
         for (int i = multipleMonsterHPbars.Count - 1; i >= 0; i--)
         {
-            // Enemy 또는 HP바가 삭제된 경우 리스트에서 제거
             if (monsterTransforms[i] == null || multipleMonsterHPbars[i] == null)
             {
                 monsterTransforms.RemoveAt(i);
