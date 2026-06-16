@@ -8,8 +8,8 @@ public class Enemy : MonoBehaviour, ITakeDamage
     [SerializeField] private   int   rewardGold = 10;
     [SerializeField] private   int   rewardExp  = 5;
 
-    [Header("이동 속도")]
-    [SerializeField] private float moveSpeed = 3f;      // ✅ 기본 이동 속도
+    // ❌ moveSpeed 제거 (TargetMove.speed로 관리)
+    // ❌ originalMoveSpeed 제거 (SlowCoroutine에서 직접 저장)
 
     protected float currentHealth;
     public    bool  isDead { get; set; }
@@ -17,10 +17,8 @@ public class Enemy : MonoBehaviour, ITakeDamage
     private GameObject hpBarObject;
     private EnemyHpBar hpBarController;
 
-    private float originalMoveSpeed;                    // ✅ 원래 속도 저장용
-    private Coroutine slowCoroutine;                    // ✅ 둔화 코루틴 중복 방지
+    private Coroutine slowCoroutine;
 
-    // ──────────────────────────────────────────────
     public void SetHpBar(GameObject hpBar)
     {
         hpBarObject     = hpBar;
@@ -32,9 +30,9 @@ public class Enemy : MonoBehaviour, ITakeDamage
 
     protected virtual void InitStats()
     {
-        currentHealth    = maxHealth;
-        isDead           = false;
-        originalMoveSpeed = moveSpeed;                  // ✅ 원래 속도 저장
+        currentHealth = maxHealth;
+        isDead        = false;
+        // ❌ originalMoveSpeed 저장 제거
     }
 
     public virtual void ApplyStatMultiplier(float mult)
@@ -44,9 +42,6 @@ public class Enemy : MonoBehaviour, ITakeDamage
         hpBarController?.UpdateHp(currentHealth, maxHealth);
     }
 
-    // ──────────────────────────────────────────────
-    //  데미지
-    // ──────────────────────────────────────────────
     public void TakeDamage(float damage)
     {
         if (isDead) return;
@@ -60,13 +55,8 @@ public class Enemy : MonoBehaviour, ITakeDamage
     }
 
     // ──────────────────────────────────────────────
-    //  둔화
+    //  둔화 — TargetMove.speed만 사용
     // ──────────────────────────────────────────────
-
-    /// <summary>SkillSlow에서 호출. 이미 둔화 중이면 갱신됩니다.</summary>
-    // ──────────────────────────────────────────────
-//  둔화
-// ──────────────────────────────────────────────
     public void ApplySlow(float slowRate, float duration)
     {
         if (isDead) return;
@@ -74,7 +64,6 @@ public class Enemy : MonoBehaviour, ITakeDamage
         TargetMove moveScript = GetComponent<TargetMove>();
         if (moveScript == null) return;
 
-        // 기존 둔화 코루틴 취소 후 갱신
         if (slowCoroutine != null)
             StopCoroutine(slowCoroutine);
 
@@ -83,7 +72,7 @@ public class Enemy : MonoBehaviour, ITakeDamage
 
     private IEnumerator SlowCoroutine(TargetMove moveScript, float slowRate, float duration)
     {
-        // ✅ 둔화 적용 직전 현재 속도를 저장
+        // ✅ TargetMove.speed 기준으로만 관리
         float originalSpeed = moveScript.GetSpeed();
         float slowedSpeed   = originalSpeed * (1f - slowRate);
 
@@ -92,7 +81,6 @@ public class Enemy : MonoBehaviour, ITakeDamage
 
         yield return new WaitForSeconds(duration);
 
-        // ✅ 저장해둔 원래 속도로 복원
         moveScript.SetSpeed(originalSpeed);
         slowCoroutine = null;
         Debug.Log($"[Enemy] 둔화 해제 — 속도 복원: {originalSpeed}");
@@ -107,7 +95,7 @@ public class Enemy : MonoBehaviour, ITakeDamage
         isDead = true;
 
         if (slowCoroutine != null)
-            StopCoroutine(slowCoroutine);   // ✅ 사망 시 코루틴 정리
+            StopCoroutine(slowCoroutine);
 
         RemoveHpBar();
         CurrencyManager.Instance?.AddGold(rewardGold);

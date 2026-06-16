@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
+  m_Name: com 4
+  m_EditorClassIdentifier: Assembly-CSharp::CompanionData
+  companionName: 4
+  icon: {fileID: 2022560608615539102, guid: 6b2e019703e7240758b08a18f0d6c3e7, type: 3}
+  prefab: {fileID: 2884879547798327090, guid: 2439ecd521d81bd41afdddb19d18b77e, type: 3}
+  detectRange: 6
+  grade: 2
+  ownedSkill: {fileID: 11400000, guid: a5ddf3b243c8caf4eaa4ca50cf394176, type: 2}

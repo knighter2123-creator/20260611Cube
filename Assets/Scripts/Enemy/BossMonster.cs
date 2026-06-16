@@ -9,7 +9,7 @@ public class BossMonster : Enemy
     [SerializeField] private float bossCurrencyMultiplier = 1.5f;
 
     [Header("보석 보상")]
-    [SerializeField] private int baseRewardGem = 10;       // ✅ 기본 보석 보상량
+    [SerializeField] private int baseRewardGem = 100;       // ✅ 기본 보석 보상량
 
     protected override void InitStats()
     {

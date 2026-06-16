@@ -11,5 +11,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/StageScene.unity
     guid: 954c3a808a5e27044b65686ffe6b35aa
+  - enabled: 1
+    path: Assets/Scenes/GachaScene.unity
+    guid: 05e701c1e97bf024c8b8b50ee95d6806
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0

@@ -12,8 +12,9 @@ public class PlayerName : MonoBehaviour
 
     public void Refresh()
     {
-        string savedName = PlayerPrefs.GetString("유저 : " + "PlayerName", "유저 : " + "플레이어");
+        // ✅ 저장 키 "PlayerName"과 일치 + 표시 형식 분리
+        string savedName = PlayerPrefs.GetString("PlayerName", "플레이어");
         if (nickNameText != null)
-            nickNameText.text = savedName;
+            nickNameText.text = "유저 : " + savedName;
     }
 }

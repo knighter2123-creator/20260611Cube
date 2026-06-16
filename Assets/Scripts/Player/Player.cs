@@ -10,9 +10,6 @@ public class Player : MonoBehaviour
     [Header("세부 설정")]
     [SerializeField] private LayerMask enemyLayer;
 
-    [Header("적 탐지 범위")]
-    [SerializeField] private float detectRange = 10f;
-
     private Transform firePoint;
     private Enemy currentTarget;
     private float attackTimer;
@@ -130,6 +127,7 @@ public class Player : MonoBehaviour
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, stat != null ? stat.attackRange : 10f);
+        // ❌ Gizmos.DrawWireSphere(transform.position, detectRange);
+        Gizmos.DrawWireSphere(transform.position, stat != null ? stat.attackRange : 10f); // ✅
     }
 }

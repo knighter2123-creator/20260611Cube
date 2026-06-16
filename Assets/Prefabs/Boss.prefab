@@ -114,7 +114,7 @@ MonoBehaviour:
   bossExpMultiplier: 2
   baseRewardExp: 10
   bossCurrencyMultiplier: 1.5
-  baseRewardGem: 10
+  baseRewardGem: 300
 --- !u!114 &-3016653492814616856
 MonoBehaviour:
   m_ObjectHideFlags: 0

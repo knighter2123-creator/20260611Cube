@@ -80,7 +80,7 @@ public class EnemyRespawn : MonoBehaviour
         if (enemyScript != null)
             enemyScript.ApplyStatMultiplier(statMultiplier);
 
-        FindObjectOfType<HpBar>()?.RegisterEnemy(newEnemy);
+        FindFirstObjectByType<HpBar>()?.RegisterEnemy(newEnemy);
         totalEnemiesSpawned++;
         activeEnemies.Add(newEnemy);
 
@@ -102,7 +102,7 @@ public class EnemyRespawn : MonoBehaviour
         if (bossScript != null)
             bossScript.ApplyStatMultiplier(statMultiplier);
 
-        FindObjectOfType<HpBar>()?.RegisterEnemy(boss);
+        FindFirstObjectByType<HpBar>()?.RegisterEnemy(boss);
 
         TargetMove moveScript = boss.GetComponent<TargetMove>();
         if (moveScript != null)

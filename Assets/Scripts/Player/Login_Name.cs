@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Login_Name : MonoBehaviour
@@ -29,6 +28,8 @@ public class Login_Name : MonoBehaviour
         PlayerPrefs.Save();
 
         Debug.Log($"[Login] 닉네임 저장 완료: {inputName}");
-        SceneManager.LoadScene("StageScene");
+
+        // ✅ SceneLoader로 교체
+        SceneLoader.Instance.GoToStage();
     }
 }
