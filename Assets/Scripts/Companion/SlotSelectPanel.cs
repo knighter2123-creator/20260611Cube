@@ -14,12 +14,18 @@ public class SlotSelectPanel : MonoBehaviour
     [Header("선택 동료 표시 (선택)")]
     [SerializeField] private TextMeshProUGUI selectedNameText;
 
+    [Header("취소 버튼")]
+    [SerializeField] private Button cancelButton;   // 슬롯 선택 취소 버튼
+
     private CompanionData     _pendingData;
     private CompanionListItem _callerItem;
 
     void Awake()
     {
         panel.SetActive(false);
+
+        if (cancelButton != null)
+            cancelButton.onClick.AddListener(OnCancelClicked);
     }
 
     public void Open(CompanionData data, CompanionListItem caller)
@@ -36,13 +42,20 @@ public class SlotSelectPanel : MonoBehaviour
 
     public void Close()
     {
-        // 버튼 정리 후 참조 해제
         foreach (Transform child in slotButtonContent)
             Destroy(child.gameObject);
 
         _pendingData = null;
         _callerItem  = null;
         panel.SetActive(false);
+    }
+
+    private void OnCancelClicked()
+    {
+        // 배치 없이 패널만 닫음
+        CompanionListItem callerItem = _callerItem;
+        Close();
+        callerItem?.RefreshActionButtons();
     }
 
     private void BuildSlotButtons()
@@ -76,14 +89,12 @@ public class SlotSelectPanel : MonoBehaviour
         if (_pendingData == null) return;
 
         CompanionManager  cm         = CompanionManager.Instance;
-        CompanionListItem callerItem = _callerItem;   // Close() 전에 로컬로 보관
+        CompanionListItem callerItem = _callerItem;
 
-        // 슬롯에 다른 동료가 있으면 회수
         Companion occupant = cm.GetSlotOccupant(slotIndex);
         if (occupant != null)
             cm.RetrieveCompanion(occupant);
 
-        // 이 동료가 이미 다른 슬롯에 배치돼 있으면 먼저 회수
         Companion existing = cm.GetOwnedCompanions().Find(c => c.Data == _pendingData);
         if (existing != null)
             cm.RetrieveCompanion(existing);
@@ -98,10 +109,8 @@ public class SlotSelectPanel : MonoBehaviour
         cm.PlaceCompanion(existing, slotIndex);
         Debug.Log($"[SlotSelectPanel] {_pendingData.companionName} → 슬롯 {slotIndex} 배치");
 
-        // Close() 먼저 — 슬롯 버튼 Destroy 처리
         Close();
 
-        // Close() 이후 callerItem 갱신 — 이미 파괴된 슬롯 버튼과 무관
         if (callerItem != null)
             callerItem.RefreshActionButtons();
     }
