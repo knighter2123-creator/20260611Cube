@@ -8,12 +8,15 @@ public class CompanionListUI : MonoBehaviour
     [SerializeField] private GameObject companionListPanel;
 
     [Header("버튼")]
-    [SerializeField] private Button openButton;   // 동료 목록 열기 버튼
-    [SerializeField] private Button closeButton;  // 동료 목록 닫기 버튼
+    [SerializeField] private Button openButton;
+    [SerializeField] private Button closeButton;
 
     [Header("동료 목록")]
     [SerializeField] private Transform  companionListContent;
     [SerializeField] private GameObject companionItemPrefab;
+
+    [Header("슬롯 선택 패널")]
+    [SerializeField] private SlotSelectPanel slotSelectPanel;
 
     void Start()
     {
@@ -32,6 +35,7 @@ public class CompanionListUI : MonoBehaviour
     private void CloseCompanionList()
     {
         companionListPanel.SetActive(false);
+        slotSelectPanel?.Close();
     }
 
     private void RefreshCompanionList()
@@ -50,7 +54,7 @@ public class CompanionListUI : MonoBehaviour
         {
             GameObject item = Instantiate(companionItemPrefab, companionListContent);
             CompanionListItem ui = item.GetComponent<CompanionListItem>();
-            ui?.Setup(data);
+            ui?.Setup(data, slotSelectPanel);
         }
     }
 }

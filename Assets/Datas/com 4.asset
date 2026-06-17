@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
   m_Name: com 4
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
-  companionName: 4
-  icon: {fileID: 2022560608615539102, guid: 6b2e019703e7240758b08a18f0d6c3e7, type: 3}
+  companionName: "\uC5D0\uD53D"
+  icon: {fileID: 21300000, guid: defebd30b7d2e4bff960711bed04e54f, type: 3}
   prefab: {fileID: 2884879547798327090, guid: 2439ecd521d81bd41afdddb19d18b77e, type: 3}
   detectRange: 6
   grade: 2
-  ownedSkill: {fileID: 11400000, guid: a5ddf3b243c8caf4eaa4ca50cf394176, type: 2}
+  ownedSkill: {fileID: 11400000, guid: 7bd7ac94322e7db4aa1409dfbc1f71f8, type: 2}

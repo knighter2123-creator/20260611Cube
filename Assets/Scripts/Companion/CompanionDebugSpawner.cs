@@ -38,10 +38,13 @@ public class CompanionDebugSpawner : MonoBehaviour
             return;
         }
 
+        // 이미 배치된 동료가 있으면 회수 후 보유 목록에서도 제거
         Companion existing = CompanionManager.Instance.GetSlotOccupant(index);
         if (existing != null)
         {
-            Debug.Log($"[Debug] 슬롯 {index}에 이미 {existing.CompanionName}이 배치되어 있습니다.");
+            CompanionManager.Instance.RetrieveCompanion(existing);
+            CompanionManager.Instance.RemoveCompanion(existing);
+            Debug.Log($"[Debug] 슬롯 {index} — {existing.CompanionName} 소환 해제");
             return;
         }
 
@@ -54,7 +57,6 @@ public class CompanionDebugSpawner : MonoBehaviour
         bool placed = CompanionManager.Instance.PlaceCompanion(newCompanion, index);
         if (!placed) return;
 
-        // ✅ CompanionData.ownedSkill 자동 장착 확인 로그
         Debug.Log($"[Debug] {data.companionName} → 슬롯 {index} 배치 완료 / 스킬: {data.ownedSkill?.skillName ?? "없음"}");
     }
 }

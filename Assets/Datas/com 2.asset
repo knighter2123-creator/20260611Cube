@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
   m_Name: com 2
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
-  companionName: 2
-  icon: {fileID: -893675218100121079, guid: b4fc8029638e545698c1d10bb521aaee, type: 3}
+  companionName: "\uB808\uC5B4"
+  icon: {fileID: 21300000, guid: c84d25441265a4e42b000f20f8fb20d8, type: 3}
   prefab: {fileID: 3391353107492281548, guid: 00f9fe8474bc47644ac179b9207cdbbc, type: 3}
   detectRange: 5
   grade: 1

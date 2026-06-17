@@ -101,6 +101,18 @@ public class CompanionManager : MonoBehaviour
             return;
         }
     }
+    
+    public void RemoveCompanion(Companion companion)
+    {
+        if (!ownedCompanions.Contains(companion)) return;
+
+        ownedCompanions.Remove(companion);
+        if (ownedCompanionData != null)
+            ownedCompanionData.Remove(companion.Data); // Data 프로퍼티 명칭에 맞게 조정
+
+        Destroy(companion.gameObject);
+        Debug.Log($"[CompanionManager] {companion.CompanionName} 제거");
+    }
 
     // ──────────────────────────────────────────────
     //  조회
@@ -109,4 +121,5 @@ public class CompanionManager : MonoBehaviour
     public List<CompanionData> GetOwnedCompanionData()  => ownedCompanionData;
     public Companion           GetSlotOccupant(int idx) => slotOccupants[idx];
     public bool                IsFull                   => ownedCompanions.Count >= maxCompanions;
+    public int SlotCount => placementSlots.Length;
 }

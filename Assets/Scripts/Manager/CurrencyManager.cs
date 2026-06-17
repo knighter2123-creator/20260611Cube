@@ -78,13 +78,13 @@ public class CurrencyManager : MonoBehaviour
     private void UpdateGoldUI()
     {
         if (currencyText != null)
-            currencyText.text = "Gold : " + FormatNumber(gold);
+            currencyText.text = FormatNumber(gold);
     }
 
     private void UpdateGemUI()
     {
         if (gemText != null)
-            gemText.text = "Gem : " + FormatNumber(gem);
+            gemText.text = FormatNumber(gem);
     }
 
     private string FormatNumber(int money)
