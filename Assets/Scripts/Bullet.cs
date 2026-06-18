@@ -8,6 +8,7 @@ public class Bullet : MonoBehaviour
     [SerializeField] private float lifeTime = 3f;
 
     private float       damage;
+    private bool        isCritical;
     private Vector2     direction;
     private float       timer;
     private Rigidbody2D rb;
@@ -32,10 +33,44 @@ public class Bullet : MonoBehaviour
         if (rb != null) rb.linearVelocity = Vector2.zero;
     }
 
-    public void Init(Vector2 dir, float dmg)
+    /// <summary>
+    /// Player에서 호출. 크리티컬 판정 포함 발사 처리 전부 담당.
+    /// </summary>
+    public static void Launch(Enemy target, Transform firePoint, PlayerStat stat)
+    {
+        if (target == null || ObjectPoolManager.Instance == null) return;
+
+        // 크리티컬 판정
+        bool  isCritical  = Random.Range(0f, 100f) < stat.Critical;
+        float finalDamage = isCritical
+            ? stat.baseDamage * stat.CriticalMultiplier
+            : stat.baseDamage;
+
+        Vector2 spawnPos = (Vector2)firePoint.position;
+        Vector2 dir      = ((Vector2)target.transform.position - spawnPos).normalized;
+        float   angle    = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+        GameObject bulletObj = ObjectPoolManager.Instance.GetBulletInactive();
+        bulletObj.transform.position = (Vector3)spawnPos;
+        bulletObj.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+
+        Bullet bullet = bulletObj.GetComponent<Bullet>();
+        if (bullet == null)
+        {
+            Debug.LogError("[Bullet] Bullet 컴포넌트를 찾을 수 없습니다.");
+            ObjectPoolManager.Instance.ReturnBullet(bulletObj);
+            return;
+        }
+
+        bulletObj.SetActive(true);
+        bullet.Init(dir, finalDamage, isCritical);
+    }
+
+    public void Init(Vector2 dir, float dmg, bool crit = false)
     {
         direction         = dir.normalized;
         damage            = dmg;
+        isCritical        = crit;
         timer             = 0f;
         isReturned        = false;
         rb.linearVelocity = direction * speed;
@@ -53,11 +88,10 @@ public class Bullet : MonoBehaviour
         if (!other.CompareTag("Enemy")) return;
         if (isReturned) return;
 
-        ITakeDamage target = other.GetComponent<ITakeDamage>();
+        Enemy target = other.GetComponent<Enemy>();
         if (target == null || target.isDead) return;
 
-        target.TakeDamage(damage);
-
+        target.TakeDamage(damage, isCritical);
         ReturnToPool();
     }
 

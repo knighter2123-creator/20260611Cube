@@ -4,11 +4,12 @@ using UnityEngine;
 public partial class Enemy : MonoBehaviour, ITakeDamage
 {
     [Header("Enemy 스탯")]
+    [SerializeField] protected float currentHealth;
     [SerializeField] protected float maxHealth = 100f;
+    [SerializeField] protected float defence   = 5f;
     [SerializeField] private int rewardGold = 10;
     [SerializeField] private int rewardExp  = 5;
-
-    protected float currentHealth;
+    
     public bool isDead { get; set; }
 
     private GameObject hpBarObject;
@@ -16,7 +17,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
 
     public void SetHpBar(GameObject hpBar)
     {
-        hpBarObject    = hpBar;
+        hpBarObject     = hpBar;
         hpBarController = hpBar.GetComponentInChildren<EnemyHpBar>();
         hpBarController?.UpdateHp(currentHealth, maxHealth);
     }
@@ -39,14 +40,29 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         hpBarController?.UpdateHp(currentHealth, maxHealth);
     }
 
+    // 일반 데미지 (스킬용 — 크리티컬 없음)
     public void TakeDamage(float damage)
+    {
+        TakeDamage(damage, isCritical: false);
+    }
+
+    // 크리티컬 여부를 받는 메인 메서드
+    public void TakeDamage(float damage, bool isCritical)
     {
         if (isDead) return;
 
-        float finalDamage = damage / _armorBreakMultiplier;   // 방어력 감소 반영
+        float reducedDefence = defence / _armorBreakMultiplier;
+        float finalDamage    = Mathf.Max(damage - reducedDefence, 0f);
+
         currentHealth -= finalDamage;
         currentHealth  = Mathf.Max(currentHealth, 0f);
         hpBarController?.UpdateHp(currentHealth, maxHealth);
+
+        DamageTextPool.Instance?.ShowDamage(
+            transform.position,
+            Mathf.RoundToInt(finalDamage),
+            isCritical
+        );
 
         if (currentHealth <= 0)
             Die();
@@ -66,7 +82,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         Destroy(gameObject);
     }
 
-    protected void RemoveHpBar()
+    public void RemoveHpBar()
     {
         if (hpBarObject != null)
             Destroy(hpBarObject);

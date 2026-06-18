@@ -9,12 +9,12 @@ public class StageManager : MonoBehaviour
     [Header("UI")]
     [SerializeField] private TextMeshProUGUI killCountText;
     [SerializeField] private TextMeshProUGUI timerText;
-    [SerializeField] private TextMeshProUGUI stageText;      // "1-1", "1-2" 표시용
+    [SerializeField] private TextMeshProUGUI stageText;
 
     [Header("스테이지 설정")]
     [SerializeField] private int   killGoal       = 20;
     [SerializeField] private float timeLimit      = 184f;
-    [SerializeField] private float statMultiplier = 1.03f;   // 스테이지당 스탯 배율
+    [SerializeField] private float statMultiplier = 1.03f;
 
     public event Action OnStageClear;
     public event Action OnStageFail;
@@ -24,10 +24,10 @@ public class StageManager : MonoBehaviour
     private bool  bossSpawned = false;
     private bool  stageOver   = false;
 
-    private int   currentWorld = 1;   // "1-X"의 앞자리
-    private int   currentStage = 1;   // "1-X"의 뒷자리
-    private int   maxStagePerWorld = 10; // ✅ 월드당 최대 스테이지 수
-    private float currentStatMult = 1f; // 누적 스탯 배율
+    private int   currentWorld     = 1;
+    private int   currentStage     = 1;
+    private int   maxStagePerWorld = 10;
+    private float currentStatMult  = 1f;
 
     void Awake()
     {
@@ -89,7 +89,6 @@ public class StageManager : MonoBehaviour
 
         currentStage++;
 
-        // ✅ 현재 스테이지가 최대치를 초과하면 다음 월드 1스테이지로
         if (currentStage > maxStagePerWorld)
         {
             currentStage = 1;
@@ -107,19 +106,39 @@ public class StageManager : MonoBehaviour
     {
         stageOver = true;
         OnStageFail?.Invoke();
-        Debug.Log("[StageManager] 시간 초과 — 스테이지 실패");
+
+        // X-1 스테이지 실패 → 월드 처음(X-1)으로 되돌아감 (currentWorld 유지)
+        // X-N 스테이지 실패 → 한 단계 되돌아감 (X-(N-1))
+        if (currentStage == 1)
+        {
+            // X-1 실패 : 현재 월드 1스테이지 그대로 재시작 (스탯 배율도 되돌림)
+            // currentWorld는 유지, currentStage는 1 유지
+            // 현재 월드 시작 시점의 배율로 복구
+            currentStatMult = Mathf.Pow(statMultiplier, (currentWorld - 1) * maxStagePerWorld);
+            Debug.Log($"[StageManager] {currentWorld}-1 실패 → {currentWorld}-1 재시작 / 스탯 배율: {currentStatMult:F4}");
+        }
+        else
+        {
+            // X-N 실패 : 한 스테이지 되돌아감
+            currentStage--;
+            currentStatMult /= statMultiplier;
+            
+            Debug.Log($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
+        }
+
+        NextStage();
     }
 
     private void NextStage()
     {
-        // ✅ 기존 Enemy 전부 제거
         foreach (GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy"))
+        {
+            Enemy e = enemy.GetComponent<Enemy>();
+            e?.RemoveHpBar();   // HpBar 먼저 제거
             Destroy(enemy);
+        }
 
-        // ✅ 스테이지 변수 초기화
         InitStage();
-
-        // ✅ EnemyRespawn 리셋 (새 스테이지 스폰 시작)
         EnemyRespawn.Instance.ResetStage(currentStatMult);
     }
 

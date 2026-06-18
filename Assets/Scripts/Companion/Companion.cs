@@ -4,7 +4,6 @@ public class Companion : MonoBehaviour
 {
     private CompanionData data;
 
-    // ✅ 외부 장착 제거 — data.ownedSkill 직접 사용
     private ActiveSkill skill => data?.ownedSkill;
 
     private float skillTimer = 0f;
@@ -14,6 +13,9 @@ public class Companion : MonoBehaviour
     public string        CompanionName => data != null ? data.companionName : "unknown";
     public CompanionData Data          => data;
     public ActiveSkill   OwnedSkill    => skill;
+
+    // 스킬에서 플레이어 스탯(크리티컬 확률/배율, baseDamage)을 참조하기 위한 프로퍼티
+    public PlayerStat    Stat          => Player.Instance?.stat;
 
     public void Init(CompanionData companionData)
     {
@@ -27,7 +29,7 @@ public class Companion : MonoBehaviour
 
     void Update()
     {
-        if (!isPlaced)   return;
+        if (!isPlaced)    return;
         if (skill == null) return;
 
         skillTimer += Time.deltaTime;

@@ -4,15 +4,17 @@ using UnityEngine;
 public class SkillSlow : ActiveSkill
 {
     [Range(0f, 1f)]
-    public float slowRate     = 0.5f;   // 50% 감속
+    public float slowRate     = 0.5f;
     public float slowDuration = 3f;
 
     public override void Execute(Enemy target, Companion caster)
     {
         if (target == null || target.isDead) return;
 
-        target.TakeDamage(damage);
-        target.ApplySlow(slowRate, slowDuration); // Enemy에 ApplySlow 추가 필요
-        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → 둔화 {slowRate * 100}%");
+        var (finalDamage, isCritical) = CalcDamage(caster.Stat);
+        target.TakeDamage(finalDamage, isCritical);
+        target.ApplySlow(slowRate, slowDuration);
+
+        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → {finalDamage} 데미지{(isCritical ? " (크리티컬!)" : "")} + 둔화 {slowRate * 100}%");
     }
 }

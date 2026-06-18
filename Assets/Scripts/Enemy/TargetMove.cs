@@ -13,8 +13,6 @@ public class TargetMove : MonoBehaviour
     private float initialZ;             // Z축 고정용 변수
     private bool isInitialized = false; // 경로가 설정 되었는 지 확인
     
-    // 기존 코드에 아래 메서드만 추가
-    // 기존 코드에 아래 두 메서드만 추가
     public float GetSpeed()
     {
         return speed;
