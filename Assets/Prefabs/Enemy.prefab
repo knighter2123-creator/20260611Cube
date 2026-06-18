@@ -108,8 +108,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3338726eb3137da4b98e03b7c49212f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Enemy
+  currentHealth: 0
   maxHealth: 50
-  rewardGold: 10
+  defence: 5
+  rewardGold: 30
   rewardExp: 10
 --- !u!70 &-3323855093147334155
 CapsuleCollider2D:

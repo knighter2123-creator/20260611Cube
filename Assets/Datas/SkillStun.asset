@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: SkillStun
   m_EditorClassIdentifier: Assembly-CSharp::SkillStun
   skillName: "\uAE30\uC808"
+  damage: 20
   cooldown: 5
-  damage: 30
-  icon: {fileID: 21300000, guid: 3a71b148b3aeddc46a11b5b528ed0acc, type: 3}
   stunDuration: 2

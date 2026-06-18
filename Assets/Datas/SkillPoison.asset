@@ -13,9 +13,8 @@ MonoBehaviour:
   m_Name: SkillPoison
   m_EditorClassIdentifier: Assembly-CSharp::SkillPoison
   skillName: "\uB9F9\uB3C5"
+  damage: 15
   cooldown: 5
-  damage: 30
-  icon: {fileID: 21300000, guid: 8893047a765474f49bd7cf13392c7442, type: 3}
   dotDamage: 5
   dotInterval: 1
   dotDuration: 5

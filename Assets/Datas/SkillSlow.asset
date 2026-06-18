@@ -13,8 +13,7 @@ MonoBehaviour:
   m_Name: SkillSlow
   m_EditorClassIdentifier: Assembly-CSharp::SkillSlow
   skillName: "\uB454\uD654"
+  damage: 20
   cooldown: 3
-  damage: 30
-  icon: {fileID: 21300000, guid: 63e038f9720fdbc4eb5516284e0887ef, type: 3}
   slowRate: 0.5
   slowDuration: 2

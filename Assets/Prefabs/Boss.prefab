@@ -108,10 +108,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f63c1a7b428c23747b1695955a47545a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossMonster
+  currentHealth: 0
   maxHealth: 50
-  rewardGold: 10
+  defence: 5
+  rewardGold: 30
   rewardExp: 10
   bossHpMultiplier: 1.5
+  bossDefenceMultiplier: 1.5
   bossExpMultiplier: 2
   baseRewardExp: 10
   bossCurrencyMultiplier: 1.5

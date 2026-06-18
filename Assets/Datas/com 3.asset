@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
   m_Name: com 3
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
-  companionName: Epic
+  companionName: "\uD30C\uC1C4"
   icon: {fileID: 21300000, guid: da5bd5128607d42b58a0100672bc61d3, type: 3}
   prefab: {fileID: 1645179444967808548, guid: 601c964f440887540ab2b3a478644c39, type: 3}
-  detectRange: 6
+  detectRange: 4
   grade: 2
   ownedSkill: {fileID: 11400000, guid: 922f7b466d17dc64a8996e23c59b5ab9, type: 2}

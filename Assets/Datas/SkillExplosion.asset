@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: SkillExplosion
   m_EditorClassIdentifier: Assembly-CSharp::SkillExplosion
   skillName: "\uD3ED\uBC1C"
-  cooldown: 5
   damage: 30
-  icon: {fileID: 21300000, guid: 263fdbb0e14cd44459716c4513d1f168, type: 3}
+  cooldown: 7
   explosionRadius: 4

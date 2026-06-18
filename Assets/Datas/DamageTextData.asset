@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: DamageTextData
   m_EditorClassIdentifier: Assembly-CSharp::DamageTextData
   lifetime: 1.2
-  riseHeight: 1.5
+  riseHeight: 1.3
   riseCurve:
     serializedVersion: 2
     m_Curve:
