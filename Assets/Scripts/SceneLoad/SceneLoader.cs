@@ -49,7 +49,6 @@ public class SceneLoader : MonoBehaviour
     }
 
     // ── 내부 유틸 ─────────────────────────────────
-
     private void LoadScene(string sceneName)
     {
         Time.timeScale = 1f;

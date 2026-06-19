@@ -15,7 +15,12 @@ public class Login_Name : MonoBehaviour
 
     public void PlayToMain()
     {
-        // ✅ SceneLoader로 교체
-        SceneLoader.Instance.GoToStage();
+        if (SceneLoader.Instance == null)
+        {
+            GameObject obj = new GameObject("SceneLoader");
+            obj.AddComponent<SceneLoader>();
+        }
+
+        SceneLoader.Instance.GoToStageWithLoading();
     }
 }

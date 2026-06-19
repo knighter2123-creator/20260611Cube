@@ -194,10 +194,7 @@ public class UpgradeUI : MonoBehaviour
     /// <summary>StatType에 따라 현재 스탯 수치 문자열 반환</summary>
     private string GetStatValueString(LevelUpManager.StatType type)
     {
-        // LevelUpManager는 stat을 직접 노출하지 않으므로
-        // GameManager → Player 경유로 현재 스탯을 가져옵니다.
-        // Player 스크립트에 프로퍼티가 없으면 아래처럼 직접 추가하세요.
-        var player = GameManager.Instance?.GetPlayer;
+        var player = Player.Instance;
         if (player == null) return "-";
 
         return type switch

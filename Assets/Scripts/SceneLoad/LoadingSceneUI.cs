@@ -28,43 +28,34 @@ public class LoadingSceneUI : MonoBehaviour
     {
         if (tipText != null && tips.Length > 0)
             tipText.text = tips[Random.Range(0, tips.Length)];
-        // StartCoroutine(DelayTime());
         StartCoroutine(LoadStageScene());
     }
 
-     // private IEnumerator DelayTime()
-     // {
-     //     yield return new WaitForSecondsRealtime(2);
-     // }
+     private IEnumerator LoadStageScene()
+     {
+         AsyncOperation op = SceneManager.LoadSceneAsync(SceneLoader.STAGE_SCENE);
+         op.allowSceneActivation = false;
 
-    private IEnumerator LoadStageScene()
-    {
-        // allowSceneActivation = false 로 설정해 progress 0.9에서 대기
-        AsyncOperation op = SceneManager.LoadSceneAsync(SceneLoader.STAGE_SCENE);
-        op.allowSceneActivation = false;
+         // 로딩 진행하면서 progress 표시
+         while (op.progress < 0.9f)
+         {
+             float displayProgress = Mathf.Clamp01(op.progress / 0.9f);
 
-        while (!op.isDone)
-        {
-            // Unity AsyncOperation은 0 ~ 0.9 까지만 progress를 올림
-            float displayProgress = Mathf.Clamp01(op.progress / 0.9f);
+             if (progressBar != null)
+                 progressBar.value = displayProgress;
 
-            if (progressBar != null)
-                progressBar.value = displayProgress;
+             if (progressText != null)
+                 progressText.text = $"Loading... {Mathf.RoundToInt(displayProgress * 100)}%";
 
-            if (progressText != null)
-                progressText.text = $"Loading... {Mathf.RoundToInt(displayProgress * 100)}%";
+             yield return null;
+         }
 
-            // 로딩 완료 (0.9 도달) → 씬 활성화
-            if (op.progress >= 0.9f)
-            {
-                if (progressBar != null)  progressBar.value   = 1f;
-                if (progressText != null) progressText.text   = "Loading... 100%";
+         // 로딩 완료 후 2초 고정 대기
+         if (progressBar != null)  progressBar.value  = 1f;
+         if (progressText != null) progressText.text  = "Loading... 100%";
 
-                // 한 프레임 대기 후 전환 (100% UI가 잠깐 보이도록)
-                yield return null;
-                op.allowSceneActivation = true;
-            }
-            yield return null;
-        }
-    }
+         yield return new WaitForSecondsRealtime(2f);
+
+         op.allowSceneActivation = true;
+     }
 }

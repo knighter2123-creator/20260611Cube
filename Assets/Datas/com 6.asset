@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: com 6
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   companionName: "\uC2A4\uD134"
-  icon: {fileID: 21300000, guid: ba6e4899ce2184481b037df5cb76ef31, type: 3}
+  icon: {fileID: 21300000, guid: 21ed692efe3d95a40bcb58ec97b4d87a, type: 3}
   prefab: {fileID: 2970979869946304497, guid: 18ebbd0964b975941af0dd7ba2f2b293, type: 3}
   detectRange: 4
   grade: 3

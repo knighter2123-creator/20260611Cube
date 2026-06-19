@@ -113,6 +113,10 @@ public class LevelUpManager : MonoBehaviour
         }
         stat = playerStat;
     }
+    public void ResetStat()
+    {
+        stat = null;
+    }
     
     // ══════════════════════════════════════════════
     //  [3] 스탯 강화  (Currency 소비)

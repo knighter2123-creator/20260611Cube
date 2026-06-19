@@ -51,9 +51,10 @@ public class GameSettingsManager : MonoBehaviour
     {
         Time.timeScale = 1f;
 
-        // CurrencyManager 파괴 후 씬 전환
         if (CurrencyManager.Instance != null)
             Destroy(CurrencyManager.Instance.gameObject);
+
+        LevelUpManager.Instance?.ResetStat();  // Destroy 대신 초기화만
 
         SceneManager.LoadScene(LOGIN_SCENE);
     }
