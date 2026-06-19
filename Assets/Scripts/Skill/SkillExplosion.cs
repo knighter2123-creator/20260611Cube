@@ -10,6 +10,8 @@ public class SkillExplosion : ActiveSkill
     {
         if (target == null || target.isDead) return;
 
+        PlayEffect(target.transform.position); 
+        
         Collider2D[] hits = Physics2D.OverlapCircleAll(target.transform.position, explosionRadius);
         int hitCount = 0;
 

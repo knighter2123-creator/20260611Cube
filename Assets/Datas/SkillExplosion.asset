@@ -15,4 +15,7 @@ MonoBehaviour:
   skillName: "\uD3ED\uBC1C"
   damage: 30
   cooldown: 7
-  explosionRadius: 4
+  effectPrefab: {fileID: 1777368103255146055, guid: 04c78b265e7c7764b9df9ec3bee5916b,
+    type: 3}
+  effectDuration: 0.65
+  explosionRadius: 3

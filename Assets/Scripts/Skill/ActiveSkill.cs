@@ -7,21 +7,33 @@ using UnityEngine;
 public abstract class ActiveSkill : ScriptableObject
 {
     [Header("스킬 기본 정보")]
-    public string skillName   = "스킬";
-    public float  damage      = 20f;   // 스킬 기본 배율 (플레이어 baseDamage에 곱해짐)
-    public float  cooldown    = 5f;
+    public string skillName = "스킬";
+    public float  damage    = 20f;
+    public float  cooldown  = 5f;
+
+    [Header("이펙트")]
+    public GameObject effectPrefab;
+    public float  effectDuration = 0.5f;
 
     public abstract void Execute(Enemy target, Companion caster);
 
-    /// <summary>
-    /// 플레이어 스탯을 반영한 최종 데미지와 크리티컬 여부를 반환합니다.
-    /// damage 필드를 baseDamage 배율로 사용합니다.
-    /// </summary>
     protected (float finalDamage, bool isCritical) CalcDamage(PlayerStat stat)
     {
-        float base_  = stat.baseDamage + damage;
-        bool  crit   = Random.Range(0f, 100f) < stat.Critical;
-        float final  = crit ? base_ * stat.CriticalMultiplier : base_;
+        float base_ = stat.baseDamage + damage;
+        bool  crit  = Random.Range(0f, 100f) < stat.Critical;
+        float final = crit ? base_ * stat.CriticalMultiplier : base_;
         return (final, crit);
+    }
+
+    protected void PlayEffect(Vector3 position)
+    {
+        if (effectPrefab == null) return;
+
+        GameObject fx = Instantiate(effectPrefab, position, Quaternion.identity);
+
+        SpriteRenderer sr = fx.GetComponent<SpriteRenderer>();
+        if (sr != null) sr.sortingOrder = 10;
+
+        Destroy(fx, effectDuration);
     }
 }

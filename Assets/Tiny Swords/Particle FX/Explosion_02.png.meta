@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: 0fb3704cb47b345c3bc3d5afcf150930
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352566
+  packageName: Tiny Swords
+  packageVersion: 1.0
+  assetPath: Assets/Tiny Swords/Particle FX/Explosion_02.png
+  uploadId: 844324
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -435,10 +442,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: fb9a0e13595069fb0800000000000000
-      internalID: -4641516227613644353
+      spriteID: d54c17379f827f04f9c24772d62d0828
+      internalID: 1389206078
       vertices: []
       indices: 
       edges: []
@@ -457,10 +464,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: a7131ce434d8417a0800000000000000
-      internalID: -6407341049617763974
+      spriteID: caf7db9e3efb4184885d715f65404590
+      internalID: -270585911
       vertices: []
       indices: 
       edges: []
@@ -479,10 +486,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 0a8f138f3f5989ca0800000000000000
-      internalID: -6009888827652310880
+      spriteID: 11cabd02e66a3ad4b982cd8473c8269a
+      internalID: 977782827
       vertices: []
       indices: 
       edges: []
@@ -501,10 +508,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: c090521dc4da759d0800000000000000
-      internalID: -2785567299067377396
+      spriteID: eb6d56708633f6b488de20a9548e1717
+      internalID: -377508701
       vertices: []
       indices: 
       edges: []
@@ -523,10 +530,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 71f26e77e9d206c40800000000000000
-      internalID: 5503448903286402839
+      spriteID: c03c152c978968d4e9ab526914f8b556
+      internalID: -1749187214
       vertices: []
       indices: 
       edges: []
@@ -545,10 +552,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: a072a8046dde5f170800000000000000
-      internalID: 8211731000041547530
+      spriteID: 95fbd8525c383084da74c9b17b432d41
+      internalID: -202758722
       vertices: []
       indices: 
       edges: []
@@ -567,10 +574,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: a43756bcd2f1bdbf0800000000000000
-      internalID: -298610668743593142
+      spriteID: 6220f978854d64c488cd9333dd97d86d
+      internalID: 948883939
       vertices: []
       indices: 
       edges: []
@@ -589,10 +596,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 1bca3a2329d929730800000000000000
-      internalID: 4004436269926165681
+      spriteID: a4fbd1e52cf434b43b7420b71e3fd545
+      internalID: 1047725430
       vertices: []
       indices: 
       edges: []
@@ -611,10 +618,10 @@ TextureImporter:
       customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 1cfdf113157c5cfd0800000000000000
-      internalID: -2322230881309171775
+      spriteID: c167501a0d8304941b2e67f11844c348
+      internalID: -471524328
       vertices: []
       indices: 
       edges: []
@@ -633,27 +640,20 @@ TextureImporter:
     spriteCustomMetadata:
       entries:
       - key: SpriteEditor.SliceSettings
-        value: '{"sliceOnImport":false,"gridCellCount":{"x":10.0,"y":1.0},"gridSpriteSize":{"x":192.0,"y":192.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":2,"keepEmptyRects":false,"isAlternate":false}'
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":192.0,"y":192.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
       Explosion_02_0: -3981084935166230369
-      Explosion_02_1: -4641516227613644353
-      Explosion_02_2: -6407341049617763974
-      Explosion_02_3: -6009888827652310880
-      Explosion_02_4: -2785567299067377396
-      Explosion_02_5: 5503448903286402839
-      Explosion_02_6: 8211731000041547530
-      Explosion_02_7: -298610668743593142
-      Explosion_02_8: 4004436269926165681
-      Explosion_02_9: -2322230881309171775
+      Explosion_02_1: 1389206078
+      Explosion_02_2: -270585911
+      Explosion_02_3: 977782827
+      Explosion_02_4: -377508701
+      Explosion_02_5: -1749187214
+      Explosion_02_6: -202758722
+      Explosion_02_7: 948883939
+      Explosion_02_8: 1047725430
+      Explosion_02_9: -471524328
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 352566
-  packageName: Tiny Swords
-  packageVersion: 1.0
-  assetPath: Assets/Tiny Swords/Particle FX/Explosion_02.png
-  uploadId: 844324
