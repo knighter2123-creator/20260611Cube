@@ -41,13 +41,13 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     }
 
     // 일반 데미지 (스킬용 — 크리티컬 없음)
-    public void TakeDamage(float damage)
+    public virtual void TakeDamage(float damage)
     {
         TakeDamage(damage, isCritical: false);
     }
 
     // 크리티컬 여부를 받는 메인 메서드
-    public void TakeDamage(float damage, bool isCritical)
+    public virtual void TakeDamage(float damage, bool isCritical)
     {
         if (isDead) return;
 

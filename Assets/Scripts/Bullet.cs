@@ -40,11 +40,15 @@ public class Bullet : MonoBehaviour
     {
         if (target == null || ObjectPoolManager.Instance == null) return;
 
+        // 영구 버프 적용된 기본 공격력
+        float buffMult     = PlayerBuffManager.Instance?.DamageMultiplier ?? 1f;
+        float buffedDamage = stat.baseDamage * buffMult;
+
         // 크리티컬 판정
         bool  isCritical  = Random.Range(0f, 100f) < stat.Critical;
         float finalDamage = isCritical
-            ? stat.baseDamage * stat.CriticalMultiplier
-            : stat.baseDamage;
+            ? buffedDamage * stat.CriticalMultiplier
+            : buffedDamage;
 
         Vector2 spawnPos = (Vector2)firePoint.position;
         Vector2 dir      = ((Vector2)target.transform.position - spawnPos).normalized;

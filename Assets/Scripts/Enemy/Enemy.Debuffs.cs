@@ -9,7 +9,8 @@ public partial class Enemy
 {
     // ── 상태 필드 ───────────────────────────────
     private float _armorBreakMultiplier = 1f;   // 1 = 정상, 0.6 = 방어력 40% 감소
-
+    private Color _originalColor;
+    private bool  _isSlowed = false;
     private Coroutine _slowCoroutine;
     private Coroutine _armorBreakCoroutine;
     private Coroutine _dotCoroutine;
@@ -18,28 +19,33 @@ public partial class Enemy
     // ──────────────────────────────────────────
     //  둔화
     // ──────────────────────────────────────────
-    public void ApplySlow(float slowRate, float duration)
+    public void ApplySlow(float rate, float duration)
     {
-        if (isDead) return;
-
-        TargetMove moveScript = GetComponent<TargetMove>();
-        if (moveScript == null) return;
-
-        StopCoroutineIfRunning(ref _slowCoroutine);
-        _slowCoroutine = StartCoroutine(SlowCoroutine(moveScript, slowRate, duration));
+        if (_slowCoroutine != null) StopCoroutine(_slowCoroutine);
+        _slowCoroutine = StartCoroutine(SlowCoroutine(rate, duration));
     }
 
-    private IEnumerator SlowCoroutine(TargetMove moveScript, float slowRate, float duration)
+    private IEnumerator SlowCoroutine(float rate, float duration)
     {
-        float originalSpeed = moveScript.GetSpeed();
-        moveScript.SetSpeed(originalSpeed * (1f - slowRate));
-        Debug.Log($"[Debuff] 둔화 적용 {slowRate * 100}% ({duration}s)");
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+
+        // 처음 둔화일 때만 원래 색 저장
+        if (!_isSlowed && sr != null)
+            _originalColor = sr.color;
+
+        _isSlowed = true;
+
+        TargetMove tm = GetComponent<TargetMove>();
+        if (tm != null) tm.SetSpeed(tm.GetSpeed() * (1f - rate));
+        if (sr != null) sr.color = new Color(0.3f, 0.6f, 1f);
 
         yield return new WaitForSeconds(duration);
 
-        moveScript.SetSpeed(originalSpeed);
+        if (sr != null) sr.color = _originalColor;
+        if (tm != null) tm.SetSpeed(tm.GetSpeed() / (1f - rate));
+
+        _isSlowed   = false;
         _slowCoroutine = null;
-        Debug.Log("[Debuff] 둔화 해제");
     }
 
     // ──────────────────────────────────────────
