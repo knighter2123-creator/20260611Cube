@@ -15,9 +15,6 @@ public class CompanionListUI : MonoBehaviour
     [SerializeField] private Transform  companionListContent;
     [SerializeField] private GameObject companionItemPrefab;
 
-    [Header("슬롯 선택 패널")]
-    [SerializeField] private SlotSelectPanel slotSelectPanel;
-
     void Start()
     {
         openButton.onClick.AddListener(OpenCompanionList);
@@ -35,7 +32,8 @@ public class CompanionListUI : MonoBehaviour
     private void CloseCompanionList()
     {
         companionListPanel.SetActive(false);
-        slotSelectPanel?.Close();
+        // 목록을 닫을 때 배치 모드가 진행 중이면 같이 취소
+        CompanionPlacementController.Instance?.CancelPlacement();
     }
 
     private void RefreshCompanionList()
@@ -54,7 +52,7 @@ public class CompanionListUI : MonoBehaviour
         {
             GameObject item = Instantiate(companionItemPrefab, companionListContent);
             CompanionListItem ui = item.GetComponent<CompanionListItem>();
-            ui?.Setup(data, slotSelectPanel);
+            ui?.Setup(data);   // 더 이상 패널을 넘기지 않음
         }
     }
 }

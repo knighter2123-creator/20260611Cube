@@ -176,10 +176,10 @@ public class UpgradeUI : MonoBehaviour
             bool canAfford = CurrencyManager.Instance != null && CurrencyManager.Instance.Gold >= cost;
 
             if (row.upgradeLevelText != null)
-                row.upgradeLevelText.text = isMaxed ? "MAX" : $"Lv. {upgradeLv:N0} / 5,000";
+                row.upgradeLevelText.text = isMaxed ? "MAX" : $"{upgradeLv:N0} / 5,000";
 
             if (row.costText != null)
-                row.costText.text = isMaxed ? "-" : $"Cost : {cost:N0}";
+                row.costText.text = isMaxed ? "-" : $"비용 : {cost:N0}";
 
             if (row.statValueText != null)
                 row.statValueText.text = GetStatValueString(type);
@@ -199,10 +199,10 @@ public class UpgradeUI : MonoBehaviour
 
         return type switch
         {
-            LevelUpManager.StatType.Damage     => $"{player.stat.baseDamage} ATK",
+            LevelUpManager.StatType.Damage     => $"{player.stat.baseDamage}",
             LevelUpManager.StatType.CritChance => $"{player.stat.Critical:F1} %",
             LevelUpManager.StatType.CritDamage => $"{player.stat.CriticalMultiplier:F2} x",
-            LevelUpManager.StatType.attackspd  => $"{player.stat.AttackSpd} SPD",
+            LevelUpManager.StatType.attackspd  => $"{player.stat.AttackSpd}",
             _                                  => "-"
         };
     }

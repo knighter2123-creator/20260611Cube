@@ -5,7 +5,8 @@ public class CompanionDebugSpawner : MonoBehaviour
     [Header("디버그용 동료 데이터")]
     [SerializeField] private CompanionData[] companionDataList;
 
-    // ❌ debugSkill 제거 (CompanionData.ownedSkill에서 자동 장착)
+    [Header("디버그 배치 셀 좌표 (companionDataList와 인덱스 대응)")]
+    [SerializeField] private Vector3Int[] debugCells;   // 예: (0,0,0), (1,0,0) ...
 
     void Update()
     {
@@ -24,7 +25,11 @@ public class CompanionDebugSpawner : MonoBehaviour
             Debug.LogWarning($"[Debug] companionDataList에 인덱스 {index} 데이터가 없습니다.");
             return;
         }
-
+        if (debugCells == null || index >= debugCells.Length)
+        {
+            Debug.LogWarning($"[Debug] debugCells에 인덱스 {index} 셀이 없습니다.");
+            return;
+        }
         if (CompanionManager.Instance == null)
         {
             Debug.LogWarning("[Debug] CompanionManager가 씬에 없습니다.");
@@ -38,25 +43,31 @@ public class CompanionDebugSpawner : MonoBehaviour
             return;
         }
 
-        // 이미 배치된 동료가 있으면 회수 후 보유 목록에서도 제거
-        Companion existing = CompanionManager.Instance.GetSlotOccupant(index);
+        Vector3Int cell = debugCells[index];
+
+        // 해당 셀에 이미 같은 동료가 배치돼 있으면 토글로 회수+제거
+        Companion existing = CompanionManager.Instance.GetOwnedCompanions()
+            .Find(c => c.Data == data && c.IsPlaced);
         if (existing != null)
         {
-            CompanionManager.Instance.RetrieveCompanion(existing);
-            CompanionManager.Instance.RemoveCompanion(existing);
-            Debug.Log($"[Debug] 슬롯 {index} — {existing.CompanionName} 소환 해제");
+            CompanionManager.Instance.RemoveCompanion(existing); // 내부에서 회수까지 처리
+            Debug.Log($"[Debug] {existing.CompanionName} 소환 해제");
             return;
         }
 
-        bool added = CompanionManager.Instance.AddCompanion(data);
-        if (!added) return;
+        if (!CompanionManager.Instance.AddCompanion(data)) return;
 
-        var companions = CompanionManager.Instance.GetOwnedCompanions();
-        Companion newCompanion = companions[companions.Count - 1];
+        var companions  = CompanionManager.Instance.GetOwnedCompanions();
+        Companion spawned = companions[companions.Count - 1];
 
-        bool placed = CompanionManager.Instance.PlaceCompanion(newCompanion, index);
-        if (!placed) return;
+        bool placed = CompanionManager.Instance.PlaceCompanion(spawned, cell);
+        if (!placed)
+        {
+            CompanionManager.Instance.RemoveCompanion(spawned); // ← 비활성 잔존 제거
+            Debug.LogWarning($"[Debug] {cell} 배치 실패 — 타일 없음/점유됨. debugCells[{index}] 확인");
+            return;
+        }
 
-        Debug.Log($"[Debug] {data.companionName} → 슬롯 {index} 배치 완료 / 스킬: {data.ownedSkill?.skillName ?? "없음"}");
+        Debug.Log($"[Debug] {data.companionName} → {cell} 배치 완료 / 스킬: {data.ownedSkill?.skillName ?? "없음"}");
     }
 }

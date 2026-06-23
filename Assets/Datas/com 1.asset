@@ -15,6 +15,6 @@ MonoBehaviour:
   companionName: "\uACF5\uACA9"
   icon: {fileID: 21300000, guid: 95052c6b62fb3de4695beaa99f842ac2, type: 3}
   prefab: {fileID: 5725842826671454127, guid: 829ae7959aec9a6439995d5ccd3a6c10, type: 3}
-  detectRange: 4
+  detectRange: 5
   grade: 0
   ownedSkill: {fileID: 11400000, guid: a5ddf3b243c8caf4eaa4ca50cf394176, type: 2}

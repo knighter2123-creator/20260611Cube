@@ -15,6 +15,6 @@ MonoBehaviour:
   companionName: "\uB454\uD654"
   icon: {fileID: 21300000, guid: 90e99a7fde056a4418b9fe16084adb5c, type: 3}
   prefab: {fileID: 3391353107492281548, guid: 00f9fe8474bc47644ac179b9207cdbbc, type: 3}
-  detectRange: 4
+  detectRange: 5
   grade: 1
   ownedSkill: {fileID: 11400000, guid: 6104c83c479037c4987ea8fd8ac21b6c, type: 2}

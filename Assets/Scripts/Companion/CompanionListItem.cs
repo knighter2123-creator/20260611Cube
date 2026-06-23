@@ -20,8 +20,7 @@ public class CompanionListItem : MonoBehaviour
     private static readonly Color ColorEpic      = new Color(1f, 0.4f, 0.7f);
     private static readonly Color ColorLegendary = new Color(0.6f, 1f, 0.4f);
 
-    private CompanionData   _data;
-    private SlotSelectPanel _slotSelectPanel;
+    private CompanionData _data;
 
     void Awake()
     {
@@ -29,14 +28,10 @@ public class CompanionListItem : MonoBehaviour
             iconButton = GetComponent<Button>();
     }
 
-    public void Setup(CompanionData data, SlotSelectPanel slotSelectPanel)
+    // SlotSelectPanel 인자 제거
+    public void Setup(CompanionData data)
     {
-        _data            = data;
-        _slotSelectPanel = slotSelectPanel;
-
-        if (_slotSelectPanel == null)
-            Debug.LogError("[CompanionListItem] SlotSelectPanel이 null입니다. " +
-                           "CompanionListUI Inspector의 Slot Select Panel 필드를 확인하세요.");
+        _data = data;
 
         if (data.icon != null)
             iconImage.sprite = data.icon;
@@ -76,13 +71,8 @@ public class CompanionListItem : MonoBehaviour
 
     private void OnPlaceClicked()
     {
-        if (_slotSelectPanel == null)
-        {
-            Debug.LogError("[CompanionListItem] SlotSelectPanel이 연결되지 않았습니다. " +
-                           "CompanionListUI Inspector의 Slot Select Panel 필드를 확인하세요.");
-            return;
-        }
-        _slotSelectPanel.Open(_data, this);
+        // 슬롯 패널 대신 맵 탭 배치 모드로 진입
+        CompanionPlacementController.Instance?.BeginPlacement(_data, this);
         actionButtons.SetActive(false);
     }
 
