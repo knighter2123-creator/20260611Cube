@@ -9,7 +9,8 @@ public class SceneLoader : MonoBehaviour
     public const string STAGE_SCENE   = "StageScene";
     public const string GACHA_SCENE   = "GachaScene";
     public const string LOADING_SCENE = "LoadingScene";
-
+    public const string EVOLVE_SCENE = "EvolveScene";   
+    
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -20,7 +21,13 @@ public class SceneLoader : MonoBehaviour
     // ── 씬 이동 ───────────────────────────────────
 
     public void GoToLogin() => LoadScene(LOGIN_SCENE);
-
+    
+    // 진화 스테이지로 입장 (StageScene 완전 전환 → 진행 위치는 EvolveStageContext에 저장돼 있음)
+    public void GoToEvolveStage() => LoadScene(EVOLVE_SCENE);
+    
+    // 클리어 후 원래 StageScene으로 복귀
+    public void ReturnFromEvolve() => LoadScene(STAGE_SCENE);
+    
     /// <summary>Login → Loading → Stage 경유 이동</summary>
     public void GoToStageWithLoading() => LoadScene(LOADING_SCENE);
 

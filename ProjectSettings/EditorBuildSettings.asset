@@ -17,5 +17,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/GachaScene.unity
     guid: 05e701c1e97bf024c8b8b50ee95d6806
+  - enabled: 1
+    path: Assets/Scenes/EvolveScene.unity
+    guid: 16ee230387ab1894c9024e1b60638a83
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0

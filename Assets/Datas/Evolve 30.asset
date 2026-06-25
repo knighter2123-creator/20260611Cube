@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33a61b1baccf5b440b4a49ceb1b28dd1, type: 3}
+  m_Name: Evolve 30
+  m_EditorClassIdentifier: Assembly-CSharp::EvolveStageData
+  id: evolve_30
+  displayName: "\uC9C4\uD654 \uC2A4\uD14C\uC774\uC9C0 (Lv.30)"
+  requiredLevel: 30
+  bossHpMultiplier: 3
+  bossDefenceMultiplier: 2
+  damageBuffPercent: 0.2

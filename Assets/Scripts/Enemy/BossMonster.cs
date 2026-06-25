@@ -12,6 +12,8 @@ public class BossMonster : Enemy
     [Header("보석 보상")]
     [SerializeField] private int baseRewardGem = 100;
 
+    protected float statMult = 1f;   // 스폰 시 받은 누적 배율
+    
     protected override void InitStats()
     {
         base.InitStats();
@@ -22,6 +24,7 @@ public class BossMonster : Enemy
 
     public override void ApplyStatMultiplier(float mult)
     {
+        statMult      = mult;
         maxHealth     *= mult;
         currentHealth  = maxHealth;
         defence       *= mult;
@@ -37,7 +40,7 @@ public class BossMonster : Enemy
 
         CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(100 * bossCurrencyMultiplier));
         CurrencyManager.Instance?.AddGem(baseRewardGem);
-        LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(baseRewardExp * bossExpMultiplier));
+        LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(baseRewardExp * (bossExpMultiplier * statMult)));
         StageManager.Instance?.ReportBossKill();
 
         Destroy(gameObject);

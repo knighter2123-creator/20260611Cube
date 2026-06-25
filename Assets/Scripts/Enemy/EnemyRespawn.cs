@@ -32,7 +32,13 @@ public class EnemyRespawn : MonoBehaviour
 
     void Awake() { Instance = this; }
 
-    void Start() { respawnCoroutine = StartCoroutine(RespawnLoop()); }
+    void Start()
+    {
+        // 진화 스테이지 복귀 시 StageManager.Start가 먼저 ResetStage()를 호출해
+        // 이미 루프를 돌리고 있을 수 있음. 실행 순서와 무관하게 중복 스폰 방지.
+        if (respawnCoroutine == null)
+            respawnCoroutine = StartCoroutine(RespawnLoop());
+    }
 
     // ── 스테이지 리셋 (StageManager에서 호출) ──────
 

@@ -2,7 +2,10 @@ using System;
 using UnityEngine;
 using TMPro;
 
-public class StageManager : MonoBehaviour
+// StageManager는 partial로 분리되어 있습니다.
+//   StageManager.cs     — 핵심 상태 / 라이프사이클 / 진행 로직
+//   StageManager.UI.cs  — UI 갱신 전용
+public partial class StageManager : MonoBehaviour
 {
     public static StageManager Instance;
 
@@ -14,10 +17,16 @@ public class StageManager : MonoBehaviour
     [Header("스테이지 설정")]
     [SerializeField] private int   killGoal       = 20;
     [SerializeField] private float timeLimit      = 184f;
-    [SerializeField] private float statMultiplier = 1.03f;
+    [SerializeField] private float statMultiplier = 1.5f;
 
     public event Action OnStageClear;
     public event Action OnStageFail;
+
+    public float StatMultiplier => statMultiplier;
+    
+    // 진화 스테이지 입장 버튼이 현재 위치를 읽을 수 있게 공개
+    public int CurrentWorld => currentWorld;
+    public int CurrentStage => currentStage;
 
     private int   killCount   = 0;
     private float timeLeft;
@@ -37,6 +46,19 @@ public class StageManager : MonoBehaviour
 
     void Start()
     {
+        // 진화 스테이지에서 복귀한 경우 → 원래 위치/난이도 복원 후 그 스테이지 재구성
+        if (EvolveStageContext.HasReturn)
+        {
+            currentWorld    = EvolveStageContext.ReturnWorld;
+            currentStage    = EvolveStageContext.ReturnStage;
+            currentStatMult = Mathf.Pow(statMultiplier,
+                (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
+            EvolveStageContext.ClearReturn();
+
+            NextStage();   // 적 정리 + InitStage + 복원된 난이도로 재스폰
+            return;
+        }
+
         InitStage();
     }
 
@@ -79,7 +101,7 @@ public class StageManager : MonoBehaviour
         StageClear();
     }
 
-    // ── 내부 ───────────────────────────────────────
+    // ── 내부 진행 ──────────────────────────────────
 
     private void StageClear()
     {
@@ -107,22 +129,17 @@ public class StageManager : MonoBehaviour
         stageOver = true;
         OnStageFail?.Invoke();
 
-        // X-1 스테이지 실패 → 월드 처음(X-1)으로 되돌아감 (currentWorld 유지)
-        // X-N 스테이지 실패 → 한 단계 되돌아감 (X-(N-1))
+        // X-1 실패 → 현재 월드 1스테이지 그대로 재시작
+        // X-N 실패 → 한 단계 되돌아감
         if (currentStage == 1)
         {
-            // X-1 실패 : 현재 월드 1스테이지 그대로 재시작 (스탯 배율도 되돌림)
-            // currentWorld는 유지, currentStage는 1 유지
-            // 현재 월드 시작 시점의 배율로 복구
             currentStatMult = Mathf.Pow(statMultiplier, (currentWorld - 1) * maxStagePerWorld);
             Debug.Log($"[StageManager] {currentWorld}-1 실패 → {currentWorld}-1 재시작 / 스탯 배율: {currentStatMult:F4}");
         }
         else
         {
-            // X-N 실패 : 한 스테이지 되돌아감
             currentStage--;
             currentStatMult /= statMultiplier;
-            
             Debug.Log($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
         }
 
@@ -152,26 +169,5 @@ public class StageManager : MonoBehaviour
         UpdateKillUI();
         UpdateTimerUI();
         UpdateStageUI();
-    }
-
-    private void UpdateKillUI()
-    {
-        if (killCountText != null)
-            killCountText.text = $"처치  {killCount} / {killGoal}";
-    }
-
-    private void UpdateTimerUI()
-    {
-        if (timerText == null) return;
-        int m = Mathf.FloorToInt(timeLeft / 60f);
-        int s = Mathf.FloorToInt(timeLeft % 60f);
-        timerText.text  = $"{m}:{s:D2}";
-        timerText.color = timeLeft <= 30f ? Color.red : Color.white;
-    }
-
-    private void UpdateStageUI()
-    {
-        if (stageText != null)
-            stageText.text = $"{currentWorld}-{currentStage}";
     }
 }

@@ -10,10 +10,14 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     [SerializeField] private int rewardGold = 10;
     [SerializeField] private int rewardExp  = 5;
     
+    protected float statMult = 1f;   // 스폰 시 받은 누적 배율
+    
     public bool isDead { get; set; }
 
     private GameObject hpBarObject;
     private EnemyHpBar hpBarController;
+    
+    private StageManager stageManager;
 
     public void SetHpBar(GameObject hpBar)
     {
@@ -35,6 +39,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
 
     public virtual void ApplyStatMultiplier(float mult)
     {
+        statMult      = mult;
         maxHealth     *= mult;
         currentHealth  = maxHealth;
         hpBarController?.UpdateHp(currentHealth, maxHealth);
@@ -75,8 +80,8 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
 
         StopAllDebuffs();
         RemoveHpBar();
-        CurrencyManager.Instance?.AddGold(rewardGold);
-        LevelUpManager.Instance?.AddExp(rewardExp);
+        CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(rewardGold * statMult));
+        LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(rewardExp * statMult));
         StageManager.Instance?.ReportEnemyKill();
 
         Destroy(gameObject);

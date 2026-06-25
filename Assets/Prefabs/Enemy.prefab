@@ -112,7 +112,7 @@ MonoBehaviour:
   maxHealth: 50
   defence: 5
   rewardGold: 30
-  rewardExp: 10
+  rewardExp: 30
 --- !u!70 &-3323855093147334155
 CapsuleCollider2D:
   m_ObjectHideFlags: 0
