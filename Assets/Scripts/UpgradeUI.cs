@@ -202,7 +202,7 @@ public class UpgradeUI : MonoBehaviour
             LevelUpManager.StatType.Damage     => $"{player.stat.baseDamage}",
             LevelUpManager.StatType.CritChance => $"{player.stat.Critical:F1} %",
             LevelUpManager.StatType.CritDamage => $"{player.stat.CriticalMultiplier:F2} x",
-            LevelUpManager.StatType.attackspd  => $"{player.stat.AttackSpd}",
+            LevelUpManager.StatType.Attackspd  => $"{player.stat.AttackSpd}",
             _                                  => "-"
         };
     }

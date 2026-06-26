@@ -24,7 +24,7 @@ public class PlayerStat
     [Header("전투 스탯(강화로만 상승)")]
     public int   baseDamage          = 5;
     public int   AttackSpd           = 300;
-    public float Critical            = 5f;
+    public float Critical            = 3f;
     public float CriticalMultiplier  = 1.5f;
 
     // ──────────────────────────────────────────────
@@ -52,7 +52,7 @@ public class PlayerStat
         baseDamage         = 5;
         AttackSpd          = 300;
         Critical           = 5f;
-        CriticalMultiplier = 1.5f;
+        CriticalMultiplier = 1.3f;
         
         UpgradeLevelDamage     = 0;
         UpgradeLevelAttackSpd  = 0;

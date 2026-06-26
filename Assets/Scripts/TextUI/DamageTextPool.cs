@@ -58,12 +58,6 @@ public class DamageTextPool : MonoBehaviour
         Spawn(worldPos, amount, DamageTextType.DoT);
     }
 
-    /// <summary>힐</summary>
-    public void ShowHeal(Vector3 worldPos, int amount)
-    {
-        Spawn(worldPos, amount, DamageTextType.Heal);
-    }
-
     // ───────────────────────────────────────────
     // Internal
     // ───────────────────────────────────────────

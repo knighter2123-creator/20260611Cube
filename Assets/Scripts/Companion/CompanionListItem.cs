@@ -28,7 +28,6 @@ public class CompanionListItem : MonoBehaviour
             iconButton = GetComponent<Button>();
     }
 
-    // SlotSelectPanel 인자 제거
     public void Setup(CompanionData data)
     {
         _data = data;

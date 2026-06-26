@@ -16,7 +16,6 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
 
     private GameObject hpBarObject;
     private EnemyHpBar hpBarController;
-    
     private StageManager stageManager;
 
     public void SetHpBar(GameObject hpBar)

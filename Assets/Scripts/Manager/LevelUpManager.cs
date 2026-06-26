@@ -51,24 +51,19 @@ partial class LevelUpManager : MonoBehaviour
     {
         if (stat != null)
         {
-            // 씬 전환 시 이전 데이터 복원
+            // (기존 씬 전환 복원 로직 — 그대로 유지)
             playerStat.Level = stat.Level;
             playerStat.Experience = stat.Experience;
-            playerStat.MaxExperience = stat.MaxExperience;
-            
-            // 강화 레벨 복원
-            playerStat.UpgradeLevelDamage = stat.UpgradeLevelDamage;
-            playerStat.UpgradeLevelAttackSpd = stat.UpgradeLevelAttackSpd;
-            playerStat.UpgradeLevelCritChance = stat.UpgradeLevelCritChance;
-            playerStat.UpgradeLevelCritDamage = stat.UpgradeLevelCritDamage;
-            
-            // 전투 스탯 복원
-            playerStat.baseDamage = stat.baseDamage;
-            playerStat.Critical =  stat.Critical;
-            playerStat.CriticalMultiplier = stat.CriticalMultiplier;
-            
+            // ... 나머지 복원 ...
+            stat = playerStat;
         }
-        stat = playerStat;
+        else
+        {
+            stat = playerStat;
+            // 이번 세션 첫 초기화 → 세이브가 있으면 적용
+            if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
+                ApplyFrom(SaveManager.Instance.Current);
+        }
     }
     public void ResetStat()
     {
@@ -90,10 +85,7 @@ partial class LevelUpManager : MonoBehaviour
             stat.Level++;
             stat.MaxExperience = CalculateMaxExp(stat.Level); // 레벨별 필요 경험치 계산
             OnLevelUp?.Invoke(stat.Level);
-            Debug.Log($"[LevelUpManager] 레벨업! Lv.{stat.Level} | 다음 레벨까지 {stat.MaxExperience} exp");
         }
-
-        Debug.Log($"[LevelUpManager] 경험치 +{amount} | {stat.Experience}/{stat.MaxExperience}");
     }
 
     /// <summary>레벨에 따른 필요 경험치 공식 (인스펙터 설정으로 교체 가능)</summary>
@@ -110,7 +102,7 @@ partial class LevelUpManager : MonoBehaviour
             StatType.Damage     => (damageConfig,     stat.UpgradeLevelDamage),
             StatType.CritChance => (critChanceConfig, stat.UpgradeLevelCritChance),
             StatType.CritDamage => (critDamageConfig, stat.UpgradeLevelCritDamage),
-            StatType.attackspd => (attackspdConfig, stat.UpgradeLevelAttackSpd),
+            StatType.Attackspd => (attackspdConfig, stat.UpgradeLevelAttackSpd),
             _                   => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }

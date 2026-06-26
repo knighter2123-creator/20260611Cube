@@ -18,12 +18,19 @@ public class EvolveStageEntry : MonoBehaviour
     [SerializeField] private Button enterButton;
     [SerializeField] private TextMeshProUGUI lockText; // (선택) 잠금/안내 문구
 
+    private bool _unlocked;
     void Start()
     {
         if (enterButton != null)
             enterButton.onClick.AddListener(TryEnter);
 
         RefreshLockState();
+    }
+
+    void Update()
+    {
+        // 아직 잠겨 있을 때만 계속 확인 (해제되면 더 볼 필요 없음 — 레벨은 안 내려가니까)
+        if (!_unlocked) RefreshLockState();
     }
 
     void OnEnable()
@@ -38,9 +45,10 @@ public class EvolveStageEntry : MonoBehaviour
     private void RefreshLockState()
     {
         if (stageData == null) return;
-
+        
         bool unlocked = PlayerLevel >= stageData.requiredLevel;
-
+        _unlocked = unlocked;
+        
         if (enterButton != null)
             enterButton.interactable = unlocked;
 
@@ -64,7 +72,7 @@ public class EvolveStageEntry : MonoBehaviour
         int stage = StageManager.Instance != null ? StageManager.Instance.CurrentStage : 1;
 
         EvolveStageContext.Enter(stageData, world, stage);
-
+        CompanionManager.Instance?.SavePlacementSnapshot();
         SceneLoader.Instance?.GoToEvolveStage();
     }
 }

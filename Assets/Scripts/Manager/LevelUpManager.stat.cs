@@ -16,7 +16,7 @@ public partial class LevelUpManager
         Damage,
         CritChance,
         CritDamage,
-        attackspd,
+        Attackspd,
     }
     // ══════════════════════════════════════════════
     //  강화 설정 구조체  (인스펙터에서 조정 가능)
@@ -34,11 +34,10 @@ public partial class LevelUpManager
     }
     
     [Header("스탯별 강화 설정")]
-    [Header("스탯별 강화 설정")]
     [SerializeField] private UpgradeConfig damageConfig     = new UpgradeConfig { baseCost = 10, costPerLevel = 15, gainPerUpgrade = 5f   };
-    [SerializeField] private UpgradeConfig attackspdConfig  = new UpgradeConfig { baseCost = 30, costPerLevel = 15, gainPerUpgrade = 5f   }; // ✅ gain 양수로 변경
-    [SerializeField] private UpgradeConfig critChanceConfig = new UpgradeConfig { baseCost = 50, costPerLevel = 20, gainPerUpgrade = 0.5f };
-    [SerializeField] private UpgradeConfig critDamageConfig = new UpgradeConfig { baseCost = 30, costPerLevel = 25, gainPerUpgrade = 0.1f };
+    [SerializeField] private UpgradeConfig attackspdConfig  = new UpgradeConfig { baseCost = 150, costPerLevel = 50, gainPerUpgrade = 0.5f   }; // ✅ gain 양수로 변경
+    [SerializeField] private UpgradeConfig critChanceConfig = new UpgradeConfig { baseCost = 300, costPerLevel = 150, gainPerUpgrade = 0.1f };
+    [SerializeField] private UpgradeConfig critDamageConfig = new UpgradeConfig { baseCost = 100, costPerLevel = 30, gainPerUpgrade = 0.1f };
     
     // ══════════════════════════════════════════════
     //  [3] 스탯 강화  (Currency 소비)
@@ -125,7 +124,7 @@ public partial class LevelUpManager
                 stat.CriticalMultiplier += gain;
                 break;
 
-            case StatType.attackspd:
+            case StatType.Attackspd:
                 // ✅ AttackSpd(ms) 감소 → 쿨다운 감소 → 공격속도 증가
                 // 최소 100ms(0.1초) 아래로 내려가지 않도록 클램프
                 stat.AttackSpd = Mathf.Max(stat.AttackSpd - Mathf.RoundToInt(gain), 100);
@@ -141,7 +140,7 @@ public partial class LevelUpManager
             StatType.Damage     => stat.UpgradeLevelDamage,
             StatType.CritChance => stat.UpgradeLevelCritChance,
             StatType.CritDamage => stat.UpgradeLevelCritDamage,
-            StatType.attackspd => stat.UpgradeLevelAttackSpd,
+            StatType.Attackspd => stat.UpgradeLevelAttackSpd,
             _                   => 0
         };
     }
@@ -153,7 +152,7 @@ public partial class LevelUpManager
             case StatType.Damage:     stat.UpgradeLevelDamage      = value; break;
             case StatType.CritChance: stat.UpgradeLevelCritChance  = value; break;
             case StatType.CritDamage: stat.UpgradeLevelCritDamage  = value; break;
-            case StatType.attackspd: stat.UpgradeLevelAttackSpd = value; break;
+            case StatType.Attackspd: stat.UpgradeLevelAttackSpd = value; break;
         }
     }
 }

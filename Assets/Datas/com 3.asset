@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
   m_Name: com 3
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
+  id: ep_Armbreak
   companionName: "\uD30C\uC1C4"
   icon: {fileID: 21300000, guid: 1877011fdc8954440a807dd46b4eaab4, type: 3}
   prefab: {fileID: 1645179444967808548, guid: 601c964f440887540ab2b3a478644c39, type: 3}

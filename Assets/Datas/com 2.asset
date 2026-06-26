@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
   m_Name: com 2
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
+  id: ra_Slow
   companionName: "\uB454\uD654"
   icon: {fileID: 21300000, guid: 90e99a7fde056a4418b9fe16084adb5c, type: 3}
   prefab: {fileID: 3391353107492281548, guid: 00f9fe8474bc47644ac179b9207cdbbc, type: 3}

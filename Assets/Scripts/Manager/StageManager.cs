@@ -120,7 +120,8 @@ public partial class StageManager : MonoBehaviour
 
         currentStatMult *= statMultiplier;
         Debug.Log($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
-
+        
+        SaveManager.Instance?.Save();
         NextStage();
     }
 

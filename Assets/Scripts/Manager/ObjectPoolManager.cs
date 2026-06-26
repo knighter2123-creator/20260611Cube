@@ -45,11 +45,7 @@ public class ObjectPoolManager : MonoBehaviour
         obj.SetActive(false);
         return obj;
     }
-
-    // ──────────────────────────────────────────────
-    //  Public API
-    // ──────────────────────────────────────────────
-
+    
     /// <summary>
     /// 풀에서 Bullet을 꺼내 반환합니다. (비활성 상태)
     /// 호출자가 위치·Init 설정 후 직접 SetActive(true) 해야 합니다.
@@ -57,17 +53,9 @@ public class ObjectPoolManager : MonoBehaviour
     public GameObject GetBulletInactive()
     {
         if (pool.Count == 0)
-            pool.Enqueue(CreateBullet());
+            pool.Enqueue(CreateBullet()); // 총알 장전
 
-        return pool.Dequeue();   // SetActive는 호출자 책임
-    }
-
-    /// <summary>풀에서 Bullet을 꺼내 즉시 활성화해 반환합니다. (하위 호환용)</summary>
-    public GameObject GetBullet()
-    {
-        GameObject obj = GetBulletInactive();
-        obj.SetActive(true);
-        return obj;
+        return pool.Dequeue();   // 맨 앞의 총알 소모
     }
 
     /// <summary>사용이 끝난 Bullet을 풀에 반환합니다.</summary>

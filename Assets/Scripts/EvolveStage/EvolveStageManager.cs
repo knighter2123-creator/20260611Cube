@@ -103,6 +103,7 @@ public partial class EvolveStageManager : MonoBehaviour
         }
 
         // 복귀 위치는 EvolveStageContext에 저장돼 있고, StageManager가 복원함
+        CompanionManager.Instance?.SavePlacementSnapshot();
         SceneLoader.Instance?.ReturnFromEvolve();
     }
 }
