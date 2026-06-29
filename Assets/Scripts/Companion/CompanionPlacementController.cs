@@ -96,18 +96,21 @@ public class CompanionPlacementController : MonoBehaviour
 
     private void ConfirmPlace(CompanionManager cm, Vector3Int cell)
     {
-        // 이미 보유 중이면 그 인스턴스, 아니면 새로 획득
-        Companion existing = cm.GetOwnedCompanions().Find(c => c.Data == pendingData);
-        if (existing == null)
+        // 보유 동료 중에서 배치할 인스턴스를 id로 찾는다 (인스턴스 비교 금지)
+        Companion target = cm.GetOwnedCompanions()
+            .Find(c => c != null && c.Data != null && c.Data.id == pendingData.id);
+
+        if (target == null)
         {
-            if (!cm.AddCompanion(pendingData)) { CancelPlacement(); return; }
-            var list = cm.GetOwnedCompanions();
-            existing = list[list.Count - 1];
+            // 보유 목록엔 있는데 오브젝트가 없다면 RestoreIntoScene이 아직 안 된 것.
+            // 배치에서 새로 획득하지 않는다.
+            Debug.LogWarning($"[Placement] {pendingData.companionName} 배치 대상 없음 (오브젝트 미생성/미보유)");
+            CancelPlacement();
+            return;
         }
 
-        cm.PlaceCompanion(existing, cell);
+        cm.PlaceCompanion(target, cell);
         Debug.Log($"[Placement] {pendingData.companionName} → {cell} 배치");
-
         CancelPlacement();
     }
 

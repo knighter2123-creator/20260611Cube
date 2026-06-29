@@ -55,6 +55,9 @@ public class SaveData
     // ── 동료 배치 (보유 인덱스 → 셀) ──
     public List<CompanionPlacement> companionPlacements = new List<CompanionPlacement>();
 
+    public int gold = 0;
+    public int gem  = 0;
+    
     // ── 기타 ──
     public string playerName = "";
 }

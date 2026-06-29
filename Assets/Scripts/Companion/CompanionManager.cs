@@ -33,10 +33,7 @@ public class CompanionManager : MonoBehaviour
 
     void Start()
     {
-        // 모든 Awake 완료 후(SaveManager 로드 완료) 세이브에서 보유/배치 복원.
-        // 데이터만 채우고, 실제 오브젝트는 게임 씬에서 RestoreIntoScene이 생성한다.
-        if (SaveManager.Instance != null)
-            ApplyFrom(SaveManager.Instance.Current);
+       
     }
 
     public void BindPlaceableTilemap(Tilemap tilemap) => placeableTilemap = tilemap;
@@ -48,7 +45,7 @@ public class CompanionManager : MonoBehaviour
     /// <summary>보유 동료 id 목록 + 배치를 SaveData에 기록.</summary>
     public void CaptureTo(SaveData d)
     {
-        // 보유 목록
+        // 보유 목록 (기존 그대로)
         d.ownedCompanionIds.Clear();
         foreach (var data in ownedCompanionData)
         {
@@ -61,21 +58,26 @@ public class CompanionManager : MonoBehaviour
             d.ownedCompanionIds.Add(data.id);
         }
 
-        // 배치: 배치 가능한 씬(타일맵 살아있음)이면 현재 occupied로 최신화.
-        // LoginScene 등 타일맵이 없는 곳에서는 기존 배치 의도를 그대로 보존(덮어쓰지 않음).
-        if (placeableTilemap != null) SavePlacementSnapshot();
-
-        d.companionPlacements.Clear();
-        foreach (var kv in placementByIndex)
+        // ── 배치 ──
+        // 배치 가능한 씬이고 실제로 배치된 동료가 있을 때만 스냅샷 갱신.
+        // occupied가 비어 있으면(로드 직후·회수 상태 등) 기존 배치를 덮어쓰지 않고 보존.
+        if (placeableTilemap != null && occupied.Count > 0)
         {
-            d.companionPlacements.Add(new CompanionPlacement
+            SavePlacementSnapshot();
+
+            d.companionPlacements.Clear();
+            foreach (var kv in placementByIndex)
             {
-                ownedIndex = kv.Key,
-                cellX = kv.Value.x,
-                cellY = kv.Value.y,
-                cellZ = kv.Value.z
-            });
+                d.companionPlacements.Add(new CompanionPlacement
+                {
+                    ownedIndex = kv.Key,
+                    cellX = kv.Value.x,
+                    cellY = kv.Value.y,
+                    cellZ = kv.Value.z
+                });
+            }
         }
+        // else: 기존 d.companionPlacements 그대로 유지 (병합 저장)
     }
 
     /// <summary>
@@ -88,6 +90,13 @@ public class CompanionManager : MonoBehaviour
         if (database == null)
         {
             Debug.LogError("[CompanionManager] CompanionDatabase가 연결되지 않아 동료를 복원할 수 없습니다.");
+            return;
+        }
+        
+        // 이미 이 세이브대로 복원돼 오브젝트가 살아있으면 다시 비우지 않는다 (중복 ApplyFrom 방지)
+        if (ownedCompanions.Count > 0)
+        {
+            Debug.Log("[CompanionManager] 이미 복원됨 — ApplyFrom 건너뜀");
             return;
         }
 
@@ -121,14 +130,20 @@ public class CompanionManager : MonoBehaviour
             return false;
         }
 
+        // 이미 보유(복원 포함)한 동료면 획득 처리하지 않음
+        if (data != null && ownedCompanionData.Exists(c => c != null && c.id == data.id))
+        {
+            Debug.Log($"[CompanionManager] {data.companionName}은(는) 이미 보유 중 — 획득 무시");
+            return false;
+        }
+
         Companion companion = SpawnCompanionObject(data);
         if (companion == null) return false;
 
         ownedCompanionData.Add(data);
         ownedCompanions.Add(companion);
 
-        SaveManager.Instance?.Save();   // 보유 목록 변경 → 저장
-
+        SaveManager.Instance?.Save();
         Debug.Log($"[CompanionManager] {data.companionName} 획득");
         return true;
     }
@@ -175,6 +190,17 @@ public class CompanionManager : MonoBehaviour
     /// </summary>
     public void RestoreIntoScene(Tilemap tilemap)
     {
+        Debug.Log($"[Restore] 호출 — data={ownedCompanionData.Count}, objects={ownedCompanions.Count}\n{System.Environment.StackTrace}");
+        
+        // ── 보강: Start의 ApplyFrom이 순서 때문에 skip됐을 수 있으니, 여기서 보장 ──
+        if (ownedCompanionData.Count == 0
+            && SaveManager.Instance != null
+            && SaveManager.Instance.Current != null
+            && SaveManager.Instance.Current.ownedCompanionIds.Count > 0)
+        {
+            ApplyFrom(SaveManager.Instance.Current);
+        }
+
         BindPlaceableTilemap(tilemap);
         occupied.Clear();
 
@@ -198,11 +224,11 @@ public class CompanionManager : MonoBehaviour
             if (intended.TryGetValue(i, out Vector3Int cell))
             {
                 if (PlaceCompanion(companion, cell))
-                    placementByIndex[newIndex] = cell;   // 성공한 배치만, 새 인덱스로 기록
+                {
+                    placementByIndex[newIndex] = cell;
+                }
             }
         }
-
-        Debug.Log($"[CompanionManager] 씬 복원 완료 — 동료 {ownedCompanions.Count}명 / 배치 {occupied.Count}개");
     }
 
     // ──────────────────────────────────────────────
@@ -248,21 +274,6 @@ public class CompanionManager : MonoBehaviour
             occupied.Remove(found.Value);
             companion.Retrieve();
         }
-    }
-
-    public void RemoveCompanion(Companion companion)
-    {
-        if (!ownedCompanions.Contains(companion)) return;
-
-        RetrieveCompanion(companion);                 // occupied에서도 제거
-        ownedCompanions.Remove(companion);
-        ownedCompanionData?.Remove(companion.Data);
-
-        Destroy(companion.gameObject);
-
-        SaveManager.Instance?.Save();   // 보유 목록 변경 → 저장
-
-        Debug.Log($"[CompanionManager] {companion.CompanionName} 제거");
     }
 
     // ──────────────────────────────────────────────

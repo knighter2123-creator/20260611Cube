@@ -67,7 +67,7 @@ public class GachaSystem : MonoBehaviour
         {
             Debug.Log($"[Gacha] 보석 부족. 필요: {cost}");
             return results;
-        }
+        } 
 
         for (int i = 0; i < count; i++)
         {
@@ -119,7 +119,7 @@ public class GachaSystem : MonoBehaviour
 
         foreach (CompanionData owned in CompanionManager.Instance.GetOwnedCompanionData())
         {
-            if (owned.companionName == data.companionName)
+            if (owned != null && owned.id == data.id)
                 return true;
         }
         return false;

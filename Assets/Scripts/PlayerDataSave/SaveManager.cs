@@ -34,6 +34,7 @@ public class SaveManager : MonoBehaviour
         StageManager.Instance?.CaptureTo(data);
         PlayerBuffManager.Instance?.CaptureTo(data);
         CompanionManager.Instance?.CaptureTo(data);
+        CurrencyManager.Instance?.CaptureTo(data);
 
         Current = data;
 

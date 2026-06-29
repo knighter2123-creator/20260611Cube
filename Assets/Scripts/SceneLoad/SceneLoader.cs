@@ -35,8 +35,13 @@ public class SceneLoader : MonoBehaviour
     {
         if (IsSceneLoaded(GACHA_SCENE))
         {
-            Time.timeScale = 1f;
             SceneManager.UnloadSceneAsync(GACHA_SCENE);
+
+            // 가챠 닫을 때 1f로 고정하지 말고, 저장된 배속을 복원
+            if (GameSpeedManager.Instance != null)
+                GameSpeedManager.Instance.ReapplySpeed();
+            else
+                Time.timeScale = 1f;
         }
         else
         {

@@ -46,7 +46,7 @@ public partial class StageManager : MonoBehaviour
 
     void Start()
     {
-        // 진화 스테이지에서 복귀한 경우 → 원래 위치/난이도 복원 후 그 스테이지 재구성
+        // 1) 진화 스테이지에서 복귀
         if (EvolveStageContext.HasReturn)
         {
             currentWorld    = EvolveStageContext.ReturnWorld;
@@ -54,11 +54,19 @@ public partial class StageManager : MonoBehaviour
             currentStatMult = Mathf.Pow(statMultiplier,
                 (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
             EvolveStageContext.ClearReturn();
-
-            NextStage();   // 적 정리 + InitStage + 복원된 난이도로 재스폰
+            NextStage();
             return;
         }
 
+        // 2) 세이브된 진행도 복원  ← 이게 없으면 항상 1-1에서 시작
+        if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
+        {
+            ApplyFrom(SaveManager.Instance.Current);
+            NextStage();
+            return;
+        }
+
+        // 3) 세이브 없음 — 처음부터
         InitStage();
     }
 

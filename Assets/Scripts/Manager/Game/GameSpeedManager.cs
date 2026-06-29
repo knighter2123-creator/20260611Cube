@@ -12,7 +12,9 @@ public class GameSpeedManager : MonoBehaviour
     [SerializeField] private float[] speedSteps = { 1f, 2f, 3f };  // 순환할 배속 목록
 
     private int _currentIndex = 0;
-
+    
+    public void ReapplySpeed() => ApplySpeed();
+    
     public float CurrentSpeed => speedSteps[_currentIndex];
 
     void Awake()

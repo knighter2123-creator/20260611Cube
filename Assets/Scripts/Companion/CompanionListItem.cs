@@ -90,8 +90,11 @@ public class CompanionListItem : MonoBehaviour
     private Companion FindPlacedCompanion()
     {
         var companions = CompanionManager.Instance?.GetOwnedCompanions();
-        if (companions == null) return null;
-        return companions.Find(c => c.Data == _data && c.IsPlaced);
+        if (companions == null || _data == null) return null;
+
+
+        return companions.Find(c => c != null && c.Data != null
+                                              && c.Data.id == _data.id && c.IsPlaced);
     }
 
     private Color GetGradeColor(CompanionGrade grade)

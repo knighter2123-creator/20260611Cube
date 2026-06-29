@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using TMPro;
 
-public class CurrencyManager : MonoBehaviour
+public partial class CurrencyManager : MonoBehaviour
 {
     public static CurrencyManager Instance;
 
@@ -28,8 +28,13 @@ public class CurrencyManager : MonoBehaviour
 
     void Start()
     {
-        UpdateGoldUI();
-        UpdateGemUI();
+        if (SaveManager.Instance != null)
+            ApplyFrom(SaveManager.Instance.Current);   // 저장된 골드/젬 복원 + UI 갱신
+        else
+        {
+            UpdateGoldUI();
+            UpdateGemUI();
+        }
     }
 
     // ── 골드 ───────────────────────────────────────
