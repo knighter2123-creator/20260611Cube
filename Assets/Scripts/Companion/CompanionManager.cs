@@ -170,7 +170,6 @@ public class CompanionManager : MonoBehaviour
     // ──────────────────────────────────────────────
     //  씬 전환 — 배치 스냅샷 / 복원
     // ──────────────────────────────────────────────
-
     /// <summary>현재 occupied를 placementByIndex로 반영 (배치 가능한 씬에서 호출).</summary>
     public void SavePlacementSnapshot()
     {
@@ -189,9 +188,7 @@ public class CompanionManager : MonoBehaviour
     /// 생성 실패가 있어도 인덱스가 어긋나지 않게 placementByIndex를 새 인덱스로 다시 만든다.
     /// </summary>
     public void RestoreIntoScene(Tilemap tilemap)
-    {
-        Debug.Log($"[Restore] 호출 — data={ownedCompanionData.Count}, objects={ownedCompanions.Count}\n{System.Environment.StackTrace}");
-        
+    { 
         // ── 보강: Start의 ApplyFrom이 순서 때문에 skip됐을 수 있으니, 여기서 보장 ──
         if (ownedCompanionData.Count == 0
             && SaveManager.Instance != null

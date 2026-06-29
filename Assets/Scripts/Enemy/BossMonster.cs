@@ -11,8 +11,6 @@ public class BossMonster : Enemy
 
     [Header("보석 보상")]
     [SerializeField] private int baseRewardGem = 100;
-
-    protected float statMult = 1f;   // 스폰 시 받은 누적 배율
     
     protected override void InitStats()
     {

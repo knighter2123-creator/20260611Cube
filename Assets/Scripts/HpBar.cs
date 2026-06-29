@@ -15,11 +15,6 @@ public class HpBar : MonoBehaviour
     {
         mainCamera = Camera.main;
         canvasRect = GetComponent<RectTransform>();
-
-        // ✅ EnemyRespawn이 RegisterEnemy()를 호출하므로 여기서 중복 등록 제거
-        // (씬에 미리 배치된 Enemy가 있을 때만 필요하면 아래 주석 해제)
-        // foreach (GameObject monster in GameObject.FindGameObjectsWithTag("Enemy"))
-        //     RegisterEnemy(monster);
     }
 
     public void RegisterEnemy(GameObject monster)

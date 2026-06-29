@@ -92,7 +92,6 @@ public class CompanionListItem : MonoBehaviour
         var companions = CompanionManager.Instance?.GetOwnedCompanions();
         if (companions == null || _data == null) return null;
 
-
         return companions.Find(c => c != null && c.Data != null
                                               && c.Data.id == _data.id && c.IsPlaced);
     }
