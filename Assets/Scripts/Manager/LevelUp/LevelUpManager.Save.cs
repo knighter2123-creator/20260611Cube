@@ -1,5 +1,8 @@
 // LevelUpManager의 세이브 연동 partial.
 // 레벨/경험치/강화레벨/전투스탯을 SaveData와 주고받는다.
+
+using UnityEngine;
+
 partial class LevelUpManager
 {
     /// <summary>현재 스탯을 SaveData에 기록 (저장 시 SaveManager가 호출).</summary>
@@ -41,5 +44,7 @@ partial class LevelUpManager
 
         OnLevelUp?.Invoke(stat.Level);          // 레벨 UI 갱신
         OnExpChanged?.Invoke(stat.Experience);  // 경험치 바 갱신
+        
+        Debug.Log($"[LevelUp] ApplyFrom 완료 | dmg={stat.baseDamage}, lvD={stat.UpgradeLevelDamage} | id={GetInstanceID()}");
     }
 }

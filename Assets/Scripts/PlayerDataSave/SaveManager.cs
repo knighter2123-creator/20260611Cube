@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -35,6 +36,7 @@ public class SaveManager : MonoBehaviour
         PlayerBuffManager.Instance?.CaptureTo(data);
         CompanionManager.Instance?.CaptureTo(data);
         CurrencyManager.Instance?.CaptureTo(data);
+        CompanionFragment.Instance?.CaptureTo(data); 
 
         Current = data;
 
@@ -68,9 +70,11 @@ public class SaveManager : MonoBehaviour
 
             // 구버전 세이브 호환 — 리스트 필드가 null로 역직렬화될 경우 방어
             if (Current.claimedEvolveRewards == null)
-                Current.claimedEvolveRewards = new System.Collections.Generic.List<string>();
+                Current.claimedEvolveRewards = new List<string>();
             if (Current.ownedCompanionIds == null)
-                Current.ownedCompanionIds = new System.Collections.Generic.List<string>();
+                Current.ownedCompanionIds = new List<string>();
+            if (Current.companionFragments == null)
+                Current.companionFragments = new List<FragmentEntry>();
 
             Debug.Log("[SaveManager] 불러오기 완료");
         }

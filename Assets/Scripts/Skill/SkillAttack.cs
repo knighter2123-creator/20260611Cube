@@ -9,7 +9,5 @@ public class SkillAttack : ActiveSkill
 
         var (finalDamage, isCritical) = CalcDamage(caster.Stat);
         target.TakeDamage(finalDamage, isCritical);
-
-        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → {finalDamage} 데미지{(isCritical ? " (크리티컬!)" : "")}");
     }
 }

@@ -11,6 +11,13 @@ public class CompanionPlacement
     public int cellZ;
 }
 
+[Serializable]
+public class FragmentEntry
+{
+    public string companionId;
+    public int    count;
+}
+
 /// <summary>
 /// 디스크에 저장되는 플레이어 진행 데이터 (JsonUtility 직렬화용).
 /// 필드를 추가하면 자동으로 저장/로드 대상에 포함됩니다.
@@ -51,6 +58,7 @@ public class SaveData
 
     // ── 동료 보유 목록 (CompanionData.id 목록) ──
     public List<string> ownedCompanionIds = new List<string>();
+    public List<FragmentEntry> companionFragments = new List<FragmentEntry>();
 
     // ── 동료 배치 (보유 인덱스 → 셀) ──
     public List<CompanionPlacement> companionPlacements = new List<CompanionPlacement>();
@@ -60,4 +68,6 @@ public class SaveData
     
     // ── 기타 ──
     public string playerName = "";
+    public long lastExitTime = 0;
+    public long lastIdleClaimTime = 0;   // 마지막 정산 시각 (DateTime.ToBinary())
 }

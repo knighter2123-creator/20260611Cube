@@ -23,7 +23,5 @@ public class SkillArmorBreak : ActiveSkill
         if (!target.isDead)
             TimedAttachEffect.Spawn(armorBreakEffectPrefab, target.transform,
                 armorBreakDuration, "ArmorBreak");
-
-        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → {finalDamage} 데미지{(isCritical ? " (크리티컬!)" : "")} + 방어력 {armorBreakRate * 100}% 감소 ({armorBreakDuration}s)");
     }
 }

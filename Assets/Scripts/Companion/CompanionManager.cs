@@ -29,6 +29,11 @@ public class CompanionManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
+        {
+            ApplyFrom(SaveManager.Instance.Current);
+            CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance.Current);  // ★ 조각도 같은 시점에 복원
+        }
     }
 
     void Start()
@@ -197,6 +202,9 @@ public class CompanionManager : MonoBehaviour
         {
             ApplyFrom(SaveManager.Instance.Current);
         }
+
+        // ★ 조각 복원도 여기서 보장 (이 시점엔 CompanionFragment.Instance가 확실히 존재)
+        CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance?.Current);
 
         BindPlaceableTilemap(tilemap);
         occupied.Clear();

@@ -51,16 +51,31 @@ partial class LevelUpManager : MonoBehaviour
     {
         if (stat != null)
         {
-            // (기존 씬 전환 복원 로직 — 그대로 유지)
-            playerStat.Level = stat.Level;
-            playerStat.Experience = stat.Experience;
-            // ... 나머지 복원 ...
+            // 씬 전환: 메모리의 옛 stat(최신 강화 반영)을 새 PlayerStat에 그대로 이전
+            playerStat.Level         = stat.Level;
+            playerStat.Experience    = stat.Experience;
+            playerStat.MaxExperience = stat.MaxExperience;
+
+            // ★ 강화 레벨 복원 (누락분)
+            playerStat.UpgradeLevelDamage     = stat.UpgradeLevelDamage;
+            playerStat.UpgradeLevelAttackSpd  = stat.UpgradeLevelAttackSpd;
+            playerStat.UpgradeLevelCritChance = stat.UpgradeLevelCritChance;
+            playerStat.UpgradeLevelCritDamage = stat.UpgradeLevelCritDamage;
+
+            // ★ 강화로 누적된 실제 전투 스탯 복원 (누락분 — 이게 빠져서 dmg가 리셋됐음)
+            playerStat.baseDamage          = stat.baseDamage;
+            playerStat.Critical            = stat.Critical;
+            playerStat.CriticalMultiplier  = stat.CriticalMultiplier;
+            playerStat.AttackSpd           = stat.AttackSpd;
+
             stat = playerStat;
+
+            OnLevelUp?.Invoke(stat.Level);
+            OnExpChanged?.Invoke(stat.Experience);
         }
         else
         {
             stat = playerStat;
-            // 이번 세션 첫 초기화 → 세이브가 있으면 적용
             if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
                 ApplyFrom(SaveManager.Instance.Current);
         }

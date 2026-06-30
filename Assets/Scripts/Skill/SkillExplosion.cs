@@ -25,7 +25,5 @@ public class SkillExplosion : ActiveSkill
             enemy.TakeDamage(finalDamage, isCritical);
             hitCount++;
         }
-
-        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → 반경 {explosionRadius}m 내 {hitCount}명 적중");
     }
 }

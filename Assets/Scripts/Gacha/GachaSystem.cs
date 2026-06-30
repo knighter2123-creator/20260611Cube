@@ -67,7 +67,7 @@ public class GachaSystem : MonoBehaviour
         {
             Debug.Log($"[Gacha] 보석 부족. 필요: {cost}");
             return results;
-        } 
+        }
 
         for (int i = 0; i < count; i++)
         {
@@ -77,6 +77,9 @@ public class GachaSystem : MonoBehaviour
             GachaResult result = ProcessResult(data);
             results.Add(result);
         }
+
+        // ★ 젬 차감 + 동료/조각 획득을 한 번에 저장 (루프 밖에서 1회)
+        SaveManager.Instance?.Save();
 
         Debug.Log($"[Gacha] {count}회 뽑기 완료");
         return results;

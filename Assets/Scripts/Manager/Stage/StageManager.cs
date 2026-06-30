@@ -37,6 +37,7 @@ public partial class StageManager : MonoBehaviour
     private int   currentStage     = 1;
     private int   maxStagePerWorld = 10;
     private float currentStatMult  = 1f;
+    public float CurrentStatMult => currentStatMult;
 
     void Awake()
     {

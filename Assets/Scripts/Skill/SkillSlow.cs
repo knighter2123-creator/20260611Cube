@@ -14,7 +14,5 @@ public class SkillSlow : ActiveSkill
         var (finalDamage, isCritical) = CalcDamage(caster.Stat);
         target.TakeDamage(finalDamage, isCritical);
         target.ApplySlow(slowRate, slowDuration);
-
-        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → {finalDamage} 데미지{(isCritical ? " (크리티컬!)" : "")} + 둔화 {slowRate * 100}%");
     }
 }

@@ -21,7 +21,5 @@ public class SkillPoison : ActiveSkill
 
         target.TakeDamage(finalDamage, isCritical);
         target.ApplyDot(finalDot, dotInterval, dotDuration);
-
-        Debug.Log($"[Skill] {caster.CompanionName} → {skillName} → {finalDamage} 즉시{(isCritical ? " (크리티컬!)" : "")} + {finalDot}/s 독 ({dotDuration}s)");
     }
 }

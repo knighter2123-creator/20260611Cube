@@ -14,7 +14,6 @@ public class GachaUIManager : MonoBehaviour
     [SerializeField] private Button draw100Button;
 
     [Header("이동 버튼")]
-    [SerializeField] private Button backButton;
     [SerializeField] private Button closeResultButton;
 
     [Header("뽑기 결과")]
@@ -29,7 +28,6 @@ public class GachaUIManager : MonoBehaviour
         draw100Button.onClick.AddListener(() => OnDraw(GachaSystem.Instance.DrawHundred()));
 
         // ── 이동 버튼 ──────────────────────────────
-        backButton.onClick.AddListener(() => SceneLoader.Instance.GoToStage());
         closeResultButton.onClick.AddListener(() => ShowGachaPanel());
 
         // ── 초기 상태 ──────────────────────────────
