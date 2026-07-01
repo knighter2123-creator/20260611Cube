@@ -44,10 +44,6 @@ public class ShopManager : MonoBehaviour
 
         var cm = CurrencyManager.Instance;
         if (cm == null) return Fail(product, "재화 매니저를 찾을 수 없습니다.");
-        Debug.Log($"[Shop] 구매 시도 | 보유 젬={cm.Gem}, 요구={product.CostAmount}, CM ID={cm.GetInstanceID()}");
-
-        if (!cm.TrySpendCurrency(product.CostType, product.CostAmount))
-            return Fail(product, $"{product.CostType} 이(가) 부족합니다.");
 
         if (product.CostType == CurrencyType.Cash)
             return Fail(product, "현금 결제는 아직 지원되지 않습니다.");   // 추후 IAP 연동

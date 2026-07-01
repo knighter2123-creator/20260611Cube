@@ -10,13 +10,16 @@ partial class LevelUpManager
     {
         if (!enableDebugKeys) return;
 
-        // F1 : 레벨 30으로 점프
         if (Input.GetKeyDown(KeyCode.F1))
             DebugSetLevel(30);
-
-        // F2 : 경험치 50 추가 (레벨업 로직 그대로 테스트)
         if (Input.GetKeyDown(KeyCode.F2))
-            AddExp(50);
+            DebugSetLevel(50);
+        if (Input.GetKeyDown(KeyCode.F3))
+            DebugSetLevel(70);
+        if (Input.GetKeyDown(KeyCode.F4))
+            DebugSetLevel(100);
+        if (Input.GetKeyDown(KeyCode.F5))
+            DebugSetLevel(200);
     }
 
     private void DebugSetLevel(int level)

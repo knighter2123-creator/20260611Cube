@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 350698144df7d274c901bacefc9a0923, type: 3}
   m_Name: Addgold
   m_EditorClassIdentifier: Assembly-CSharp::ShopProductData
-  id: Spend_Gem 3000
+  id: Spend_Gem 1500
   category: Gold
   displayName: "\uACE8\uB4DC \uAD6C\uB9E4"
   description: "\uBCF4\uC11D 3000\uC744 \uC18C\uBAA8\uD558\uC5EC \uACE8\uB4DC\uB97C
     10000\uB9CC\uD07C \uC99D\uAC00\uC2DC\uD0B5\uB2C8\uB2E4."
   icon: {fileID: 4542172883094368417, guid: 6164a349e6a420442979a612321facfc, type: 3}
   costType: 1
-  costAmount: 3000
-  cashPriceText: "\uBE44\uC6A9 : Gem 3000"
+  costAmount: 1500
+  cashPriceText: "\uBE44\uC6A9 : Gem 1500"
   rewardType: 0
-  rewardAmount: 10000
+  rewardAmount: 50000

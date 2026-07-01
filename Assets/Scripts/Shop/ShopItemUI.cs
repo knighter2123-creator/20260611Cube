@@ -65,6 +65,7 @@ public class ShopItemUI : MonoBehaviour
 
     private void OnClickBuy()
     {
+        Debug.Log($"[Shop] OnClickBuy 호출 | 상품={product?.DisplayName} | UI ID={GetInstanceID()}");
         ShopManager.Instance?.TryPurchase(product);
     }
 }

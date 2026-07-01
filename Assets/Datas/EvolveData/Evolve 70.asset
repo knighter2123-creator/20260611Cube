@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 33a61b1baccf5b440b4a49ceb1b28dd1, type: 3}
-  m_Name: Evolve 50
+  m_Name: Evolve 70
   m_EditorClassIdentifier: Assembly-CSharp::EvolveStageData
-  id: evolve_50
-  displayName: "\uC9C4\uD654 \uC2A4\uD14C\uC774\uC9C0 (Lv.50)"
-  requiredLevel: 50
-  bossHpMultiplier: 2
-  bossDefenceMultiplier: 3
-  damageBuffPercent: 0.2
+  id: evolve_70
+  displayName: "\uC9C4\uD654 \uC2A4\uD14C\uC774\uC9C0 (Lv.70)"
+  requiredLevel: 70
+  bossHpMultiplier: 5
+  bossDefenceMultiplier: 4
+  damageBuffPercent: 0.3
