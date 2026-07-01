@@ -19,7 +19,7 @@ MonoBehaviour:
     10000\uB9CC\uD07C \uC99D\uAC00\uC2DC\uD0B5\uB2C8\uB2E4."
   icon: {fileID: 4542172883094368417, guid: 6164a349e6a420442979a612321facfc, type: 3}
   costType: 1
-  costAmount: -3000
+  costAmount: 3000
   cashPriceText: "\uBE44\uC6A9 : Gem 3000"
   rewardType: 0
   rewardAmount: 10000
