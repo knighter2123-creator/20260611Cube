@@ -36,14 +36,14 @@ public class PlayerExpUI : MonoBehaviour
         LevelUpManager.Instance.OnLevelUp    -= OnLevelUp;
     }
 
-    private void OnExpChanged(int currentExp) => Refresh();
+    private void OnExpChanged(long currentExp) => Refresh();
     private void OnLevelUp(int newLevel)      => Refresh();
 
     private void Refresh()
     {
         int level      = LevelUpManager.Instance.CurrentLevel;
-        int currentExp = LevelUpManager.Instance.CurrentExp;
-        int maxExp     = LevelUpManager.Instance.MaxExp;
+        long currentExp = LevelUpManager.Instance.CurrentExp;
+        long maxExp     = LevelUpManager.Instance.MaxExp;
 
         if (levelText != null)
             levelText.text = $"Lv. {level}";

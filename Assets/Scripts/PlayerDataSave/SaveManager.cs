@@ -99,23 +99,13 @@ public class SaveManager : MonoBehaviour
             Save();
         }
     }
-
-    // ── 세이브 초기화 (새 게임) ────────────────────
-    /// <summary>
-    /// 세이브 파일과 메모리 데이터를 모두 초기화.
-    /// 진화 보상 플래그·동료 보유 목록·영구 버프가 전부 SaveData에 있으므로 함께 리셋됨.
-    /// 호출 후에는 LoginScene으로 돌아가 각 매니저가 기본값으로 다시 초기화되게 하세요.
-    /// </summary>
+    
+    [ContextMenu("세이브 삭제")]
     public void DeleteSave()
     {
         if (File.Exists(SavePath)) File.Delete(SavePath);
         Current = new SaveData();
-
-        // 과거 버전에서 PlayerPrefs에 남았을 수 있는 잔여 키 정리 (있으면 제거)
-        PlayerPrefs.DeleteKey("PlayerDamageBuff");   // 구 PlayerBuffManager 키
-        PlayerPrefs.Save();
-
-        Debug.Log("[SaveManager] 세이브 삭제 (새 게임). LoginScene으로 재진입 권장.");
+        Debug.Log($"[SaveManager] 세이브 삭제됨: {SavePath}");
     }
 
     // ── 자동 저장 ──────────────────────────────────

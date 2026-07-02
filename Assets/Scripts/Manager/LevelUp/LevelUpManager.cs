@@ -26,7 +26,7 @@ partial class LevelUpManager : MonoBehaviour
     // ══════════════════════════════════════════════
     
     public event Action<int> OnLevelUp; // 레벨업 시 새 레벨 전달
-    public event Action<int> OnExpChanged; // 현재 exp 전달 (경험치 바 UI용)
+    public event Action<long> OnExpChanged; // 현재 exp 전달 (경험치 바 UI용)
     
     // ══════════════════════════════════════════════
     //  상수
@@ -36,8 +36,8 @@ partial class LevelUpManager : MonoBehaviour
     // ══════════════════════════════════════════════
     //  프로퍼티
     // ══════════════════════════════════════════════
-    public int CurrentExp   => stat != null ? stat.Experience : 0;
-    public int MaxExp       => stat != null ? stat.MaxExperience     : 100;
+    public long CurrentExp => stat != null ? stat.Experience : 0;
+    public long MaxExp     => stat != null ? stat.MaxExperience : 100;
     public int CurrentLevel => stat != null ? stat.Level : 1;
     
     // ══════════════════════════════════════════════
@@ -104,10 +104,11 @@ partial class LevelUpManager : MonoBehaviour
     }
 
     /// <summary>레벨에 따른 필요 경험치 공식 (인스펙터 설정으로 교체 가능)</summary>
-    private int CalculateMaxExp(int level)
+    private long CalculateMaxExp(int level)
     {
-        // 예: 100 → 150 → 225... (1.5배 증가)
-        return Mathf.RoundToInt(100 * Mathf.Pow(1.5f, level - 1));
+        // 100 → 150 → 225 ... (1.5배 증가)
+        double value = 100.0 * System.Math.Pow(1.1, level - 1);
+        return (long)System.Math.Max(1.0, System.Math.Round(value)); // 0 방지 가드
     }
     // StatType → (UpgradeConfig, 현재 강화 레벨)
     private (UpgradeConfig config, int level) GetConfigAndLevel(StatType type)

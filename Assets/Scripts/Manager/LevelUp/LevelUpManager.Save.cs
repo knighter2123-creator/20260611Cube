@@ -31,20 +31,21 @@ partial class LevelUpManager
 
         stat.Level         = d.level;
         stat.Experience    = d.experience;
-        stat.MaxExperience = d.maxExperience;
+        stat.MaxExperience = d.maxExperience > 0 ? d.maxExperience : 100;
 
         stat.UpgradeLevelDamage     = d.upgradeDamage;
         stat.UpgradeLevelAttackSpd  = d.upgradeAttackSpd;
         stat.UpgradeLevelCritChance = d.upgradeCritChance;
         stat.UpgradeLevelCritDamage = d.upgradeCritDamage;
 
-        stat.baseDamage         = d.baseDamage;
-        stat.Critical           = d.critical;
-        stat.CriticalMultiplier = d.criticalMultiplier;
+        // ★ 오염된 세이브(0) 자가 치유 — 0/음수면 기본값으로 복구
+        stat.baseDamage         = d.baseDamage         > 0  ? d.baseDamage         : 20;
+        stat.Critical           = d.critical           > 0  ? d.critical           : 3f;
+        stat.CriticalMultiplier = d.criticalMultiplier > 0  ? d.criticalMultiplier : 1.5f;
 
-        OnLevelUp?.Invoke(stat.Level);          // 레벨 UI 갱신
-        OnExpChanged?.Invoke(stat.Experience);  // 경험치 바 갱신
-        
+        OnLevelUp?.Invoke(stat.Level);
+        OnExpChanged?.Invoke(stat.Experience);
+
         Debug.Log($"[LevelUp] ApplyFrom 완료 | dmg={stat.baseDamage}, lvD={stat.UpgradeLevelDamage} | id={GetInstanceID()}");
     }
 }

@@ -30,11 +30,9 @@ public class Player : MonoBehaviour
 
     void Start()
     {
-        if (isFirstLoad)
-        {
-            playerStat.InitFull();
-            isFirstLoad = false;
-        }
+        bool hasSave = SaveManager.Instance != null && SaveManager.Instance.HasSave();
+        if (!hasSave)
+            playerStat.InitFull();   // ← 이 줄이 실제로 있는지 확인
 
         attackTimer = 0f;
 

@@ -30,8 +30,8 @@ public class SaveData
 
     // ── 레벨 / 경험치 ──
     public int level         = 1;
-    public int experience    = 0;
-    public int maxExperience = 100;
+    public long experience    = 0;
+    public long maxExperience = 100;
 
     // ── 강화 레벨 ──
     public int upgradeDamage     = 0;
@@ -55,6 +55,7 @@ public class SaveData
 
     // ── 진화 보상 1회 지급 플래그 (지급 완료된 티어 id 목록) ──
     public List<string> claimedEvolveRewards = new List<string>();
+   
 
     // ── 동료 보유 목록 (CompanionData.id 목록) ──
     public List<string> ownedCompanionIds = new List<string>();

@@ -8,8 +8,8 @@ public class PlayerStat
     // ──────────────────────────────────────────────
     [Header("레벨 / 경험치")]
     public int   Level         = 1;
-    public int Experience        = 0;
-    public int MaxExperience     = 100;
+    public long Experience        = 0;
+    public long MaxExperience     = 100;
     
     // ──────────────────────────────────────────────
     //  공격 범위
@@ -49,11 +49,13 @@ public class PlayerStat
     {
         Level              = 1;
         Experience         = 0;
-        baseDamage         = 5;
-        AttackSpd          = 300;
-        Critical           = 5f;
-        CriticalMultiplier = 1.3f;
-        
+        MaxExperience      = 100;   // 누락
+        attackRange        = 500f;  // 누락 — 이게 빠져서 10이 유지됨
+        baseDamage         = 20;
+        AttackSpd          = 3000;
+        Critical           = 3f;    // 필드 초기화값과 통일 (기존 5f)
+        CriticalMultiplier = 1.5f;  // 필드 초기화값과 통일 (기존 1.3f)
+
         UpgradeLevelDamage     = 0;
         UpgradeLevelAttackSpd  = 0;
         UpgradeLevelCritChance = 0;
