@@ -15387,6 +15387,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CompanionManager
   maxCompanions: 6
   placeableTilemap: {fileID: 703190236}
+  database: {fileID: 11400000, guid: 9eea1e003cd21274fae47eac227a22ad, type: 2}
 --- !u!4 &2072141218
 Transform:
   m_ObjectHideFlags: 0
