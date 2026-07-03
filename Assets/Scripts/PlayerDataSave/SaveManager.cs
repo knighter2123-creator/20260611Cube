@@ -12,7 +12,7 @@ using UnityEngine;
 public class SaveManager : MonoBehaviour
 {
     public static SaveManager Instance { get; private set; }
-
+    
     public SaveData Current { get; private set; }
 
     private string SavePath => Path.Combine(Application.persistentDataPath, "save.json");
@@ -37,6 +37,7 @@ public class SaveManager : MonoBehaviour
         CompanionManager.Instance?.CaptureTo(data);
         CurrencyManager.Instance?.CaptureTo(data);
         CompanionFragment.Instance?.CaptureTo(data); 
+        MissionManager.Instance?.CaptureTo(data);
 
         Current = data;
 

@@ -71,4 +71,5 @@ public class SaveData
     public string playerName = "";
     public long lastExitTime = 0;
     public long lastIdleClaimTime = 0;   // 마지막 정산 시각 (DateTime.ToBinary())
+    public MissionSaveData missionData = new MissionSaveData();
 }
