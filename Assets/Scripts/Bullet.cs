@@ -14,21 +14,21 @@ public class Bullet : MonoBehaviour
     private Rigidbody2D rb;
     private bool        isReturned;
 
-    void Awake()
+    void Awake() // 1
     {
         rb = GetComponent<Rigidbody2D>();
         rb.gravityScale   = 0f;
         rb.freezeRotation = true;
     }
 
-    void OnEnable()
+    void OnEnable() // 2
     {
         timer      = 0f;
         isReturned = false;
         if (rb != null) rb.linearVelocity = Vector2.zero;
     }
 
-    void OnDisable()
+    void OnDisable() // 8
     {
         if (rb != null) rb.linearVelocity = Vector2.zero;
     }

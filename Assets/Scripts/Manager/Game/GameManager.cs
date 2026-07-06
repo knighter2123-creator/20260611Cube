@@ -22,7 +22,7 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+        
 
         // 🔥 여기서 확보
         if (levelUpManager == null)

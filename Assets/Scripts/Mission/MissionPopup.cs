@@ -52,9 +52,10 @@ public class MissionPopup : MonoBehaviour
 
     private void ShowTab(MissionType type)
     {
+        Debug.Log($"[MissionPopup] ShowTab: {type}");
         currentTab = type;
         Rebuild();
-        if (masterMissionUI != null) masterMissionUI.Bind(currentTab);  // 탭에 맞춰 재바인딩
+        if (masterMissionUI != null) masterMissionUI.Bind(currentTab);
         RefreshClaimAllButton();
     }
 
@@ -65,9 +66,16 @@ public class MissionPopup : MonoBehaviour
         spawnedItems.Clear();
 
         var mgr = MissionManager.Instance;
-        if (mgr == null) return;
+        if (mgr == null)
+        {
+            Debug.LogWarning("[MissionPopup] MissionManager.Instance == null");  // ← 추가
+            return;
+        }
 
-        foreach (var data in mgr.GetMissions(currentTab))
+        var list = mgr.GetMissions(currentTab);
+        Debug.Log($"[MissionPopup] {currentTab} 미션 개수: {list.Count}");        // ← 추가
+
+        foreach (var data in list)
         {
             var ui = Instantiate(itemPrefab, contentParent);
             ui.Bind(data);

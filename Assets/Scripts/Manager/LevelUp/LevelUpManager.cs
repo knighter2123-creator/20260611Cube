@@ -19,7 +19,7 @@ partial class LevelUpManager : MonoBehaviour
             return;
         }
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+        
     }
     // ══════════════════════════════════════════════
     //  이벤트
