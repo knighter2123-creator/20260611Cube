@@ -26,13 +26,17 @@ public class CompanionManager : MonoBehaviour
 
     void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
-        
+
         if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
         {
             ApplyFrom(SaveManager.Instance.Current);
-            CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance.Current);  // ★ 조각도 같은 시점에 복원
+            CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance.Current);
         }
     }
 
@@ -193,46 +197,43 @@ public class CompanionManager : MonoBehaviour
     /// 생성 실패가 있어도 인덱스가 어긋나지 않게 placementByIndex를 새 인덱스로 다시 만든다.
     /// </summary>
     public void RestoreIntoScene(Tilemap tilemap)
-    { 
-        // ── 보강: Start의 ApplyFrom이 순서 때문에 skip됐을 수 있으니, 여기서 보장 ──
-        if (ownedCompanionData.Count == 0
-            && SaveManager.Instance != null
-            && SaveManager.Instance.Current != null
-            && SaveManager.Instance.Current.ownedCompanionIds.Count > 0)
-        {
-            ApplyFrom(SaveManager.Instance.Current);
-        }
-
-        // ★ 조각 복원도 여기서 보장 (이 시점엔 CompanionFragment.Instance가 확실히 존재)
-        CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance?.Current);
+    {
+        Debug.Log($"[CompanionManager] RestoreIntoScene — 데이터 {ownedCompanionData.Count}명, 오브젝트 {ownedCompanions.Count}개");
 
         BindPlaceableTilemap(tilemap);
+
+        // 이전 씬의 배치 점유 정보만 초기화 (오브젝트는 유지)
         occupied.Clear();
 
-        // 기존 배치 의도 보관 (원본 인덱스 기준)
-        Dictionary<int, Vector3Int> intended = new Dictionary<int, Vector3Int>(placementByIndex);
-
-        List<CompanionData> dataList = new List<CompanionData>(ownedCompanionData);
-        ownedCompanions.Clear();
-        ownedCompanionData.Clear();
-        placementByIndex.Clear();   // 정확한 새 인덱스로 다시 채움
-
-        for (int i = 0; i < dataList.Count; i++)
+        // 오브젝트가 없으면(최초 실행/앱 재시작 후 복원) 데이터로부터 생성
+        if (ownedCompanions.Count == 0 && ownedCompanionData.Count > 0)
         {
-            Companion companion = SpawnCompanionObject(dataList[i]);
-            if (companion == null) continue;
+            List<CompanionData> dataList = new List<CompanionData>(ownedCompanionData);
+            ownedCompanionData.Clear();
 
-            ownedCompanionData.Add(dataList[i]);
-            ownedCompanions.Add(companion);
-            int newIndex = ownedCompanions.Count - 1;
-
-            if (intended.TryGetValue(i, out Vector3Int cell))
+            foreach (var data in dataList)
             {
-                if (PlaceCompanion(companion, cell))
-                {
-                    placementByIndex[newIndex] = cell;
-                }
+                Companion companion = SpawnCompanionObject(data);
+                if (companion == null) continue;
+                ownedCompanionData.Add(data);
+                ownedCompanions.Add(companion);
             }
+        }
+
+        // 모든 유지된 오브젝트를 일단 회수 상태로 (이전 씬 타일맵 위치 해제)
+        foreach (var companion in ownedCompanions)
+            if (companion != null) companion.Retrieve();
+
+        // 배치 의도(placementByIndex)대로 현재 씬 타일맵에 재배치
+        foreach (var kv in placementByIndex)
+        {
+            int idx = kv.Key;
+            Vector3Int cell = kv.Value;
+            if (idx < 0 || idx >= ownedCompanions.Count) continue;
+
+            Companion companion = ownedCompanions[idx];
+            if (companion != null)
+                PlaceCompanion(companion, cell);
         }
     }
 

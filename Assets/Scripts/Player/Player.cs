@@ -49,10 +49,10 @@ public class Player : MonoBehaviour
     void FindTarget()
     {
         currentTarget = null;
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
 
-        GameObject[] enemies      = GameObject.FindGameObjectsWithTag("Enemy");
-        float        closestDist  = Mathf.Infinity;
-        Enemy        closestEnemy = null;
+        float closestDist = Mathf.Infinity;
+        Enemy closestEnemy = null;
 
         foreach (GameObject enemyObj in enemies)
         {
@@ -64,26 +64,23 @@ public class Player : MonoBehaviour
 
             if (dist < closestDist)
             {
-                closestDist  = dist;
+                closestDist = dist;
                 closestEnemy = e;
             }
         }
-
         currentTarget = closestEnemy;
     }
 
     void HandleAttack()
     {
-        if (isDead) return;
-        if (currentTarget == null) return;
-
         attackTimer += Time.deltaTime;
-
         float cooldown = Mathf.Max(stat.attackCooldown, 0.1f);
+
         if (attackTimer >= cooldown)
         {
             attackTimer = 0f;
-            Bullet.Launch(currentTarget, firePoint != null ? firePoint : transform, playerStat);
+            if (currentTarget == null || currentTarget.isDead) { }
+            Bullet.Launch(currentTarget, firePoint, playerStat);
         }
     }
 

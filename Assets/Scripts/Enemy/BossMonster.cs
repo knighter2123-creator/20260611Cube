@@ -40,6 +40,7 @@ public class BossMonster : Enemy
         CurrencyManager.Instance?.AddGem(baseRewardGem);
         LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(baseRewardExp * (bossExpMultiplier * statMult)));
         StageManager.Instance?.ReportBossKill();
+        MissionManager.Instance?.ReportBossKill();
 
         Destroy(gameObject);
     }

@@ -30,13 +30,17 @@ public partial class MissionManager : MonoBehaviour
 
     private void Awake()
     {
-        Instance = this; // 씬 바운드 싱글톤
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);   // 중복 → 파괴 (씬 재진입 시 새로 생긴 것 제거)
+            return;
+        }
+        Instance = this;
 
-        // 세이브에서 자기 데이터 복원 (각 매니저가 자기 시점에 ApplyFrom)
         if (SaveManager.Instance != null && SaveManager.Instance.Current != null)
             ApplyFrom(SaveManager.Instance.Current);
         else
-            EnsureInitialized(); // 세이브 매니저가 없는 예외 상황 폴백
+            EnsureInitialized();
     }
 
     private void Start()
@@ -83,6 +87,7 @@ public partial class MissionManager : MonoBehaviour
     // ---------------- 진행도 리포트 ----------------
     public void ReportProgress(MissionConditionType conditionType, int amount = 1)
     {
+        Debug.Log($"[MissionManager] ReportProgress: {conditionType} +{amount}");
         if (!initialized) EnsureInitialized();
         if (amount <= 0) return;
 

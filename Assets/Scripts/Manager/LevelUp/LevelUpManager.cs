@@ -13,6 +13,7 @@ partial class LevelUpManager : MonoBehaviour
     private PlayerStat stat;
     void Awake()
     {
+        
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);

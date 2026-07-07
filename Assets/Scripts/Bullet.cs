@@ -38,8 +38,12 @@ public class Bullet : MonoBehaviour
     /// </summary>
     public static void Launch(Enemy target, Transform firePoint, PlayerStat stat)
     {
-        if (target == null || ObjectPoolManager.Instance == null) return;
-
+        // 방어 가드 (누락됐던 부분 복원)
+        if (target == null || target.isDead) return;
+        if (stat == null) return;
+        if (firePoint == null) return;
+        if (ObjectPoolManager.Instance == null) return;
+        
         // 영구 버프 적용된 기본 공격력
         float buffMult     = PlayerBuffManager.Instance?.DamageMultiplier ?? 1f;
         float buffedDamage = stat.baseDamage * buffMult;
@@ -51,7 +55,7 @@ public class Bullet : MonoBehaviour
             : buffedDamage;
 
         Vector2 spawnPos = (Vector2)firePoint.position;
-        Vector2 dir      = ((Vector2)target.transform.position - spawnPos).normalized;
+        Vector2 dir = ((Vector2)target.transform.position - spawnPos).normalized;
         float   angle    = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
         GameObject bulletObj = ObjectPoolManager.Instance.GetBulletInactive();
@@ -68,6 +72,7 @@ public class Bullet : MonoBehaviour
 
         bulletObj.SetActive(true);
         bullet.Init(dir, finalDamage, isCritical);
+        
     }
 
     public void Init(Vector2 dir, float dmg, bool crit = false)

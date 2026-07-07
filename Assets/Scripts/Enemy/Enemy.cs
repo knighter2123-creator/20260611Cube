@@ -82,6 +82,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(rewardGold * statMult));
         LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(rewardExp * statMult));
         StageManager.Instance?.ReportEnemyKill();
+        MissionManager.Instance?.ReportEnemyKill();
 
         Destroy(gameObject);
     }

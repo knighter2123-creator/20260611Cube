@@ -66,7 +66,7 @@ public class GachaSystem : MonoBehaviour
         if (!CurrencyManager.Instance.SpendGem(cost))
         {
             Debug.Log($"[Gacha] 보석 부족. 필요: {cost}");
-            return results;
+            return results;   // 실패 → 여기서 리턴, 카운트 안 오름 (정상)
         }
 
         for (int i = 0; i < count; i++)
@@ -77,6 +77,10 @@ public class GachaSystem : MonoBehaviour
             GachaResult result = ProcessResult(data);
             results.Add(result);
         }
+
+        // ★ 미션 진행도 리포트 (실제 뽑힌 개수만큼)
+        if (results.Count > 0)
+            MissionManager.Instance?.ReportGachaPull(results.Count);
 
         // ★ 젬 차감 + 동료/조각 획득을 한 번에 저장 (루프 밖에서 1회)
         SaveManager.Instance?.Save();
