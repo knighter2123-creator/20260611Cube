@@ -29,7 +29,7 @@ public class PlayerName : MonoBehaviour
     {
         string savedName = PlayerPrefs.GetString("PlayerName", "플레이어");
         if (nickNameText != null)
-            nickNameText.text = "유저 : " + savedName;
+            nickNameText.text = savedName;
     }
 
     void OpenPopup()
@@ -50,9 +50,9 @@ public class PlayerName : MonoBehaviour
     {
         string inputName = usernameField.text.Trim();
 
-        if (inputName.Length < 2 || inputName.Length > 10)
+        if (inputName.Length < 2 || inputName.Length > 6)
         {
-            Debug.Log("닉네임을 2~10글자 이내로 작성하세요.");
+            Debug.Log("닉네임을 2~6글자 이내로 작성하세요.");
             usernameField.text = string.Empty;
             return;
         }

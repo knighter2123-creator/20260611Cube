@@ -13,7 +13,6 @@ public class Player : MonoBehaviour
 
     private Enemy currentTarget;
     private float attackTimer;
-    private bool  isDead      = false;
     private bool  isFirstLoad;
 
     public PlayerStat stat => playerStat;
@@ -79,7 +78,7 @@ public class Player : MonoBehaviour
         if (attackTimer >= cooldown)
         {
             attackTimer = 0f;
-            if (currentTarget == null || currentTarget.isDead) { }
+            if (currentTarget == null || currentTarget.isDead) return;
             Bullet.Launch(currentTarget, firePoint, playerStat);
         }
     }
