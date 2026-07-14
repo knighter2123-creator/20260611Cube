@@ -80,7 +80,12 @@ public class GachaSystem : MonoBehaviour
 
         // ★ 미션 진행도 리포트 (실제 뽑힌 개수만큼)
         if (results.Count > 0)
+        {
             MissionManager.Instance?.ReportGachaPull(results.Count);
+
+            // ★ 가이드 퀘스트: 동료 소환
+            GuideQuestManager.Instance?.ReportSummon(results.Count);
+        }
 
         // ★ 젬 차감 + 동료/조각 획득을 한 번에 저장 (루프 밖에서 1회)
         SaveManager.Instance?.Save();

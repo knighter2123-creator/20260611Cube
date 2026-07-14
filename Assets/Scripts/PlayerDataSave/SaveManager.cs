@@ -19,7 +19,6 @@ public class SaveManager : MonoBehaviour
 
     void Awake()
     {
-       
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
@@ -39,6 +38,7 @@ public class SaveManager : MonoBehaviour
         CurrencyManager.Instance?.CaptureTo(data);
         CompanionFragment.Instance?.CaptureTo(data); 
         MissionManager.Instance?.CaptureTo(data);
+        GuideQuestManager.Instance?.CaptureTo(data);
 
         Current = data;
 

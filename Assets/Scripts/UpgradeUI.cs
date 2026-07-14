@@ -36,10 +36,11 @@ public class UpgradeUI : MonoBehaviour
     //  인스펙터 연결
     // ══════════════════════════════════════════════
     [Header("공통 UI")]
+    [Tooltip("★ 이 컴포넌트가 붙은 오브젝트와 달라야 함 (같으면 Start에서 자신을 꺼버림)")]
     [SerializeField] private GameObject upgradePanel;   // 패널 전체 (열기/닫기용)
 
     [Header("스탯 행")]
-    [SerializeField] private StatRow[] statRows;        // 인스펙터에서 3개 배열로 설정
+    [SerializeField] private StatRow[] statRows;
 
     // ══════════════════════════════════════════════
     //  내부 상태
@@ -54,19 +55,29 @@ public class UpgradeUI : MonoBehaviour
         // 게임 시작 시 패널 숨김
         if (upgradePanel != null)
             upgradePanel.SetActive(false);
+
+        // ★ 가이드 퀘스트: 씬 전환으로 넘어온 "강화 UI 열기" 예약 소비
+        //   (OnEnable은 Start보다 먼저 실행되므로 예약은 여기서 처리해야 함)
+        var gq = GuideQuestManager.Instance;
+        if (gq != null && gq.TryConsumeStatFocus(out LevelUpManager.StatType type))
+            FocusStat(type);
     }
 
     void OnEnable()
     {
         lm = LevelUpManager.Instance;
-        if (lm == null) return;
 
-        lm.OnStatUpgraded += HandleStatUpgraded;
+        // ★ lm이 아직 없어도 버튼 리스너는 반드시 등록한다 (조기 리턴 금지)
+        if (lm != null)
+            lm.OnStatUpgraded += HandleStatUpgraded;
+
         RegisterButtonListeners();
 
-        // 골드 변경 시 버튼 상태 갱신
         if (CurrencyManager.Instance != null)
             CurrencyManager.Instance.OnGoldChanged += HandleGoldChanged;
+
+        if (GuideQuestManager.Instance != null)
+            GuideQuestManager.Instance.OnFocusStatUpgrade += FocusStat;
 
         RefreshAll();
     }
@@ -79,19 +90,21 @@ public class UpgradeUI : MonoBehaviour
         if (CurrencyManager.Instance != null)
             CurrencyManager.Instance.OnGoldChanged -= HandleGoldChanged;
 
+        // ★ 구독 해제
+        if (GuideQuestManager.Instance != null)
+            GuideQuestManager.Instance.OnFocusStatUpgrade -= FocusStat;
+
         UnregisterButtonListeners();
     }
 
     // ══════════════════════════════════════════════
     //  버튼 리스너 등록 / 해제
-    //  (인스펙터 OnClick 대신 코드로 등록 → 씬 전환 후 참조 끊김 방지)
     // ══════════════════════════════════════════════
     private void RegisterButtonListeners()
     {
         foreach (var row in statRows)
         {
-            // 클로저 캡처를 위해 지역 변수로 복사
-            var type = row.statType;
+            var type = row.statType;   // 클로저 캡처용 지역 복사
 
             row.buttonX1?.onClick.AddListener(() => OnClickUpgrade(type, 1));
             row.buttonX10?.onClick.AddListener(() => OnClickUpgrade(type, 10));
@@ -113,23 +126,28 @@ public class UpgradeUI : MonoBehaviour
     //  버튼 콜백
     // ══════════════════════════════════════════════
 
-    /// <summary>강화 버튼 클릭 시 호출 (×1 / ×10 / ×100 공용)</summary>
+    /// <summary>강화 버튼 클릭 (×1 / ×10 / ×100 공용)</summary>
     private void OnClickUpgrade(LevelUpManager.StatType type, int times)
     {
+        if (lm == null) lm = LevelUpManager.Instance;
         if (lm == null) return;
 
         int successCount = lm.TryUpgradeMultiple(type, times);
 
         if (successCount == 0)
         {
-            // 강화 실패 시 버튼 인터랙션으로 피드백
-            // 필요하면 여기에 SFX나 흔들림 효과 추가
             Debug.Log($"[UpgradeUI] {type} 강화 실패 (Currency 부족 또는 최대 레벨)");
+            return;
         }
-        // 성공 시 OnStatUpgraded 이벤트 → HandleStatUpgraded → RefreshRow 호출
+
+        // ★ 가이드 퀘스트에 "실제 성공 횟수"만큼 보고
+        //   OnStatUpgraded 이벤트를 구독하지 않는 이유: ×100의 발화 횟수를 신뢰할 수 없음
+        GuideQuestManager.Instance?.ReportStatUpgrade(type, successCount);
+
+        // UI 갱신은 OnStatUpgraded → HandleStatUpgraded → RefreshRow가 처리
     }
 
-    /// <summary>닫기 버튼 — 인스펙터 OnClick에 연결하거나 코드로 연결</summary>
+    /// <summary>닫기 버튼</summary>
     public void OnClickClose()
     {
         if (upgradePanel != null)
@@ -141,29 +159,55 @@ public class UpgradeUI : MonoBehaviour
     {
         if (upgradePanel != null)
             upgradePanel.SetActive(true);
+
+        // ★ 패널이 열리는 시점에 갱신
+        //   OnEnable은 씬 로드 직후 1회만 발화하며, 그땐 Player.Instance가 아직 없을 수 있음.
+        //   Open()은 UpgradeUI 자신을 켜는 게 아니라 자식 패널만 켜므로 OnEnable이 재발화하지 않는다.
+        if (lm == null) lm = LevelUpManager.Instance;
+        RefreshAll();
+    }
+
+    /// <summary>가이드 퀘스트가 지정한 스탯 강화 항목을 열고 강조한다.</summary>
+    private void FocusStat(LevelUpManager.StatType type)
+    {
+        Open();
+
+        foreach (var row in statRows)
+        {
+            if (row.statType != type) continue;
+
+            Debug.Log($"[UpgradeUI] 가이드 퀘스트 포커스 → {GuideQuest.StatName(type)}");
+            RefreshRow(type);
+            // 필요하면 여기서 하이라이트 / 스크롤 이동 처리
+            break;
+        }
     }
 
     // ══════════════════════════════════════════════
     //  이벤트 핸들러
     // ══════════════════════════════════════════════
-   
     private void HandleStatUpgraded(LevelUpManager.StatType type) => RefreshRow(type);
 
-    // ══════════════════════════════════════════════
-    //  UI 갱신
-    // ══════════════════════════════════════════════
-
-    /// <summary>패널 열릴 때 전체 갱신</summary>
-    private void RefreshAll()
+    // 골드 바뀔 때 전체 행 버튼 상태 재갱신
+    private void HandleGoldChanged(int _)
     {
-        // RefreshCurrency() 제거 — CurrencyManager.UpdateUI()가 자동 처리
         foreach (var row in statRows)
             RefreshRow(row.statType);
     }
 
-    /// <summary>특정 스탯 행 전체 갱신 (강화 후 해당 행만 갱신)</summary>
+    // ══════════════════════════════════════════════
+    //  UI 갱신
+    // ══════════════════════════════════════════════
+    private void RefreshAll()
+    {
+        foreach (var row in statRows)
+            RefreshRow(row.statType);
+    }
+
     private void RefreshRow(LevelUpManager.StatType type)
     {
+        if (lm == null) return;
+
         foreach (var row in statRows)
         {
             if (row.statType != type) continue;
@@ -171,9 +215,6 @@ public class UpgradeUI : MonoBehaviour
             int  upgradeLv = lm.GetUpgradeLevel(type);
             int  cost      = lm.GetUpgradeCost(type);
             bool isMaxed   = upgradeLv >= 5000;
-
-            // 골드 비교를 CurrencyManager.Gold 기준으로 변경
-            bool canAfford = CurrencyManager.Instance != null && CurrencyManager.Instance.Gold >= cost;
 
             if (row.upgradeLevelText != null)
                 row.upgradeLevelText.text = isMaxed ? "MAX" : $"{upgradeLv:N0} / 5,000";
@@ -191,7 +232,6 @@ public class UpgradeUI : MonoBehaviour
         }
     }
 
-    /// <summary>StatType에 따라 현재 스탯 수치 문자열 반환</summary>
     private string GetStatValueString(LevelUpManager.StatType type)
     {
         var player = Player.Instance;
@@ -207,17 +247,9 @@ public class UpgradeUI : MonoBehaviour
         };
     }
 
-    /// <summary>버튼 Interactable 상태 + 색상 동시 적용</summary>
     private void SetButtonInteractable(Button btn, bool interactable)
     {
         if (btn == null) return;
         btn.interactable = interactable;
-    }
-    
-    // 골드 바뀔 때 전체 행 버튼 상태 재갱신
-    private void HandleGoldChanged(int _)
-    {
-        foreach (var row in statRows)
-            RefreshRow(row.statType);
     }
 }

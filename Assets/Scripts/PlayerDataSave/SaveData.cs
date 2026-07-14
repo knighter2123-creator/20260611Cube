@@ -44,6 +44,7 @@ public class SaveData
     public int baseDamage         = 0;
     public float critical           = 0f;
     public float criticalMultiplier = 0f;
+    public float attackSpd = 1f;
 
     // ── 스테이지 진행도 ──
     public int currentWorld = 1;
@@ -55,7 +56,6 @@ public class SaveData
 
     // ── 진화 보상 1회 지급 플래그 (지급 완료된 티어 id 목록) ──
     public List<string> claimedEvolveRewards = new List<string>();
-   
 
     // ── 동료 보유 목록 (CompanionData.id 목록) ──
     public List<string> ownedCompanionIds = new List<string>();
@@ -72,4 +72,5 @@ public class SaveData
     public long lastExitTime = 0;
     public long lastIdleClaimTime = 0;   // 마지막 정산 시각 (DateTime.ToBinary())
     public MissionSaveData missionData = new MissionSaveData();
+    public GuideQuestSaveData guideQuest = new GuideQuestSaveData();
 }

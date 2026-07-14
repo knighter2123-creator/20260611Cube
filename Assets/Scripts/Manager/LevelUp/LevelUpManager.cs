@@ -108,7 +108,7 @@ partial class LevelUpManager : MonoBehaviour
     private long CalculateMaxExp(int level)
     {
         // 100 → 150 → 225 ... (1.5배 증가)
-        double value = 100.0 * System.Math.Pow(1.1, level - 1);
+        double value = 100.0 * System.Math.Pow(1.15, level - 1);
         return (long)System.Math.Max(1.0, System.Math.Round(value)); // 0 방지 가드
     }
     // StatType → (UpgradeConfig, 현재 강화 레벨)

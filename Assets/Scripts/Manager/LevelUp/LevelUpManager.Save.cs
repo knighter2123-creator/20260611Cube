@@ -22,6 +22,7 @@ partial class LevelUpManager
         d.baseDamage         = stat.baseDamage;
         d.critical           = stat.Critical;
         d.criticalMultiplier = stat.CriticalMultiplier;
+        d.attackSpd = stat.AttackSpd;
     }
 
     /// <summary>SaveData를 현재 스탯에 반영 (스탯 준비 후 호출 — Init 참고).</summary>
@@ -42,6 +43,7 @@ partial class LevelUpManager
         stat.baseDamage         = d.baseDamage         > 0  ? d.baseDamage         : 20;
         stat.Critical           = d.critical           > 0  ? d.critical           : 3f;
         stat.CriticalMultiplier = d.criticalMultiplier > 0  ? d.criticalMultiplier : 1.5f;
+        stat.AttackSpd = d.attackSpd > 0f ? d.attackSpd : 1f;
 
         OnLevelUp?.Invoke(stat.Level);
         OnExpChanged?.Invoke(stat.Experience);

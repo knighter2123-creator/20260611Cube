@@ -35,8 +35,8 @@ public partial class LevelUpManager
     
     [Header("스탯별 강화 설정")]
     [SerializeField] private UpgradeConfig damageConfig     = new UpgradeConfig { baseCost = 10, costPerLevel = 15, gainPerUpgrade = 5f   };
-    [SerializeField] private UpgradeConfig attackspdConfig  = new UpgradeConfig { baseCost = 150, costPerLevel = 50, gainPerUpgrade = 50f   }; // ✅ gain 양수로 변경
-    [SerializeField] private UpgradeConfig critChanceConfig = new UpgradeConfig { baseCost = 300, costPerLevel = 150, gainPerUpgrade = 0.1f };
+    [SerializeField] private UpgradeConfig attackspdConfig  = new UpgradeConfig { baseCost = 150, costPerLevel = 50, gainPerUpgrade = 10f   }; // ✅ gain 양수로 변경
+    [SerializeField] private UpgradeConfig critChanceConfig = new UpgradeConfig { baseCost = 300, costPerLevel = 150, gainPerUpgrade = 0.05f };
     [SerializeField] private UpgradeConfig critDamageConfig = new UpgradeConfig { baseCost = 100, costPerLevel = 30, gainPerUpgrade = 0.1f };
     
     // ══════════════════════════════════════════════

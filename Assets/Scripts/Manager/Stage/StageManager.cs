@@ -98,6 +98,9 @@ public partial class StageManager : MonoBehaviour
         killCount++;
         UpdateKillUI();
 
+        // ★ 가이드 퀘스트: 적 처치
+        GuideQuestManager.Instance?.ReportEnemyKill();
+
         if (killCount >= killGoal)
         {
             bossSpawned = true;
@@ -108,6 +111,10 @@ public partial class StageManager : MonoBehaviour
     public void ReportBossKill()
     {
         if (stageOver) return;
+
+        // ★ 보스는 ReportEnemyKill을 거치지 않으므로 여기서 별도 보고
+        GuideQuestManager.Instance?.ReportEnemyKill();
+
         StageClear();
     }
 
@@ -118,6 +125,10 @@ public partial class StageManager : MonoBehaviour
         stageOver = true;
         OnStageClear?.Invoke();
         Debug.Log($"[StageManager] {currentWorld}-{currentStage} 클리어!");
+
+        // ★ 가이드 퀘스트: 방금 클리어한 스테이지를 보고
+        //   ※ 반드시 currentStage++ 이전에! 이후에 넣으면 다음 스테이지를 클리어했다고 보고됨
+        GuideQuestManager.Instance?.ReportStageClear(currentWorld, currentStage);
 
         currentStage++;
 
@@ -130,7 +141,7 @@ public partial class StageManager : MonoBehaviour
 
         currentStatMult *= statMultiplier;
         Debug.Log($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
-        
+
         SaveManager.Instance?.Save();
         NextStage();
     }

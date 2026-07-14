@@ -72,4 +72,27 @@ public class SceneLoader : MonoBehaviour
         Scene scene = SceneManager.GetSceneByName(sceneName);
         return scene.IsValid() && scene.isLoaded;
     }
+    
+    // ── 상태 조회 (GuideQuest 등 외부 판단용) ─────
+
+    /// <summary>현재 활성 씬 이름</summary>
+    public string CurrentScene => SceneManager.GetActiveScene().name;
+
+    /// <summary>가챠가 Additive로 열려 있는지</summary>
+    public bool IsGachaOpen => IsSceneLoaded(GACHA_SCENE);
+
+    /// <summary>이미 스테이지면 아무것도 하지 않고, 아니면 스테이지로 복귀한다.</summary>
+    public void EnsureStageScene()
+    {
+        // 가챠가 열려 있으면 GoToStage가 언로드 + 배속 복원까지 처리
+        if (IsGachaOpen)
+        {
+            GoToStage();
+            return;
+        }
+
+        if (CurrentScene == STAGE_SCENE) return;   // 불필요한 재로드 방지
+
+        GoToStage();
+    }
 }

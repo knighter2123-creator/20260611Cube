@@ -83,6 +83,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(rewardExp * statMult));
         StageManager.Instance?.ReportEnemyKill();
         MissionManager.Instance?.ReportEnemyKill();
+        GuideQuestManager.Instance?.ReportEnemyKill();
 
         Destroy(gameObject);
     }
