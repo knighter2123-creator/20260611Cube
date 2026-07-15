@@ -13,17 +13,17 @@ MonoBehaviour:
   m_Name: GuideQuestTable
   m_EditorClassIdentifier: Assembly-CSharp::GuideQuestTable
   gemBase: 100
-  gemGrowth: 1.05
+  gemGrowth: 1.1
   gemCap: 5000
   goldBase: 100
-  goldGrowth: 1.1
+  goldGrowth: 1.5
   goldCap: 0
-  cycleOrder: 0000000001000000020000000300000004000000
+  cycleOrder: 0200000000000000010000000300000004000000
   killBase: 10
   killPerCycle: 10
   stagesPerChapter: 10
   stageStep: 5
-  statBase: 1
+  statBase: 5
   statPerCycle: 5
   summonBase: 1
   summonPerCycle: 1

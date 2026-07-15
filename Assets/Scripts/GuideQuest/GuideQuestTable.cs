@@ -55,18 +55,12 @@ public class GuideQuestTable : ScriptableObject
     [SerializeField] private int levelBase = 5;
     [SerializeField] private int levelPerCycle = 5;
 
-    [Header("보상 (젬)")]
-    [SerializeField] private int rewardBase = 10;
-    [SerializeField] private float rewardGrowth = 1.06f; // 단계마다 6% 복리 증가
-    [SerializeField] private int rewardCap = 5000;       // 상한 (0이면 무제한)
-
     [Header("옵션")]
     [Tooltip("체크 시 조건 충족 즉시 자동으로 보상 지급 후 다음 단계로 진행")]
     public bool autoClaim = false;
 
     public int CycleLength => Mathf.Max(1, cycleOrder.Length);
 
-    /// <summary>step(0-based)에 해당하는 퀘스트를 생성한다.</summary>
     /// <summary>step(0-based)에 해당하는 퀘스트를 생성한다. 순수 함수 — 단계 제한 없음.</summary>
     public GuideQuest Build(int step)
     {if (step < 0) step = 0;

@@ -52,7 +52,7 @@ public class PlayerStat
         MaxExperience      = 100;   // 누락
         attackRange        = 500f;  // 누락 — 이게 빠져서 10이 유지됨
         baseDamage         = 20;
-        AttackSpd          = 3000;
+        AttackSpd          = 3000f;
         Critical           = 3f;    // 필드 초기화값과 통일 (기존 5f)
         CriticalMultiplier = 1.5f;  // 필드 초기화값과 통일 (기존 1.3f)
 

@@ -43,11 +43,27 @@ partial class LevelUpManager
         stat.baseDamage         = d.baseDamage         > 0  ? d.baseDamage         : 20;
         stat.Critical           = d.critical           > 0  ? d.critical           : 3f;
         stat.CriticalMultiplier = d.criticalMultiplier > 0  ? d.criticalMultiplier : 1.5f;
-        stat.AttackSpd = d.attackSpd > 0f ? d.attackSpd : 1f;
+        stat.AttackSpd = RestoreAttackSpd(d.attackSpd, stat.UpgradeLevelAttackSpd);
 
         OnLevelUp?.Invoke(stat.Level);
         OnExpChanged?.Invoke(stat.Experience);
 
         Debug.Log($"[LevelUp] ApplyFrom 완료 | dmg={stat.baseDamage}, lvD={stat.UpgradeLevelDamage} | id={GetInstanceID()}");
+    }
+    /// <summary>
+    /// AttackSpd는 [100, 3000] 범위에서만 유효(ApplyGain 하한 100 클램프).
+    /// 범위를 벗어난 저장값(0, 1 등 오염)은 강화 레벨로부터 재구성한다.
+    /// </summary>
+    private float RestoreAttackSpd(float saved, int upgradeLevel)
+    {
+        if (saved >= 100f && saved <= 3000f) return saved;   // 정상값은 그대로
+
+        // ApplyGain 공식 역산: 3000 - gain * 강화레벨, 하한 100
+        float restored = 3000f - attackspdConfig.gainPerUpgrade * upgradeLevel;
+        restored = Mathf.Clamp(restored, 100f, 3000f);
+
+        Debug.LogWarning($"[LevelUp] AttackSpd 오염값({saved}) 감지 → {restored}f로 복구 " +
+                         $"(강화레벨 {upgradeLevel})");
+        return restored;
     }
 }
