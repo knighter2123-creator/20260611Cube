@@ -8,7 +8,8 @@ public enum GuideQuestType
     StageClear,       // 스테이지 클리어 → 젬
     StatUpgrade,      // 스탯 강화     → 골드
     SummonCompanion,  // 동료 소환     → 젬
-    LevelUp           // 레벨업       → 젬
+    LevelUp,          // 레벨업       → 젬
+    EvolveClear       // 각성 스테이지 클리어 -> 젬
 }
 
 /// <summary>단계별로 생성되는 퀘스트 1건 (런타임 전용, 저장하지 않음)</summary>
@@ -41,6 +42,7 @@ public class GuideQuest
             case GuideQuestType.StageClear:
             case GuideQuestType.SummonCompanion:
             case GuideQuestType.LevelUp:
+            case GuideQuestType.EvolveClear:
             default:
                 return CurrencyType.Gem;
         }
@@ -65,6 +67,8 @@ public class GuideQuest
                     return $"동료 {requiredCount}회 소환";
                 case GuideQuestType.LevelUp:
                     return $"레벨 {requiredCount} 달성";
+                case GuideQuestType.EvolveClear:
+                    return "각성 1회 하기";
                 default:
                     return string.Empty;
             }

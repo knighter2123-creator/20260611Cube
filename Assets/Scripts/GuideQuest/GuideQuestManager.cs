@@ -18,7 +18,6 @@ public partial class GuideQuestManager : MonoBehaviour
     private int highestStage = 0;  // 클리어한 최고 스테이지 (스테이지 퀘스트 판정용)
 
     private bool isLoading = false;   // ApplyFrom 중 저장 억제 (다른 매니저 데이터 보호)
-    private bool isClaiming = false;  // autoClaim 재귀 방지
 
     // ── 이벤트 ────────────────────────────────────
     /// <summary>퀘스트가 교체될 때 (초기화 / 다음 단계 진입)</summary>
@@ -152,12 +151,8 @@ public partial class GuideQuestManager : MonoBehaviour
 
         if (IsComplete)
         {
-            Debug.Log($"[GuideQuest] {Current.Title} 조건 충족: {Current.Description}");
-
-            if (table != null && table.autoClaim && !isClaiming)
-                ClaimAllComplete();
-            else
-                RequestSave();
+            Debug.Log($"[GuideQuest] {Current.Title} 조건 충족: {Current.Description} (수령 대기)");
+            RequestSave();   // ★ 자동 지급 제거 — 완료 상태만 저장, 지급은 버튼(Claim)에서
         }
     }
 
@@ -184,26 +179,6 @@ public partial class GuideQuestManager : MonoBehaviour
         RequestSave();
         return true;
     }
-
-    /// <summary>autoClaim 모드: 연쇄 충족을 재귀 없이 반복 처리</summary>
-    private void ClaimAllComplete()
-    {
-        if (isClaiming) return;
-
-        isClaiming = true;
-        try
-        {
-            int safety = 0;
-            while (IsComplete && safety++ < 200)
-                Claim();
-        }
-        finally
-        {
-            isClaiming = false;
-        }
-        RequestSave();
-    }
-
     /// <summary>
     /// 이미 달성한 상태(목표 스테이지를 이미 클리어함 / 레벨이 이미 높음)를 즉시 반영.
     /// 로드 직후, 단계 진행 직후 호출.
@@ -230,7 +205,7 @@ public partial class GuideQuestManager : MonoBehaviour
     /// <summary>로드 중이 아닐 때만 저장 (미초기화 매니저가 빈 값으로 덮어쓰는 것 방지)</summary>
     private void RequestSave()
     {
-        if (isLoading || isClaiming) return;
+        if (isLoading) return;   // ★ isClaiming 조건 제거
         SaveManager.Instance?.Save();
     }
 
