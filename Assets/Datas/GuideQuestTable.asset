@@ -18,9 +18,10 @@ MonoBehaviour:
   goldBase: 100
   goldGrowth: 1.5
   goldCap: 0
-  cycleOrder: 0200000000000000010000000300000004000000
-  killBase: 10
-  killPerCycle: 10
+  baseCycle: 0200000000000000010000000300000004000000
+  evolveLevels: 1e000000320000004600000064000000c8000000
+  killBase: 5
+  killPerCycle: 0
   stagesPerChapter: 10
   stageStep: 5
   statBase: 5
@@ -29,7 +30,3 @@ MonoBehaviour:
   summonPerCycle: 1
   levelBase: 5
   levelPerCycle: 5
-  rewardBase: 100
-  rewardGrowth: 1.05
-  rewardCap: 5000
-  autoClaim: 0
