@@ -26,23 +26,15 @@ public class CompanionManager : MonoBehaviour
 
     void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+        DontDestroyOnLoad(gameObject);   // ✅ GachaSystem과 동일하게 스스로 지속
 
         if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
         {
             ApplyFrom(SaveManager.Instance.Current);
             CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance.Current);
         }
-    }
-
-    void Start()
-    {
-       
     }
 
     public void BindPlaceableTilemap(Tilemap tilemap) => placeableTilemap = tilemap;
@@ -133,27 +125,32 @@ public class CompanionManager : MonoBehaviour
     // ──────────────────────────────────────────────
     public bool AddCompanion(CompanionData data)
     {
-        if (ownedCompanions.Count >= maxCompanions)
+        if (data == null) return false;
+
+        // 이미 보유(복원 포함)한 동료면 신규 획득 아님 → 조각 처리로 넘김
+        if (ownedCompanionData.Exists(c => c != null && c.id == data.id))
         {
-            Debug.Log("[CompanionManager] 동료 슬롯이 가득 찼습니다.");
+            Debug.Log($"[CompanionManager] {data.companionName}은(는) 이미 보유 중 — 신규 획득 아님");
             return false;
         }
 
-        // 이미 보유(복원 포함)한 동료면 획득 처리하지 않음
-        if (data != null && ownedCompanionData.Exists(c => c != null && c.id == data.id))
-        {
-            Debug.Log($"[CompanionManager] {data.companionName}은(는) 이미 보유 중 — 획득 무시");
-            return false;
-        }
-
-        Companion companion = SpawnCompanionObject(data);
-        if (companion == null) return false;
-
+        // ✅ 보유(도감) 등록은 슬롯 제한과 무관하게 항상 수행 (중복 판정의 기준)
         ownedCompanionData.Add(data);
-        ownedCompanions.Add(companion);
+        Debug.Log($"[CompanionManager] {data.companionName} 신규 보유 등록");
+
+        // ✅ 배치용 오브젝트는 슬롯 여유가 있을 때만 생성 (없으면 데이터만 보유)
+        if (ownedCompanions.Count < maxCompanions)
+        {
+            Companion companion = SpawnCompanionObject(data);
+            if (companion != null)
+                ownedCompanions.Add(companion);
+        }
+        else
+        {
+            Debug.Log($"[CompanionManager] 배치 슬롯 가득 — {data.companionName}은 데이터만 보유(오브젝트 미생성)");
+        }
 
         SaveManager.Instance?.Save();
-        Debug.Log($"[CompanionManager] {data.companionName} 획득");
         return true;
     }
 
@@ -162,7 +159,8 @@ public class CompanionManager : MonoBehaviour
         if (data == null)        { Debug.LogError("[CompanionManager] CompanionData가 null입니다."); return null; }
         if (data.prefab == null) { Debug.LogError($"[CompanionManager] {data.companionName}의 prefab이 null입니다."); return null; }
 
-        GameObject obj       = Instantiate(data.prefab);
+        GameObject obj = Instantiate(data.prefab);
+        obj.transform.SetParent(transform);
         Companion  companion = obj.GetComponent<Companion>();
         if (companion == null)
         {

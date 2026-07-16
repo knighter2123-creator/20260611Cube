@@ -127,13 +127,24 @@ public class GachaSystem : MonoBehaviour
 
     private bool IsAlreadyOwned(CompanionData data)
     {
-        if (CompanionManager.Instance == null) return false;
+        if (CompanionManager.Instance == null)
+        {
+            Debug.LogWarning("[Gacha] CompanionManager.Instance == null → 항상 신규 처리됨 ★원인 1★"); // 이게 문제 
+            return false;
+        }
 
+        int ownedCount = 0;
         foreach (CompanionData owned in CompanionManager.Instance.GetOwnedCompanionData())
         {
+            ownedCount++;
+            Debug.Log($"[Gacha] 보유중 id={owned?.id} / name={owned?.companionName}");
             if (owned != null && owned.id == data.id)
+            {
+                Debug.Log($"[Gacha] → 중복 확인! id={data.id}");
                 return true;
+            }
         }
+        Debug.Log($"[Gacha] 보유 {ownedCount}개 / 검사대상 id={data.id} → 매칭 없음(신규 처리)");
         return false;
     }
 
