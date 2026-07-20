@@ -1,7 +1,5 @@
 using System;
 using UnityEngine;
-using Random = System.Random;
-
 
 partial class LevelUpManager : MonoBehaviour
 {

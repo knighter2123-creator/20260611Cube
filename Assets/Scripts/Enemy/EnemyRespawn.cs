@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class EnemyRespawn : MonoBehaviour
@@ -16,26 +15,31 @@ public class EnemyRespawn : MonoBehaviour
 
     [Header("Boss Settings")]
     public GameObject bossPrefab;
-    public int  killCountToSpawnBoss = 20;
-    public int  maxTotalSpawn        = 20;
+    public int maxTotalSpawn = 20;
 
-    private int  maxEnemyCount      = 20;
-    private int  totalEnemiesSpawned = 0;
-    private int  totalEnemiesKilled  = 0;
-    private bool bossSpawned         = false;
+    [Header("풀 예열 개수")]
+    [SerializeField] private int prewarmCount = 12;
 
-    // ✅ 스테이지별 스탯 배율
-    private float statMultiplier = 1f;
+    private int   totalEnemiesSpawned = 0;
+    private bool  bossSpawned         = false;
+    private float statMultiplier      = 1f;
 
-    private List<GameObject> activeEnemies = new List<GameObject>();
+    private HpBar     hpBarRoot;          // ★ 매 스폰마다 씬 스캔하던 것 캐싱
     private Coroutine respawnCoroutine;
 
-    void Awake() { Instance = this; }
+    void Awake()
+    {
+        // ★ 중복 인스턴스 가드 (없으면 스폰 코루틴이 두 벌 돌 수 있음)
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+    }
 
     void Start()
     {
-        // 진화 스테이지 복귀 시 StageManager.Start가 먼저 ResetStage()를 호출해
-        // 이미 루프를 돌리고 있을 수 있음. 실행 순서와 무관하게 중복 스폰 방지.
+        hpBarRoot = FindFirstObjectByType<HpBar>();
+        ObjectPoolManager.Instance?.Prewarm(enemyPrefab, prewarmCount);
+
+        // StageManager.Start가 먼저 ResetStage를 호출했을 수 있으므로 중복 방지
         if (respawnCoroutine == null)
             respawnCoroutine = StartCoroutine(RespawnLoop());
     }
@@ -46,11 +50,8 @@ public class EnemyRespawn : MonoBehaviour
     {
         statMultiplier      = newStatMult;
         totalEnemiesSpawned = 0;
-        totalEnemiesKilled  = 0;
         bossSpawned         = false;
-        activeEnemies.Clear();
 
-        // 기존 코루틴 재시작
         if (respawnCoroutine != null)
             StopCoroutine(respawnCoroutine);
         respawnCoroutine = StartCoroutine(RespawnLoop());
@@ -64,35 +65,12 @@ public class EnemyRespawn : MonoBehaviour
     {
         if (enemyPrefab == null || spawnWaypoints.Length == 0) return;
         if (bossSpawned) return;
-
-        int beforeCount = activeEnemies.Count;
-        activeEnemies.RemoveAll(item => item == null);
-        totalEnemiesKilled += beforeCount - activeEnemies.Count;
-
-        if (totalEnemiesKilled >= killCountToSpawnBoss)
-        {
-            SpawnBoss();
-            return;
-        }
-
         if (totalEnemiesSpawned >= maxTotalSpawn) return;
-        if (activeEnemies.Count >= maxEnemyCount) return;
 
-        Vector3 spawnPos = spawnWaypoints[0].position;
-        GameObject newEnemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+        GameObject obj = Spawn(enemyPrefab);
+        if (obj == null) return;
 
-        // ✅ 스탯 배율 적용
-        Enemy enemyScript = newEnemy.GetComponent<Enemy>();
-        if (enemyScript != null)
-            enemyScript.ApplyStatMultiplier(statMultiplier);
-
-        FindFirstObjectByType<HpBar>()?.RegisterEnemy(newEnemy);
         totalEnemiesSpawned++;
-        activeEnemies.Add(newEnemy);
-
-        TargetMove moveScript = newEnemy.GetComponent<TargetMove>();
-        if (moveScript != null)
-            moveScript.SetupPath(spawnWaypoints);
     }
 
     public void SpawnBoss()
@@ -100,28 +78,41 @@ public class EnemyRespawn : MonoBehaviour
         if (bossSpawned || bossPrefab == null) return;
         bossSpawned = true;
 
+        Spawn(bossPrefab);
+        Debug.Log("[EnemyRespawn] 보스 소환!");
+    }
+
+    /// <summary>풀에서 꺼내 초기화 → 활성화까지 담당하는 공통 경로</summary>
+    private GameObject Spawn(GameObject prefab)
+    {
+        if (ObjectPoolManager.Instance == null) return null;
+
         Vector3 spawnPos = spawnWaypoints[0].position;
-        GameObject boss = Instantiate(bossPrefab, spawnPos, Quaternion.identity);
+        GameObject obj = ObjectPoolManager.Instance.GetInactive(
+            prefab, spawnPos, Quaternion.identity);
+        if (obj == null) return null;
 
-        // ✅ 보스 스탯 배율 적용
-        Enemy bossScript = boss.GetComponent<Enemy>();
-        if (bossScript != null)
-            bossScript.ApplyStatMultiplier(statMultiplier);
+        // ★ 반드시 SetActive(true) 이전에 초기화 (OnEnable에서 Active 등록되므로)
+        if (obj.TryGetComponent(out Enemy enemy))
+            enemy.OnSpawnFromPool(statMultiplier);
 
-        FindFirstObjectByType<HpBar>()?.RegisterEnemy(boss);
+        if (obj.TryGetComponent(out TargetMove move))
+            move.SetupPath(spawnWaypoints);
 
-        TargetMove moveScript = boss.GetComponent<TargetMove>();
-        if (moveScript != null)
-            moveScript.SetupPath(spawnWaypoints);
+        enemy.OnSpawnFromPool(statMultiplier);   // ResetDebuffs → ResetForSpawn (isInitialized = false)
+        move.SetupPath(spawnWaypoints);          // ★ 반드시 이 다음 (isInitialized = true)
+        obj.SetActive(true);
 
-        Debug.Log("보스 소환!");
+        hpBarRoot?.RegisterEnemy(obj);   // HpBar는 활성화 이후 등록
+        return obj;
     }
 
     private IEnumerator RespawnLoop()
     {
+        var wait = new WaitForSeconds(respawnDelay);   // 매 루프 할당 제거
         while (true)
         {
-            yield return new WaitForSeconds(respawnDelay);
+            yield return wait;
             SpawnEnemy();
         }
     }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Player : MonoBehaviour
@@ -9,7 +10,11 @@ public class Player : MonoBehaviour
 
     [Header("세부 설정")]
     [SerializeField] private Transform  firePoint;
-    [SerializeField] private LayerMask  enemyLayer;
+    
+    [Header("타겟 갱신")]
+    [SerializeField] private float retargetInterval = 0.1f;   // 재탐색 주기(초)
+
+    private float retargetTimer;
 
     private Enemy currentTarget;
     private float attackTimer;
@@ -41,46 +46,57 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        FindTarget();
+        retargetTimer += Time.deltaTime;
+
+        // 타겟이 사라졌거나 주기가 됐을 때만 재탐색
+        if (currentTarget == null || currentTarget.isDead || retargetTimer >= retargetInterval)
+        {
+            retargetTimer = 0f;
+            FindTarget();
+        }
+
         HandleAttack();
     }
 
+
     void FindTarget()
     {
-        currentTarget = null;
-        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
+        Vector2 myPos      = transform.position;
+        float   closestSqr = stat.attackRange * stat.attackRange;  // 사거리 검사를 비교에 흡수
+        Enemy   closest    = null;
 
-        float closestDist = Mathf.Infinity;
-        Enemy closestEnemy = null;
-
-        foreach (GameObject enemyObj in enemies)
+        List<Enemy> list = Enemy.Active;
+        for (int i = 0; i < list.Count; i++)   // foreach 대신 for → 열거자 생성 없음
         {
-            float dist = Vector3.Distance(transform.position, enemyObj.transform.position);
-            if (dist > stat.attackRange) continue;
-
-            Enemy e = enemyObj.GetComponent<Enemy>();
+            Enemy e = list[i];
             if (e == null || e.isDead) continue;
 
-            if (dist < closestDist)
+            float sqr = ((Vector2)e.transform.position - myPos).sqrMagnitude;
+            if (sqr <= closestSqr)             // sqrt 생략
             {
-                closestDist = dist;
-                closestEnemy = e;
+                closestSqr = sqr;
+                closest    = e;
             }
         }
-        currentTarget = closestEnemy;
+
+        currentTarget = closest;
     }
 
     void HandleAttack()
     {
-        attackTimer += Time.deltaTime;
         float cooldown = Mathf.Max(stat.attackCooldown, 0.1f);
 
-        if (attackTimer >= cooldown)
+        if (attackTimer < cooldown)
         {
-            attackTimer = 0f;
-            if (currentTarget == null || currentTarget.isDead) return;
-            Bullet.Launch(currentTarget, firePoint, playerStat);
+            attackTimer += Time.deltaTime;
+            return;
         }
+
+        // 쿨타임은 찼지만 타겟이 없음 → 타이머를 리셋하지 않고 유지(=발사 대기 상태)
+        if (currentTarget == null || currentTarget.isDead) return;
+
+        attackTimer = 0f;
+        Bullet.Launch(currentTarget, firePoint, playerStat);
     }
 
     void OnDrawGizmosSelected()

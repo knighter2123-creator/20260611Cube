@@ -1,9 +1,18 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public partial class MissionManager : MonoBehaviour
 {
+    // ── 조회용 인덱스 (allMissions 선형 탐색 제거) ──
+    private readonly Dictionary<string, MissionData> missionById
+        = new Dictionary<string, MissionData>();
+    private readonly Dictionary<MissionType, List<MissionData>> missionsByType
+        = new Dictionary<MissionType, List<MissionData>>();
+    private readonly Dictionary<MissionConditionType, List<MissionData>> missionsByCondition
+        = new Dictionary<MissionConditionType, List<MissionData>>();
+    
     public static MissionManager Instance { get; private set; }
 
     [Header("미션 정의 (ScriptableObject)")]
@@ -26,7 +35,7 @@ public partial class MissionManager : MonoBehaviour
 
     private const int ResetHour = 6;                 // am 6
     private const float ResetCheckInterval = 60f;    // 게임 켜둔 채 경계 넘길 때 대비
-    private float resetCheckTimer = 0f;
+    
 
     private void Awake()
     {
@@ -45,19 +54,59 @@ public partial class MissionManager : MonoBehaviour
 
     private void Start()
     {
-        // 세이브 로드(ApplyFrom)가 없었던 경우(신규 설치 등) 대비 폴백
         EnsureInitialized();
+        StartCoroutine(ResetCheckLoop());
     }
+    
+    private IEnumerator ResetCheckLoop()
+    {
+        var wait = new WaitForSecondsRealtime(ResetCheckInterval);
+        while (true)
+        {
+            yield return wait;
+
+            long beforeD = lastDailyResetTicks;
+            long beforeW = lastWeeklyResetTicks;
+            CheckResets();
+            if (beforeD != lastDailyResetTicks || beforeW != lastWeeklyResetTicks)
+                OnMissionUpdated?.Invoke();
+        }
+    }
+
 
     // ApplyFrom 끝, Start, 또는 최초 리포트 시 호출되어도 딱 한 번만 초기화
     public void EnsureInitialized()
     {
         if (initialized) return;
 
-        BuildMissingProgress(); // 세이브에 없던 신규 미션 항목 생성
-        CheckResets();          // 로드된 시각 기준으로 초기화 필요 여부 판정
+        BuildIndex();           // ★ 추가 — 반드시 가장 먼저
+        BuildMissingProgress();
+        CheckResets();
 
         initialized = true;
+    }
+    
+    // 인스펙터 리스트를 딱 한 번만 순회해서 3개 인덱스를 구축
+    private void BuildIndex()
+    {
+        missionById.Clear();
+        missionsByType.Clear();
+        missionsByCondition.Clear();
+
+        foreach (var m in allMissions)
+        {
+            if (m == null || string.IsNullOrEmpty(m.id)) continue;
+
+            missionById[m.id] = m;
+
+            if (!missionsByType.TryGetValue(m.missionType, out var byType))
+                missionsByType[m.missionType] = byType = new List<MissionData>();
+            byType.Add(m);
+
+            if (!missionsByCondition.TryGetValue(m.conditionType, out var byCond))
+                missionsByCondition[m.conditionType] = byCond = new List<MissionData>();
+            byCond.Add(m);
+        }
     }
 
     private void BuildMissingProgress()
@@ -70,37 +119,23 @@ public partial class MissionManager : MonoBehaviour
         }
     }
 
-    private void Update()
-    {
-        // Time.timeScale 영향을 받지 않도록 unscaled 사용
-        resetCheckTimer += Time.unscaledDeltaTime;
-        if (resetCheckTimer < ResetCheckInterval) return;
-
-        resetCheckTimer = 0f;
-        long beforeD = lastDailyResetTicks;
-        long beforeW = lastWeeklyResetTicks;
-        CheckResets();
-        if (beforeD != lastDailyResetTicks || beforeW != lastWeeklyResetTicks)
-            OnMissionUpdated?.Invoke();
-    }
+    
 
     // ---------------- 진행도 리포트 ----------------
     public void ReportProgress(MissionConditionType conditionType, int amount = 1)
     {
-        Debug.Log($"[MissionManager] ReportProgress: {conditionType} +{amount}");
         if (!initialized) EnsureInitialized();
         if (amount <= 0) return;
+        if (!missionsByCondition.TryGetValue(conditionType, out var list)) return;
 
         bool changed = false;
-
-        foreach (var m in allMissions)
+        for (int i = 0; i < list.Count; i++)
         {
-            if (m == null || m.conditionType != conditionType) continue;
+            var m = list[i];
             if (!progressMap.TryGetValue(m.id, out var p)) continue;
-            if (p.claimed) continue;                       // 이미 수령 → 누적 불필요
-            if (p.currentCount >= m.requiredCount) continue; // 이미 달성 → 스킵
+            if (p.claimed) continue;
+            if (p.currentCount >= m.requiredCount) continue;
 
-            // 일일/주간이 같은 이벤트로 각각 누적됨 (적 1마리 → 일일·주간 동시 +1)
             p.currentCount = Mathf.Min(p.currentCount + amount, m.requiredCount);
             changed = true;
         }
@@ -115,31 +150,27 @@ public partial class MissionManager : MonoBehaviour
     // 해당 타입에서 "수령 완료(claimed)"된 개별 미션 수
     public int CountCompleted(MissionType type)
     {
+        if (!missionsByType.TryGetValue(type, out var list)) return 0;
+
         int count = 0;
-        foreach (var m in allMissions)
+        for (int i = 0; i < list.Count; i++)
         {
-            if (m == null || m.missionType != type) continue;
-            // "달성만으로 열리게" 하려면 아래를 GetState(m.id) != InProgress 로 교체
-            if (GetState(m.id) == MissionState.Claimed) count++;
+            // GetState(id) 대신 데이터를 직접 넘겨 재탐색 제거
+            if (GetStateOf(list[i]) == MissionState.Claimed) count++;
         }
         return count;
     }
 
     // 해당 타입의 개별 미션 총 개수
     public int CountTotal(MissionType type)
-    {
-        int count = 0;
-        foreach (var m in allMissions)
-            if (m != null && m.missionType == type) count++;
-        return count;
-    }
+        => missionsByType.TryGetValue(type, out var list) ? list.Count : 0;
     
     // ---------------- 조회 (UI 용) ----------------
     public MissionData GetMissionData(string missionId)
     {
-        foreach (var m in allMissions)
-            if (m != null && m.id == missionId) return m;
-        return null;
+        if (string.IsNullOrEmpty(missionId)) return null;
+        missionById.TryGetValue(missionId, out var m);
+        return m;
     }
 
     public MissionProgress GetProgress(string missionId)
@@ -148,19 +179,22 @@ public partial class MissionManager : MonoBehaviour
         return p;
     }
 
-    public List<MissionData> GetMissions(MissionType type)
+    // 반환값을 수정하지 마세요 (내부 캐시를 그대로 반환)
+    public IReadOnlyList<MissionData> GetMissions(MissionType type)
     {
-        var list = new List<MissionData>();
-        foreach (var m in allMissions)
-            if (m != null && m.missionType == type) list.Add(m);
-        return list;
+        return missionsByType.TryGetValue(type, out var list)
+            ? list
+            : System.Array.Empty<MissionData>();
     }
-
     public MissionState GetState(string missionId)
+        => GetStateOf(GetMissionData(missionId));
+    
+    private MissionState GetStateOf(MissionData m)
     {
-        var m = GetMissionData(missionId);
-        var p = GetProgress(missionId);
-        if (m == null || p == null) return MissionState.InProgress;
+        if (m == null) return MissionState.InProgress;
+        if (!progressMap.TryGetValue(m.id, out var p) || p == null)
+            return MissionState.InProgress;
+
         if (p.claimed) return MissionState.Claimed;
         if (p.currentCount >= m.requiredCount) return MissionState.Claimable;
         return MissionState.InProgress;

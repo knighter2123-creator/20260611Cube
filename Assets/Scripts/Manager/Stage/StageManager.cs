@@ -104,6 +104,10 @@ public partial class StageManager : MonoBehaviour
         if (killCount >= killGoal)
         {
             bossSpawned = true;
+
+            // ★ 보스 출현 알림
+            ShowBossNotice();
+
             EnemyRespawn.Instance.SpawnBoss();
         }
     }
@@ -126,9 +130,9 @@ public partial class StageManager : MonoBehaviour
         OnStageClear?.Invoke();
         Debug.Log($"[StageManager] {currentWorld}-{currentStage} 클리어!");
 
-        // ★ 가이드 퀘스트: 방금 클리어한 스테이지를 보고
-        //   ※ 반드시 currentStage++ 이전에! 이후에 넣으면 다음 스테이지를 클리어했다고 보고됨
+        // ※ 아래 두 줄은 반드시 currentStage++ 이전에!
         GuideQuestManager.Instance?.ReportStageClear(currentWorld, currentStage);
+        ShowStageClearNotice();          // ← 여기로 이동, 파라미터 불필요
 
         currentStage++;
 
@@ -143,7 +147,7 @@ public partial class StageManager : MonoBehaviour
         Debug.Log($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
 
         SaveManager.Instance?.Save();
-        NextStage();
+        StartCoroutine(NextStageDelayed());
     }
 
     private void StageFail()
@@ -165,16 +169,24 @@ public partial class StageManager : MonoBehaviour
             Debug.Log($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
         }
 
-        NextStage();
+        ShowStageFailNotice();
+        StartCoroutine(NextStageDelayed());
     }
 
     private void NextStage()
     {
-        foreach (GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy"))
+        // OnDisable에서 자기 자신을 제거하므로 역순 순회
+        var list = Enemy.Active;
+        for (int i = list.Count - 1; i >= 0; i--)
         {
-            Enemy e = enemy.GetComponent<Enemy>();
-            e?.RemoveHpBar();   // HpBar 먼저 제거
-            Destroy(enemy);
+            Enemy e = list[i];
+            if (e == null) continue;
+
+            e.RemoveHpBar();
+            if (ObjectPoolManager.Instance != null)
+                ObjectPoolManager.Instance.Return(e.gameObject);
+            else
+                e.gameObject.SetActive(false);
         }
 
         InitStage();
@@ -191,5 +203,6 @@ public partial class StageManager : MonoBehaviour
         UpdateKillUI();
         UpdateTimerUI();
         UpdateStageUI();
+        ShowStageStartNotice();
     }
 }

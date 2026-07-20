@@ -59,20 +59,19 @@ public class Bullet : MonoBehaviour
         float   angle    = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
         GameObject bulletObj = ObjectPoolManager.Instance.GetBulletInactive();
-        bulletObj.transform.position = (Vector3)spawnPos;
-        bulletObj.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
-        Bullet bullet = bulletObj.GetComponent<Bullet>();
-        if (bullet == null)
+        if (!bulletObj.TryGetComponent(out Bullet bullet))
         {
             Debug.LogError("[Bullet] Bullet 컴포넌트를 찾을 수 없습니다.");
             ObjectPoolManager.Instance.ReturnBullet(bulletObj);
             return;
         }
 
+        bulletObj.transform.SetPositionAndRotation(
+            (Vector3)spawnPos, Quaternion.Euler(0f, 0f, angle));
+
         bulletObj.SetActive(true);
         bullet.Init(dir, finalDamage, isCritical);
-        
     }
 
     public void Init(Vector2 dir, float dmg, bool crit = false)
@@ -94,10 +93,10 @@ public class Bullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (!other.CompareTag("Enemy")) return;
-        if (isReturned) return;
+        if (!other.TryGetComponent(out Enemy target)) return;
+        if (target.isDead) return;
 
-        Enemy target = other.GetComponent<Enemy>();
+        // Enemy target = other.GetComponent<Enemy>();
         if (target == null || target.isDead) return;
 
         target.TakeDamage(damage, isCritical);
