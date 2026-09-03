@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
@@ -6,6 +7,7 @@ public class GameSettingsManager : MonoBehaviour
 {
     public static GameSettingsManager Instance;
 
+    
     [Header("UI")]
     [SerializeField] private GameObject settingsPanel;
     [SerializeField] private Button openSettingsButton;
@@ -36,7 +38,8 @@ public class GameSettingsManager : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
+        // New Input System: ESC 키 감지
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             ToggleSettings();
     }
 

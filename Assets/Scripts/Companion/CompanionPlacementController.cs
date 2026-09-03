@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using TMPro;
 
 public class CompanionPlacementController : MonoBehaviour
@@ -64,10 +65,11 @@ public class CompanionPlacementController : MonoBehaviour
     }
 
     void Update()
-    {   
+    {
         if (!isPlacing) return;
 
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+        // 우클릭으로 취소 — 데스크톱/에디터 전용 (터치엔 우클릭 없음)
+        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
         {
             CancelPlacement();
             return;
@@ -76,7 +78,11 @@ public class CompanionPlacementController : MonoBehaviour
         CompanionManager cm = CompanionManager.Instance;
         if (cm == null) return;
 
-        Vector3 world = cam.ScreenToWorldPoint(Input.mousePosition);
+        // 마우스 + 터치 통합 (Pointer는 둘의 상위 추상)
+        Pointer pointer = Pointer.current;
+        if (pointer == null) return;
+
+        Vector3 world = cam.ScreenToWorldPoint(pointer.position.ReadValue());
         world.z = 0f;
 
         if (!cm.TryGetCell(world, out Vector3Int cell)) return;
@@ -89,8 +95,8 @@ public class CompanionPlacementController : MonoBehaviour
             ghost.color = canPlace ? validColor : invalidColor;
         }
 
-        // UI 위 클릭은 무시 (리스트 버튼 누르다 배치되는 사고 방지)
-        if (Input.GetMouseButtonDown(0) && canPlace && !IsPointerOverUI())
+        // UI 위 클릭/탭은 무시 (리스트 버튼 누르다 배치되는 사고 방지)
+        if (pointer.press.wasPressedThisFrame && canPlace && !IsPointerOverUI())
             ConfirmPlace(cm, cell);
     }
 

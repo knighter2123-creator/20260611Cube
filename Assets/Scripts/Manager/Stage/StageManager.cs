@@ -2,9 +2,6 @@ using System;
 using UnityEngine;
 using TMPro;
 
-// StageManager는 partial로 분리되어 있습니다.
-//   StageManager.cs     — 핵심 상태 / 라이프사이클 / 진행 로직
-//   StageManager.UI.cs  — UI 갱신 전용
 public partial class StageManager : MonoBehaviour
 {
     public static StageManager Instance;
