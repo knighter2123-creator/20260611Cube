@@ -11,11 +11,32 @@ public abstract class ActiveSkill : ScriptableObject
     public float  damage    = 20f;
     public float  cooldown  = 5f;
 
+    [Tooltip("동료 머리 위 쿨다운 인디케이터에 표시할 아이콘 (없으면 원형만 표시)")]
+    public Sprite icon;
+
     [Header("이펙트")]
     public GameObject effectPrefab;
     public float  effectDuration = 0.5f;
 
     public abstract void Execute(Enemy target, Companion caster);
+
+    /// <summary>
+    /// 스킬 사용 진입점. Execute() 실행 후 쿨다운 UI를 자동으로 띄웁니다.
+    /// 호출부에서 skill.Execute(target, this) 대신 skill.Cast(target, this) 를 쓰면
+    /// 모든 스킬이 쿨다운 표시를 공짜로 얻습니다.
+    /// </summary>
+    public void Cast(Enemy target, Companion caster)
+    {
+        Execute(target, caster);
+        NotifyCooldown(caster);
+    }
+
+    /// <summary>시전자 머리 위에 이 스킬의 쿨다운 게이지를 시작합니다.</summary>
+    protected void NotifyCooldown(Companion caster)
+    {
+        if (caster == null) return;
+        SkillCooldownIndicator.Begin(caster, icon, cooldown);
+    }
 
     protected (float finalDamage, bool isCritical) CalcDamage(PlayerStat stat)
     {

@@ -124,7 +124,9 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         // 늦게 들어오는 총알 충돌로 중복 처리되는 것 방지
         for (int i = 0; i < cachedColliders.Length; i++)
             cachedColliders[i].enabled = false;
-
+        
+        GrayscaleEffect.Clear(gameObject);
+        
         StopAllDebuffs();
         RemoveHpBar();
         CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(rewardGold * statMult));
@@ -134,7 +136,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         //   여기서 GuideQuestManager를 직접 부르면 2중 카운트됨
         StageManager.Instance?.ReportEnemyKill();
         MissionManager.Instance?.ReportEnemyKill();
-
+        
         ReturnToPool();
     }
 

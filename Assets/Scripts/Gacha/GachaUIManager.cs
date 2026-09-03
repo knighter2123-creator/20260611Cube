@@ -28,17 +28,23 @@ public class GachaUIManager : MonoBehaviour
     [SerializeField] private float maxTotalRevealTime = 2.5f;
     [Tooltip("등장 이펙트 Overlay 호환 스프라이트 애니메이션")]
     [SerializeField] private UISpriteAnimation effectPrefab;
-    [Tooltip("이펙트를 담을 UI 부모. 결과 아이템보다 '위'에 렌더되도록 계층상 아래쪽에 두기")]
+    [Tooltip("이펙트를 담을 UI 부모. ★반드시 씬(Hierarchy)의 오브젝트를 넣을 것. 프리팹 애셋 X")]
     [SerializeField] private RectTransform effectLayer;
+    [Tooltip("이펙트가 자동으로 사라지지 않을 때를 대비한 강제 정리 시간(0이면 정리 안 함)")]
+    [SerializeField] private float effectLifetime = 1.5f;
+
     [Header("화면 흔들림")]
     [SerializeField] private ScreenShake screenShake;
     [Tooltip("이 등급 이상일 때만 화면 흔들림 (enum 선언 순서 기준)")]
     [SerializeField] private CompanionGrade shakeThreshold = CompanionGrade.Epic;
 
     private Coroutine revealing;
+    private bool effectLayerValid;
 
     void Start()
     {
+        ValidateEffectLayer();
+
         draw1Button.onClick.AddListener(()   => OnDraw(GachaSystem.Instance.DrawOne()));
         draw10Button.onClick.AddListener(()  => OnDraw(GachaSystem.Instance.DrawTen()));
         draw100Button.onClick.AddListener(() => OnDraw(GachaSystem.Instance.DrawHundred()));
@@ -48,10 +54,39 @@ public class GachaUIManager : MonoBehaviour
         ShowGachaPanel();
     }
 
+    /// <summary>
+    /// effectLayer가 씬 오브젝트인지 검사.
+    /// 프리팹 애셋을 인스펙터에 넣으면 Instantiate(prefab, parent)가
+    /// "Cannot instantiate objects with a parent which is persistent" 경고를 내고
+    /// 부모 없이 씬 루트에 생성됩니다.
+    /// </summary>
+    private void ValidateEffectLayer()
+    {
+        effectLayerValid = false;
+
+        if (effectLayer == null)
+        {
+            Debug.LogWarning("[GachaUIManager] effectLayer가 비어 있어 등장 이펙트를 건너뜁니다.", this);
+            return;
+        }
+
+        // 프리팹 애셋은 씬에 속해 있지 않음 → scene.IsValid()가 false
+        if (!effectLayer.gameObject.scene.IsValid())
+        {
+            Debug.LogError(
+                $"[GachaUIManager] effectLayer('{effectLayer.name}')에 프리팹 애셋이 들어가 있습니다. " +
+                "Project 창이 아니라 Hierarchy(씬)에 있는 Canvas 하위 오브젝트를 드래그해 넣으세요.", this);
+            return;
+        }
+
+        effectLayerValid = true;
+    }
+
     private void ShowGachaPanel()
     {
         // 연출 도중 닫으면 코루틴 정리
         if (revealing != null) { StopCoroutine(revealing); revealing = null; }
+        ClearEffects();
         gachaPanel.SetActive(true);
         resultPanel.SetActive(false);
     }
@@ -67,8 +102,14 @@ public class GachaUIManager : MonoBehaviour
         if (results.Count == 0) return;   // 보석 부족 등
         if (revealing != null)  return;   // 연출 중 중복 실행 방지
 
+        // Destroy는 프레임 끝에 처리되므로, 새 아이템이 붙기 전에 계층에서 즉시 떼어냄
         foreach (Transform child in resultContent)
+        {
+            child.SetParent(null, false);
             Destroy(child.gameObject);
+        }
+
+        ClearEffects();
 
         ShowResultPanel();
         revealing = StartCoroutine(RevealRoutine(results));
@@ -104,11 +145,23 @@ public class GachaUIManager : MonoBehaviour
 
     private void SpawnEffect(Transform itemTransform)
     {
-        if (effectPrefab == null || effectLayer == null) return;
+        if (effectPrefab == null || !effectLayerValid) return;
 
         // Overlay 캔버스에서는 월드 position이 곧 스크린 픽셀 좌표 → 아이템 위치에 바로 배치 가능
         UISpriteAnimation fx = Instantiate(effectPrefab, effectLayer);
         fx.transform.position = itemTransform.position;
+        fx.transform.localScale = Vector3.one;
         // playOnEnable이 true면 자동 재생. 아니면 fx.Play();
+
+        if (effectLifetime > 0f)
+            Destroy(fx.gameObject, effectLifetime);   // 100연차에서 이펙트가 쌓이는 것 방지
+    }
+
+    private void ClearEffects()
+    {
+        if (!effectLayerValid) return;
+
+        for (int i = effectLayer.childCount - 1; i >= 0; i--)
+            Destroy(effectLayer.GetChild(i).gameObject);
     }
 }
