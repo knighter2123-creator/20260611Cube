@@ -400,9 +400,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SoundManager
   bgmSource: {fileID: 550798677}
   sfxSource: {fileID: 550798677}
-  defaultMaster: 0.1
+  defaultMaster: 0.3
   defaultBgm: 0.1
-  defaultSfx: 0.1
+  defaultSfx: 0.2
   sameClipMinInterval: 0.04
 --- !u!82 &550798677
 AudioSource:
