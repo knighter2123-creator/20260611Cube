@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
 
 /// <summary>
 /// URP Volume 의 Bloom 을 코드로 제어합니다.
@@ -125,20 +126,6 @@ public class BloomController : MonoBehaviour
             }
         }
 
-        if (targetVolume == null)
-        {
-            Debug.LogWarning("[BloomController] Bloom 오버라이드를 가진 Volume 을 찾지 못했습니다. " +
-                             "Global Volume 에 Bloom 을 추가하세요.", this);
-            return;
-        }
-
-        // profile 은 런타임 사본이라 여기서 값을 바꿔도 에셋이 더러워지지 않습니다
-        if (!targetVolume.profile.TryGet(out bloom))
-        {
-            Debug.LogWarning("[BloomController] Volume 프로파일에 Bloom 이 없습니다.", this);
-            return;
-        }
-
         bloom.intensity.overrideState = true;
 
         // 기본 슬라이더 값을 정하지 않았으면 프로파일에 설정된 Intensity 로부터 역산
@@ -210,8 +197,22 @@ public class BloomController : MonoBehaviour
         else if (previewOnChange) { PulseFor(previewSeconds); ApplyImmediate(TargetIntensity); }
     }
 
+    /// <summary>
+    /// 토글 초기 상태를 저장된 설정으로 맞추고 리스너를 겁니다.
+    /// ★ 인스펙터에서 On Value Changed 를 수동으로 연결하면 'Static Parameters' 를 잘못 고르기 쉽고,
+    ///   시작 시 토글의 체크 상태가 저장값과 어긋납니다. 이 메서드를 쓰면 둘 다 해결됩니다.
+    ///   (이 메서드로 연결했다면 인스펙터의 On Value Changed 항목은 비워두세요)
+    /// </summary>
+    public void BindToggle(Toggle toggle)
+    {
+        if (toggle == null) return;
+
+        toggle.SetIsOnWithoutNotify(userEnabled);
+        toggle.onValueChanged.AddListener(OnToggleChanged);
+    }
+
     /// <summary>슬라이더 초기값을 세팅할 때 쓰세요. (이벤트를 되쏘지 않음)</summary>
-    public void BindSlider(UnityEngine.UI.Slider slider)
+    public void BindSlider(Slider slider)
     {
         if (slider == null) return;
 
@@ -278,112 +279,4 @@ public class BloomController : MonoBehaviour
         if (togglePostProcessing && cameraData != null)
             cameraData.renderPostProcessing = on;
     }
-
-    // ─────────────────────────────────────────────
-    // 진단
-    // ─────────────────────────────────────────────
-
-    /// <summary>
-    /// 블룸이 안 보일 때 원인을 한 번에 확인합니다.
-    /// 인스펙터에서 컴포넌트 우클릭 → "블룸 진단" 으로도 실행할 수 있습니다.
-    /// </summary>
-    [ContextMenu("블룸 진단")]
-    public void Diagnose()
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("═════ Bloom 진단 ═════");
-
-        // ① 렌더 파이프라인 + HDR
-        var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
-        if (urp == null)
-        {
-            sb.AppendLine("❌ 현재 활성 렌더 파이프라인이 URP 가 아닙니다. (Graphics / Quality 설정 확인)");
-        }
-        else
-        {
-            sb.AppendLine($"{Mark(urp.supportsHDR)} URP Asset 의 HDR : {urp.supportsHDR}");
-            if (!urp.supportsHDR)
-                sb.AppendLine("   → URP Asset 인스펙터에서 HDR 을 켜세요. 꺼져 있으면 밝기가 1.0 으로 잘려 블룸이 절대 안 나옵니다.");
-        }
-
-        // ② 카메라
-        Camera cam = targetCamera != null ? targetCamera : Camera.main;
-        if (cam == null)
-        {
-            sb.AppendLine("❌ 카메라를 찾지 못했습니다. (Camera.main = MainCamera 태그 확인)");
-        }
-        else
-        {
-            var data = cam.GetUniversalAdditionalCameraData();
-            sb.AppendLine($"{Mark(data != null && data.renderPostProcessing)} 카메라 '{cam.name}' 의 Post Processing : {(data != null && data.renderPostProcessing)}");
-            if (data != null && !data.renderPostProcessing)
-                sb.AppendLine("   → 지금 블룸이 꺼진 상태라면 정상입니다(이 스크립트가 껐음). 연출 중에도 false 면 카메라 체크박스를 확인하세요.");
-        }
-
-        // ③ Volume
-        if (targetVolume == null)
-        {
-            sb.AppendLine("❌ Bloom 오버라이드를 가진 Volume 을 찾지 못했습니다.");
-            sb.AppendLine("   → Hierarchy 우클릭 → Volume → Global Volume, Profile 에 Bloom 오버라이드를 추가하세요.");
-        }
-        else
-        {
-            sb.AppendLine($"✅ Volume : '{targetVolume.name}'");
-            sb.AppendLine($"{Mark(targetVolume.isGlobal)} isGlobal : {targetVolume.isGlobal}");
-            if (!targetVolume.isGlobal)
-                sb.AppendLine("   → Local Volume 이면 카메라가 콜라이더 안에 들어와야 적용됩니다. Global 로 바꾸는 걸 권장합니다.");
-
-            sb.AppendLine($"{Mark(targetVolume.weight > 0.99f)} weight : {targetVolume.weight} (1이어야 온전히 적용)");
-            sb.AppendLine($"{Mark(targetVolume.enabled && targetVolume.gameObject.activeInHierarchy)} 활성 상태 : {targetVolume.enabled && targetVolume.gameObject.activeInHierarchy}");
-        }
-
-        // ④ Bloom 오버라이드
-        if (bloom == null)
-        {
-            sb.AppendLine("❌ Bloom 오버라이드를 잡지 못했습니다.");
-        }
-        else
-        {
-            sb.AppendLine($"✅ Bloom 오버라이드 확보");
-            sb.AppendLine($"   active            : {bloom.active}");
-            sb.AppendLine($"   intensity(현재)   : {bloom.intensity.value:0.###}");
-            sb.AppendLine($"   threshold         : {bloom.threshold.value:0.###}  (1.0 근처 권장)");
-            sb.AppendLine($"   {Mark(bloom.threshold.overrideState)} threshold override : {bloom.threshold.overrideState}");
-            if (!bloom.threshold.overrideState)
-                sb.AppendLine("   → Bloom 오버라이드에서 Threshold 왼쪽 체크박스가 꺼져 있습니다. 켜고 값을 지정하세요.");
-        }
-
-        // ⑤ 이 스크립트의 상태
-        sb.AppendLine("───── 컨트롤러 상태 ─────");
-        sb.AppendLine($"   유저 토글 (userEnabled) : {userEnabled}");
-        sb.AppendLine($"   유저 강도 (slider 0~1)  : {userScale:0.###}");
-        sb.AppendLine($"   켜졌을 때 Intensity     : {TargetIntensity:0.###}  (maxIntensity {maxIntensity})");
-        sb.AppendLine($"   alwaysOn                : {alwaysOn}");
-        sb.AppendLine($"   요청 refCount           : {refCount}");
-        sb.AppendLine($"   PulseFor 남은 시간      : {Mathf.Max(0f, holdUntil - Now):0.##}s");
-        sb.AppendLine($"   현재 적용 Intensity     : {current:0.###}");
-
-        if (!alwaysOn && refCount == 0 && Now >= holdUntil)
-        {
-            sb.AppendLine();
-            sb.AppendLine("ℹ️ 지금은 아무 연출도 블룸을 요청하지 않아 '의도적으로 꺼진' 상태입니다.");
-            sb.AppendLine("   테스트하려면 Always On 을 체크하거나, 우클릭 → '3초간 켜보기' 를 실행하세요.");
-        }
-
-        Debug.Log(sb.ToString(), this);
-    }
-
-    [ContextMenu("3초간 켜보기")]
-    private void TestPulse()
-    {
-        if (!Application.isPlaying)
-        {
-            Debug.LogWarning("[BloomController] 플레이 모드에서만 테스트할 수 있습니다.");
-            return;
-        }
-        PulseFor(3f);
-        Debug.Log("[BloomController] 3초간 블룸을 켭니다.", this);
-    }
-
-    private static string Mark(bool ok) => ok ? "✅" : "⚠️";
 }

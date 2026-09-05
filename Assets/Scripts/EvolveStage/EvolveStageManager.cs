@@ -86,6 +86,14 @@ public partial class EvolveStageManager : MonoBehaviour
         if (stageOver) return;
         stageOver = true;
 
+        // ★ 가이드 퀘스트 '각성 1회' 보고.
+        //   ReturnToStage()가 씬을 전환하므로 반드시 그 전에 호출해야 합니다.
+        //   (이 호출이 없어서 버프는 적용되는데 퀘스트만 안 끝나던 문제)
+        if (GuideQuestManager.Instance != null)
+            GuideQuestManager.Instance.ReportEvolveClear();
+        else
+            Debug.LogWarning("[EvolveStageManager] GuideQuestManager를 찾을 수 없어 각성 퀘스트를 보고하지 못했습니다.");
+
         OnStageClear?.Invoke();
         Debug.Log("[EvolveStageManager] 진화 스테이지 클리어 → 원래 스테이지로 복귀");
 

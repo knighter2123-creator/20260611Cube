@@ -20,6 +20,11 @@ partial class LevelUpManager : MonoBehaviour
         Instance = this;
     }
 
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
     // ══════════════════════════════════════════════
     //  이벤트
     // ══════════════════════════════════════════════
@@ -31,8 +36,8 @@ partial class LevelUpManager : MonoBehaviour
     public event Action<long> OnExpChanged;
 
     /// <summary>
-    /// 씬 전환 등으로 스탯이 "복원"됐을 때 발생. 레벨업이 아니므로 연출을 재생하면 안 됩니다.
-    /// UI 갱신 용도로만 쓰세요.
+    /// 씬 전환이나 세이브 로드로 스탯이 "복원"됐을 때 발생. 레벨업이 아니므로 연출을 재생하면 안 됩니다.
+    /// UI 갱신 / 퀘스트 진행도 동기화 용도로만 쓰세요.
     /// </summary>
     public event Action<int> OnStatRestored;
 
@@ -44,9 +49,16 @@ partial class LevelUpManager : MonoBehaviour
     // ══════════════════════════════════════════════
     //  프로퍼티
     // ══════════════════════════════════════════════
-    public long CurrentExp  => stat != null ? stat.Experience    : 0;
-    public long MaxExp      => stat != null ? stat.MaxExperience : 100;
-    public int  CurrentLevel => stat != null ? stat.Level        : 1;
+    public long CurrentExp   => stat != null ? stat.Experience    : 0;
+    public long MaxExp       => stat != null ? stat.MaxExperience : 100;
+    public int  CurrentLevel => stat != null ? stat.Level         : 1;
+
+    /// <summary>
+    /// PlayerStat이 주입되어 강화/경험치 API를 쓸 수 있는 상태인가.
+    /// ★ Instance는 있는데 stat이 null인 구간이 존재합니다. UI는 이걸 봐야
+    ///   "비용 0 / 레벨 0" 같은 거짓 정보를 표시하지 않습니다.
+    /// </summary>
+    public bool IsReady => stat != null;
 
     // ══════════════════════════════════════════════
     //  초기화
@@ -57,6 +69,12 @@ partial class LevelUpManager : MonoBehaviour
     /// </summary>
     public void Init(PlayerStat playerStat)
     {
+        if (playerStat == null)
+        {
+            Debug.LogError("[LevelUpManager] Init에 null PlayerStat이 들어왔습니다.");
+            return;
+        }
+
         if (stat != null)
         {
             // 씬 전환: 메모리의 옛 stat(최신 강화 반영)을 새 PlayerStat에 그대로 이전
@@ -88,6 +106,12 @@ partial class LevelUpManager : MonoBehaviour
             stat = playerStat;
             if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
                 ApplyFrom(SaveManager.Instance.Current);
+            else
+            {
+                // 세이브가 없어도 UI는 초기값으로 한 번 갱신돼야 합니다
+                OnStatRestored?.Invoke(stat.Level);
+                OnExpChanged?.Invoke(stat.Experience);
+            }
         }
     }
 

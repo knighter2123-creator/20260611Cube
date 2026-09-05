@@ -19,6 +19,14 @@ public partial class GuideQuestManager : MonoBehaviour
 
     private bool isLoading = false;   // ApplyFrom 중 저장 억제 (다른 매니저 데이터 보호)
 
+    // ★ '각성 1회' 단계에 아직 도달하지 않았을 때 들어온 각성 클리어를 적립해둔다.
+    //   Claim이 수동이라, 레벨업 보상을 받기 전에 각성 스테이지를 클리어하면
+    //   보고가 그냥 버려지고 그 티어의 각성 퀘스트를 영영 못 깨는 사고가 납니다.
+    private int pendingEvolveClears = 0;
+    private const int MaxPendingEvolveClears = 8;
+
+    private bool levelUpBound = false;
+
     // ── 이벤트 ────────────────────────────────────
     /// <summary>퀘스트가 교체될 때 (초기화 / 다음 단계 진입)</summary>
     public event Action<GuideQuest> OnQuestChanged;
@@ -56,15 +64,41 @@ public partial class GuideQuestManager : MonoBehaviour
         else
             RebuildCurrent(notify: true);
 
-        // 레벨업 보고 구독
-        if (LevelUpManager.Instance != null)
-            LevelUpManager.Instance.OnLevelUp += ReportLevelUp;
+        TryBindLevelUp();
+    }
+
+    private void Update()
+    {
+        // ★ 원래는 Start에서 한 번만 구독을 시도해서, LevelUpManager가 아직 없으면
+        //   그 세션 내내 레벨업 퀘스트가 진행되지 않았습니다. 붙을 때까지 재시도합니다.
+        if (!levelUpBound) TryBindLevelUp();
+    }
+
+    private void TryBindLevelUp()
+    {
+        if (levelUpBound) return;
+        if (LevelUpManager.Instance == null) return;
+
+        LevelUpManager.Instance.OnLevelUp += ReportLevelUp;
+
+        // ★ 세이브 로드/씬 전환으로 레벨이 '복원'될 때도 퀘스트 진행도는 따라가야 합니다.
+        //   (연출은 OnStatRestored 를 구독하지 않으므로 레벨업 이펙트는 재생되지 않습니다)
+        LevelUpManager.Instance.OnStatRestored += ReportLevelUp;
+
+        levelUpBound = true;
+
+        ReSyncCurrent();   // 이미 목표 레벨을 넘어섰다면 즉시 반영
     }
 
     private void OnDestroy()
     {
-        if (LevelUpManager.Instance != null)
-            LevelUpManager.Instance.OnLevelUp -= ReportLevelUp;
+        if (levelUpBound && LevelUpManager.Instance != null)
+        {
+            LevelUpManager.Instance.OnLevelUp      -= ReportLevelUp;
+            LevelUpManager.Instance.OnStatRestored -= ReportLevelUp;
+        }
+
+        if (Instance == this) Instance = null;
     }
 
     private void RebuildCurrent(bool notify)
@@ -133,6 +167,25 @@ public partial class GuideQuestManager : MonoBehaviour
         SetProgress(newLevel);
     }
 
+    /// <summary>
+    /// ★ 신규 — 각성(진화) 스테이지 클리어 시 호출 (EvolveStageManager.ReportBossKill).
+    /// 아직 '각성 1회' 단계가 아니면 버리지 않고 적립해뒀다가 그 단계 진입 시 반영합니다.
+    /// </summary>
+    public void ReportEvolveClear(int count = 1)
+    {
+        if (count <= 0) return;
+
+        if (Current != null && Current.type == GuideQuestType.EvolveClear)
+        {
+            AddProgress(count);
+            return;
+        }
+
+        pendingEvolveClears = Mathf.Min(pendingEvolveClears + count, MaxPendingEvolveClears);
+        Debug.Log($"[GuideQuest] 각성 클리어를 적립했습니다 (대기 {pendingEvolveClears}회). " +
+                  $"현재 퀘스트: {(Current != null ? Current.type.ToString() : "없음")}");
+    }
+
     // ══════════════════════════════════════════════
     //  진행도 / 보상
     // ══════════════════════════════════════════════
@@ -179,8 +232,9 @@ public partial class GuideQuestManager : MonoBehaviour
         RequestSave();
         return true;
     }
+
     /// <summary>
-    /// 이미 달성한 상태(목표 스테이지를 이미 클리어함 / 레벨이 이미 높음)를 즉시 반영.
+    /// 이미 달성한 상태(목표 스테이지를 이미 클리어함 / 레벨이 이미 높음 / 각성을 이미 클리어함)를 즉시 반영.
     /// 로드 직후, 단계 진행 직후 호출.
     /// </summary>
     public void ReSyncCurrent()
@@ -198,6 +252,17 @@ public partial class GuideQuestManager : MonoBehaviour
             case GuideQuestType.LevelUp:
                 int lv = LevelUpManager.Instance != null ? LevelUpManager.Instance.CurrentLevel : 0;
                 if (lv > progress) SetProgress(lv);
+                break;
+
+            // ★ 단계 진입 전에 미리 클리어해둔 각성이 있으면 여기서 반영
+            case GuideQuestType.EvolveClear:
+                if (pendingEvolveClears > 0)
+                {
+                    int use = pendingEvolveClears;
+                    pendingEvolveClears = 0;
+                    Debug.Log($"[GuideQuest] 적립해둔 각성 클리어 {use}회를 반영합니다.");
+                    AddProgress(use);
+                }
                 break;
         }
     }

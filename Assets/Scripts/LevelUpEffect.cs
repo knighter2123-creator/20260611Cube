@@ -86,6 +86,10 @@ public class LevelUpEffect : MonoBehaviour
     [Tooltip("연출이 끝난 뒤에도 블룸을 유지할 여유 시간(페이드아웃용)")]
     public float bloomTailTime = 0.4f;
 
+    [Tooltip("블룸 설정이 꺼져 있으면 레벨업 연출 자체를 아예 재생하지 않습니다.\n" +
+             "체크 해제(기본)면 블룸만 빠지고 광주·링·텍스트는 그대로 나옵니다.")]
+    public bool skipWhenBloomDisabled = false;
+
     public bool useScreenFlash = true;
     [Tooltip("직교 카메라에서만 동작합니다")]
     public float flashTime = 0.18f;
@@ -98,6 +102,10 @@ public class LevelUpEffect : MonoBehaviour
     public bool autoBindLevelUpManager = true;
     [Tooltip("연결 성공/재생 시 콘솔에 로그를 남깁니다")]
     public bool logBinding = true;
+
+    [Tooltip("씬 시작 후 이 시간(초) 동안은 연출을 재생하지 않고 현재 레벨을 기준값으로만 따라갑니다. " +
+             "세이브 로드로 Lv.1 → Lv.15 가 복원될 때 레벨업 연출이 터지는 걸 막습니다.")]
+    public float suppressAfterLoadSeconds = 1.5f;
 
     [Header("기타")]
     [Tooltip("이 간격 안에 다시 호출되면 무시 (연속 레벨업 스팸 방지)")]
@@ -152,15 +160,30 @@ public class LevelUpEffect : MonoBehaviour
     // LevelUpManager 자동 연결
     // ─────────────────────────────────────────────
     private LevelUpManager boundManager;
-    private int lastKnownLevel = -1;
+    private int   lastKnownLevel = -1;
+    private float suppressUntil;
 
-    private void OnEnable() => TryBind();
+    /// <summary>지금이 '시작 직후 억제 구간'인가</summary>
+    private bool IsSuppressed => Time.unscaledTime < suppressUntil;
+
+    private void OnEnable()
+    {
+        // 씬이 새로 로드될 때마다 억제 구간을 다시 잡습니다
+        suppressUntil = Time.unscaledTime + Mathf.Max(0f, suppressAfterLoadSeconds);
+        TryBind();
+    }
+
     private void OnDisable() => Unbind();
 
     private void Update()
     {
         // LevelUpManager 가 나중에 만들어지는 구조여도 붙을 때까지 재시도
         if (autoBindLevelUpManager && boundManager == null) TryBind();
+
+        // ★ 억제 구간 동안은 연출 없이 현재 레벨만 계속 따라갑니다.
+        //   세이브 로드가 언제 끝나든(스탯이 나중에 주입돼도) 기준값이 복원된 레벨로 맞춰집니다.
+        if (boundManager != null && IsSuppressed)
+            lastKnownLevel = boundManager.CurrentLevel;
     }
 
     private void TryBind()
@@ -174,7 +197,24 @@ public class LevelUpEffect : MonoBehaviour
         lastKnownLevel = boundManager.CurrentLevel;
 
         if (logBinding)
-            Debug.Log($"[LevelUpEffect] LevelUpManager 에 연결됐습니다. (현재 Lv.{lastKnownLevel})", this);
+            Debug.Log($"[LevelUpEffect] LevelUpManager 에 연결됐습니다. (현재 Lv.{lastKnownLevel}, " +
+                      $"{Mathf.Max(0f, suppressUntil - Time.unscaledTime):0.0}초간 연출 억제)", this);
+    }
+
+    /// <summary>
+    /// 세이브 로드가 끝난 직후 직접 호출하면, 시간 창에 의존하지 않고 기준 레벨을 확정할 수 있습니다.
+    /// 예) SaveManager 로드 완료 지점에서 LevelUpEffect.Instance?.SyncLevelBaseline();
+    /// </summary>
+    public void SyncLevelBaseline()
+    {
+        if (boundManager == null) TryBind();
+        if (boundManager == null) return;
+
+        lastKnownLevel = boundManager.CurrentLevel;
+        suppressUntil  = 0f;   // 기준이 확정됐으므로 억제 해제
+
+        if (logBinding)
+            Debug.Log($"[LevelUpEffect] 기준 레벨을 Lv.{lastKnownLevel} 로 확정했습니다.", this);
     }
 
     private void Unbind()
@@ -185,7 +225,18 @@ public class LevelUpEffect : MonoBehaviour
 
     private void HandleLevelUp(int newLevel)
     {
-        // 씬 전환 시 스탯 복원으로 같은(또는 더 낮은) 레벨이 재통보되는 경우는 연출하지 않음
+        // ★ 시작 직후 억제 구간 : 세이브 로드로 Lv.1 → Lv.15 가 복원되는 것을
+        //   레벨업으로 오인하지 않도록, 기준값만 올리고 연출은 건너뜁니다.
+        if (IsSuppressed)
+        {
+            lastKnownLevel = Mathf.Max(lastKnownLevel, newLevel);
+
+            if (logBinding)
+                Debug.Log($"[LevelUpEffect] 시작 직후라 Lv.{newLevel} 통보를 복원으로 간주하고 연출을 생략했습니다.", this);
+            return;
+        }
+
+        // 씬 전환 시 스탯 복원으로 같은(또는 더 낮은) 레벨이 재통보되는 경우도 연출하지 않음
         if (newLevel <= lastKnownLevel)
         {
             lastKnownLevel = newLevel;
@@ -210,6 +261,16 @@ public class LevelUpEffect : MonoBehaviour
     /// <summary>지정한 대상 위치에서 레벨업 연출을 재생합니다.</summary>
     public void PlayAt(Transform at, int newLevel)
     {
+        // 저사양 모드처럼 "블룸을 끄면 연출도 통째로 끄고 싶다"는 경우
+        if (skipWhenBloomDisabled &&
+            BloomController.Instance != null &&
+            !BloomController.Instance.UserEnabled)
+        {
+            if (logBinding)
+                Debug.Log("[LevelUpEffect] 블룸 설정이 꺼져 있어 연출을 건너뜁니다.", this);
+            return;
+        }
+
         float now = useUnscaledTime ? Time.unscaledTime : Time.time;
         if (now - lastPlayTime < minInterval) return;
         lastPlayTime = now;
