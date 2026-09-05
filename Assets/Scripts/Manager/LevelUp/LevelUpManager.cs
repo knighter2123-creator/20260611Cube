@@ -9,36 +9,45 @@ partial class LevelUpManager : MonoBehaviour
     public static LevelUpManager Instance;
 
     private PlayerStat stat;
+
     void Awake()
     {
-        
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
         Instance = this;
-        
     }
+
     // ══════════════════════════════════════════════
     //  이벤트
     // ══════════════════════════════════════════════
-    
-    public event Action<int> OnLevelUp; // 레벨업 시 새 레벨 전달
-    public event Action<long> OnExpChanged; // 현재 exp 전달 (경험치 바 UI용)
-    
+
+    /// <summary>진짜로 레벨이 올랐을 때만 발생. 연출은 이 이벤트에 연결하세요.</summary>
+    public event Action<int> OnLevelUp;
+
+    /// <summary>현재 exp 전달 (경험치 바 UI용)</summary>
+    public event Action<long> OnExpChanged;
+
+    /// <summary>
+    /// 씬 전환 등으로 스탯이 "복원"됐을 때 발생. 레벨업이 아니므로 연출을 재생하면 안 됩니다.
+    /// UI 갱신 용도로만 쓰세요.
+    /// </summary>
+    public event Action<int> OnStatRestored;
+
     // ══════════════════════════════════════════════
     //  상수
     // ══════════════════════════════════════════════
     private const int MAX_PLAYER_LEVEL = 999;
-  
+
     // ══════════════════════════════════════════════
     //  프로퍼티
     // ══════════════════════════════════════════════
-    public long CurrentExp => stat != null ? stat.Experience : 0;
-    public long MaxExp     => stat != null ? stat.MaxExperience : 100;
-    public int CurrentLevel => stat != null ? stat.Level : 1;
-    
+    public long CurrentExp  => stat != null ? stat.Experience    : 0;
+    public long MaxExp      => stat != null ? stat.MaxExperience : 100;
+    public int  CurrentLevel => stat != null ? stat.Level        : 1;
+
     // ══════════════════════════════════════════════
     //  초기화
     // ══════════════════════════════════════════════
@@ -69,7 +78,9 @@ partial class LevelUpManager : MonoBehaviour
 
             stat = playerStat;
 
-            OnLevelUp?.Invoke(stat.Level);
+            // ★ 여기서 OnLevelUp 을 쏘면 "씬만 바꿔도 레벨업 연출이 터집니다".
+            //   복원은 레벨업이 아니므로 전용 이벤트로 분리했습니다.
+            OnStatRestored?.Invoke(stat.Level);
             OnExpChanged?.Invoke(stat.Experience);
         }
         else
@@ -79,11 +90,12 @@ partial class LevelUpManager : MonoBehaviour
                 ApplyFrom(SaveManager.Instance.Current);
         }
     }
+
     public void ResetStat()
     {
         stat = null;
     }
-    
+
     /// <summary>Enemy/Boss 사망 시 호출. 경험치 지급 + 레벨업 처리.</summary>
     public void AddExp(int amount)
     {
@@ -93,22 +105,25 @@ partial class LevelUpManager : MonoBehaviour
         OnExpChanged?.Invoke(stat.Experience);
 
         // 레벨업 (초과 경험치 이월)
-        while (stat.Experience >= stat.MaxExperience)
+        while (stat.Experience >= stat.MaxExperience && stat.Level < MAX_PLAYER_LEVEL)
         {
             stat.Experience -= stat.MaxExperience;
             stat.Level++;
             stat.MaxExperience = CalculateMaxExp(stat.Level); // 레벨별 필요 경험치 계산
+
             OnLevelUp?.Invoke(stat.Level);
+            OnExpChanged?.Invoke(stat.Experience);
         }
     }
 
     /// <summary>레벨에 따른 필요 경험치 공식 (인스펙터 설정으로 교체 가능)</summary>
     private long CalculateMaxExp(int level)
     {
-        // 100 → 150 → 225 ... (1.5배 증가)
+        // 100 → 115 → 132 ... (1.15배 증가)
         double value = 100.0 * System.Math.Pow(1.15, level - 1);
         return (long)System.Math.Max(1.0, System.Math.Round(value)); // 0 방지 가드
     }
+
     // StatType → (UpgradeConfig, 현재 강화 레벨)
     private (UpgradeConfig config, int level) GetConfigAndLevel(StatType type)
     {
@@ -117,11 +132,8 @@ partial class LevelUpManager : MonoBehaviour
             StatType.Damage     => (damageConfig,     stat.UpgradeLevelDamage),
             StatType.CritChance => (critChanceConfig, stat.UpgradeLevelCritChance),
             StatType.CritDamage => (critDamageConfig, stat.UpgradeLevelCritDamage),
-            StatType.Attackspd => (attackspdConfig, stat.UpgradeLevelAttackSpd),
+            StatType.Attackspd  => (attackspdConfig,  stat.UpgradeLevelAttackSpd),
             _                   => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }
-
- 
-    
 }

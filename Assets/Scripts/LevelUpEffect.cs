@@ -93,6 +93,12 @@ public class LevelUpEffect : MonoBehaviour
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip   levelUpSfx;
 
+    [Header("자동 연결")]
+    [Tooltip("LevelUpManager.OnLevelUp 을 자동으로 구독해서, 레벨업 시 알아서 재생합니다")]
+    public bool autoBindLevelUpManager = true;
+    [Tooltip("연결 성공/재생 시 콘솔에 로그를 남깁니다")]
+    public bool logBinding = true;
+
     [Header("기타")]
     [Tooltip("이 간격 안에 다시 호출되면 무시 (연속 레벨업 스팸 방지)")]
     public float minInterval = 0.15f;
@@ -135,9 +141,63 @@ public class LevelUpEffect : MonoBehaviour
     {
         if (Instance == this) Instance = null;
 
+        Unbind();
+
         // root 는 씬 루트에 따로 만들어지므로 직접 정리
         if (root != null) Destroy(root.gameObject);
         if (flash != null && flash.transform.parent != root) Destroy(flash.gameObject);
+    }
+
+    // ─────────────────────────────────────────────
+    // LevelUpManager 자동 연결
+    // ─────────────────────────────────────────────
+    private LevelUpManager boundManager;
+    private int lastKnownLevel = -1;
+
+    private void OnEnable() => TryBind();
+    private void OnDisable() => Unbind();
+
+    private void Update()
+    {
+        // LevelUpManager 가 나중에 만들어지는 구조여도 붙을 때까지 재시도
+        if (autoBindLevelUpManager && boundManager == null) TryBind();
+    }
+
+    private void TryBind()
+    {
+        if (!autoBindLevelUpManager) return;
+        if (boundManager != null) return;
+        if (LevelUpManager.Instance == null) return;
+
+        boundManager = LevelUpManager.Instance;
+        boundManager.OnLevelUp += HandleLevelUp;
+        lastKnownLevel = boundManager.CurrentLevel;
+
+        if (logBinding)
+            Debug.Log($"[LevelUpEffect] LevelUpManager 에 연결됐습니다. (현재 Lv.{lastKnownLevel})", this);
+    }
+
+    private void Unbind()
+    {
+        if (boundManager != null) boundManager.OnLevelUp -= HandleLevelUp;
+        boundManager = null;
+    }
+
+    private void HandleLevelUp(int newLevel)
+    {
+        // 씬 전환 시 스탯 복원으로 같은(또는 더 낮은) 레벨이 재통보되는 경우는 연출하지 않음
+        if (newLevel <= lastKnownLevel)
+        {
+            lastKnownLevel = newLevel;
+            return;
+        }
+
+        lastKnownLevel = newLevel;
+
+        if (logBinding)
+            Debug.Log($"[LevelUpEffect] 레벨업 감지 → Lv.{newLevel} 연출 재생", this);
+
+        Play(newLevel);
     }
 
     // ─────────────────────────────────────────────

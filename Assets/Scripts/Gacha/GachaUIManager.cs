@@ -32,6 +32,8 @@ public class GachaUIManager : MonoBehaviour
     [SerializeField] private RectTransform effectLayer;
     [Tooltip("이펙트가 자동으로 사라지지 않을 때를 대비한 강제 정리 시간(0이면 정리 안 함)")]
     [SerializeField] private float effectLifetime = 1.5f;
+    [Tooltip("이 등급 이상일 때만 등장 이펙트 (enum 선언 순서 기준). 모든 기물에 보이려면 최하위 등급으로")]
+    [SerializeField] private CompanionGrade effectThreshold = CompanionGrade.Epic;
 
     [Header("화면 흔들림")]
     [SerializeField] private ScreenShake screenShake;
@@ -40,10 +42,12 @@ public class GachaUIManager : MonoBehaviour
 
     private Coroutine revealing;
     private bool effectLayerValid;
+    private RectTransform contentRect;
 
     void Start()
     {
         ValidateEffectLayer();
+        contentRect = resultContent as RectTransform;
 
         draw1Button.onClick.AddListener(()   => OnDraw(GachaSystem.Instance.DrawOne()));
         draw10Button.onClick.AddListener(()  => OnDraw(GachaSystem.Instance.DrawTen()));
@@ -86,7 +90,10 @@ public class GachaUIManager : MonoBehaviour
     {
         // 연출 도중 닫으면 코루틴 정리
         if (revealing != null) { StopCoroutine(revealing); revealing = null; }
+
+        ClearResults();
         ClearEffects();
+
         gachaPanel.SetActive(true);
         resultPanel.SetActive(false);
     }
@@ -99,20 +106,37 @@ public class GachaUIManager : MonoBehaviour
 
     private void OnDraw(List<GachaSystem.GachaResult> results)
     {
-        if (results.Count == 0) return;   // 보석 부족 등
-        if (revealing != null)  return;   // 연출 중 중복 실행 방지
+        if (results == null || results.Count == 0) return;   // 보석 부족 등
+        if (revealing != null)  return;                      // 연출 중 중복 실행 방지
 
-        // Destroy는 프레임 끝에 처리되므로, 새 아이템이 붙기 전에 계층에서 즉시 떼어냄
-        foreach (Transform child in resultContent)
-        {
-            child.SetParent(null, false);
-            Destroy(child.gameObject);
-        }
-
+        ClearResults();
         ClearEffects();
 
         ShowResultPanel();
         revealing = StartCoroutine(RevealRoutine(results));
+    }
+
+    /// <summary>
+    /// 이전 뽑기 결과를 모두 제거합니다.
+    ///
+    /// ★ foreach (Transform child in resultContent) 안에서 계층을 바꾸면 안 됩니다.
+    ///   Transform의 열거자는 인덱스를 하나씩 올리며 GetChild(i)를 부르는데,
+    ///   중간에 자식을 떼어내면 뒤 인덱스가 당겨져서 '한 칸씩 건너뛰며' 절반만 지워집니다.
+    ///   → 10연차 뒤 1연차를 하면 이전 기물이 남아 보이던 원인이 이것입니다.
+    ///   반드시 역순 인덱스로 순회하세요.
+    /// </summary>
+    private void ClearResults()
+    {
+        if (resultContent == null) return;
+
+        for (int i = resultContent.childCount - 1; i >= 0; i--)
+        {
+            Transform child = resultContent.GetChild(i);
+
+            // Destroy는 프레임 끝에 처리되므로, 새 아이템이 붙기 전에 계층에서 즉시 떼어냄
+            child.SetParent(null, false);
+            Destroy(child.gameObject);
+        }
     }
 
     // ✅ 아이템을 하나씩 순서대로 공개
@@ -130,9 +154,16 @@ public class GachaUIManager : MonoBehaviour
             if (ui == null) continue;
 
             ui.Setup(result);
-
-            SpawnEffect(item.transform);   // ✅ 파티클 대신 스프라이트 애니메이션
             ui.PlayAppear();
+
+            // ★ 방금 생성한 아이템은 아직 레이아웃이 계산되지 않아 position이 (0,0)이거나
+            //   직전 위치입니다. 여기서 강제로 레이아웃을 확정해야 이펙트가 제 위치에 붙습니다.
+            if (contentRect != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+
+            // ★ 등급 게이트 — 이전에는 모든 아이템에 이펙트가 붙었습니다
+            if (result.data.grade >= effectThreshold)
+                SpawnEffect(item.transform);
 
             if (screenShake != null && result.data.grade >= shakeThreshold)
                 screenShake.Shake();
@@ -149,7 +180,7 @@ public class GachaUIManager : MonoBehaviour
 
         // Overlay 캔버스에서는 월드 position이 곧 스크린 픽셀 좌표 → 아이템 위치에 바로 배치 가능
         UISpriteAnimation fx = Instantiate(effectPrefab, effectLayer);
-        fx.transform.position = itemTransform.position;
+        fx.transform.position   = itemTransform.position;
         fx.transform.localScale = Vector3.one;
         // playOnEnable이 true면 자동 재생. 아니면 fx.Play();
 

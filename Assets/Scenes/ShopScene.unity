@@ -679,6 +679,7 @@ MonoBehaviour:
     type: 3}
   effectLayer: {fileID: 571815161}
   effectLifetime: 1.5
+  effectThreshold: 2
   screenShake: {fileID: 351370930}
   shakeThreshold: 2
 --- !u!4 &286825861
@@ -2728,6 +2729,7 @@ MonoBehaviour:
   chanceLegendary: 5
   normalPool:
   - {fileID: 11400000, guid: 8e88c7b876364174892884721dcc99eb, type: 2}
+  - {fileID: 11400000, guid: 08135a98310f4d64eb3b140159bfcd57, type: 2}
   rarePool:
   - {fileID: 11400000, guid: bdbee6a304c276c46b26c4519c382427, type: 2}
   epicPool:

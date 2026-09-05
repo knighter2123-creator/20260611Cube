@@ -13,35 +13,49 @@ public class PlayerExpUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI expText;     // "120 / 300"
     [SerializeField] private Slider          expSlider;   // 경험치 바
 
-    void Start()
-    {
-        if (LevelUpManager.Instance == null)
-        {
-            Debug.LogWarning("[PlayerExpUI] LevelUpManager.Instance가 없습니다.");
-            return;
-        }
+    private LevelUpManager bound;
 
-        // OnExpChanged : Action<int> — 현재 exp 전달
-        LevelUpManager.Instance.OnExpChanged += OnExpChanged;
-        // OnLevelUp    : Action<int> — 새 레벨 전달
-        LevelUpManager.Instance.OnLevelUp    += OnLevelUp;
+    void Start() => TryBind();
+
+    void Update()
+    {
+        // LevelUpManager 가 나중에 만들어져도 붙을 때까지 재시도
+        if (bound == null) TryBind();
+    }
+
+    void OnDestroy() => Unbind();
+
+    private void TryBind()
+    {
+        if (bound != null) return;
+        if (LevelUpManager.Instance == null) return;
+
+        bound = LevelUpManager.Instance;
+        bound.OnExpChanged   += OnExpChanged;
+        bound.OnLevelUp      += OnLevelUp;
+        bound.OnStatRestored += OnLevelUp;   // 복원 시에도 UI는 갱신되어야 함
 
         Refresh();
     }
 
-    void OnDestroy()
+    private void Unbind()
     {
-        if (LevelUpManager.Instance == null) return;
-        LevelUpManager.Instance.OnExpChanged -= OnExpChanged;
-        LevelUpManager.Instance.OnLevelUp    -= OnLevelUp;
+        if (bound == null) return;
+
+        bound.OnExpChanged   -= OnExpChanged;
+        bound.OnLevelUp      -= OnLevelUp;
+        bound.OnStatRestored -= OnLevelUp;
+        bound = null;
     }
 
     private void OnExpChanged(long currentExp) => Refresh();
-    private void OnLevelUp(int newLevel)      => Refresh();
+    private void OnLevelUp(int newLevel)       => Refresh();
 
     private void Refresh()
     {
-        int level      = LevelUpManager.Instance.CurrentLevel;
+        if (LevelUpManager.Instance == null) return;
+
+        int  level      = LevelUpManager.Instance.CurrentLevel;
         long currentExp = LevelUpManager.Instance.CurrentExp;
         long maxExp     = LevelUpManager.Instance.MaxExp;
 
