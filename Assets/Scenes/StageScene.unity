@@ -2097,11 +2097,14 @@ MonoBehaviour:
   textRise: 0.45
   controlBloom: 1
   bloomTailTime: 0.4
+  skipWhenBloomDisabled: 0
   useScreenFlash: 1
   flashTime: 0.18
   screenShake: {fileID: 0}
+  preferSoundManager: 1
   audioSource: {fileID: 0}
   levelUpSfx: {fileID: 8300000, guid: 2667a0a008b044e218b63df62e2be749, type: 3}
+  sfxVolumeScale: 1
   autoBindLevelUpManager: 1
   logBinding: 1
   suppressAfterLoadSeconds: 1.5

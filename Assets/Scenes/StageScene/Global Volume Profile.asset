@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: Global Volume Profile
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
   components:
-  - {fileID: 7153305817509946011}
---- !u!114 &7153305817509946011
+  - {fileID: 5619889548831227484}
+--- !u!114 &5619889548831227484
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -32,13 +32,13 @@ MonoBehaviour:
     m_Value: 1
   threshold:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0.9
   intensity:
     m_OverrideState: 1
-    m_Value: 0.9
+    m_Value: 1
   scatter:
     m_OverrideState: 1
-    m_Value: 0.65
+    m_Value: 0.7
   clamp:
     m_OverrideState: 0
     m_Value: 65472

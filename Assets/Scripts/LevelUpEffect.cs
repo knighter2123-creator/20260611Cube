@@ -94,8 +94,15 @@ public class LevelUpEffect : MonoBehaviour
     [Tooltip("직교 카메라에서만 동작합니다")]
     public float flashTime = 0.18f;
     [SerializeField] private ScreenShake screenShake;
+
+    [Header("사운드")]
+    [Tooltip("SoundManager 가 있으면 그쪽으로 재생합니다. 볼륨 설정이 적용되므로 권장")]
+    [SerializeField] private bool preferSoundManager = true;
+    [Tooltip("SoundManager 가 없을 때 쓸 예비 AudioSource (선택)")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip   levelUpSfx;
+    [Range(0f, 2f)]
+    [SerializeField] private float sfxVolumeScale = 1f;
 
     [Header("자동 연결")]
     [Tooltip("LevelUpManager.OnLevelUp 을 자동으로 구독해서, 레벨업 시 알아서 재생합니다")]
@@ -295,8 +302,7 @@ public class LevelUpEffect : MonoBehaviour
         if (subLabel  != null)
             subLabel.text = string.IsNullOrEmpty(subTextFormat) ? string.Empty : string.Format(subTextFormat, newLevel);
 
-        if (audioSource != null && levelUpSfx != null)
-            audioSource.PlayOneShot(levelUpSfx);
+        PlaySfx();
 
         if (screenShake != null)
             screenShake.Shake();
@@ -329,6 +335,42 @@ public class LevelUpEffect : MonoBehaviour
 
         root.gameObject.SetActive(false);
         playing = null;
+    }
+
+    /// <summary>
+    /// 효과음 재생. 원래는 audioSource/levelUpSfx 가 비어 있으면 조용히 아무 일도 안 해서
+    /// "왜 소리가 안 나지"를 알 방법이 없었습니다. 실패 원인을 명시합니다.
+    /// </summary>
+    private void PlaySfx()
+    {
+        if (levelUpSfx == null)
+        {
+            if (logBinding)
+                Debug.LogWarning("[LevelUpEffect] levelUpSfx 가 비어 있어 효과음을 재생하지 않습니다.", this);
+            return;
+        }
+
+        if (preferSoundManager && SoundManager.Instance != null)
+        {
+            SoundManager.Instance.PlaySfx(levelUpSfx, sfxVolumeScale);
+            return;
+        }
+
+        if (audioSource == null)
+        {
+            Debug.LogWarning("[LevelUpEffect] SoundManager 도 없고 audioSource 도 비어 있어 효과음을 재생할 수 없습니다. " +
+                             "씬에 SoundManager 를 두거나 audioSource 를 연결하세요.", this);
+            return;
+        }
+
+        if (!audioSource.isActiveAndEnabled)
+        {
+            Debug.LogWarning($"[LevelUpEffect] audioSource('{audioSource.name}') 가 비활성 상태라 재생되지 않습니다. " +
+                             "비활성 오브젝트의 AudioSource 는 소리를 내지 못합니다.", audioSource);
+            return;
+        }
+
+        audioSource.PlayOneShot(levelUpSfx, Mathf.Clamp01(sfxVolumeScale));
     }
 
     // ── 개별 요소 ────────────────────────────────
