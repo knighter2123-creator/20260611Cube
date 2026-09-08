@@ -1,6 +1,16 @@
 using System.Collections;
 using UnityEngine;
 
+/// <summary>
+/// 적 스폰 담당. 스테이지가 바뀔 때마다 StageManager가 ResetStage()를 불러
+/// "이번 스테이지는 어떤 프리팹을, 어떤 배율로, 얼마 간격으로 뽑을지"를 알려줍니다.
+///
+/// ★ 이번 수정 요약
+///   1) enemyPrefab / bossPrefab 단일 필드 → worldSets(WorldEnemySet 배열)로 교체
+///   2) ResetStage가 world / stage 번호를 받아 프리팹과 속도 배율을 결정
+///   3) Start()에서 스폰 루프를 자동 시작하지 않음 (프리팹이 정해지기 전이므로)
+///   4) Spawn() 안의 중복 호출 제거 (기존 코드에 OnSpawnFromPool·SetupPath가 2번씩 있었음)
+/// </summary>
 public class EnemyRespawn : MonoBehaviour
 {
     public static EnemyRespawn Instance;
@@ -8,13 +18,15 @@ public class EnemyRespawn : MonoBehaviour
     [Header("이 프리팹이 따라갈 이동 경로")]
     public Transform[] spawnWaypoints;
 
-    [SerializeField] private GameObject enemyPrefab;
+    [Header("월드별 적 세트")]
+    [Tooltip("배열 순서가 곧 월드 번호입니다. index 0 = 월드 1, index 1 = 월드 2 ...")]
+    [SerializeField] private WorldEnemySet[] worldSets;
 
-    [Tooltip("적 생성 주기 (초)")]
+    [Tooltip("적 생성 주기 (초). 오버라이드의 respawnDelayMultiplier가 여기에 곱해집니다.")]
     [SerializeField] private float respawnDelay = 3f;
 
     [Header("Boss Settings")]
-    public GameObject bossPrefab;
+    [Tooltip("보스 등장 전까지 뽑을 잡몹 최대 수")]
     public int maxTotalSpawn = 20;
 
     [Header("풀 예열 개수")]
@@ -24,65 +36,151 @@ public class EnemyRespawn : MonoBehaviour
     private bool  bossSpawned         = false;
     private float statMultiplier      = 1f;
 
-    private HpBar     hpBarRoot;          // ★ 매 스폰마다 씬 스캔하던 것 캐싱
+    // ── 현재 스테이지에 적용 중인 값 (ApplyStageSet에서 채워짐) ──
+    //
+    // 이렇게 "지금 무엇이 적용 중인지"를 필드로 들고 있으면,
+    // SpawnEnemy()나 SpawnBoss()는 매번 표를 다시 뒤질 필요 없이
+    // 이 값만 읽으면 됩니다. 계산은 스테이지 전환 때 1번만.
+    private GameObject currentEnemyPrefab;
+    private GameObject currentBossPrefab;
+    private float      currentSpeedMult = 1f;
+    private float      currentDelay;
+
+    private HpBar     hpBarRoot;          // 매 스폰마다 씬을 뒤지지 않도록 캐싱
     private Coroutine respawnCoroutine;
 
     void Awake()
     {
-        // ★ 중복 인스턴스 가드 (없으면 스폰 코루틴이 두 벌 돌 수 있음)
+        // 중복 인스턴스 가드 (없으면 스폰 코루틴이 두 벌 돌 수 있음)
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        currentDelay = respawnDelay;   // ResetStage 전에 참조돼도 0이 되지 않도록
     }
 
     void Start()
     {
         hpBarRoot = FindFirstObjectByType<HpBar>();
-        ObjectPoolManager.Instance?.Prewarm(enemyPrefab, prewarmCount);
 
-        // StageManager.Start가 먼저 ResetStage를 호출했을 수 있으므로 중복 방지
-        if (respawnCoroutine == null)
-            respawnCoroutine = StartCoroutine(RespawnLoop());
+        // ★ 여기서 스폰 루프를 시작하지 않습니다.
+        //   프리팹은 "몇 월드 몇 스테이지인가"를 알아야 정할 수 있고,
+        //   그 정보는 StageManager만 가지고 있기 때문입니다.
+        //   StageManager가 ResetStage()를 부르는 순간 루프가 시작됩니다.
+        //   → "누가 주도권을 갖는가"를 한 곳으로 몰아주는 게 버그를 줄입니다.
     }
 
     // ── 스테이지 리셋 (StageManager에서 호출) ──────
 
-    public void ResetStage(float newStatMult)
+    /// <summary>
+    /// 스테이지 시작 시 호출. 스탯 배율과 현재 위치(월드-스테이지)를 받습니다.
+    /// </summary>
+    public void ResetStage(float newStatMult, int world, int stage)
     {
         statMultiplier      = newStatMult;
         totalEnemiesSpawned = 0;
         bossSpawned         = false;
 
-        if (respawnCoroutine != null)
-            StopCoroutine(respawnCoroutine);
+        ApplyStageSet(world, stage);
+
+        // 이전 스테이지의 코루틴이 남아 있으면 반드시 정리.
+        // 안 그러면 스폰 루프가 두 개, 세 개로 늘어나 적이 배로 쏟아집니다.
+        if (respawnCoroutine != null) StopCoroutine(respawnCoroutine);
         respawnCoroutine = StartCoroutine(RespawnLoop());
 
-        Debug.Log($"[EnemyRespawn] 스테이지 리셋 — 스탯 배율: {statMultiplier:F4}");
+        Debug.Log($"[EnemyRespawn] {world}-{stage} 시작 — 프리팹: {currentEnemyPrefab?.name} " +
+                  $"/ 스탯 x{statMultiplier:F3} / 속도 x{currentSpeedMult:F2} / 주기 {currentDelay:F2}s");
+    }
+
+    /// <summary>
+    /// 월드/스테이지 번호로 이번 스테이지의 프리팹·배율을 확정합니다.
+    /// </summary>
+    private void ApplyStageSet(int world, int stage)
+    {
+        if (worldSets == null || worldSets.Length == 0)
+        {
+            Debug.LogError("[EnemyRespawn] worldSets가 비어 있습니다. 인스펙터에서 WorldEnemySet 에셋을 넣어주세요.");
+            return;
+        }
+
+        // ─── Mathf.Clamp의 역할 (학습 포인트) ──────────────────────────
+        // 월드 3개만 만들어 뒀는데 플레이어가 4월드에 도달하면?
+        // worldSets[3] 은 배열 범위를 벗어나 게임이 터집니다(IndexOutOfRange).
+        // Clamp는 값을 [최소, 최대] 안으로 강제로 밀어 넣어주는 함수라서,
+        // 4월드 이상은 자동으로 "마지막 세트"를 계속 쓰게 됩니다.
+        // 방치형처럼 스테이지가 끝없이 늘어나는 장르에서 아주 유용한 안전장치예요.
+        // ──────────────────────────────────────────────────────────────
+        int idx = Mathf.Clamp(world - 1, 0, worldSets.Length - 1);
+        var set = worldSets[idx];
+
+        if (set == null)
+        {
+            Debug.LogError($"[EnemyRespawn] worldSets[{idx}] 가 비어 있습니다(None).");
+            return;
+        }
+
+        // 1단계: 기본값으로 세팅
+        currentEnemyPrefab = set.normalPrefab;
+        currentBossPrefab  = set.bossPrefab;
+        currentSpeedMult   = 1f;
+        currentDelay       = respawnDelay;
+
+        // 2단계: 예외 규칙이 있으면 덮어쓰기 (예: 5스테이지 = 빠른 적)
+        var ov = set.GetOverride(stage);
+        if (ov != null)
+        {
+            if (ov.prefab != null) currentEnemyPrefab = ov.prefab;   // 비어 있으면 기본 프리팹 유지
+            currentSpeedMult = ov.speedMultiplier;
+            currentDelay     = respawnDelay * ov.respawnDelayMultiplier;
+        }
+
+        // 프리팹이 바뀌었을 수 있으므로 매 스테이지 예열.
+        // (수정된 Prewarm은 부족분만 채우므로 여러 번 불러도 안전합니다)
+        ObjectPoolManager.Instance?.Prewarm(currentEnemyPrefab, prewarmCount);
     }
 
     // ── 스폰 ───────────────────────────────────────
 
     void SpawnEnemy()
     {
-        if (enemyPrefab == null || spawnWaypoints.Length == 0) return;
+        if (currentEnemyPrefab == null || spawnWaypoints.Length == 0) return;
         if (bossSpawned) return;
         if (totalEnemiesSpawned >= maxTotalSpawn) return;
 
-        GameObject obj = Spawn(enemyPrefab);
-        if (obj == null) return;
-
-        totalEnemiesSpawned++;
+        // ★ 스폰에 성공했을 때만 카운트를 올립니다.
+        //   (기존 코드도 같은 의도였지만, 실패 시에도 obj가 null인지만 보고
+        //    return 했기 때문에 흐름을 한 줄로 합쳐 명확하게 만들었습니다)
+        if (Spawn(currentEnemyPrefab) != null)
+            totalEnemiesSpawned++;
     }
 
     public void SpawnBoss()
     {
-        if (bossSpawned || bossPrefab == null) return;
+        if (bossSpawned || currentBossPrefab == null) return;
         bossSpawned = true;
 
-        Spawn(bossPrefab);
+        Spawn(currentBossPrefab);
         Debug.Log("[EnemyRespawn] 보스 소환!");
     }
 
-    /// <summary>풀에서 꺼내 초기화 → 활성화까지 담당하는 공통 경로</summary>
+    /// <summary>
+    /// 풀에서 꺼내 초기화 → 활성화까지 담당하는 공통 경로.
+    ///
+    /// ─── 호출 순서가 왜 중요한가 (가장 중요한 학습 포인트) ───────────────
+    ///
+    ///   ① GetInactive()      : 꺼져 있는 상태로 받아온다
+    ///   ② OnSpawnFromPool()  : 체력·디버프 초기화
+    ///                          → 내부에서 ResetDebuffs() → TargetMove.ResetForSpawn()
+    ///                          → 이때 spawnSpeedMult가 1로 리셋됨!
+    ///   ③ SetSpawnSpeedMultiplier() : 그래서 ②보다 뒤에 와야 한다
+    ///   ④ SetupPath()        : isInitialized = true → 이제부터 움직일 수 있다
+    ///   ⑤ SetActive(true)    : OnEnable에서 Enemy.Active 목록에 등록
+    ///   ⑥ RegisterEnemy()    : HP바는 오브젝트가 켜진 뒤에 붙인다
+    ///
+    /// 순서를 바꾸면 "속도 배율이 안 먹는다", "적이 경로 중간에서 출발한다",
+    /// "체력 0인 적이 한 프레임 보인다" 같은 재현하기 어려운 버그가 납니다.
+    /// 이런 곳에는 주석으로 이유를 남겨두는 습관이 미래의 자신을 살립니다.
+    /// ──────────────────────────────────────────────────────────────────
+    /// </summary>
     private GameObject Spawn(GameObject prefab)
     {
         if (ObjectPoolManager.Instance == null) return null;
@@ -92,24 +190,37 @@ public class EnemyRespawn : MonoBehaviour
             prefab, spawnPos, Quaternion.identity);
         if (obj == null) return null;
 
-        // ★ 반드시 SetActive(true) 이전에 초기화 (OnEnable에서 Active 등록되므로)
+        // ② 스탯·디버프 초기화 (SetActive 이전이어야 함)
         if (obj.TryGetComponent(out Enemy enemy))
             enemy.OnSpawnFromPool(statMultiplier);
 
+        // ③④ 속도 배율 → 경로 세팅 (반드시 이 순서)
         if (obj.TryGetComponent(out TargetMove move))
+        {
+            move.SetSpawnSpeedMultiplier(currentSpeedMult);
             move.SetupPath(spawnWaypoints);
+        }
 
-        enemy.OnSpawnFromPool(statMultiplier);   // ResetDebuffs → ResetForSpawn (isInitialized = false)
-        move.SetupPath(spawnWaypoints);          // ★ 반드시 이 다음 (isInitialized = true)
+        // ⑤ 이제 켠다
         obj.SetActive(true);
 
-        hpBarRoot?.RegisterEnemy(obj);   // HpBar는 활성화 이후 등록
+        // ⑥ HpBar는 활성화 이후 등록
+        hpBarRoot?.RegisterEnemy(obj);
         return obj;
     }
 
     private IEnumerator RespawnLoop()
     {
-        var wait = new WaitForSeconds(respawnDelay);   // 매 루프 할당 제거
+        // ─── 왜 wait 객체를 밖에서 한 번만 만드는가 (학습 포인트) ──────────
+        // while 안에서 매번 new WaitForSeconds(...)를 하면 루프를 돌 때마다
+        // 새 객체가 생기고, 그게 전부 쓰레기가 되어 GC를 부릅니다.
+        // 값이 변하지 않는 대기 객체는 밖에서 한 번 만들어 재사용하세요.
+        //
+        // 여기서는 스테이지가 바뀔 때 코루틴 자체를 다시 시작하므로
+        // currentDelay가 바뀌어도 자연스럽게 반영됩니다.
+        // ──────────────────────────────────────────────────────────────
+        var wait = new WaitForSeconds(currentDelay);
+
         while (true)
         {
             yield return wait;

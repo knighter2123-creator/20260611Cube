@@ -9218,11 +9218,11 @@ MonoBehaviour:
   - {fileID: 1480606403}
   - {fileID: 1841382799}
   - {fileID: 1096335347}
-  enemyPrefab: {fileID: 8197083033936464343, guid: c4dd1d77c66f13348ac39e4f612fdae3,
-    type: 3}
+  worldSets:
+  - {fileID: 11400000, guid: 530c72ae005e8ca4fb3d625a235a3d99, type: 2}
+  - {fileID: 11400000, guid: 2a3715fa57529284a9f66cf57bc41be5, type: 2}
+  - {fileID: 11400000, guid: 5d969a75d354da345a0495f7e8a20baf, type: 2}
   respawnDelay: 3
-  bossPrefab: {fileID: 2431723932254382337, guid: 9dbaee4187b85b44f810079739c829a8,
-    type: 3}
   maxTotalSpawn: 20
   prewarmCount: 12
 --- !u!4 &613816707

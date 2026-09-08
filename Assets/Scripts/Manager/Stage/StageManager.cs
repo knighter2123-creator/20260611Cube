@@ -2,6 +2,24 @@ using System;
 using UnityEngine;
 using TMPro;
 
+/// <summary>
+/// 스테이지 진행(킬 카운트 / 제한 시간 / 클리어·실패 / 월드-스테이지 번호) 담당.
+///
+/// ★ 이번 수정은 딱 두 군데입니다. 파일 안에서 "★ 수정" 을 검색하세요.
+///   1) Start()의 3번 분기(세이브 없음)에서도 EnemyRespawn.ResetStage를 호출
+///   2) NextStage()의 ResetStage 호출에 currentWorld / currentStage 인자 추가
+///
+/// 나머지 코드는 원본 그대로입니다.
+/// (이 클래스는 partial 이므로, ShowBossNotice / ApplyFrom 등은
+///  다른 파일에 있는 나머지 절반에 그대로 남아 있습니다 — 건드릴 필요 없습니다.)
+///
+/// ─── partial class가 뭔가요? (학습 포인트) ────────────────────────────
+/// 하나의 클래스를 여러 파일에 나눠 쓰는 문법입니다. 컴파일할 때 합쳐져서
+/// 완전히 같은 하나의 클래스가 돼요. Enemy.cs / Enemy.Debuffs.cs 처럼
+/// "핵심 로직"과 "부가 기능"을 나눠두면 파일이 짧아져 읽기 쉬워집니다.
+/// 단, 같은 클래스이므로 필드 이름이 겹치면 컴파일 오류가 납니다.
+/// ────────────────────────────────────────────────────────────────────
+/// </summary>
 public partial class StageManager : MonoBehaviour
 {
     public static StageManager Instance;
@@ -20,7 +38,7 @@ public partial class StageManager : MonoBehaviour
     public event Action OnStageFail;
 
     public float StatMultiplier => statMultiplier;
-    
+
     // 진화 스테이지 입장 버튼이 현재 위치를 읽을 수 있게 공개
     public int CurrentWorld => currentWorld;
     public int CurrentStage => currentStage;
@@ -38,7 +56,6 @@ public partial class StageManager : MonoBehaviour
 
     void Awake()
     {
-        
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
     }
@@ -53,7 +70,7 @@ public partial class StageManager : MonoBehaviour
             currentStatMult = Mathf.Pow(statMultiplier,
                 (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
             EvolveStageContext.ClearReturn();
-            NextStage();
+            NextStage();          // ← 내부에서 ResetStage를 부르므로 프리팹도 함께 결정됨
             return;
         }
 
@@ -61,12 +78,20 @@ public partial class StageManager : MonoBehaviour
         if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
         {
             ApplyFrom(SaveManager.Instance.Current);
-            NextStage();
+            NextStage();          // ← 여기도 마찬가지
             return;
         }
 
         // 3) 세이브 없음 — 처음부터
         InitStage();
+
+        // ★ 수정 ①
+        //   기존에는 InitStage()만 부르고 끝냈습니다. 예전 EnemyRespawn은
+        //   Start()에서 스스로 스폰 루프를 돌렸기 때문에 그래도 적이 나왔죠.
+        //   이제는 "어느 월드의 어느 프리팹을 쓸지"를 StageManager가 알려줘야
+        //   스폰이 시작되므로, 신규 시작 경로에서도 반드시 호출해야 합니다.
+        //   (이걸 빠뜨리면 1-1에서 적이 한 마리도 안 나옵니다)
+        NotifyRespawner();
     }
 
     void Update()
@@ -173,6 +198,12 @@ public partial class StageManager : MonoBehaviour
     private void NextStage()
     {
         // OnDisable에서 자기 자신을 제거하므로 역순 순회
+        //
+        // ─── 왜 역순인가? (학습 포인트) ─────────────────────────────
+        // 앞에서부터 돌면서 원소를 지우면, 지운 자리로 뒤 원소가 당겨오면서
+        // 한 칸씩 건너뛰게 됩니다. 뒤에서부터 지우면 아직 방문하지 않은
+        // 앞쪽 인덱스가 흔들리지 않아 안전합니다.
+        // ────────────────────────────────────────────────────────
         var list = Enemy.Active;
         for (int i = list.Count - 1; i >= 0; i--)
         {
@@ -187,7 +218,31 @@ public partial class StageManager : MonoBehaviour
         }
 
         InitStage();
-        EnemyRespawn.Instance.ResetStage(currentStatMult);
+
+        // ★ 수정 ②
+        //   월드·스테이지 번호를 함께 넘겨 프리팹과 속도 배율까지 갱신합니다.
+        NotifyRespawner();
+    }
+
+    /// <summary>
+    /// ★ 신규 — EnemyRespawn에게 "이번 스테이지 정보"를 전달하는 창구.
+    ///
+    /// 호출하는 곳이 두 군데(Start의 3번 분기, NextStage)라서 함수로 뺐습니다.
+    /// 같은 코드를 두 번 쓰면 나중에 한쪽만 고치는 실수가 반드시 생깁니다.
+    /// (DRY 원칙 — Don't Repeat Yourself)
+    /// </summary>
+    private void NotifyRespawner()
+    {
+        if (EnemyRespawn.Instance == null)
+        {
+            // ?. 대신 명시적으로 검사하고 경고를 남깁니다.
+            // 조용히 넘어가면 "적이 안 나오는데 이유를 모르겠는" 상황이 되니까요.
+            Debug.LogError("[StageManager] EnemyRespawn.Instance가 없습니다. " +
+                           "씬에 EnemyRespawn이 있는지, 실행 순서가 StageManager보다 앞인지 확인하세요.");
+            return;
+        }
+
+        EnemyRespawn.Instance.ResetStage(currentStatMult, currentWorld, currentStage);
     }
 
     private void InitStage()
