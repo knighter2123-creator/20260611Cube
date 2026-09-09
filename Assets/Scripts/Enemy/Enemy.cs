@@ -4,7 +4,11 @@ using UnityEngine;
 /// <summary>
 /// 모든 적의 공통 기반 클래스.
 ///
-/// ★ 이번 수정: Die() 안의 "보상 지급"과 "처치 보고"를 가상 메서드로 분리
+/// ★ 이번 수정은 TakeDamage() 한 군데뿐입니다. "★ 증강" 을 검색하세요.
+///   ① 기존 버그 수정 — 방어력 감소가 오히려 방어력을 올리고 있었습니다 (나눗셈 → 곱셈)
+///   ② 증강 '적 방어력 감소' 배율 반영
+///
+/// 나머지 코드는 원본 그대로입니다.
 ///
 /// ─── 왜 이렇게 바꾸나? (핵심 학습 포인트: 템플릿 메서드 패턴) ─────────────
 ///
@@ -133,8 +137,30 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     {
         if (isDead) return;
 
-        float reducedDefence = defence / _armorBreakMultiplier;
-        float finalDamage    = Mathf.Max(damage - reducedDefence, 0f);
+        // ★ 증강 ─────────────────────────────────────────────────────────
+        //
+        // 【기존 버그】 원래 코드는 이랬습니다:
+        //     float reducedDefence = defence / _armorBreakMultiplier;
+        //
+        //   _armorBreakMultiplier 는 "1 = 정상, 0.6 = 방어력 40% 감소" 라는 뜻인데
+        //   나눗셈을 쓰면  defence / 0.6 = defence × 1.67  이 되어
+        //   방어력 감소 스킬이 오히려 적을 단단하게 만들고 있었습니다.
+        //   방향이 정반대라 "스킬을 썼는데 대미지가 줄어드는" 증상이 났을 겁니다.
+        //   → 곱셈으로 바로잡았습니다.
+        //
+        // 【배율 레이어】 이제 방어력은 세 겹의 곱으로 결정됩니다.
+        //     기본 방어력 × 스킬 방어력감소 × 증강 방어력감소
+        //
+        //   TargetMove 의  baseSpeed × spawnSpeedMult × slowMultiplier  와 똑같은 구조입니다.
+        //   각 효과가 서로 독립된 '레이어'라서, 스킬 디버프가 끝나도
+        //   증강 버프는 그대로 남습니다. 뺄셈으로 처리했다면
+        //   "스킬이 풀릴 때 증강 효과까지 같이 사라지는" 버그가 났을 겁니다.
+        //
+        //   AugmentManager 가 씬에 없으면 EnemyDefense 는 1을 돌려주므로
+        //   증강 시스템을 빼도 이 코드는 그대로 동작합니다.
+        // ────────────────────────────────────────────────────────────────
+        float effectiveDefence = defence * _armorBreakMultiplier * AugmentManager.EnemyDefense;
+        float finalDamage      = Mathf.Max(damage - effectiveDefence, 0f);
 
         currentHealth -= finalDamage;
         currentHealth  = Mathf.Max(currentHealth, 0f);

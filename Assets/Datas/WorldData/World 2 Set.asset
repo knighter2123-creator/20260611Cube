@@ -19,7 +19,7 @@ MonoBehaviour:
     type: 3}
   overrides:
   - stage: 5
-    prefab: {fileID: 8197083033936464343, guid: c4dd1d77c66f13348ac39e4f612fdae3,
+    prefab: {fileID: 8197083033936464343, guid: 7b976779c9cac96458798387ec344462,
       type: 3}
-    speedMultiplier: 1.7
+    speedMultiplier: 2.5
     respawnDelayMultiplier: 1

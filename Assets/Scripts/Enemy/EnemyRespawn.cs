@@ -5,11 +5,14 @@ using UnityEngine;
 /// 적 스폰 담당. 스테이지가 바뀔 때마다 StageManager가 ResetStage()를 불러
 /// "이번 스테이지는 어떤 프리팹을, 어떤 배율로, 얼마 간격으로 뽑을지"를 알려줍니다.
 ///
-/// ★ 이번 수정 요약
+/// ★ 이번 수정은 RespawnLoop() 한 군데뿐입니다. "★ 증강" 을 검색하세요.
+///   증강 '적 생성 주기 감소' 배율을 스폰 대기시간에 반영합니다.
+///
+/// ─── 기존 수정 요약 (그대로 유지) ───
 ///   1) enemyPrefab / bossPrefab 단일 필드 → worldSets(WorldEnemySet 배열)로 교체
 ///   2) ResetStage가 world / stage 번호를 받아 프리팹과 속도 배율을 결정
 ///   3) Start()에서 스폰 루프를 자동 시작하지 않음 (프리팹이 정해지기 전이므로)
-///   4) Spawn() 안의 중복 호출 제거 (기존 코드에 OnSpawnFromPool·SetupPath가 2번씩 있었음)
+///   4) Spawn() 안의 중복 호출 제거
 /// </summary>
 public class EnemyRespawn : MonoBehaviour
 {
@@ -24,6 +27,9 @@ public class EnemyRespawn : MonoBehaviour
 
     [Tooltip("적 생성 주기 (초). 오버라이드의 respawnDelayMultiplier가 여기에 곱해집니다.")]
     [SerializeField] private float respawnDelay = 3f;
+
+    [Tooltip("증강 등으로 주기가 줄어들 때의 하한선(초). 너무 작으면 화면이 적으로 뒤덮입니다.")]
+    [SerializeField] private float minRespawnDelay = 0.15f;
 
     [Header("Boss Settings")]
     [Tooltip("보스 등장 전까지 뽑을 잡몹 최대 수")]
@@ -147,8 +153,6 @@ public class EnemyRespawn : MonoBehaviour
         if (totalEnemiesSpawned >= maxTotalSpawn) return;
 
         // ★ 스폰에 성공했을 때만 카운트를 올립니다.
-        //   (기존 코드도 같은 의도였지만, 실패 시에도 obj가 null인지만 보고
-        //    return 했기 때문에 흐름을 한 줄로 합쳐 명확하게 만들었습니다)
         if (Spawn(currentEnemyPrefab) != null)
             totalEnemiesSpawned++;
     }
@@ -211,18 +215,41 @@ public class EnemyRespawn : MonoBehaviour
 
     private IEnumerator RespawnLoop()
     {
-        // ─── 왜 wait 객체를 밖에서 한 번만 만드는가 (학습 포인트) ──────────
-        // while 안에서 매번 new WaitForSeconds(...)를 하면 루프를 돌 때마다
-        // 새 객체가 생기고, 그게 전부 쓰레기가 되어 GC를 부릅니다.
-        // 값이 변하지 않는 대기 객체는 밖에서 한 번 만들어 재사용하세요.
+        // ★ 증강 ─────────────────────────────────────────────────────────
         //
-        // 여기서는 스테이지가 바뀔 때 코루틴 자체를 다시 시작하므로
-        // currentDelay가 바뀌어도 자연스럽게 반영됩니다.
-        // ──────────────────────────────────────────────────────────────
-        var wait = new WaitForSeconds(currentDelay);
+        // 【원래 코드의 한계】
+        //     var wait = new WaitForSeconds(currentDelay);   // 루프 밖에서 1회 생성
+        //
+        //   "값이 변하지 않는 대기 객체는 밖에서 한 번 만들어 재사용" — 이 원칙 자체는 옳습니다.
+        //   스테이지가 바뀔 때마다 코루틴을 새로 시작하니까 그때는 문제가 없었어요.
+        //   그런데 증강은 스테이지 '도중에' 주기를 바꿉니다.
+        //   객체를 한 번만 만들면 그 변화가 영원히 반영되지 않습니다.
+        //
+        // 【해결】 매번 new 를 하는 게 아니라, "값이 바뀐 순간에만" 새로 만듭니다.
+        //   증강이 켜지고 꺼질 때 딱 2번만 할당이 일어나므로
+        //   GC 부담은 사실상 0이면서 실시간 반영도 됩니다.
+        //   원래 주석의 교훈(불필요한 new 금지)을 지키면서 요구사항만 추가한 형태입니다.
+        //
+        //   ※ AugmentManager 가 없으면 SpawnDelay 는 항상 1을 돌려주므로
+        //     이 코드는 증강 시스템 없이도 원래대로 동작합니다.
+        // ────────────────────────────────────────────────────────────────
+
+        float lastDelay = -1f;
+        WaitForSeconds wait = null;
 
         while (true)
         {
+            float delay = Mathf.Max(minRespawnDelay, currentDelay * AugmentManager.SpawnDelay);
+
+            // float 비교에 == 대신 Approximately 를 쓰는 이유:
+            // 부동소수점은 0.1 + 0.2 != 0.3 처럼 미세한 오차가 생겨서
+            // == 로 비교하면 사실상 같은 값인데도 매번 다르다고 판정될 수 있습니다.
+            if (!Mathf.Approximately(delay, lastDelay))
+            {
+                lastDelay = delay;
+                wait = new WaitForSeconds(delay);
+            }
+
             yield return wait;
             SpawnEnemy();
         }

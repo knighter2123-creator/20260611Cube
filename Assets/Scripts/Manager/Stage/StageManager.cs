@@ -5,9 +5,7 @@ using TMPro;
 /// <summary>
 /// 스테이지 진행(킬 카운트 / 제한 시간 / 클리어·실패 / 월드-스테이지 번호) 담당.
 ///
-/// ★ 이번 수정은 딱 두 군데입니다. 파일 안에서 "★ 수정" 을 검색하세요.
-///   1) Start()의 3번 분기(세이브 없음)에서도 EnemyRespawn.ResetStage를 호출
-///   2) NextStage()의 ResetStage 호출에 currentWorld / currentStage 인자 추가
+/// ★ 이번 수정은 StageClear() 안의 딱 한 줄입니다. "★ 증강" 을 검색하세요.
 ///
 /// 나머지 코드는 원본 그대로입니다.
 /// (이 클래스는 partial 이므로, ShowBossNotice / ApplyFrom 등은
@@ -85,7 +83,6 @@ public partial class StageManager : MonoBehaviour
         // 3) 세이브 없음 — 처음부터
         InitStage();
 
-        // ★ 수정 ①
         //   기존에는 InitStage()만 부르고 끝냈습니다. 예전 EnemyRespawn은
         //   Start()에서 스스로 스폰 루프를 돌렸기 때문에 그래도 적이 나왔죠.
         //   이제는 "어느 월드의 어느 프리팹을 쓸지"를 StageManager가 알려줘야
@@ -152,9 +149,27 @@ public partial class StageManager : MonoBehaviour
         OnStageClear?.Invoke();
         Debug.Log($"[StageManager] {currentWorld}-{currentStage} 클리어!");
 
-        // ※ 아래 두 줄은 반드시 currentStage++ 이전에!
+        // ※ 아래 세 줄은 반드시 currentStage++ 이전에!
         GuideQuestManager.Instance?.ReportStageClear(currentWorld, currentStage);
         ShowStageClearNotice();          // ← 여기로 이동, 파라미터 불필요
+
+        // ★ 증강 ─────────────────────────────────────────────────────────
+        //
+        // 이 위치가 중요합니다. 바로 아래 currentStage++ 가 실행되고 나면
+        // currentStage 는 이미 "다음 스테이지" 번호(1-10 클리어 → 2-1)라서,
+        // 그 값을 넘기면 조건(stage == 10)에 걸리지 않아 카드가 영영 안 뜹니다.
+        // 반드시 '방금 클리어한' 번호를 넘겨야 합니다.
+        //
+        // AugmentManager 는 openDelay(기본 1초) 만큼 기다렸다가 창을 엽니다.
+        // 클리어 알림 연출을 잠깐 보여주고 카드를 띄우기 위해서입니다.
+        // 창이 열리는 순간 Time.timeScale 이 0이 되므로,
+        // 아래 NextStageDelayed() 코루틴의 대기도 함께 멈춥니다.
+        // → 플레이어가 카드를 고르기 전에 다음 스테이지가 시작되는 일이 없습니다.
+        //   (WaitForSeconds 는 timeScale 의 영향을 받는다는 성질을 이용한 것입니다.
+        //    만약 그 코루틴이 WaitForSecondsRealtime 을 쓴다면 멈추지 않으니,
+        //    openDelay 를 0으로 두거나 전환 대기시간을 늘려주세요.)
+        // ────────────────────────────────────────────────────────────────
+        AugmentManager.Instance?.OnStageCleared(currentWorld, currentStage);
 
         currentStage++;
 
@@ -219,9 +234,13 @@ public partial class StageManager : MonoBehaviour
 
         InitStage();
 
-        // ★ 수정 ②
         //   월드·스테이지 번호를 함께 넘겨 프리팹과 속도 배율까지 갱신합니다.
         NotifyRespawner();
+
+        // ★ 증강 — 증강 매니저에도 "지금 몇 스테이지인지" 알려줍니다.
+        //   등급 상승 보정(월드가 오를수록 고등급이 잘 나옴)과
+        //   '이번 스테이지 동안' 버프 정리에 쓰입니다.
+        AugmentManager.Instance?.SetCurrentStage(currentWorld, currentStage);
     }
 
     /// <summary>

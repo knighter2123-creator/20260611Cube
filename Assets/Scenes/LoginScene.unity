@@ -1392,7 +1392,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ebeeb31c975f1049bbcb9587ac02591, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IdleRewardManager
-  idleRatio: 0.8
+  idleRatio: 0.5
   maxAccrualHours: 24
   rewardGoldPerKill: 10
   rewardExpPerKill: 5
