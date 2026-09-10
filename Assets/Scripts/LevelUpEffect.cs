@@ -203,9 +203,6 @@ public class LevelUpEffect : MonoBehaviour
         boundManager.OnLevelUp += HandleLevelUp;
         lastKnownLevel = boundManager.CurrentLevel;
 
-        if (logBinding)
-            Debug.Log($"[LevelUpEffect] LevelUpManager 에 연결됐습니다. (현재 Lv.{lastKnownLevel}, " +
-                      $"{Mathf.Max(0f, suppressUntil - Time.unscaledTime):0.0}초간 연출 억제)", this);
     }
 
     /// <summary>
@@ -220,8 +217,6 @@ public class LevelUpEffect : MonoBehaviour
         lastKnownLevel = boundManager.CurrentLevel;
         suppressUntil  = 0f;   // 기준이 확정됐으므로 억제 해제
 
-        if (logBinding)
-            Debug.Log($"[LevelUpEffect] 기준 레벨을 Lv.{lastKnownLevel} 로 확정했습니다.", this);
     }
 
     private void Unbind()
@@ -238,8 +233,6 @@ public class LevelUpEffect : MonoBehaviour
         {
             lastKnownLevel = Mathf.Max(lastKnownLevel, newLevel);
 
-            if (logBinding)
-                Debug.Log($"[LevelUpEffect] 시작 직후라 Lv.{newLevel} 통보를 복원으로 간주하고 연출을 생략했습니다.", this);
             return;
         }
 
@@ -269,14 +262,8 @@ public class LevelUpEffect : MonoBehaviour
     public void PlayAt(Transform at, int newLevel)
     {
         // 저사양 모드처럼 "블룸을 끄면 연출도 통째로 끄고 싶다"는 경우
-        if (skipWhenBloomDisabled &&
-            BloomController.Instance != null &&
-            !BloomController.Instance.UserEnabled)
-        {
-            if (logBinding)
-                Debug.Log("[LevelUpEffect] 블룸 설정이 꺼져 있어 연출을 건너뜁니다.", this);
-            return;
-        }
+        if (skipWhenBloomDisabled && BloomController.Instance != null &&
+            !BloomController.Instance.UserEnabled) { }
 
         float now = useUnscaledTime ? Time.unscaledTime : Time.time;
         if (now - lastPlayTime < minInterval) return;

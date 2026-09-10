@@ -266,7 +266,7 @@ public partial class AugmentManager : MonoBehaviour
     [ContextMenu("테스트: 카드 선택창 열기")]
     private void TestOpen() => Open();
 
-    [ContextMenu("테스트: 증강 전체 초기화")]
+    [ContextMenu("테스트: 보너스 전체 초기화")]
     private void TestReset() => ResetAll();
 
     [ContextMenu("테스트: 현재 상태 출력")]

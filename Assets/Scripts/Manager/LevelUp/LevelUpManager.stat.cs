@@ -113,7 +113,6 @@ public partial class LevelUpManager
         if (!batchingUpgrades)
         {
             OnStatUpgraded?.Invoke(type);
-            Debug.Log($"[LevelUpManager] {type} 강화 Lv.{currentLv + 1} | 비용 {cost}");
         }
 
         return true;
@@ -150,8 +149,6 @@ public partial class LevelUpManager
         if (successCount > 0)
         {
             OnStatUpgraded?.Invoke(type);   // 끝난 뒤 한 번만
-            Debug.Log($"[LevelUpManager] {type} 강화 {successCount}회 성공 " +
-                      $"(요청 {times}회) → Lv.{GetUpgradeLevelValue(type)}");
         }
 
         return successCount;
@@ -182,11 +179,6 @@ public partial class LevelUpManager
                 // ✅ AttackSpd(ms) 감소 → 쿨다운 감소 → 공격속도 증가
                 // 최소 100ms(0.1초) 아래로 내려가지 않도록 클램프
                 stat.AttackSpd = Mathf.Max(stat.AttackSpd - Mathf.RoundToInt(gain), 100);
-
-                // 반복 강화 중에는 로그를 찍지 않습니다 (×100이면 100줄)
-                if (!batchingUpgrades)
-                    Debug.Log($"[LevelUpManager] AttackSpd: {stat.AttackSpd}ms → " +
-                              $"cooldown: {stat.AttackSpd / 1000f:F3}초");
                 break;
         }
     }

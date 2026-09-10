@@ -21,8 +21,7 @@ public class PlayerName : MonoBehaviour
 
     void Start()
     {
-        // 인스펙터 미할당을 한 번에 잡아내고, 여기서 멈춰 연쇄 에러를 막는다
-        if (!ValidateReferences()) return;
+       
 
         popupPanel.SetActive(false);
 
@@ -31,41 +30,6 @@ public class PlayerName : MonoBehaviour
         cancelButton.onClick.AddListener(ClosePopup);
 
         Refresh();
-    }
-
-    private bool ValidateReferences()
-    {
-        bool ok = true;
-
-        // 두 번째 인자로 this를 넘기면 콘솔의 에러를 클릭했을 때
-        // Hierarchy에서 해당 오브젝트가 하이라이트된다
-        if (popupPanel == null)
-        {
-            Debug.LogError("[PlayerName] popupPanel이 할당되지 않았습니다. 인스펙터에서 팝업 패널을 넣어주세요.", this);
-            ok = false;
-        }
-        if (nicknameDisplayButton == null)
-        {
-            Debug.LogError("[PlayerName] nicknameDisplayButton이 할당되지 않았습니다.", this);
-            ok = false;
-        }
-        if (usernameField == null)
-        {
-            Debug.LogError("[PlayerName] usernameField가 할당되지 않았습니다.", this);
-            ok = false;
-        }
-        if (confirmButton == null)
-        {
-            Debug.LogError("[PlayerName] confirmButton이 할당되지 않았습니다.", this);
-            ok = false;
-        }
-        if (cancelButton == null)
-        {
-            Debug.LogError("[PlayerName] cancelButton이 할당되지 않았습니다.", this);
-            ok = false;
-        }
-
-        return ok;
     }
 
     public void Refresh()

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -281,7 +282,7 @@ public partial class AugmentSelectUI
         var descTmp = AugmentUIFactory.CreateText("Desc", texts,
             card.GetDescription(), CardDescFontSize, TMPro.FontStyles.Normal, descColor);
         descTmp.alignment          = descAlign;
-        descTmp.enableWordWrapping = true;
+        descTmp.textWrappingMode = TextWrappingModes.Normal;
         AugmentUIFactory.SetTextHeight(descTmp, 76f);
 
         // 보유 스택 — 두 번째로 먹을 때부터 표시
