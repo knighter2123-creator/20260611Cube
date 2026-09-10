@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5881ba78532c62048a10a8fa37aa8710, type: 3}
+  m_Name: cm_SpawnRate
+  m_EditorClassIdentifier: Assembly-CSharp::AugmentSpawnRate
+  id: cm_SpawnRate
+  displayName: "\uC801 \uC0DD\uC131 \uC8FC\uAE30 \uAC10\uC18C"
+  description: "10\uCD08\uAC04 \uC801\uC758 \uC0DD\uC131 \uC8FC\uAE30\uAC00 10% \uBE68\uB77C\uC9D1\uB2C8\uB2E4."
+  icon: {fileID: 0}
+  rarity: 0
+  weight: 100
+  maxStack: 0
+  multiplier: 0.9
+  duration: 10

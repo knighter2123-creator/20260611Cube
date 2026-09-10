@@ -13,18 +13,34 @@ MonoBehaviour:
   m_Name: AugmentPool
   m_EditorClassIdentifier: Assembly-CSharp::AugmentPool
   cards:
-  - {fileID: 11400000, guid: 0ab4a50d7838b324b986a8a292adcfa7, type: 2}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 11400000, guid: 9837be72c3045944b917b665e214131a, type: 2}
+  - {fileID: 11400000, guid: 7f3da490d8790204bbd1d80a078b73df, type: 2}
+  - {fileID: 11400000, guid: 667d3494ca640a1418918e74c825ae46, type: 2}
+  - {fileID: 11400000, guid: 364eb184c3a23fc40b9756d10e50f972, type: 2}
+  - {fileID: 11400000, guid: 48014278f1c4e0449ac51c822172dae5, type: 2}
+  - {fileID: 11400000, guid: 5280b6ff42c1d1e46b6b81c394e4e6eb, type: 2}
+  - {fileID: 11400000, guid: a10f064f4a566e74b8967f3b97378e5a, type: 2}
+  - {fileID: 11400000, guid: e47c8b2a6ef98214bbef122616fa690b, type: 2}
+  - {fileID: 11400000, guid: 36e8de5e3c4f870409c0fa87221c52e8, type: 2}
+  - {fileID: 11400000, guid: 1541d79906c3eba448937f94ba33f341, type: 2}
+  - {fileID: 11400000, guid: ce1018065428c474aaabce5b4af48b9f, type: 2}
+  - {fileID: 11400000, guid: 260f9ea8b35f38547b818249ceb74e5d, type: 2}
+  - {fileID: 11400000, guid: d580c06a8a5c3da4f9ff887288037d68, type: 2}
+  - {fileID: 11400000, guid: fe34cf7db2585324599d25a6833612db, type: 2}
+  - {fileID: 11400000, guid: dfa67cb0b05f2b44b82212987d744890, type: 2}
+  - {fileID: 11400000, guid: c9605b963f25e4b438d92fa09d4973f8, type: 2}
+  - {fileID: 11400000, guid: 6a0ca6026edccac44b826286ed0fc399, type: 2}
+  - {fileID: 11400000, guid: 3f13702463daf504a9bfdc43a8bf37d0, type: 2}
+  - {fileID: 11400000, guid: ca77df6715afeef479480bb43c806c1e, type: 2}
+  - {fileID: 11400000, guid: c0fb21bcafdab034cad3e674b488f09d, type: 2}
+  - {fileID: 11400000, guid: a3498a2f10d6be2428b06fc5dbec7ef8, type: 2}
+  - {fileID: 11400000, guid: 5ddf1b83fd32ee2459ed614322b1e510, type: 2}
+  - {fileID: 11400000, guid: c9bed4a075bf8724fa5218a1b8ee8ec1, type: 2}
+  - {fileID: 11400000, guid: 7f0d09942a2120c4b91794bebcfe6bdc, type: 2}
+  - {fileID: 11400000, guid: 06d9215e78916574496cdc8ce509d773, type: 2}
+  - {fileID: 11400000, guid: 364647ef34c377c489ca8a666aa8878c, type: 2}
   commonMultiplier: 1
-  rareMultiplier: 0.5
-  epicMultiplier: 0.18
-  legendaryMultiplier: 0.05
-  rarityBoostPerWorld: 0.05
+  rareMultiplier: 0.6
+  epicMultiplier: 0.1
+  legendaryMultiplier: 0.03
+  rarityBoostPerWorld: 0.03

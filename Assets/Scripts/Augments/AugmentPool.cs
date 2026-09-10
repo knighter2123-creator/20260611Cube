@@ -49,21 +49,51 @@ public class AugmentPool : ScriptableObject
         var candidates = new List<AugmentCard>();
         var weights    = new List<float>();
 
+        // 왜 제외됐는지 세어둡니다. 장수가 모자랄 때 원인을 짚어주기 위해서입니다.
+        int nullSlots = 0, zeroWeight = 0, maxedOut = 0;
+
         for (int i = 0; i < cards.Count; i++)
         {
             var c = cards[i];
-            if (c == null) continue;
-            if (c.Weight <= 0f) continue;
+            if (c == null)        { nullSlots++;  continue; }
+            if (c.Weight <= 0f)   { zeroWeight++; continue; }
 
             if (c.IsPermanent && c.MaxStack > 0 && stackOf(c) >= c.MaxStack)
+            {
+                maxedOut++;
                 continue;   // 이미 꽉 찬 카드는 안 나오게
+            }
+
+            // ★ 최종 가중치로 걸러야 합니다.
+            //
+            //   원래는 카드 개별 weight 만 보고 후보에 넣었는데,
+            //   등급 배수(예: legendaryMultiplier = 0)를 곱하면 최종 가중치가 0이 될 수 있습니다.
+            //   그러면 후보 목록에는 들어가 있지만 추첨에서는 절대 안 뽑히고,
+            //   아래 total <= 0 검사에 걸려 루프가 break 되면서
+            //   "3장을 요청했는데 2장만 나오는" 증상이 됩니다.
+            //
+            //   후보 자격은 "뽑힐 가능성이 있는가"로 판단해야 한다는 이야기입니다.
+            float w = GetWeight(c, world);
+            if (w <= 0f) { zeroWeight++; continue; }
 
             candidates.Add(c);
-            weights.Add(GetWeight(c, world));
+            weights.Add(w);
         }
 
         // 2) 후보가 뽑을 장수보다 적으면 있는 만큼만 (게임이 멈추면 안 되니까)
         int pick = Mathf.Min(count, candidates.Count);
+
+        // ★ 왜 모자란지 알려줍니다.
+        //   조용히 넘어가면 "카드가 두 장만 나오는데 이유를 모르겠는" 상황이 됩니다.
+        //   실패했을 때 원인을 남기는 건 방어 코드의 기본입니다.
+        if (pick < count)
+        {
+            Debug.LogWarning(
+                $"[AugmentPool] {count}장을 요청했지만 후보가 {candidates.Count}장뿐입니다.\n" +
+                $"  등록된 카드 {cards.Count}개 중 — " +
+                $"비어있음(None) {nullSlots} / 가중치 0 {zeroWeight} / 최대스택 도달 {maxedOut}\n" +
+                $"  → Cards 목록에 빈 칸이 있는지, weight 와 등급 배수가 0은 아닌지 확인하세요.");
+        }
 
         // 3) 가중치 추첨을 pick 번 반복.
         //    한 번 뽑은 카드는 후보에서 빼서 같은 카드가 두 장 뜨는 걸 막습니다.
@@ -114,5 +144,63 @@ public class AugmentPool : ScriptableObject
             rarityMul *= 1f + rarityBoostPerWorld * rarityStep * Mathf.Max(0, world - 1);
 
         return Mathf.Max(0f, card.Weight * rarityMul);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  진단
+    // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 지금 이 풀에서 각 카드가 실제로 몇 %의 확률로 뽑히는지 출력합니다.
+    /// 에셋 인스펙터 우클릭 → "1월드 기준 등장 확률 확인".
+    ///
+    /// 카드가 요청한 장수만큼 안 나오거나 특정 카드가 안 보일 때 여기부터 보세요.
+    /// </summary>
+    [ContextMenu("1월드 기준 등장 확률 확인")]
+    private void DumpChances()
+    {
+        if (cards == null || cards.Count == 0)
+        {
+            Debug.LogWarning("[AugmentPool] Cards 목록이 비어 있습니다.");
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"[AugmentPool] {name} — 카드 {cards.Count}개 (1월드 기준)");
+
+        // 먼저 총합을 구해야 각자의 비율을 낼 수 있습니다.
+        float total = 0f;
+        for (int i = 0; i < cards.Count; i++)
+            if (cards[i] != null) total += GetWeight(cards[i], 1);
+
+        int usable = 0;
+
+        for (int i = 0; i < cards.Count; i++)
+        {
+            var c = cards[i];
+
+            if (c == null)
+            {
+                sb.AppendLine($"  [{i}] ⚠ 비어 있음(None) — 이 칸 때문에 카드 장수가 모자랄 수 있습니다");
+                continue;
+            }
+
+            float w = GetWeight(c, 1);
+            if (w <= 0f)
+            {
+                sb.AppendLine($"  [{i}] ⚠ {c.DisplayName} — 가중치 0, 절대 안 나옴 " +
+                              $"(weight={c.Weight}, 등급={c.Rarity})");
+                continue;
+            }
+
+            usable++;
+            sb.AppendLine($"  [{i}] {c.DisplayName} ({c.Rarity}) — {w / total * 100f:0.0}%");
+        }
+
+        sb.AppendLine($"  → 뽑을 수 있는 카드: {usable}장");
+        if (usable < 3)
+            sb.AppendLine("  ⚠ 3장 미만입니다. 카드를 더 만들거나 위의 경고를 해결하세요.");
+
+        Debug.Log(sb.ToString());
     }
 }
