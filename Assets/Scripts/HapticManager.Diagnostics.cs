@@ -1,153 +1,121 @@
-using System.Text;
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// HapticManager 진단 전담 partial 파일.
+/// 실기기에서 "어느 진동 경로가 살아 있는지" 직접 재보는 진단 파일.
 ///
-/// ★ HapticManager.cs 의 InitVibrator() 안, InitVibrationAttributes() 호출 바로 앞에
-///   이 한 줄을 추가하세요:
+/// 진동이 안 올 때 원인 후보가 넷인데 서로 증상이 똑같습니다.
+///   ① VIBRATE 권한 없음
+///   ② VibrationAttributes(USAGE_TOUCH) 를 시스템이 억제
+///   ③ JNI 호출 자체가 실패
+///   ④ 사실은 울리고 있는데 너무 약해서 못 느낌
 ///
-///       useAttributes = useVibrationAttributes;
+/// 네 가지를 구분하려고, 서로 다른 경로로 400ms 짜리 강한 진동을
+/// 1.2초 간격으로 차례로 쏘고 각 단계를 로그로 남깁니다.
+/// 몇 번째에서 느껴졌는지만 알면 원인이 확정됩니다.
 ///
-/// [왜 만드는가]
-///   진동은 실패해도 아무 흔적을 남기지 않습니다. 예외도 없고 화면 변화도 없습니다.
-///   실기기에서는 콘솔도 안 보이니 "안 울린다"는 사실 말고는 단서가 없습니다.
-///   그래서 상태를 스스로 보고하게 만듭니다.
+/// ★ 이 파일에 Handheld.Vibrate() 가 들어 있는 것 자체가 하나의 장치입니다.
+///   유니티는 코드에 Handheld.Vibrate() 가 있으면 빌드할 때
+///   uses-permission VIBRATE 를 매니페스트에 자동으로 넣어줍니다.
+///   즉 이 파일을 추가하는 것만으로 ① 권한이 변수에서 빠집니다.
+///
+/// 원인을 찾은 뒤에는 이 파일을 지워도 됩니다.
+/// (단, 지우면 권한 자동 추가도 같이 사라지니 매니페스트를 직접 확인할 것)
 /// </summary>
 public partial class HapticManager
 {
-    [Header("진동 진단")]
-    [Tooltip("VibrationAttributes(USAGE_TOUCH) 로 용도를 표시할지. " +
-             "실기기에서 진동이 안 울릴 때 이걸 꺼보세요. 아래 설명 참고.")]
-    [SerializeField] private bool useVibrationAttributes = true;
+    private Coroutine diagnostics;
 
     /// <summary>
-    /// 마지막 진단 결과. 실기기에서는 콘솔을 못 보므로
-    /// 설정 화면의 TMP_Text 같은 데 그대로 띄워서 확인할 수 있습니다.
+    /// 진단 시퀀스 시작. 화면의 'VIB' 버튼이나 임시 버튼에 연결해서 쓰세요.
+    /// 유저 설정(userEnabled)과 쿨다운을 모두 무시합니다 — 지금은 기기가 되는지만 봅니다.
     /// </summary>
-    public string LastReport { get; private set; } = "(아직 진단하지 않음)";
-
-    /// <summary>
-    /// 진동이 안 될 때 원인을 한 번에 확인합니다.
-    /// 인스펙터에서 컴포넌트 우클릭 → "진동 진단" 으로도 실행할 수 있습니다.
-    /// </summary>
-    [ContextMenu("진동 진단")]
-    public string Diagnose()
+    public void RunDiagnosticSequence()
     {
-        var sb = new StringBuilder();
-        sb.AppendLine("═════ 진동 진단 ═════");
+        if (diagnostics != null) StopCoroutine(diagnostics);
+        diagnostics = StartCoroutine(DiagnosticRoutine());
+    }
+
+    private IEnumerator DiagnosticRoutine()
+    {
+        Debug.Log("[Haptic] ===== 진동 진단 시작 — 4단계, 각 400ms =====");
+
+        // WaitForSecondsRealtime 을 쓰는 이유 — 설정 패널에서 실행하면
+        // Time.timeScale 이 0이라 WaitForSeconds 는 영원히 끝나지 않습니다.
+        var gap = new WaitForSecondsRealtime(1.2f);
+
+        // ── ① 유니티 기본 ──
+        // 가장 단순한 경로. 이것만 되면 우리 JNI 코드 쪽에 문제가 있다는 뜻입니다.
+        Debug.Log("[Haptic] ① Handheld.Vibrate() — 유니티 기본 (약 500ms)");
+        Handheld.Vibrate();
+        yield return gap;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        // ① 권한 — 여기가 1순위 용의자입니다.
-        //
-        //   AndroidManifest 에 VIBRATE 가 없으면 진동은 "조용히" 실패합니다.
-        //   예외도, 로그도, 경고도 없습니다. 그래서 눈으로는 절대 구분이 안 됩니다.
-        //   checkSelfPermission 으로 직접 물어보면 바로 답이 나옵니다.
-        sb.AppendLine($"{Mark(HasVibratePermission())} VIBRATE 권한 : {HasVibratePermission()}");
-        if (!HasVibratePermission())
+        if (vibrator == null || vibrationEffectClass == null)
         {
-            sb.AppendLine("   → Player Settings → Publishing Settings → Custom Main Manifest 체크 후");
-            sb.AppendLine("     Assets/Plugins/Android/AndroidManifest.xml 의 <manifest> 안에 추가:");
-            sb.AppendLine("     <uses-permission android:name=\"android.permission.VIBRATE\" />");
-            sb.AppendLine("     ※ 추가 후 반드시 다시 빌드해야 합니다.");
+            Debug.LogError("[Haptic] Vibrator 를 못 잡아 ②~④ 를 건너뜁니다. 초기화 로그를 확인하세요.");
+            diagnostics = null;
+            yield break;
         }
 
-        // ② 기기 능력
-        sb.AppendLine($"   안드로이드 API        : {apiLevel}");
-        sb.AppendLine($"{Mark(vibrator != null)} Vibrator 서비스       : {(vibrator != null ? "확보" : "실패")}");
-        sb.AppendLine($"{Mark(IsSupported)} hasVibrator()         : {IsSupported}");
-        sb.AppendLine($"   세기 제어 지원        : {hasAmplitudeControl}");
-        sb.AppendLine($"   VibrationEffect 클래스: {(vibrationEffectClass != null ? "확보" : "실패")}");
-        sb.AppendLine($"   용도 표시(Attributes) : {(touchAttributes != null ? "확보" : "없음")} / 사용 {useAttributes}");
-#else
-        sb.AppendLine("ℹ️ 에디터 또는 안드로이드가 아닌 플랫폼입니다. 실제 진동은 나지 않습니다.");
-        sb.AppendLine($"   IsSupported(UI용)     : {IsSupported}");
-#endif
+        // ── ② 속성 없이 ──
+        // VibrationAttributes 를 넣기 전의 동작입니다.
+        // ③이 안 되고 이게 되면 USAGE_TOUCH 억제가 원인으로 확정됩니다.
+        Debug.Log("[Haptic] ② createOneShot + 속성 없음");
+        TryVibrate(() =>
+        {
+            using (var e = vibrationEffectClass.CallStatic<AndroidJavaObject>("createOneShot", 400L, 255))
+                vibrator.Call("vibrate", e);
+        }, "②");
+        yield return gap;
 
-        // ③ 유저 설정 — 블룸에서 겪은 것과 같은 함정입니다.
-        //   저장된 값이 꺼짐이면 코드가 아무리 맞아도 안 울립니다.
-        sb.AppendLine($"{Mark(userEnabled)} 유저 설정(userEnabled): {userEnabled}");
-        if (!userEnabled)
-            sb.AppendLine("   → 설정에서 꺼져 있습니다. PlayerPrefs 'haptic_enabled' 가 0입니다.");
-
-        sb.AppendLine($"   쿨다운 남은 시간      : {Mathf.Max(0f, minInterval - (Time.unscaledTime - lastVibrateTime)):0.00}s");
-
-        // ④ 결론
-        sb.AppendLine("───────────────────");
-        if (!userEnabled)
-            sb.AppendLine("결론: 유저 설정이 꺼져 있습니다. 설정에서 켜고 다시 시도하세요.");
-        else if (!IsSupported)
-            sb.AppendLine("결론: 기기가 진동을 지원하지 않거나 초기화에 실패했습니다.");
-#if UNITY_ANDROID && !UNITY_EDITOR
-        else if (!HasVibratePermission())
-            sb.AppendLine("결론: VIBRATE 권한이 없습니다. 매니페스트를 고치고 다시 빌드하세요.");
-#endif
+        // ── ③ USAGE_TOUCH 속성 ──
+        Debug.Log("[Haptic] ③ createOneShot + VibrationAttributes(USAGE_TOUCH)");
+        if (touchAttributes == null)
+        {
+            Debug.LogWarning("[Haptic] ③ 건너뜀 — touchAttributes 가 null 입니다.");
+        }
         else
-            sb.AppendLine("결론: 코드 쪽 조건은 모두 정상입니다. 아래 '시스템 설정' 항목을 확인하세요.");
+        {
+            TryVibrate(() =>
+            {
+                using (var e = vibrationEffectClass.CallStatic<AndroidJavaObject>("createOneShot", 400L, 255))
+                    vibrator.Call("vibrate", e, touchAttributes);
+            }, "③");
+        }
+        yield return gap;
 
-        sb.AppendLine();
-        sb.AppendLine("[시스템 설정도 확인하세요]");
-        sb.AppendLine(" · 기기의 '소리와 진동 → 진동 세기 / 터치 피드백' 이 꺼져 있으면");
-        sb.AppendLine("   앱의 진동도 함께 억제될 수 있습니다. (특히 USAGE_TOUCH 로 표시할 때)");
-        sb.AppendLine(" · 방해 금지 모드도 영향을 줄 수 있습니다.");
+        // ── ④ 구형 API ──
+        // deprecated 지만 아직 동작합니다. 위가 다 안 되는데 이게 되는 기기도 있습니다.
+        Debug.Log("[Haptic] ④ vibrate(long) — 구형 경로");
+        TryVibrate(() => vibrator.Call("vibrate", 400L), "④");
+        yield return gap;
+#else
+        Debug.Log("[Haptic] (에디터) ②~④ 는 실기기에서만 동작합니다.");
+        yield return gap;
+#endif
 
-        LastReport = sb.ToString();
-        Debug.Log(LastReport, this);
-        return LastReport;
+        Debug.Log("[Haptic] ===== 진단 끝. 몇 번에서 느껴졌는지 확인하세요 =====");
+        diagnostics = null;
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
     /// <summary>
-    /// VIBRATE 권한이 실제로 부여됐는지 확인합니다.
-    ///
-    /// VIBRATE 는 런타임 권한이 아니라 '일반 권한' 이라 매니페스트에만 있으면
-    /// 설치 시 자동으로 부여됩니다. 뒤집어 말하면, 매니페스트에 없으면
-    /// 영원히 거부 상태이고 사용자가 고칠 방법도 없습니다.
-    ///
-    /// Context.checkSelfPermission 은 API 23+ 입니다. 이 프로젝트는 최소 30 이라 항상 쓸 수 있습니다.
-    /// PackageManager.PERMISSION_GRANTED 는 0 입니다.
+    /// 한 단계를 실행하고 예외를 붙잡아 남긴다.
+    /// 예외가 나도 멈추지 않고 다음 단계로 넘어가야
+    /// "어디까지 되고 어디부터 안 되는지"를 한 번에 알 수 있다.
     /// </summary>
-    private bool HasVibratePermission()
+    private static void TryVibrate(System.Action action, string label)
     {
         try
         {
-            using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-            using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
-            {
-                int result = activity.Call<int>("checkSelfPermission", "android.permission.VIBRATE");
-                return result == 0;
-            }
+            action();
+            Debug.Log($"[Haptic] {label} 호출 성공 (예외 없음)");
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"[Haptic] 권한 확인 실패: {e.Message}");
-            return false;   // 확인 못 하면 없는 것으로 취급해 눈에 띄게 한다
+            Debug.LogError($"[Haptic] {label} 실패: {e.Message}");
         }
     }
-#endif
-
-    /// <summary>
-    /// 설정 화면의 '진동 테스트' 버튼 OnClick 에 연결하세요.
-    ///
-    /// 쿨다운과 유저 설정을 모두 무시하고 최대 세기로 한 번 울립니다.
-    /// "진동 자체가 되는가" 와 "레벨업 경로가 진동을 부르는가" 를 분리해서 확인하기 위함입니다.
-    /// 이 버튼이 울리는데 레벨업에서 안 울린다면, 문제는 진동이 아니라 호출부에 있습니다.
-    /// </summary>
-    public void TestVibrate()
-    {
-        Debug.Log("[Haptic] 테스트 진동 요청", this);
-
-        bool saved = userEnabled;
-        userEnabled = true;                        // 설정을 잠깐 무시
-        Vibrate(120, 255, ignoreCooldown: true);   // 확실히 느껴지게 길고 강하게
-        userEnabled = saved;
-
-        Diagnose();
-    }
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-    private static string Mark(bool ok) => ok ? "OK " : "!! ";
-#else
-    private static string Mark(bool ok) => ok ? "OK " : "-- ";
 #endif
 }

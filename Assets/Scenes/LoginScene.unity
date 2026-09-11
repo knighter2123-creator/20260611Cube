@@ -661,11 +661,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HapticManager
   editorTreatAsSupported: 1
   userEnabled: 1
-  levelUpDurationMs: 45
+  levelUpDurationMs: 75
   levelUpAmplitude: 160
   logBlockedCalls: 1
   minInterval: 0.25
-  useVibrationAttributes: 1
 --- !u!1 &1127942680
 GameObject:
   m_ObjectHideFlags: 0
