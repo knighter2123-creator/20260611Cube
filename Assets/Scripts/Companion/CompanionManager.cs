@@ -23,18 +23,23 @@ public class CompanionManager : MonoBehaviour
 
     // 배치 의도 (소유 인덱스 → 셀). 씬을 넘어 유지되며 세이브에 직렬화됨.
     private readonly Dictionary<int, Vector3Int> placementByIndex = new Dictionary<int, Vector3Int>();
-
+    
+    private bool loaded;
+    
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);   // ✅ GachaSystem과 동일하게 스스로 지속
 
-        if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
+        if (SaveManager.Instance != null)
         {
-            ApplyFrom(SaveManager.Instance.Current);
-            CompanionFragment.Instance?.ApplyFrom(SaveManager.Instance.Current);
+            if(SaveManager.Instance.HasSave())
+                ApplyFrom(SaveManager.Instance.Current);
+            loaded = true;
         }
+
+        if (!loaded) return;
     }
 
     public void BindPlaceableTilemap(Tilemap tilemap) => placeableTilemap = tilemap;

@@ -25,6 +25,20 @@ public partial class CurrencyManager : MonoBehaviour
         Instance = this;
     }
 
+    void OnDestroy()
+    {
+        // ★ 추가된 부분
+        //   static 필드가 파괴된 오브젝트를 계속 붙잡고 있으면
+        //   "null은 아닌데 쓸 수는 없는" 좀비 상태가 됩니다.
+        //   유니티는 파괴된 오브젝트에 == null 을 true로 만들어주지만,
+        //   그건 UnityEngine.Object 의 연산자 오버로딩 덕분이고
+        //   ?. 같은 C# 문법은 그 오버로딩을 타지 않아 예외가 날 수 있습니다.
+        //
+        //   Instance == this 로 검사하는 이유는, 중복 인스턴스가 스스로 지워질 때
+        //   살아 있는 진짜 Instance까지 null로 만들면 안 되기 때문입니다.
+        if (Instance == this) Instance = null;
+    }
+
     void Start()
     {
         if (SaveManager.Instance != null)
