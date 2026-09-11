@@ -148,6 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4266d1b0d11e41458fcc22b00710e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyManager
+  logLifecycle: 1
 --- !u!4 &119568721
 Transform:
   m_ObjectHideFlags: 0
@@ -662,7 +663,9 @@ MonoBehaviour:
   userEnabled: 1
   levelUpDurationMs: 45
   levelUpAmplitude: 160
+  logBlockedCalls: 1
   minInterval: 0.25
+  useVibrationAttributes: 1
 --- !u!1 &1127942680
 GameObject:
   m_ObjectHideFlags: 0
@@ -1337,6 +1340,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eef642fbe37a0934fbf21d93a7e17937, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ManagerRoot
+  logLifecycle: 1
 --- !u!1 &2006467812
 GameObject:
   m_ObjectHideFlags: 0

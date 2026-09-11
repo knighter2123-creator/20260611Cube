@@ -55,6 +55,10 @@ public partial class HapticManager : MonoBehaviour
     [Range(1, 255)]
     [SerializeField] private int levelUpAmplitude = 160;
 
+    [Header("디버그")]
+    [Tooltip("진동이 '건너뛰어진' 이유를 콘솔에 찍습니다. 원인 파악 후 끄세요.")]
+    [SerializeField] private bool logBlockedCalls = true;
+
     [Header("연타 방지")]
     [Tooltip("방치형은 한 번에 여러 레벨이 오르기 때문에 쿨다운이 반드시 필요하다.")]
     [SerializeField] private float minInterval = 0.25f;
@@ -77,6 +81,7 @@ public partial class HapticManager : MonoBehaviour
     private static AndroidJavaObject touchAttributes;   // VibrationAttributes (API 30+)
     private static int  apiLevel;
     private static bool hasAmplitudeControl;
+    private static bool hasPermission = true;
 
     // VibrationAttributes 경로가 한 번이라도 실패하면 내려서 다시 시도하지 않는다.
     private static bool useAttributes = true;
@@ -96,13 +101,9 @@ public partial class HapticManager : MonoBehaviour
         InitVibrator();
     }
 
-    // HapticManager.cs — 기존 OnDestroy 를 이렇게
     private void OnDestroy()
     {
-        // 남은 리스너 정리 (Binding.cs)
-        UnbindToggle();
-
-        // static 이 파괴된 오브젝트를 붙잡지 않게 정리
+        // static 이 파괴된 오브젝트를 붙잡지 않게 정리. (다른 매니저들과 같은 패턴)
         if (Instance == this) Instance = null;
     }
 
@@ -134,6 +135,30 @@ public partial class HapticManager : MonoBehaviour
                 // API 31+ 에서 deprecated 이지만 여전히 동작한다.
                 if (vibrator == null)
                     vibrator = activity.Call<AndroidJavaObject>("getSystemService", "vibrator");
+
+                // ★ 권한이 실제로 부여됐는지 런타임에 확인한다.
+                //
+                //   매니페스트에 줄을 넣었는지 눈으로 확인하는 것과,
+                //   그 줄이 실제로 빌드된 APK 에 들어갔는지는 다른 문제다.
+                //   Custom Main Manifest 체크를 안 했거나 <application> 안쪽에 잘못 넣으면
+                //   파일에는 있는데 APK 에는 없는 상태가 된다.
+                //   checkSelfPermission 은 그 최종 결과를 알려주므로 추측이 사라진다.
+                //   (0 = PackageManager.PERMISSION_GRANTED)
+                try
+                {
+                    int granted = activity.Call<int>("checkSelfPermission", "android.permission.VIBRATE");
+                    hasPermission = (granted == 0);
+
+                    if (!hasPermission)
+                        Debug.LogError("[Haptic] VIBRATE 권한이 없습니다. AndroidManifest.xml 의 <manifest> 바로 아래에 " +
+                                       "<uses-permission android:name=\"android.permission.VIBRATE\" /> 를 넣고, " +
+                                       "Player Settings → Publishing Settings → Custom Main Manifest 가 체크됐는지 확인하세요.");
+                }
+                catch (System.Exception e)
+                {
+                    hasPermission = true;   // 확인 자체가 실패하면 판단을 보류하고 진행한다
+                    Debug.LogWarning($"[Haptic] 권한 확인 실패(무시하고 진행): {e.Message}");
+                }
             }
 
             if (vibrator == null)
@@ -154,7 +179,8 @@ public partial class HapticManager : MonoBehaviour
             InitVibrationAttributes();
 
             Debug.Log($"[Haptic] 초기화 완료 - API {apiLevel}, 진동 지원 {IsSupported}, " +
-                      $"세기 제어 {hasAmplitudeControl}, 용도 표시 {touchAttributes != null}");
+                      $"권한 {hasPermission}, 세기 제어 {hasAmplitudeControl}, " +
+                      $"용도 표시 {touchAttributes != null}");
         }
         catch (System.Exception e)
         {
@@ -170,6 +196,11 @@ public partial class HapticManager : MonoBehaviour
         //   그래서 에디터에서는 UI 상으로만 '지원됨'으로 취급한다.
         //   Vibrate() 는 아래 #else 분기를 타서 로그만 찍으므로 안전하다.
         IsSupported = editorTreatAsSupported;
+
+        // ★ 에디터에서도 초기화 사실을 남긴다.
+        //   이 줄이 없으면 "HapticManager 가 씬에 있긴 한가?"를 에디터에서 확인할 방법이 없다.
+        //   실기기 분기에는 초기화 로그가 있는데 에디터 분기에만 없어서 생긴 사각지대였다.
+        Debug.Log($"[Haptic] (에디터) 초기화 — 실제 진동은 불가, UI 상 지원 {IsSupported}", this);
 #else
         // iOS / PC — 진동 없음.
         IsSupported = false;
@@ -255,12 +286,20 @@ public partial class HapticManager : MonoBehaviour
     /// <param name="ignoreCooldown">쿨다운을 무시할지. 결정적인 연출에만 true.</param>
     public void Vibrate(int durationMs, int amplitude = 255, bool ignoreCooldown = false)
     {
-        if (!userEnabled || !IsSupported) return;
-        if (durationMs <= 0) return;
+        // ★ 조용한 early return 을 전부 걷어냈다.
+        //   "진동이 안 온다"의 원인이 설정인지, 기기인지, 쿨다운인지,
+        //   애초에 호출이 안 된 건지를 구분할 방법이 없으면 고칠 수가 없다.
+        if (!userEnabled)  { LogBlocked("유저 설정이 꺼져 있음 (PlayerPrefs haptic_enabled = 0)"); return; }
+        if (!IsSupported)  { LogBlocked("IsSupported = false — 위쪽 '초기화 완료' 로그를 확인하세요"); return; }
+        if (durationMs <= 0) { LogBlocked($"durationMs = {durationMs}"); return; }
 
         // 방치형에서 레벨이 한 번에 5개 오르면 진동도 5번 겹친다.
         // "따다다닥" 하고 손이 떨려서 연출이 아니라 고장처럼 느껴진다.
-        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval) return;
+        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval)
+        {
+            LogBlocked($"쿨다운 {minInterval}s 안에 재호출됨");
+            return;
+        }
         lastVibrateTime = Time.unscaledTime;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -277,6 +316,9 @@ public partial class HapticManager : MonoBehaviour
             {
                 CallVibrate(effect);
             }
+
+            if (logBlockedCalls)
+                Debug.Log($"[Haptic] 진동 실행 — {durationMs}ms / 세기 {amp}");
         }
         catch (System.Exception e)
         {
@@ -347,6 +389,12 @@ public partial class HapticManager : MonoBehaviour
 #else
         Debug.Log($"[Haptic] (에디터) 패턴 진동 {timingsMs.Length}단계");
 #endif
+    }
+
+    private void LogBlocked(string reason)
+    {
+        if (!logBlockedCalls) return;
+        Debug.LogWarning($"[Haptic] 진동을 건너뛰었습니다 — {reason}", this);
     }
 
     /// <summary>진행 중인 진동 중단. 씬 전환이나 앱 일시정지 시 호출하면 깔끔하다.</summary>

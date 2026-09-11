@@ -14,7 +14,7 @@ using UnityEngine;
 ///   LevelUpEffect.Instance.PlayAt(player, newLevel); // 대상 지정
 /// </summary>
 [DisallowMultipleComponent]
-public class LevelUpEffect : MonoBehaviour
+public partial class LevelUpEffect : MonoBehaviour
 {
     public static LevelUpEffect Instance { get; private set; }
 
@@ -247,6 +247,12 @@ public class LevelUpEffect : MonoBehaviour
 
         if (logBinding)
             Debug.Log($"[LevelUpEffect] 레벨업 감지 → Lv.{newLevel} 연출 재생", this);
+
+// ★ 추가 — ?. 로 조용히 넘기지 않는다. 없으면 없다고 말하게 한다.
+        if (HapticManager.Instance != null)
+            HapticManager.Instance.LevelUp();
+        else
+            Debug.LogWarning("[LevelUpEffect] HapticManager.Instance 가 없어 진동을 건너뜁니다.", this);
 
         Play(newLevel);
     }

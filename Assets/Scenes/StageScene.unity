@@ -3163,6 +3163,7 @@ MonoBehaviour:
   previewSeconds: 1.5
   togglePostProcessing: 1
   useUnscaledTime: 1
+  logSettingChanges: 1
 --- !u!114 &236730934
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10056,6 +10057,7 @@ RectTransform:
   - {fileID: 1909735292}
   - {fileID: 26498022}
   - {fileID: 441002214}
+  - {fileID: 1866402624}
   - {fileID: 928550299}
   - {fileID: 1466042296}
   - {fileID: 397703235}
@@ -10067,7 +10069,6 @@ RectTransform:
   - {fileID: 1940008679}
   - {fileID: 471944338}
   - {fileID: 1398306475}
-  - {fileID: 1866402624}
   m_Father: {fileID: 280316189}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -14301,11 +14302,10 @@ MonoBehaviour:
   quitGameButton: {fileID: 1216195641}
   logInteractions: 0
   bloomSlider: {fileID: 514227628}
-  bloomToggle: {fileID: 611651107}
   bloomValueLabel: {fileID: 0}
+  flashToggle: {fileID: 611651107}
   hapticToggle: {fileID: 480775654}
   hapticUnsupportedNotice: {fileID: 0}
-  reviveIntensity01: 0.45
 --- !u!1 &766434620
 GameObject:
   m_ObjectHideFlags: 0
@@ -14592,7 +14592,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uC774\uD399\uD2B8 \uC870\uC808"
+  m_text: "\uBC88\uCA4D\uC784 \uC870\uC808"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 00ed58f0d32fd0641b8b9fea6265306b, type: 2}
   m_sharedMaterial: {fileID: 7400232286759153150, guid: 00ed58f0d32fd0641b8b9fea6265306b,
@@ -18956,7 +18956,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: -50, y: -100}
+  m_AnchoredPosition: {x: -150, y: -100}
   m_SizeDelta: {x: 1600, y: 780}
   m_Pivot: {x: 1, y: 1}
 --- !u!1 &1082959114
@@ -33518,7 +33518,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uB808\uBCA8\uC5C5 \uC774\uD399\uD2B8"
+  m_Text: "\uD654\uBA74 \uBC88\uCA4D\uC784"
 --- !u!222 &2089635756
 CanvasRenderer:
   m_ObjectHideFlags: 0
