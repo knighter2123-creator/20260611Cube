@@ -29,7 +29,7 @@ using UnityEngine.UI;
 ///    게다가 패널이 닫혀 있으면 갱신 자체가 무의미합니다.
 /// ─────────────────────────────────────────────────────────────
 /// </summary>
-public class PlayerStatusUI : MonoBehaviour
+public class PlayerStatusUI : MonoBehaviour, ITabPage
 {
     // ══════════════════════════════════════════════════════════
     //  인스펙터 연결
@@ -54,8 +54,14 @@ public class PlayerStatusUI : MonoBehaviour
         public TMP_Text detail;
     }
 
+    [Header("동작 모드")]
+    [Tooltip("TabWindow 안의 한 탭으로 쓸 때 체크하세요.\n" +
+             "체크하면 이 스크립트는 panelRoot 를 스스로 켜고 끄지 않고, openButton 도 무시합니다.\n" +
+             "그 둘은 TabWindow 가 담당합니다. (같은 오브젝트를 두 주체가 SetActive 하면 반드시 어긋납니다)")]
+    [SerializeField] private bool useAsTabPage = false;
+
     [Header("열기 / 닫기")]
-    [Tooltip("Status 버튼. 누르면 패널이 열립니다(다시 누르면 닫힘)")]
+    [Tooltip("Status 버튼. 누르면 패널이 열립니다(다시 누르면 닫힘). 탭 모드에서는 비워두세요")]
     [SerializeField] private Button openButton;
 
     [Tooltip("패널 안의 X 버튼 (없으면 비워두세요)")]
@@ -100,6 +106,22 @@ public class PlayerStatusUI : MonoBehaviour
 
     private void Awake()
     {
+        // ★ 탭 모드에서는 '열고 닫는 일' 전부를 TabWindow 에 넘깁니다.
+        //   - panelRoot 참조를 끊는 이유: 탭 내용은 TabWindow 가 켜고 끕니다.
+        //     둘이 같은 오브젝트를 SetActive 하면 "탭을 바꿨는데 스탯창이 도로 켜지는" 상태가 됩니다.
+        //   - openButton 을 무시하는 이유: 진입점을 화살표 버튼 하나로 모으기로 했으므로
+        //     여기 남은 옛 Status 버튼이 살아 있으면 창이 두 개의 경로로 열립니다.
+        if (useAsTabPage)
+        {
+            if (panelRoot != null)
+            {
+                Debug.LogWarning("[PlayerStatusUI] 탭 모드에서는 panelRoot 를 쓰지 않습니다. " +
+                                 "패널을 켜고 끄는 일은 TabWindow 가 합니다. 참조를 무시합니다.", this);
+                panelRoot = null;
+            }
+            openButton = null;
+        }
+
         // 버튼 연결을 코드로 하면 "누가 이 버튼을 듣고 있는지"가 파일 안에서 다 보입니다.
         if (openButton  != null) openButton.onClick.AddListener(Toggle);
         if (closeButton != null) closeButton.onClick.AddListener(Close);
@@ -109,6 +131,25 @@ public class PlayerStatusUI : MonoBehaviour
         if (panelRoot != null) panelRoot.SetActive(false);
         isOpen = false;
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  ITabPage — TabWindow 가 부른다
+    // ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 이 탭이 선택됐다.
+    /// ★ Open() 을 그대로 재사용합니다. 탭 모드에서는 panelRoot 가 null 이라
+    ///   실제로 하는 일은 "구독 확인 + isOpen = true + 전체 갱신" 뿐입니다.
+    ///   열 때 무조건 다시 읽는 기존 원칙이 탭 전환에도 그대로 적용됩니다.
+    /// </summary>
+    public void OnTabShow() => Open();
+
+    /// <summary>
+    /// 다른 탭으로 넘어갔다.
+    /// ★ isOpen 을 내려두는 게 핵심입니다. 이 스크립트는 구독을 OnDestroy 까지 유지하므로,
+    ///   isOpen 이 true 로 남아 있으면 보이지도 않는 창을 위해 강화할 때마다 문자열을 조립합니다.
+    /// </summary>
+    public void OnTabHide() => Close();
 
     private void Start()
     {

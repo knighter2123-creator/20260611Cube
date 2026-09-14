@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -7,6 +8,28 @@ using TMPro;
 public class CompanionPlacementController : MonoBehaviour
 {
     public static CompanionPlacementController Instance { get; private set; }
+
+    // ══════════════════════════════════════════════
+    //  배치 모드 시작 / 종료 알림
+    // ══════════════════════════════════════════════
+    //
+    // ★ 왜 이벤트가 필요한가
+    //   배치 모드에 들어가면 화면을 덮고 있는 UI 가 전부 비켜줘야 합니다.
+    //   IsPointerOverUI() 는 "탭 좌표에 UI 가 하나라도 있으면 무시" 하는 방식이라,
+    //   반투명 배경 한 장만 깔려 있어도 배치가 영원히 안 됩니다.
+    //
+    //   지금까지는 companionListPanel 하나만 직접 껐는데, 탭 창 구조에서는
+    //   꺼야 할 대상이 '창 전체'로 바뀝니다. 그렇다고 이 스크립트가 탭 창을 알 필요는 없죠.
+    //   "배치가 시작됐다" 만 알리고, 비켜주는 건 각자 알아서 하게 둡니다.
+    //
+    // ★ static 이 아니라 인스턴스 이벤트인 이유
+    //   이 컴포넌트는 씬에 속해 있어 씬을 넘나들면 파괴/재생성됩니다.
+    //   static 이벤트는 구독자가 해제를 한 번만 빠뜨려도 파괴된 오브젝트를 계속 붙잡습니다.
+    public event Action OnPlacementBegan;
+    public event Action OnPlacementEnded;
+
+    /// <summary>지금 배치 모드인가. (UI 가 자기를 숨길지 판단할 때 사용)</summary>
+    public bool IsPlacing => isPlacing;
 
     [Header("배치 중 숨길 동료 리스트 패널")]
     [SerializeField] private GameObject companionListPanel;   // 인스펙터에서 연결
@@ -75,10 +98,17 @@ public class CompanionPlacementController : MonoBehaviour
             hintText.gameObject.SetActive(true);
             hintText.text = $"{data.companionName} — 배치할 위치를 탭하세요";
         }
+
+        OnPlacementBegan?.Invoke();
     }
 
     public void CancelPlacement()
     {
+        // ★ 이미 배치 모드가 아니면 알림을 쏘지 않습니다.
+        //   CancelPlacement 는 ConfirmPlace 끝, 목록 닫기, 우클릭 등 여러 곳에서 불립니다.
+        //   가드가 없으면 "끝났다"가 여러 번 발생해, 구독자가 창을 두 번 되살리는 식으로 어긋납니다.
+        bool wasPlacing = isPlacing;
+
         isPlacing   = false;
         armed       = false;
         pendingData = null;
@@ -89,6 +119,8 @@ public class CompanionPlacementController : MonoBehaviour
         if (hintText != null) hintText.gameObject.SetActive(false);
 
         caller?.RefreshActionButtons();
+
+        if (wasPlacing) OnPlacementEnded?.Invoke();
     }
 
     void Update()
