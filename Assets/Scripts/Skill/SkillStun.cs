@@ -26,8 +26,5 @@ public class SkillStun : ActiveSkill
         if (grayscaleOnStun && !target.isDead)
             GrayscaleEffect.Apply(target.gameObject, stunDuration + grayscaleExtra);
 
-        // 시전자 머리 위 쿨다운 표시
-        // (호출부를 skill.Cast(...) 로 바꿨다면 이 줄은 지워도 됩니다 — 중복 호출돼도 동작엔 문제 없음)
-        NotifyCooldown(caster);
     }
 }

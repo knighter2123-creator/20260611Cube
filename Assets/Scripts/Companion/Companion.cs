@@ -40,7 +40,7 @@ public class Companion : MonoBehaviour
             if (target != null)
             {
                 skillTimer = 0f;
-                skill.Execute(target, this);
+                skill.Cast(target, this);
             }
         }
     }
