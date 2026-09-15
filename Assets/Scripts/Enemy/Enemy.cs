@@ -110,7 +110,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     }
 
     /// <summary>훅 — 자식이 추가한 상태를 초기화. 기본은 아무것도 안 함.</summary>
-    protected virtual void OnResetForSpawn() { }
+    protected void OnResetForSpawn() { }
 
     /// <summary>
     /// ★ 원본 기준값에서 매번 새로 계산합니다.
