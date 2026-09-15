@@ -41,17 +41,25 @@ public class CompanionListItem : MonoBehaviour
         int fragmentCount = CompanionFragment.Instance?.GetFragment(data) ?? 0;
         fragmentText.text = $"조각 : {fragmentCount}";
 
-        iconButton.onClick.RemoveAllListeners();
-        iconButton.onClick.AddListener(ToggleActionButtons);
-
-        placeButton.onClick.RemoveAllListeners();
-        placeButton.onClick.AddListener(OnPlaceClicked);
-
-        cancelButton.onClick.RemoveAllListeners();
-        cancelButton.onClick.AddListener(OnCancelClicked);
+        RemoveActionButtons();
+        AddActionButtons();
 
         actionButtons.SetActive(false);
         RefreshActionButtons();
+    }
+
+    private void AddActionButtons()
+    {
+        iconButton.onClick.AddListener(ToggleActionButtons);
+        placeButton.onClick.AddListener(OnPlaceClicked);
+        cancelButton.onClick.AddListener(OnCancelClicked);
+    }
+
+    private void RemoveActionButtons()
+    {
+        iconButton.onClick.RemoveAllListeners();
+        placeButton.onClick.RemoveAllListeners();
+        cancelButton.onClick.RemoveAllListeners();
     }
 
     public void RefreshActionButtons()

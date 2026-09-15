@@ -30,6 +30,8 @@ public partial class PlayerStatusCodeUI
     //  인스펙터 설정 — 생김새
     // ══════════════════════════════════════════════════════════
     [Header("창 모양")]
+    [Tooltip("창 너비(px). 0 이하로 두면 부모 너비를 꽉 채웁니다.\n" +
+             "탭 안에 넣을 때는 0 을 권장합니다 — 고정 폭은 탭 영역과 거의 항상 어긋납니다.")]
     [SerializeField] private float windowWidth  = 920f;
     [SerializeField] private int   cornerRadius = 28;
     [SerializeField] private Color windowColor  = new Color(0.11f, 0.13f, 0.18f, 0.98f);
@@ -78,10 +80,11 @@ public partial class PlayerStatusCodeUI
         if (built) return;
         built = true;   // ★ 실제 생성 전에 세웁니다. 생성 중에 다시 불려도 재귀하지 않게
 
-        Canvas canvas = ResolveCanvas();
-        if (canvas == null)
+        Transform parent = ResolveBuildParent();
+        if (parent == null)
         {
-            Debug.LogError("[PlayerStatusCodeUI] Canvas 를 만들 수 없어 UI 생성을 중단합니다.");
+            Debug.LogError("[PlayerStatusCodeUI] 붙일 곳을 찾지 못해 UI 생성을 중단합니다. " +
+                           "Build Parent 를 연결하거나 씬에 Canvas 를 두세요.");
             built = false;
             return;
         }
@@ -92,10 +95,39 @@ public partial class PlayerStatusCodeUI
         if (UnityEngine.EventSystems.EventSystem.current == null)
             Debug.LogWarning("[PlayerStatusCodeUI] 씬에 EventSystem 이 없어 버튼이 눌리지 않습니다.");
 
-        BuildPanel(canvas.transform);
-        BuildOpenButton(canvas.transform);
+        BuildPanel(parent);
+
+        // ★ Status 버튼만은 Build Parent 가 아니라 '캔버스 루트' 에 만듭니다.
+        //   패널 안에 두면 panelRoot 를 끄는 순간 버튼까지 꺼져 다시 열 방법이 없어집니다.
+        //   탭 안에 두면 탭이 가려질 때 같이 꺼지므로 더 나쁩니다.
+        //   (탭 모드에서는 코어가 createOpenButton 을 강제로 꺼서 애초에 만들지 않습니다)
+        Transform buttonParent = targetCanvas != null ? targetCanvas.transform : parent;
+        BuildOpenButton(buttonParent);
 
         panelRoot.SetActive(false);
+    }
+
+    /// <summary>
+    /// UI 를 붙일 부모를 정합니다.
+    ///
+    /// ★ targetCanvas 를 없애고 Panel 필드로 바꾸지 않은 이유
+    ///   ResolveCanvas() 는 '부모 찾기' 외에도 일을 합니다 — 씬에 캔버스가 없으면
+    ///   CanvasScaler 와 GraphicRaycaster 까지 갖춘 캔버스를 만들어 줍니다.
+    ///   필드를 통째로 갈아치우면 그 안전장치가 사라집니다.
+    ///   그래서 '부모만' 갈아끼우고 캔버스 확보 로직은 그대로 둡니다.
+    /// </summary>
+    private Transform ResolveBuildParent()
+    {
+        if (buildParent != null)
+        {
+            // 캔버스는 Status 버튼을 붙일 때 필요할 수 있으니 미리 잡아 둡니다.
+            // 실패해도 패널 생성 자체는 진행합니다 (buildParent 가 이미 캔버스 밑에 있을 테니까요).
+            ResolveCanvas();
+            return buildParent;
+        }
+
+        Canvas canvas = ResolveCanvas();
+        return canvas != null ? canvas.transform : null;
     }
 
     private Canvas ResolveCanvas()
@@ -126,26 +158,49 @@ public partial class PlayerStatusCodeUI
     //  패널
     // ══════════════════════════════════════════════════════════
 
-    private void BuildPanel(Transform canvasTransform)
+    private void BuildPanel(Transform parentTransform)
     {
-        // ── 루트 (화면 전체를 덮음) ──
-        RectTransform root = NewRect("PlayerStatusPanel(Auto)", canvasTransform);
+        // ── 루트 (부모를 꽉 채움) ──
+        RectTransform root = NewRect("PlayerStatusPanel(Auto)", parentTransform);
         Stretch(root);
         panelRoot        = root.gameObject;
         panelCanvasGroup = panelRoot.AddComponent<CanvasGroup>();
 
         // ── 어두운 배경: 눌러서 닫기 ──
-        RectTransform dim = NewRect("Dim", root);
-        Stretch(dim);
-        Image dimImage = dim.gameObject.AddComponent<Image>();
-        dimImage.color = dimColor;
-        AddClick(dim.gameObject, dimImage, Close);
+        //
+        // ★ 탭 모드에서는 만들지 않습니다.
+        //   ① 탭 창에는 이미 자체 Dimmed 가 깔려 있어, 여기서 또 깔면 창 '안쪽'이
+        //      한 겹 더 어두워집니다. 화면 전체가 아니라 탭 영역만 덮으니 더 어색합니다.
+        //   ② 이 Dim 의 클릭은 Close() 입니다. 탭 모드에서 Close() 는 내용만 감추므로,
+        //      눌러도 탭 창은 열린 채 '빈 탭' 이 됩니다.
+        if (!useAsTabPage)
+        {
+            RectTransform dim = NewRect("Dim", root);
+            Stretch(dim);
+            Image dimImage = dim.gameObject.AddComponent<Image>();
+            dimImage.color = dimColor;
+            AddClick(dim.gameObject, dimImage, Close);
+        }
 
         // ── 창 ──
         // 높이를 0 으로 두고 ContentSizeFitter 에게 맡깁니다.
         // 스탯을 추가하면 창이 알아서 길어집니다.
         windowRect = NewRect("Window", root);
-        Center(windowRect, new Vector2(windowWidth, 0f));
+
+        // ★ Window Width 를 0 이하로 두면 부모 너비를 꽉 채웁니다.
+        //   탭 안에서는 고정 920px 이 거의 항상 문제가 됩니다. 탭 영역이 그보다 좁으면
+        //   창이 옆으로 삐져나가고, 넓으면 가운데에 덩그러니 뜹니다.
+        //
+        //   가로만 늘리고 세로는 여전히 ContentSizeFitter 에게 맡깁니다.
+        //   네 방향 Stretch 를 쓰면 Fitter 가 정한 높이를 앵커가 덮어써서 둘이 싸웁니다.
+        if (windowWidth > 0f)
+        {
+            Center(windowRect, new Vector2(windowWidth, 0f));
+        }
+        else
+        {
+            StretchWidth(windowRect);
+        }
 
         Image windowImage = windowRect.gameObject.AddComponent<Image>();
         windowImage.sprite = RoundedSprite(cornerRadius);
@@ -184,20 +239,28 @@ public partial class PlayerStatusCodeUI
         Flexible(title.gameObject, 1f);
 
         // 닫기 버튼 — 정사각형이라 레이아웃이 늘리지 않게 고정 크기를 줍니다
-        RectTransform closeRect = NewRect("CloseButton", titleRow);
-        Fixed(closeRect.gameObject, 56f, 56f);
+        //
+        // ★ 탭 모드에서는 만들지 않습니다.
+        //   TabWindow 헤더에 이미 ✕ 가 있고, 여기 ✕ 는 Close() 만 부릅니다.
+        //   탭 모드의 Close() 는 '이 탭 내용을 감추는' 것이라, 눌러도 창은 열린 채
+        //   아무것도 없는 탭이 남습니다. 닫는 버튼이 창을 안 닫으면 유저는 고장으로 받아들입니다.
+        if (!useAsTabPage)
+        {
+            RectTransform closeRect = NewRect("CloseButton", titleRow);
+            Fixed(closeRect.gameObject, 56f, 56f);
 
-        Image closeImage = closeRect.gameObject.AddComponent<Image>();
-        closeImage.sprite = RoundedSprite(14);
-        closeImage.type   = Image.Type.Sliced;
-        closeImage.color  = new Color(1f, 1f, 1f, 0.12f);
-        AddClick(closeRect.gameObject, closeImage, Close);
+            Image closeImage = closeRect.gameObject.AddComponent<Image>();
+            closeImage.sprite = RoundedSprite(14);
+            closeImage.type   = Image.Type.Sliced;
+            closeImage.color  = new Color(1f, 1f, 1f, 0.12f);
+            AddClick(closeRect.gameObject, closeImage, Close);
 
-        RectTransform closeLabelRect = NewRect("Label", closeRect);
-        Stretch(closeLabelRect);
-        // 닫기 라벨도 PlayerStatusText 의 상수를 씁니다.
-        // 폰트에 없는 기호를 직접 박아두면 나중에 찾기 어렵습니다.
-        NewTextOn(closeLabelRect, PlayerStatusText.CLOSE_LABEL, 30f, Color.white, TextAlignmentOptions.Center);
+            RectTransform closeLabelRect = NewRect("Label", closeRect);
+            Stretch(closeLabelRect);
+            // 닫기 라벨도 PlayerStatusText 의 상수를 씁니다.
+            // 폰트에 없는 기호를 직접 박아두면 나중에 찾기 어렵습니다.
+            NewTextOn(closeLabelRect, PlayerStatusText.CLOSE_LABEL, 30f, Color.white, TextAlignmentOptions.Center);
+        }
 
         // 레벨 + 경험치 숫자 줄
         RectTransform levelRow = NewRow("LevelRow", parent, 8f);
@@ -339,6 +402,27 @@ public partial class PlayerStatusCodeUI
         rect.pivot            = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = Vector2.zero;
         rect.sizeDelta        = size;
+        rect.localScale       = Vector3.one;
+    }
+
+    /// <summary>
+    /// 가로는 부모를 꽉 채우고, 세로는 내용(ContentSizeFitter)이 정하게 둡니다.
+    ///
+    /// ★ 왜 Stretch() 를 그대로 쓰지 않는가
+    ///   Stretch 는 네 방향 앵커를 펼치고 offset 으로 크기를 정합니다.
+    ///   그러면 ContentSizeFitter 가 계산한 높이를 앵커가 매 프레임 덮어써서
+    ///   "높이가 안 늘어난다 / 깜빡인다" 는 증상이 납니다.
+    ///   한쪽 축만 앵커로 늘리고 다른 축은 Fitter 에게 맡기면 둘이 싸우지 않습니다.
+    /// </summary>
+    private static void StretchWidth(RectTransform rect)
+    {
+        rect.anchorMin        = new Vector2(0f, 0.5f);
+        rect.anchorMax        = new Vector2(1f, 0.5f);
+        rect.pivot            = new Vector2(0.5f, 0.5f);
+        rect.offsetMin        = new Vector2(0f, rect.offsetMin.y);
+        rect.offsetMax        = new Vector2(0f, rect.offsetMax.y);
+        rect.anchoredPosition = new Vector2(0f, 0f);
+        rect.sizeDelta        = new Vector2(0f, 0f);   // 가로는 앵커가, 세로는 Fitter 가 정함
         rect.localScale       = Vector3.one;
     }
 

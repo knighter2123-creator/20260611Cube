@@ -21,8 +21,6 @@ public class PlayerName : MonoBehaviour
 
     void Start()
     {
-       
-
         popupPanel.SetActive(false);
 
         nicknameDisplayButton.onClick.AddListener(OpenPopup);

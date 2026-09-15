@@ -95,7 +95,7 @@ public partial class HapticManager : MonoBehaviour
             return;
         }
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+
 
         userEnabled = PlayerPrefs.GetInt(PrefKey, 1) == 1;
         InitVibrator();

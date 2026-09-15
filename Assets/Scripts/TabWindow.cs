@@ -92,6 +92,17 @@ public class TabWindow : MonoBehaviour
     [Tooltip("어두운 배경을 눌러도 닫히게 하려면 연결 (선택)")]
     [SerializeField] private Button dimmedButton;
 
+    [Header("진입 버튼 아이콘 (선택)")]
+    [Tooltip("창 상태에 따라 스프라이트를 바꿀 Image.\n" +
+             "비워두면 Open Button 의 Target Graphic 을 씁니다.")]
+    [SerializeField] private Image openButtonIcon;
+
+    [Tooltip("창이 닫혀 있을 때의 아이콘 (예: ▲ 펼치기)")]
+    [SerializeField] private Sprite iconWhenClosed;
+
+    [Tooltip("창이 열려 있을 때의 아이콘 (예: ▼ 접기)")]
+    [SerializeField] private Sprite iconWhenOpened;
+
     [Header("탭")]
     [SerializeField] private TabEntry[] tabs;
     [SerializeField] private int  defaultTabIndex   = 0;
@@ -163,8 +174,21 @@ public class TabWindow : MonoBehaviour
 
         WarnIfWindowIsChildOfOpenButton();
         WarnIfNoWayToClose();
+        WarnIfIconsAreHalfAssigned();
 
         currentTab = RestoreLastTabIndex();
+    }
+
+    /// <summary>아이콘을 한 장만 넣으면 반대 상태에서 그림이 바뀌지 않아 더 헷갈립니다.</summary>
+    private void WarnIfIconsAreHalfAssigned()
+    {
+        bool closed = iconWhenClosed != null;
+        bool opened = iconWhenOpened != null;
+
+        if (closed == opened) return;   // 둘 다 있거나 둘 다 없으면 정상
+
+        Debug.LogWarning("[TabWindow] 진입 버튼 아이콘이 한 장만 연결돼 있습니다. " +
+                         "두 장을 모두 넣거나 둘 다 비워주세요. 지금은 아이콘 교체를 하지 않습니다.", this);
     }
 
     /// <summary>
@@ -206,6 +230,7 @@ public class TabWindow : MonoBehaviour
     {
         // 시작 시 창은 닫아 둡니다.
         if (windowRoot != null) windowRoot.SetActive(false);
+        RefreshOpenButtonIcon();
 
         // 모든 탭 내용도 꺼 둡니다.
         // ★ 이걸 빼먹으면 씬에 켜둔 채 저장한 탭이 창 뒤에 겹쳐 보입니다.
@@ -223,6 +248,10 @@ public class TabWindow : MonoBehaviour
 
     private void OnEnable()
     {
+        // ★ 꺼졌다 켜지는 사이에 '배치 때문에 숨김' 상태가 남아 있을 수 있습니다.
+        //   그대로 두면 나중에 엉뚱한 배치가 끝날 때 창이 혼자 열립니다.
+        hiddenForPlacement = false;
+
         RegisterListeners();
         TryBindManagers();
     }
@@ -390,6 +419,10 @@ public class TabWindow : MonoBehaviour
         //   지금 필요한 건 '잠깐 비켜주기' 뿐이므로 오브젝트만 끕니다.
         windowRoot.SetActive(false);
         hiddenForPlacement = true;
+
+        // ★ 창이 안 보이는 동안에는 버튼도 '열기' 모양이어야 합니다.
+        //   안 그러면 화면에 창이 없는데 버튼만 '접기(▼)' 로 남아 유저가 혼란스러워집니다.
+        RefreshOpenButtonIcon();
     }
 
     private void HandlePlacementEnded()
@@ -402,6 +435,8 @@ public class TabWindow : MonoBehaviour
 
         // 배치 결과(배치 ↔ 취소 버튼)가 목록에 반영되도록 현재 탭을 다시 그립니다.
         ShowTab(currentTab, force: true);
+
+        RefreshOpenButtonIcon();
     }
 
     // ══════════════════════════════════════════════
@@ -421,11 +456,15 @@ public class TabWindow : MonoBehaviour
         //   ★ hiddenForPlacement 를 먼저 내리는 이유: 그대로 두면 CancelPlacement 가 쏘는
         //     OnPlacementEnded 가 창을 한 번 되살리고, 이어서 Open() 이 또 한 번 그립니다.
         //     동료 탭이 열려 있었다면 목록을 두 번 통째로 다시 만들게 됩니다.
+        //
+        //   ★ hiddenForPlacement 는 배치 여부와 관계없이 무조건 내립니다.
+        //     창을 여는 순간 '배치 때문에 숨긴 상태'는 더 이상 아닙니다.
+        //     배치 도중 컨트롤러가 파괴되면 OnPlacementEnded 가 영영 안 오는데,
+        //     그때 이 플래그가 true 로 남아 있으면 다음 배치가 끝날 때 창이 혼자 열립니다.
+        hiddenForPlacement = false;
+
         if (boundPlacement != null && boundPlacement.IsPlacing)
-        {
-            hiddenForPlacement = false;
             boundPlacement.CancelPlacement();
-        }
 
         if (windowRoot != null) windowRoot.SetActive(true);
 
@@ -433,6 +472,8 @@ public class TabWindow : MonoBehaviour
         //   ShowTab 안에서 OnTabShow 가 불리므로, 닫혀 있는 동안 놓친 갱신이 여기서 따라잡힙니다.
         //   "이벤트 하나를 놓쳐도 거짓 정보가 화면까지 도달하지 못하게" 하는 이중 안전장치입니다.
         ShowTab(currentTab, force: true);
+
+        RefreshOpenButtonIcon();
     }
 
     public void Close()
@@ -458,7 +499,18 @@ public class TabWindow : MonoBehaviour
         // 대칭을 맞춰 현재 탭에 먼저 알린 뒤 끕니다.
         GetPage(currentTab)?.OnTabHide();
 
+        // ★ 현재 탭의 내용도 같이 꺼야 합니다.
+        //   창만 끄면 contentRoot 는 activeSelf = true 로 남습니다. 그러면 다음에
+        //   '다른 탭'으로 창을 열 때 ShowTab 이 그 탭을 아직 보이는 중이라고 판단해
+        //   OnTabHide 를 한 번 더 보냅니다. OnTabShow 없이 OnTabHide 만 두 번 오는 셈이죠.
+        //   지금 페이지들은 여러 번 불려도 탈이 없지만, 계약이 깨지면 나중에 추가하는
+        //   페이지가 조용히 어긋납니다. 여기서 상태를 정확히 맞춰 둡니다.
+        if (currentTab >= 0 && currentTab < tabs.Length && tabs[currentTab].contentRoot != null)
+            tabs[currentTab].contentRoot.SetActive(false);
+
         if (windowRoot != null) windowRoot.SetActive(false);
+
+        RefreshOpenButtonIcon();
     }
 
     public void Toggle()
@@ -512,11 +564,27 @@ public class TabWindow : MonoBehaviour
             PlayerPrefs.SetString(LastTabPrefKey, tabs[index].id);
     }
 
-    /// <summary>id 로 탭을 엽니다. 없으면 아무 일도 하지 않습니다.</summary>
+    /// <summary>
+    /// id 로 탭을 엽니다. 없으면 아무 일도 하지 않습니다.
+    ///
+    /// ★ 창이 닫혀 있으면 창까지 엽니다.
+    ///   예전에는 탭 내용만 켜고 창은 닫힌 채로 두어서, 밖에서 이 함수를 부르면
+    ///   "아무 일도 안 일어난 것처럼" 보였습니다. 이름이 '탭을 연다'인데
+    ///   화면에 아무것도 안 뜨는 건 함수가 거짓말을 하는 겁니다.
+    /// </summary>
     public void ShowTab(string id)
     {
         int i = IndexOfTab(id);
-        if (i >= 0) ShowTab(i);
+        if (i < 0) return;
+
+        if (!IsOpen)
+        {
+            currentTab = i;   // Open() 이 이 탭을 그대로 그려 준다 (중복 갱신 방지)
+            Open();
+            return;
+        }
+
+        ShowTab(i);
     }
 
     private int IndexOfTab(string id)
@@ -546,6 +614,34 @@ public class TabWindow : MonoBehaviour
         // ★ 인스펙터는 인터페이스 타입 필드를 직렬화하지 못합니다.
         //   그래서 MonoBehaviour 로 받아 여기서 캐스팅합니다. 아니면 null 이 돌아올 뿐 터지지 않습니다.
         return tabs[index].page as ITabPage;
+    }
+
+    /// <summary>
+    /// 창 상태에 맞춰 진입 버튼 아이콘을 바꾼다. (▲ 펼치기 ↔ ▼ 접기)
+    ///
+    /// ★ overrideSprite 가 아니라 sprite 를 바꾸는 이유
+    ///   Button 의 Transition 이 Sprite Swap 이면, 버튼은 상태가 바뀔 때마다
+    ///   내부적으로 overrideSprite 를 건드립니다. 평상시(Normal)에는 overrideSprite 를
+    ///   null 로 되돌리고 원래 sprite 를 보여주죠.
+    ///   그래서 우리가 sprite 를 바꾸면 그 그림이 '기본 모습'으로 남고,
+    ///   눌림/하이라이트 연출은 버튼이 알아서 얹습니다. 둘이 싸우지 않습니다.
+    ///   반대로 overrideSprite 를 우리가 칠하면 버튼이 다음 상태 변화에서 지워버립니다.
+    ///
+    ///   같은 이유로 탭 버튼 색은 ColorBlock 을 바꿨습니다 — '기본 모습'을 바꾸는 게 핵심입니다.
+    /// </summary>
+    private void RefreshOpenButtonIcon()
+    {
+        if (iconWhenClosed == null || iconWhenOpened == null) return;
+
+        // 지정한 Image 가 없으면 버튼이 색을 칠하는 그래픽을 그대로 씁니다.
+        // (Target Graphic 이 Image 가 아닐 수도 있으므로 as 로 안전하게 받습니다)
+        Image icon = openButtonIcon != null
+            ? openButtonIcon
+            : (openButton != null ? openButton.targetGraphic as Image : null);
+
+        if (icon == null) return;
+
+        icon.sprite = IsOpen ? iconWhenOpened : iconWhenClosed;
     }
 
     private void SetTabVisual(int index, bool isSelected)

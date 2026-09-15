@@ -21,7 +21,7 @@ public class CompanionListUI : MonoBehaviour, ITabPage
 
     [Header("버튼")]
     [SerializeField] private Button openButton;
-    [SerializeField] private Button closeButton;
+    
 
     [Header("동료 목록")]
     [SerializeField] private Transform  companionListContent;
@@ -45,7 +45,6 @@ public class CompanionListUI : MonoBehaviour, ITabPage
         //   예외가 나면 Start 가 거기서 끊겨 뒤의 초기화가 통째로 실행되지 않습니다.
         //   "연결을 하나 빠뜨렸을 때 게임이 멈추지 않게" — 스탯창에서 쓴 원칙과 같습니다.
         if (openButton  != null) openButton.onClick.AddListener(OpenCompanionList);
-        if (closeButton != null) closeButton.onClick.AddListener(CloseCompanionList);
 
         if (companionListPanel != null) companionListPanel.SetActive(false);
     }
@@ -54,7 +53,6 @@ public class CompanionListUI : MonoBehaviour, ITabPage
     {
         // 등록한 리스너는 등록한 쪽이 해제합니다.
         if (openButton  != null) openButton.onClick.RemoveListener(OpenCompanionList);
-        if (closeButton != null) closeButton.onClick.RemoveListener(CloseCompanionList);
     }
 
     // ══════════════════════════════════════════════
@@ -79,14 +77,6 @@ public class CompanionListUI : MonoBehaviour, ITabPage
     {
         if (companionListPanel != null) companionListPanel.SetActive(true);
         RefreshCompanionList();
-    }
-
-    public void CloseCompanionList()
-    {
-        if (companionListPanel != null) companionListPanel.SetActive(false);
-
-        // 목록을 닫을 때 배치 모드가 진행 중이면 같이 취소
-        CompanionPlacementController.Instance?.CancelPlacement();
     }
 
     // ══════════════════════════════════════════════
