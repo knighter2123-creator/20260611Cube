@@ -41,7 +41,24 @@ public class SaveManager : MonoBehaviour
         GuideQuestManager.Instance?.CaptureTo(data);
 
         Current = data;
+        WriteToDisk(data);
+    }
 
+    /// <summary>
+    /// 매니저들의 CaptureTo() 를 거치지 않고, 지금 Current 를 그대로 파일에 씁니다.
+    /// 매니저들이 아직 세이브를 적용(ApplyFrom)하기 전인 LoginScene 에서
+    /// 이름처럼 "SaveData 에 직접 넣은 값" 만 확정할 때 사용합니다. (PlayerProfile 참고)
+    /// Save() 를 부르면 준비 안 된 매니저의 기본값이 파일을 덮어쓸 수 있기 때문입니다.
+    /// </summary>
+    public void WriteCurrentToDisk()
+    {
+        if (Current == null) Load();
+        WriteToDisk(Current);
+    }
+
+    // 실제 파일 쓰기는 이 함수 한 곳에만 있음 (Save / WriteCurrentToDisk 공용)
+    private void WriteToDisk(SaveData data)
+    {
         try
         {
             File.WriteAllText(SavePath, JsonUtility.ToJson(data, true));

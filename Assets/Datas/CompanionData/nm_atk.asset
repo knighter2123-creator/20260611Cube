@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
-  m_Name: com 2
+  m_Name: nm_atk
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
-  id: ra_Slow
-  companionName: "\uB454\uD654"
-  icon: {fileID: 21300000, guid: 90e99a7fde056a4418b9fe16084adb5c, type: 3}
-  prefab: {fileID: 3391353107492281548, guid: 00f9fe8474bc47644ac179b9207cdbbc, type: 3}
+  id: nm_atk
+  companionName: "\uACF5\uACA9"
+  icon: {fileID: 21300000, guid: 95052c6b62fb3de4695beaa99f842ac2, type: 3}
+  prefab: {fileID: 5725842826671454127, guid: 829ae7959aec9a6439995d5ccd3a6c10, type: 3}
   detectRange: 5
-  grade: 1
-  ownedSkill: {fileID: 11400000, guid: 6104c83c479037c4987ea8fd8ac21b6c, type: 2}
+  grade: 0
+  ownedSkill: {fileID: 11400000, guid: a5ddf3b243c8caf4eaa4ca50cf394176, type: 2}
