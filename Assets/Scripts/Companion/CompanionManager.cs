@@ -143,17 +143,16 @@ public class CompanionManager : MonoBehaviour
         ownedCompanionData.Add(data);
         Debug.Log($"[CompanionManager] {data.companionName} 신규 보유 등록");
 
-        // ✅ 배치용 오브젝트는 슬롯 여유가 있을 때만 생성 (없으면 데이터만 보유)
-        if (ownedCompanions.Count < maxCompanions)
-        {
-            Companion companion = SpawnCompanionObject(data);
-            if (companion != null)
-                ownedCompanions.Add(companion);
-        }
-        else
-        {
-            Debug.Log($"[CompanionManager] 배치 슬롯 가득 — {data.companionName}은 데이터만 보유(오브젝트 미생성)");
-        }
+        // ★ [수정] 오브젝트는 '항상' 만듭니다. (최대 6 제한은 PlaceCompanion 이 '배치 수' 기준으로 검사)
+        //   예전에는 오브젝트 수가 6이면 새 동료는 데이터만 보유했습니다.
+        //   그러면 배치된 동료가 6명 미만이어도 7번째 동료는 배치할 오브젝트가 없어
+        //   "배치 대상 없음" 으로 실패했고, 앱을 재시작하면(RestoreIntoScene 은 제한 없이 전부 생성) 또 됐습니다.
+        //   ★ 인덱스 영향 없음: 두 경로 모두 '데이터 순서대로' 오브젝트를 만들므로
+        //     ownedCompanions[i] 와 ownedCompanionData[i] 가 계속 같은 동료입니다 (세이브의 ownedIndex 와 일치).
+        //   비용: 꺼진 오브젝트가 몇 개 더 생길 뿐이라 무시할 수준입니다 (Update 도 isPlaced 가 아니면 즉시 반환).
+        Companion companion = SpawnCompanionObject(data);
+        if (companion != null)
+            ownedCompanions.Add(companion);
 
         SaveManager.Instance?.Save();
         return true;
@@ -266,6 +265,15 @@ public class CompanionManager : MonoBehaviour
             return false;
         }
 
+        // ★ [추가] 최대 배치 수 — 규칙을 지키는 최종 관문은 데이터를 가진 이쪽입니다.
+        //   (배치 컨트롤러도 같은 검사를 하지만, 그건 유저에게 알림을 띄우기 위한 것)
+        //   이미 배치된 동료를 다른 칸으로 '옮기는' 경우는 수가 늘지 않으므로 통과.
+        if (!companion.IsPlaced && occupied.Count >= maxCompanions)
+        {
+            Debug.Log($"[CompanionManager] 최대 배치 수({maxCompanions}) 도달 — 배치하지 않습니다.");
+            return false;
+        }
+
         RetrieveCompanion(companion);                 // 다른 셀에 있던 동료면 먼저 회수
         occupied[cell] = companion;
         companion.Place(placeableTilemap.GetCellCenterWorld(cell)); // 셀 중앙으로 스냅
@@ -308,5 +316,13 @@ public class CompanionManager : MonoBehaviour
     // ──────────────────────────────────────────────
     public List<Companion>     GetOwnedCompanions()    => ownedCompanions;
     public List<CompanionData> GetOwnedCompanionData() => ownedCompanionData;
-    public bool                IsFull                  => ownedCompanions.Count >= maxCompanions;
+    public int                 MaxCompanions           => maxCompanions;   // 배치 가능한 최대 수 (읽기 전용)
+
+    // ★ [수정] '오브젝트 수'가 아니라 '배치 수' 기준. (오브젝트는 이제 보유한 만큼 전부 만들어지므로)
+    public bool                IsFull                  => occupied.Count >= maxCompanions;
+
+    // ★ [추가] 배치 컨트롤러 / 씬 바인더가 쓰는 조회
+    public int                 PlacedCount             => occupied.Count;
+    public Tilemap             PlaceableTilemap        => placeableTilemap;
+    public bool                HasPlaceableTilemap     => placeableTilemap != null;   // 파괴된 타일맵도 false (유니티식 null 검사)
 }

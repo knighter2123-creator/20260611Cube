@@ -22,4 +22,9 @@ public class SkillPoison : ActiveSkill
         target.TakeDamage(finalDamage, isCritical);
         target.ApplyDot(finalDot, dotInterval, dotDuration);
     }
+
+    // ★ [도감] 효과 요약 — 위 Execute 의 독 피해 공식(플레이어 공격력 + dotDamage)과 같은 말로 적습니다.
+    public override string GetEffectSummary()
+        => $"적 1체에게 피해 + {FormatSeconds(dotDuration)} 동안 {FormatSeconds(dotInterval)}마다 " +
+           $"독 피해(플레이어 공격력 + {dotDamage:0.#})";
 }

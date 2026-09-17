@@ -26,4 +26,8 @@ public class SkillExplosion : ActiveSkill
             hitCount++;
         }
     }
+
+    // ★ [도감] 효과 요약
+    public override string GetEffectSummary()
+        => $"대상 주변 반경 {explosionRadius:0.#} 안의 모든 적에게 피해 (적마다 치명타 따로 판정)";
 }

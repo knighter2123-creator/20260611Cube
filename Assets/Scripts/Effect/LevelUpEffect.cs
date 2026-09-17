@@ -150,6 +150,8 @@ public partial class LevelUpEffect : MonoBehaviour
             Debug.LogWarning("[LevelUpEffect] 씬에 인스턴스가 둘 이상입니다. 나중 것을 사용합니다.", this);
         }
         Instance = this;
+
+        LoadFlashSetting();
     }
 
     private void OnDestroy()
@@ -269,7 +271,7 @@ public partial class LevelUpEffect : MonoBehaviour
     {
         // 저사양 모드처럼 "블룸을 끄면 연출도 통째로 끄고 싶다"는 경우
         if (skipWhenBloomDisabled && BloomController.Instance != null &&
-            !BloomController.Instance.UserEnabled) { }
+            !BloomController.Instance.UserEnabled) { return; }
 
         float now = useUnscaledTime ? Time.unscaledTime : Time.time;
         if (now - lastPlayTime < minInterval) return;

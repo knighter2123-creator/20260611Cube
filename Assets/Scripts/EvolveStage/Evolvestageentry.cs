@@ -29,6 +29,20 @@ public class EvolveStageEntry : MonoBehaviour, ITabPage
              "입장 직전에 창을 닫는 용도입니다.")]
     [SerializeField] private TabWindow ownerWindow;
 
+    [Header("상태 갱신")]
+    [Tooltip("탭이 보이는 동안 이 간격(초)마다 입장 가능 여부를 다시 확인합니다.\n" +
+             "세이브(클리어 기록)나 레벨이 탭을 연 '뒤에' 늦게 반영돼도 버튼이 곧 맞춰집니다.")]
+    [SerializeField] private float refreshInterval = 0.5f;
+
+    // ── 입장 가능 여부 (한 곳에서만 계산) ──
+    private enum EntryState { AllCleared, Locked, Unlocked }
+
+    // 마지막으로 화면에 반영한 상태. 같으면 다시 그리지 않습니다.
+    // ★ TMP 의 text 는 같은 문자열을 넣어도 메시를 다시 만들 수 있어, 주기 갱신에서는 바뀔 때만 씁니다.
+    private EntryState? shownState;
+    private int         shownRequiredLevel = -1;
+    private float       nextRefreshTime;
+
     // ★ 구독한 인스턴스를 들고 있다가 그 인스턴스에서 해제합니다.
     //   LevelUpManager.Instance 로 해제하면, 그 사이 매니저가 교체된 경우
     //   '새 매니저에서 있지도 않은 구독을 빼고' 옛 매니저에는 구독이 남습니다.
@@ -73,8 +87,11 @@ public class EvolveStageEntry : MonoBehaviour, ITabPage
 
     void OnEnable()
     {
-        RefreshLockState();
+        // 켜질 때는 마지막 표시 기록을 믿지 않고 무조건 다시 그립니다
+        // (꺼져 있는 동안 누군가 버튼/문구를 바꿨을 수 있음)
+        RefreshLockState(force: true);
         Bind();
+        nextRefreshTime = 0f;   // 다음 Update 에서 바로 한 번 더 확인
     }
 
     void OnDisable()
@@ -114,7 +131,7 @@ public class EvolveStageEntry : MonoBehaviour, ITabPage
     public void OnTabShow()
     {
         Bind();
-        RefreshLockState();
+        RefreshLockState(force: true);
     }
 
     public void OnTabHide() { }
@@ -133,28 +150,68 @@ public class EvolveStageEntry : MonoBehaviour, ITabPage
         return null;   // 전부 클리어함
     }
 
-    private void RefreshLockState()
+    /// <summary>
+    /// ★ [수정] 입장 가능 여부를 계산하는 곳을 이 함수 하나로 모았습니다.
+    ///   예전에는 RefreshLockState(버튼 표시) 와 TryEnter(실제 입장) 가 각자 같은 계산을 했고,
+    ///   두 계산이 '서로 다른 시점' 에 돌면서 결과가 어긋났습니다.
+    ///
+    ///   어긋나던 흐름 (예: 플레이어 Lv.40, 30티어는 이미 클리어)
+    ///     탭 표시 시점 : 클리어 기록/레벨이 아직 반영 전 → 다음 티어 = 30 → 40 ≥ 30 → 버튼 활성 ✗
+    ///     버튼 클릭 시점: 기록 반영 완료          → 다음 티어 = 50 → 40 < 50 → 입장 거부 + 잠금 문구
+    ///   → "버튼은 켜져 있는데 누르면 그제야 잠김 문구가 뜨는" 증상.
+    ///
+    ///   클리어 기록(SaveManager)에는 '바뀌었다' 는 이벤트가 없어서, 탭이 보이는 동안
+    ///   짧은 간격으로 다시 확인합니다 (아래 Update). 티어가 5개뿐이라 비용은 무시할 수준입니다.
+    /// </summary>
+    private EntryState Evaluate(out EvolveStageData next)
     {
-        EvolveStageData next = GetNextTier();
+        next = GetNextTier();
+        if (next == null) return EntryState.AllCleared;
+        return PlayerLevel >= next.requiredLevel ? EntryState.Unlocked : EntryState.Locked;
+    }
 
-        // 모든 티어 클리어 → 버튼 비활성 + 안내
-        if (next == null)
-        {
-            if (enterButton != null) enterButton.interactable = false;
-            SetLockText("모든 진화 스테이지 클리어", show: true);
-            return;
-        }
+    private void RefreshLockState() => RefreshLockState(force: false);
 
-        bool unlocked = PlayerLevel >= next.requiredLevel;
+    private void RefreshLockState(bool force)
+    {
+        EntryState state = Evaluate(out EvolveStageData next);
+        int required = next != null ? next.requiredLevel : -1;
+
+        // 화면에 보이는 상태와 같으면 아무것도 하지 않습니다 (주기 갱신 비용 최소화)
+        if (!force && shownState == state && shownRequiredLevel == required) return;
+        shownState         = state;
+        shownRequiredLevel = required;
 
         if (enterButton != null)
-            enterButton.interactable = unlocked;
+            enterButton.interactable = state == EntryState.Unlocked;
 
-        // 잠김이면 "다음 티어"의 요구 레벨을 안내, 해제되면 숨김
-        if (unlocked)
-            SetLockText("", show: false);
-        else
-            SetLockText($"Lv.{next.requiredLevel} 이상 입장 가능", show: true);
+        switch (state)
+        {
+            case EntryState.AllCleared:
+                SetLockText("모든 진화 스테이지 클리어", show: true);
+                break;
+            case EntryState.Locked:
+                // 잠김이면 "다음 티어"의 요구 레벨을 안내
+                SetLockText($"Lv.{required} 이상 입장 가능", show: true);
+                break;
+            default:
+                SetLockText("", show: false);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 탭이 보이는 동안(= 이 오브젝트가 켜져 있는 동안)만 돕니다.
+    /// 탭이 가려지면 TabWindow 가 오브젝트를 끄므로 자동으로 멈춥니다.
+    /// </summary>
+    void Update()
+    {
+        // unscaledTime — 설정창의 일시정지(timeScale 0)나 배속과 무관하게 같은 간격으로 확인
+        if (Time.unscaledTime < nextRefreshTime) return;
+        nextRefreshTime = Time.unscaledTime + Mathf.Max(0.1f, refreshInterval);
+
+        Bind();              // 매니저가 재생성됐다면 새 인스턴스로 갈아탐
+        RefreshLockState();
     }
 
     private void SetLockText(string msg, bool show)
@@ -166,17 +223,13 @@ public class EvolveStageEntry : MonoBehaviour, ITabPage
 
     private void TryEnter()
     {
-        EvolveStageData target = GetNextTier();
-        if (target == null)
+        // ★ [수정] 버튼 표시와 '같은 함수' 로 판정합니다.
+        //   여기서 막혔다면 화면이 잠시 늦었던 것이므로, 화면을 즉시 맞춘 뒤 돌아갑니다.
+        //   (정상이라면 잠긴 상태에서는 버튼이 비활성이라 여기까지 오지 않습니다)
+        EntryState state = Evaluate(out EvolveStageData target);
+        if (state != EntryState.Unlocked)
         {
-            Debug.Log("[EvolveStageEntry] 모든 진화 스테이지를 클리어했습니다.");
-            return;
-        }
-
-        if (PlayerLevel < target.requiredLevel)
-        {
-            Debug.Log($"[EvolveStageEntry] 레벨 부족: 현재 {PlayerLevel} / 필요 {target.requiredLevel} (티어 {target.id})");
-            RefreshLockState();
+            RefreshLockState(force: true);
             return;
         }
 

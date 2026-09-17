@@ -2728,17 +2728,18 @@ MonoBehaviour:
   chanceRare: 15
   chanceEpic: 10
   chanceLegendary: 5
+  poolAsset: {fileID: 11400000, guid: ff17476ef4ebb5d4d92622cfbc222faa, type: 2}
   normalPool:
   - {fileID: 11400000, guid: 8e88c7b876364174892884721dcc99eb, type: 2}
   - {fileID: 11400000, guid: 08135a98310f4d64eb3b140159bfcd57, type: 2}
   rarePool:
   - {fileID: 11400000, guid: bdbee6a304c276c46b26c4519c382427, type: 2}
   epicPool:
-  - {fileID: 11400000, guid: 927361f8eaf08eb47933622aef8d38d7, type: 2}
   - {fileID: 11400000, guid: 6fd0dc250565b5346b85a386a838d0d3, type: 2}
+  - {fileID: 11400000, guid: 927361f8eaf08eb47933622aef8d38d7, type: 2}
   legendaryPool:
-  - {fileID: 11400000, guid: ad3e818b3e148a94691e48c373c83678, type: 2}
   - {fileID: 11400000, guid: 21e4aaa8f19ba2b499138c9aa2d8c8be, type: 2}
+  - {fileID: 11400000, guid: ad3e818b3e148a94691e48c373c83678, type: 2}
   fragmentNormal: 5
   fragmentRare: 10
   fragmentEpic: 15
@@ -3381,6 +3382,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4266d1b0d11e41458fcc22b00710e36, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyManager
+  logLifecycle: 1
 --- !u!4 &1123661380
 Transform:
   m_ObjectHideFlags: 0

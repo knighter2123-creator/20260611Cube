@@ -16,19 +16,8 @@ using UnityEngine.Tilemaps;
 ///   (같은 타일맵이 이미 연결돼 있으면 스스로 건너뜁니다)
 ///
 /// ★ 붙이는 곳: MainScene 의 항상 켜져 있는 오브젝트 (예: 타일맵 오브젝트 자신, 또는 씬 관리 오브젝트)
-///
-/// ★ [기존 SceneBinder 덮어쓰기 버전]
-///   클래스 이름(SceneBinder)과 필드 이름(placeableTilemap)을 그대로 뒀습니다.
-///   유니티는 씬에 붙은 컴포넌트를 '클래스 이름'으로, 인스펙터 값을 '필드 이름'으로 찾기 때문에
-///   둘 중 하나라도 바꾸면 컴포넌트가 Missing Script 가 되거나 연결해 둔 타일맵이 사라집니다.
-///
-///   바뀐 점 (기존 대비)
-///   ① 조용히 건너뛰던 두 경우(매니저 없음 / 타일맵 비어 있음)에 에러를 띄웁니다.
-///   ② 연결한 타일맵에 타일이 하나도 없으면 에러를 띄웁니다.
-///   ③ 복원이 끝난 씬에서만 떠날 때 스냅샷을 찍습니다 (복원 전에 찍으면 이전 씬 정보로 덮어씀).
-///   ④ CompanionManager.Instance?. → != null (파괴된 매니저를 null 로 보지 못하는 ?. 문제)
 /// </summary>
-public class SceneBinder : MonoBehaviour
+public class CompanionSceneBinder : MonoBehaviour
 {
     [Tooltip("동료를 배치할 수 있는 칸이 칠해진 타일맵")]
     [SerializeField] private Tilemap placeableTilemap;
@@ -46,7 +35,7 @@ public class SceneBinder : MonoBehaviour
     {
         if (placeableTilemap == null)
         {
-            Debug.LogError("[SceneBinder] Placeable Tilemap 이 연결되지 않았습니다.", this);
+            Debug.LogError("[CompanionSceneBinder] Placeable Tilemap 이 연결되지 않았습니다.", this);
             return;
         }
 
@@ -54,21 +43,17 @@ public class SceneBinder : MonoBehaviour
         if (cm == null)
         {
             // 에디터에서 MainScene 을 바로 재생하면 LoginScene 의 매니저가 없어 여기로 옵니다.
-            Debug.LogError("[SceneBinder] CompanionManager 가 없습니다. LoginScene 부터 실행하세요.", this);
+            Debug.LogError("[CompanionSceneBinder] CompanionManager 가 없습니다. LoginScene 부터 실행하세요.", this);
             return;
         }
 
         // 다른 스크립트가 이미 이 타일맵으로 복원했다면 두 번 하지 않습니다.
         if (cm.PlaceableTilemap == placeableTilemap)
         {
+            Debug.Log("[CompanionSceneBinder] 이미 이 타일맵으로 복원돼 있어 건너뜁니다.", this);
             restored = true;
             return;
         }
-
-        // 타일이 하나도 없는 타일맵이면 어디를 눌러도 배치할 수 없으니 알려 줍니다.
-        if (placeableTilemap.GetUsedTilesCount() == 0)
-            Debug.LogError("[SceneBinder] 연결한 타일맵에 칠해진 타일이 없습니다. 어디를 눌러도 배치할 수 없습니다. " +
-                           "Build Tilemap 이 맞는지, 타일을 이 타일맵에 칠했는지 확인하세요.", placeableTilemap);
 
         cm.RestoreIntoScene(placeableTilemap);
         restored = true;

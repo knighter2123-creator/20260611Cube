@@ -16,7 +16,15 @@ public class GachaSystem : MonoBehaviour
     [SerializeField] private float chanceEpic      = 15f;
     [SerializeField] private float chanceLegendary = 5f;
 
-    [Header("동료 풀 (등급별)")]
+    // ★ [도감] 신규 — 풀 에셋.
+    //   연결하면 아래 구버전 리스트 대신 이 에셋을 씁니다. 도감도 같은 에셋을 봅니다.
+    //   비워두면 예전과 똑같이 동작합니다 (기존 씬이 깨지지 않게 하기 위한 호환 경로).
+    [Header("동료 풀 에셋 (권장) — 도감과 공유")]
+    [Tooltip("연결하면 아래 등급별 리스트는 무시됩니다.\n" +
+             "옮기는 법: 에셋 연결 → 이 컴포넌트 우클릭 → '풀 → 에셋으로 복사'")]
+    [SerializeField] private CompanionPoolAsset poolAsset;
+
+    [Header("동료 풀 (등급별) — 구버전. 위 에셋이 비었을 때만 사용")]
     [SerializeField] private List<CompanionData> normalPool;
     [SerializeField] private List<CompanionData> rarePool;
     [SerializeField] private List<CompanionData> epicPool;
@@ -129,7 +137,7 @@ public class GachaSystem : MonoBehaviour
     {
         if (CompanionManager.Instance == null)
         {
-            Debug.LogWarning("[Gacha] CompanionManager.Instance == null → 항상 신규 처리됨 ★원인 1★"); // 이게 문제 
+            
             return false;
         }
 
@@ -165,8 +173,10 @@ public class GachaSystem : MonoBehaviour
     // ──────────────────────────────────────────────
     private CompanionData GetRandomCompanion()
     {
-        CompanionGrade      grade = RollGrade();
-        List<CompanionData> pool  = GetPool(grade);
+        CompanionGrade grade = RollGrade();
+
+        // ★ [도감] List → IReadOnlyList 로 바뀌었습니다. Count 와 [i] 는 그대로 쓸 수 있습니다.
+        IReadOnlyList<CompanionData> pool = GetPool(grade);
 
         if (pool == null || pool.Count == 0)
         {
@@ -197,8 +207,16 @@ public class GachaSystem : MonoBehaviour
         return CompanionGrade.Normal;
     }
 
-    private List<CompanionData> GetPool(CompanionGrade grade)
+    /// <summary>
+    /// ★ [도감] 에셋이 있으면 에셋, 없으면 구버전 리스트.
+    ///   List&lt;T&gt; 는 IReadOnlyList&lt;T&gt; 를 구현하므로 구버전 리스트도 그대로 돌려줄 수 있습니다.
+    /// </summary>
+    private IReadOnlyList<CompanionData> GetPool(CompanionGrade grade)
     {
+        // ★ 'poolAsset != null' 은 유니티식 null 검사입니다 (연결 안 됨 / 파괴됨 모두 걸러냄).
+        //   'poolAsset?.GetPool()' 처럼 ?. 를 쓰면 이 유니티식 검사를 건너뛰니 쓰지 않습니다.
+        if (poolAsset != null) return poolAsset.GetPool(grade);
+
         return grade switch
         {
             CompanionGrade.Normal    => normalPool,
@@ -208,4 +226,56 @@ public class GachaSystem : MonoBehaviour
             _                        => normalPool
         };
     }
+
+    // ──────────────────────────────────────────────
+    //  [도감] 조회
+    // ──────────────────────────────────────────────
+
+    /// <summary>
+    /// 가챠에 등록된 모든 동료. (중복 제거는 하지 않음 — 받는 쪽이 id 로 거릅니다)
+    /// 도감이 풀 에셋을 직접 연결하지 않았을 때의 예비 경로입니다.
+    /// </summary>
+    public IEnumerable<CompanionData> GetAllPoolCompanions()
+    {
+        if (poolAsset != null)
+        {
+            foreach (var d in poolAsset.All()) yield return d;
+            yield break;   // ★ yield 함수에서 '여기서 끝' 은 return 이 아니라 yield break 입니다
+        }
+
+        foreach (var d in EnumerateOrEmpty(normalPool))    yield return d;
+        foreach (var d in EnumerateOrEmpty(rarePool))      yield return d;
+        foreach (var d in EnumerateOrEmpty(epicPool))      yield return d;
+        foreach (var d in EnumerateOrEmpty(legendaryPool)) yield return d;
+    }
+
+    // 리스트가 null 이면 빈 목록처럼 취급 (foreach 에 null 을 넣으면 예외가 납니다)
+    private static IEnumerable<CompanionData> EnumerateOrEmpty(List<CompanionData> list)
+        => list ?? (IEnumerable<CompanionData>)System.Array.Empty<CompanionData>();
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// 인스펙터의 구버전 리스트를 poolAsset 으로 복사합니다. (한 번만 쓰면 됨)
+    /// 컴포넌트 제목줄 우클릭 → 메뉴 맨 아래에 나옵니다.
+    /// </summary>
+    [ContextMenu("풀 → 에셋으로 복사")]
+    private void CopyLegacyPoolsToAsset()
+    {
+        if (poolAsset == null)
+        {
+            Debug.LogError("[Gacha] 먼저 Pool Asset 칸에 CompanionPool 에셋을 연결하세요.", this);
+            return;
+        }
+
+        // Undo 에 기록해 두면 Ctrl+Z 로 되돌릴 수 있습니다.
+        UnityEditor.Undo.RecordObject(poolAsset, "Copy Gacha Pools");
+        poolAsset.CopyFrom(normalPool, rarePool, epicPool, legendaryPool);
+
+        // ★ 코드로 에셋을 바꾸면 '바뀌었다' 고 알려야 저장됩니다. 안 하면 에디터를 끄는 순간 사라집니다.
+        UnityEditor.EditorUtility.SetDirty(poolAsset);
+        UnityEditor.AssetDatabase.SaveAssets();
+
+        Debug.Log($"[Gacha] 구버전 풀을 '{poolAsset.name}' 에셋으로 복사했습니다.", poolAsset);
+    }
+#endif
 }
