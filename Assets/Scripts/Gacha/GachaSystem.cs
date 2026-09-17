@@ -71,11 +71,9 @@ public class GachaSystem : MonoBehaviour
             return results;
         }
 
+        // 보석 부족 → 빈 결과를 돌려줍니다. (호출한 UI 가 results.Count == 0 으로 판단)
         if (!CurrencyManager.Instance.SpendGem(cost))
-        {
-            Debug.Log($"[Gacha] 보석 부족. 필요: {cost}");
             return results;   // 실패 → 여기서 리턴, 카운트 안 오름 (정상)
-        }
 
         for (int i = 0; i < count; i++)
         {
@@ -98,7 +96,6 @@ public class GachaSystem : MonoBehaviour
         // ★ 젬 차감 + 동료/조각 획득을 한 번에 저장 (루프 밖에서 1회)
         SaveManager.Instance?.Save();
 
-        Debug.Log($"[Gacha] {count}회 뽑기 완료");
         return results;
     }
 
@@ -117,8 +114,6 @@ public class GachaSystem : MonoBehaviour
             result.isDuplicate  = true;
             result.fragmentGain = GetFragmentAmount(data.grade);
             CompanionFragment.Instance?.AddFragment(data, result.fragmentGain);
-
-            Debug.Log($"[Gacha] 중복 — {data.companionName} → 조각 +{result.fragmentGain}");
         }
         else
         {
@@ -126,33 +121,25 @@ public class GachaSystem : MonoBehaviour
             result.isDuplicate  = false;
             result.fragmentGain = 0;
             CompanionManager.Instance?.AddCompanion(data);
-
-            Debug.Log($"[Gacha] 신규 — {data.companionName} 획득");
         }
 
         return result;
     }
 
+    /// <summary>
+    /// 이미 보유한 동료인가 — 이름이나 에셋 참조가 아니라 id 로 비교합니다.
+    /// (진단용 로그를 정리하면서, 세던 개수 변수(ownedCount)도 쓸 곳이 없어져 함께 뺐습니다)
+    /// </summary>
     private bool IsAlreadyOwned(CompanionData data)
     {
-        if (CompanionManager.Instance == null)
-        {
-            
-            return false;
-        }
+        CompanionManager cm = CompanionManager.Instance;
+        if (cm == null) return false;   // 매니저가 없으면 신규로 처리 (기존 동작 유지)
 
-        int ownedCount = 0;
-        foreach (CompanionData owned in CompanionManager.Instance.GetOwnedCompanionData())
+        foreach (CompanionData owned in cm.GetOwnedCompanionData())
         {
-            ownedCount++;
-            Debug.Log($"[Gacha] 보유중 id={owned?.id} / name={owned?.companionName}");
             if (owned != null && owned.id == data.id)
-            {
-                Debug.Log($"[Gacha] → 중복 확인! id={data.id}");
                 return true;
-            }
         }
-        Debug.Log($"[Gacha] 보유 {ownedCount}개 / 검사대상 id={data.id} → 매칭 없음(신규 처리)");
         return false;
     }
 
