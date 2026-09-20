@@ -1,17 +1,14 @@
 using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Serialization;   // ★ FormerlySerializedAs 사용을 위해 추가
+using UnityEngine.Serialization;
 
 // EvolveStageManager는 partial로 분리되어 있습니다.
 //   EvolveStageManager.cs        — 보스 스폰 / 클리어 / 복귀
 //   EvolveStageManager.Timer.cs  — 제한시간(2분) / 시간초과 실패
 //
-// ★ 이번 수정 요약
-//   1) 보스 프리팹을 티어(EvolveStageData)에서 우선적으로 읽도록 변경
-//      → 티어마다 다른 보스 겉모습을 쓸 수 있습니다.
-//   2) 기존 bossPrefab 필드는 fallbackBossPrefab으로 이름 변경 (역할이 "예비"로 바뀌었으므로)
-//   3) 스폰 로직을 ResolveBossPrefab()으로 분리해 읽기 쉽게 정리
+// ★ 이번 수정: ReportBossKill()에 각성 보상 갱신 보고 1줄 추가.
+//   그 외에는 한 글자도 바뀌지 않았습니다.
 public partial class EvolveStageManager : MonoBehaviour
 {
     public static EvolveStageManager Instance;
@@ -149,6 +146,24 @@ public partial class EvolveStageManager : MonoBehaviour
             GuideQuestManager.Instance.ReportEvolveClear();
         else
             Debug.LogWarning("[EvolveStageManager] GuideQuestManager를 찾을 수 없어 각성 퀘스트를 보고하지 못했습니다.");
+
+        // ══════════════════════════════════════════════════════════
+        // ★ 이번에 추가된 줄 — 각성 보상(스프라이트 / 발사체 / 연사) 갱신
+        //
+        //   AwakeningManager는 값을 직접 올리지 않고 세이브의 claimedEvolveRewards를
+        //   다시 읽어 계산합니다. 그래서:
+        //     · 여러 번 호출돼도 안전 (멱등)
+        //     · EvolveBoss가 보상을 기록하는 시점과의 순서에 덜 민감
+        //
+        //   혹시 여기서 순서가 어긋나더라도, AwakeningManager가 sceneLoaded에도
+        //   구독해 두어서 메인 스테이지에 도착하는 순간 다시 정확해집니다.
+        //   (한 번에 맞히려 하기보다, 틀려도 스스로 복구되게 설계한 부분입니다)
+        // ══════════════════════════════════════════════════════════
+        if (AwakeningManager.Instance != null)
+            AwakeningManager.Instance.ReportEvolveCleared(ActiveData != null ? ActiveData.id : null);
+        else
+            Debug.LogWarning("[EvolveStageManager] AwakeningManager를 찾을 수 없어 각성 효과를 갱신하지 못했습니다. " +
+                             "LoginScene의 Managers 루트에 추가했는지 확인하세요.");
 
         OnStageClear?.Invoke();
         Debug.Log("[EvolveStageManager] 진화 스테이지 클리어 → 원래 스테이지로 복귀");

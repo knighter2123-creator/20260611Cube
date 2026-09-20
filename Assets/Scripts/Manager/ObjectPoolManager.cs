@@ -4,7 +4,8 @@ using UnityEngine;
 /// <summary>
 /// 오브젝트 풀 관리자 (총알 전용 풀 + 프리팹별 범용 풀)
 ///
-/// ★ 이번 수정: Prewarm()의 "누적 생성" 버그 수정
+/// ★ 이번 수정: GetBulletInactive()에 "파괴된 인스턴스 건너뛰기" 가드 추가
+///   (범용 풀 GetInactive()에는 이미 있던 것이 총알 풀에만 빠져 있었습니다)
 ///
 /// ─── 오브젝트 풀링이란? (학습 포인트) ────────────────────────────────
 /// Instantiate(생성)와 Destroy(파괴)는 생각보다 비쌉니다. 특히 Destroy는
@@ -24,7 +25,9 @@ public class ObjectPoolManager : MonoBehaviour
 
     [Header("Bullet Pool 설정")]
     [SerializeField] private GameObject bulletPrefab;
-    [SerializeField] private int initialPoolSize = 20;
+
+    [Tooltip("각성으로 한 번에 여러 발이 나가면 순간 소비량이 늘어납니다. 60 권장.")]
+    [SerializeField] private int initialPoolSize = 60;
 
     private Queue<GameObject> pool = new Queue<GameObject>();
 
@@ -66,18 +69,48 @@ public class ObjectPoolManager : MonoBehaviour
     /// <summary>
     /// 풀에서 Bullet을 꺼내 반환합니다. (비활성 상태)
     /// 호출자가 위치·Init 설정 후 직접 SetActive(true) 해야 합니다.
+    ///
+    /// ═══ ★ 이번에 고친 부분 ══════════════════════════════════════════
+    ///
+    /// 기존 코드:
+    ///     if (pool.Count == 0) pool.Enqueue(CreateBullet());
+    ///     return pool.Dequeue();
+    ///
+    /// 문제: 총알은 DontDestroyOnLoad 없이 Instantiate되므로 **씬이 바뀌면 파괴됩니다.**
+    /// 그런데 이 매니저가 씬을 넘어 살아남는 구조라면, 큐 안에는 파괴된 총알의
+    /// 참조가 그대로 남습니다. 그걸 그냥 Dequeue해서 돌려주면 호출한 쪽에서
+    /// MissingReferenceException이 터지거나, 조용히 발사가 씹힙니다.
+    ///
+    /// 각성 스테이지(EvolveScene)를 왕복하는 구조라 정확히 이 경로를 밟고,
+    /// 각성으로 한 번에 여러 발이 나가기 시작하면 훨씬 자주 걸립니다.
+    ///
+    /// 범용 풀 GetInactive()에는 이 가드가 이미 있습니다. 같은 클래스 안에서
+    /// 한쪽에만 방어가 있다면, 대개는 빠진 쪽이 버그입니다.
+    ///
+    /// ★ 유니티에서 파괴된 오브젝트는 C#의 진짜 null이 아니라 "파괴됨"을 기억하는
+    ///   특수 상태입니다. 그래도 == null 비교는 유니티가 오버로딩해 둬서
+    ///   true가 나오므로 이 검사가 동작합니다.
+    /// ══════════════════════════════════════════════════════════════════
     /// </summary>
     public GameObject GetBulletInactive()
     {
-        if (pool.Count == 0)
-            pool.Enqueue(CreateBullet()); // 총알 장전
+        // 살아있는 총알이 나올 때까지 꺼냅니다 (파괴된 건 버림)
+        while (pool.Count > 0)
+        {
+            GameObject obj = pool.Dequeue();
+            if (obj != null) return obj;
+        }
 
-        return pool.Dequeue();   // 맨 앞의 총알 소모
+        // 쓸 만한 게 없으면 새로 만든다 (풀은 "최대치"가 아니라 "재활용 창고")
+        return CreateBullet();
     }
 
     /// <summary>사용이 끝난 Bullet을 풀에 반환합니다.</summary>
     public void ReturnBullet(GameObject obj)
     {
+        // ★ 파괴된 오브젝트를 다시 큐에 넣으면 쓰레기가 계속 누적됩니다.
+        if (obj == null) return;
+
         obj.SetActive(false);
         // 부모를 null로 해제 — 씬 루트에 보관해 좌표 오염 방지
         obj.transform.SetParent(null);
@@ -127,10 +160,6 @@ public class ObjectPoolManager : MonoBehaviour
         GameObject obj = null;
 
         // 씬 전환 등으로 파괴된 인스턴스가 섞여 있을 수 있으므로 살아있는 것만 꺼냄
-        //
-        // ※ 유니티에서 파괴된 오브젝트는 C#의 진짜 null이 아니라
-        //   "파괴됨"을 기억하는 특수 상태입니다. 그래도 == null 비교는
-        //   유니티가 오버로딩해 둬서 true가 나오므로 이 검사가 동작합니다.
         while (queue.Count > 0)
         {
             obj = queue.Dequeue();
@@ -175,15 +204,10 @@ public class ObjectPoolManager : MonoBehaviour
     /// <summary>
     /// 미리 생성해 첫 스폰 시 렉을 방지합니다.
     ///
-    /// ★ 수정된 부분 (중요!)
-    /// 기존 코드는 호출할 때마다 무조건 count개를 새로 만들었습니다.
-    /// 스테이지가 바뀔 때마다 Prewarm(prefab, 12)를 부르면
-    ///   1스테이지: 12개 → 2스테이지: 24개 → 10스테이지: 120개...
-    /// 이렇게 인스턴스가 무한히 불어납니다. 메모리 누수의 전형적인 형태예요.
-    ///
-    /// 그래서 "이미 대기 중인 개수를 빼고, 부족한 만큼만" 채우도록 바꿉니다.
-    /// 이런 함수를 멱등(idempotent)하다고 합니다 — 몇 번을 불러도
-    /// 결과 상태가 같다는 뜻이고, 안전한 API의 중요한 성질입니다.
+    /// ★ 기존 코드는 호출할 때마다 무조건 count개를 새로 만들어
+    ///   스테이지가 바뀔 때마다 인스턴스가 무한히 불어났습니다.
+    ///   "이미 대기 중인 개수를 빼고, 부족한 만큼만" 채우도록 바꾼 상태입니다.
+    ///   이런 함수를 멱등(idempotent)하다고 합니다.
     /// </summary>
     public void Prewarm(GameObject prefab, int count)
     {
@@ -206,9 +230,7 @@ public class ObjectPoolManager : MonoBehaviour
     /// 씬을 다시 로드하기 전 등에 호출해 풀 기록을 비웁니다. (선택)
     ///
     /// instanceToPrefab은 인스턴스가 파괴돼도 항목이 남기 때문에,
-    /// 씬 전환이 잦으면 딕셔너리가 계속 커집니다. 지금 규모에서는
-    /// 문제되지 않지만, 스테이지 씬을 따로 로드하는 구조로 바꾼다면
-    /// 그 시점에 이 함수를 불러주세요.
+    /// 씬 전환이 잦으면 딕셔너리가 계속 커집니다.
     /// </summary>
     public void ClearAllPools()
     {
