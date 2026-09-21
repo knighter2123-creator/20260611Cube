@@ -15,6 +15,8 @@ MonoBehaviour:
   id: evolve_70
   displayName: "\uC9C4\uD654 \uC2A4\uD14C\uC774\uC9C0 (Lv.70)"
   requiredLevel: 70
+  bossPrefab: {fileID: -8825517568889730819, guid: 32f62f5427b548d4cba800fb3f7f7863,
+    type: 3}
   bossHpMultiplier: 5
   bossDefenceMultiplier: 4
   damageBuffPercent: 0.3

@@ -5,32 +5,25 @@ using UnityEngine;
 /// PlayerStat → 화면에 띄울 문자열. **UI 부품을 전혀 모릅니다.**
 ///
 /// ─────────────────────────────────────────────────────────────
-/// [왜 이 클래스를 따로 만들었나 — 이번 작업의 학습 포인트]
+/// [왜 이 클래스를 따로 만들었나]
 ///
 /// 스탯창을 두 가지 방식으로 만들게 되었습니다.
 ///   · PlayerStatusUI      — 프리팹에 TMP 를 배치하고 인스펙터로 연결
 ///   · PlayerStatusCodeUI  — 스크립트가 캔버스부터 전부 코드로 생성
 ///
-/// 두 버전 모두 "공격력 725, 기본 20 · 강화 Lv.96 +480 · 증강 ×1.45" 라는
-/// **똑같은 문장**을 만들어야 합니다. 화면에 놓는 방법만 다르죠.
+/// 두 버전 모두 똑같은 문장을 만들어야 합니다. 화면에 놓는 방법만 다르죠.
+/// 그 문장 조립을 각 UI 안에 복사해 두면 고칠 곳이 두 군데가 되고,
+/// 한 곳만 고치면 두 버전이 다른 값을 보여줍니다.
 ///
-/// 그 문장 조립을 각 UI 안에 복사해 두면 이런 일이 벌어집니다.
-///   · "%p 를 %로 바꾸자" → 고칠 곳이 두 군데
-///   · 한 곳만 고치면 두 버전이 다른 값을 보여줌 → 어느 쪽이 맞는지 알 수 없음
-///
-/// 그래서 판단 기준을 다시 적용했습니다.
-///
-///   이 코드가 TMP_Text 나 Button 이라는 부품을 몰라도 되는가?
-///   몰라도 된다면 UI 밖으로 빼는 게 맞습니다.
-///
-/// AugmentUIFactory 를 뺀 것, NumberFormat 을 뺀 것과 정확히 같은 판단입니다.
-/// 다만 방향이 반대입니다 —
-///   AugmentUIFactory : "도메인을 모르는 범용 부품" 을 아래로 뺐고
-///   PlayerStatusText : "부품을 모르는 도메인 규칙" 을 위로 뺐습니다
-/// UI 코드는 그 사이에 얇게 남습니다. 이게 UI 를 두 벌 만들 수 있는 이유입니다.
+///   판단 기준: 이 코드가 TMP_Text 나 Button 이라는 부품을 몰라도 되는가?
+///             몰라도 된다면 UI 밖으로 빼는 게 맞습니다.
 ///
 /// static 클래스인 이유: 상태가 없습니다. 같은 PlayerStat 을 넣으면 항상 같은 문자열이 나옵니다.
 /// ─────────────────────────────────────────────────────────────
+///
+/// ★ 이번 수정: 공격력 내역에 '각성' 레이어 추가
+///   각성 영구 버프가 PlayerStat.FinalDamage 안으로 들어오면서,
+///   스탯창에도 그 기여분을 한 조각 더 보여줍니다.
 /// </summary>
 public static class PlayerStatusText
 {
@@ -50,30 +43,14 @@ public static class PlayerStatusText
     //  ★ 글리프 — 폰트에 없는 문자를 여기서 한 번에 바꿉니다
     // ══════════════════════════════════════════════════════════
     //
-    // [왜 상수로 빼는가 — 겪으신 문제가 바로 이것입니다]
-    //
-    // TMP 는 폰트 에셋에 없는 문자를 만나면 □ 로 그리고 이런 경고를 냅니다.
-    //
-    //   The character with Unicode value · was not found in the
-    //   [BMJUA_ttf SDF] font asset or any potential fallbacks.
-    //
-    // 게임용 한글 폰트(배민 주아체 같은)는 한글·숫자·기본 문장부호만 담고 있어서
-    // 가운뎃점(·) 이나 곱셈기호(×) 같은 기호가 빠져 있는 경우가 많습니다.
-    //
-    // 문제는 그 문자가 코드 여기저기에 흩어져 있으면 **전부 찾아 고치기 어렵다**는 점입니다.
-    // 실제로 · 는 Sep() 안의 딱 한 줄에만 있는데, 화면에는 한 줄에 세 번씩 나옵니다.
-    // 그래서 UI 파일만 뒤지면 영원히 안 보입니다.
-    //
-    // 이렇게 이름 붙여 한곳에 모아두면 폰트를 바꿀 때마다 여기만 보면 됩니다.
-    // "같은 의미의 값이 여러 곳에 흩어지면 반드시 하나는 어긋난다" 의 또 다른 사례예요.
+    // TMP 는 폰트 에셋에 없는 문자를 만나면 □ 로 그리고 경고를 냅니다.
+    // 게임용 한글 폰트(배민 주아체 등)는 가운뎃점(·)이나 곱셈기호(×)가 빠진 경우가 많습니다.
+    // 이렇게 이름 붙여 한곳에 모아두면 폰트를 바꿀 때 여기만 보면 됩니다.
     //
     // [원래 기호로 되돌리고 싶다면]
-    // 폰트 에셋에 글리프를 추가하는 쪽이 근본 해결입니다.
     //   Window → TextMeshPro → Font Asset Creator
     //   → Character Set 을 "Custom Characters" 로 두고 아래를 붙여넣어 재생성
     //        ·×✕−…™©
-    // 또는 TMP Settings 의 Default Font Asset 에 한글+기호가 다 있는 폰트를
-    // Fallback 으로 등록해도 됩니다. (Fallback 은 렌더링 비용이 조금 더 듭니다)
 
     /// <summary>세부 내역의 구분자. 폰트에 가운뎃점(·)이 있으면 "  ·  " 가 더 예쁩니다.</summary>
     public const string SEPARATOR = "  |  ";
@@ -101,8 +78,19 @@ public static class PlayerStatusText
         [Tooltip("세부 내역 글자 색 (연한 회색 권장)")]
         public Color detailColor = new Color(0.65f, 0.68f, 0.75f);
 
-        [Tooltip("보너스 기여분을 강조할 색")]
+        [Tooltip("증강(이번 판 한정) 기여분을 강조할 색")]
         public Color augmentColor = new Color(1f, 0.82f, 0.35f);
+
+        // ★ 추가된 필드.
+        //   [Serializable] 클래스에 필드를 새로 넣으면, 기존에 씬/프리팹에 저장돼 있던
+        //   Style 에는 이 값이 없으므로 위의 초기화값이 그대로 적용됩니다.
+        //   즉 인스펙터를 다시 만질 필요가 없습니다. (색을 바꾸고 싶을 때만 건드리세요)
+        //
+        //   증강과 다른 색을 쓰는 이유: 증강은 이번 판이 끝나면 사라지고,
+        //   각성은 영구입니다. 성격이 다른 두 보너스를 같은 색으로 칠하면
+        //   플레이어가 "이 수치가 계속 남는 건가?"를 구분할 수 없습니다.
+        [Tooltip("각성(영구) 기여분을 강조할 색")]
+        public Color awakenColor = new Color(0.55f, 0.85f, 1f);
     }
 
     // 호출부가 Style 을 넘기지 않아도 동작하게 기본값을 하나 들고 있습니다.
@@ -135,16 +123,23 @@ public static class PlayerStatusText
         if (s == null) return string.Empty;
         Style st = style ?? Fallback;
 
-        // 기본 20  |  강화 Lv.96 +480  |  증강 x1.45 (+225)
+        // 기본 20  |  강화 Lv.96 +480  |  보너스 x1.45 (+225)  |  각성 x1.30 (+218)
         string d = Part(st, $"기본 {NumberFormat.Short(s.PureBaseDamage)}");
 
         d += Sep(Part(st,
             $"강화 Lv.{s.UpgradeLevelDamage} {NumberFormat.Signed(s.UpgradeDamageBonus)}",
             s.UpgradeDamageBonus != 0));
 
-        d += Sep(Colored(st,
+        d += Sep(Colored(st, st.augmentColor,
             $"보너스 {MULTIPLY}{s.AugmentAttackMultiplier:0.00} ({NumberFormat.Signed(s.AugmentDamageBonus)})",
             !Mathf.Approximately(s.AugmentAttackMultiplier, 1f)));
+
+        // ★ 각성 영구 버프.
+        //   버프가 없을 때(x1.00)는 줄이 길어지기만 하므로 기본적으로 숨깁니다.
+        //   showEmptyContributions 를 켜두셨다면 다른 항목과 마찬가지로 항상 보입니다.
+        d += Sep(Colored(st, st.awakenColor,
+            $"각성 {MULTIPLY}{s.PermanentDamageMultiplier:0.00} ({NumberFormat.Signed(s.AwakenDamageBonus)})",
+            !Mathf.Approximately(s.PermanentDamageMultiplier, 1f)));
 
         return d;
     }
@@ -155,7 +150,9 @@ public static class PlayerStatusText
     //
     // 배수(×2.45)보다 "터지면 1,776 이 들어간다" 가 체감에 직결되므로
     // 합계는 실제 대미지, 내역 맨 앞에 배수를 둡니다.
-    // 배수를 크게 보여주고 싶으면 아래 한 줄만 바꾸면 두 UI 버전이 동시에 바뀝니다.
+    //
+    // ※ 합계(FinalCriticalDamage)는 FinalDamage 를 쓰므로 각성 버프가 자동 반영됩니다.
+    //   그래서 이 함수는 손댈 곳이 없습니다 — 레이어를 한 곳에서만 곱하게 만든 덕분입니다.
 
     public static string CritDamageTotal(PlayerStat s)
         => s == null ? UNKNOWN : NumberFormat.Short(s.FinalCriticalDamage);
@@ -173,7 +170,7 @@ public static class PlayerStatusText
             $"강화 Lv.{s.UpgradeLevelCritDamage} {Signed2(s.UpgradeCritDamageBonus)}",
             s.UpgradeCritDamageBonus > 0f));
 
-        d += Sep(Colored(st,
+        d += Sep(Colored(st, st.augmentColor,
             $"보너스 {Signed2(s.AugmentCritDamageBonus)}",
             s.AugmentCritDamageBonus > 0f));
 
@@ -210,7 +207,7 @@ public static class PlayerStatusText
             $"강화 Lv.{s.UpgradeLevelAttackSpd} -{s.UpgradeAttackSpdReduction:0}ms",
             s.UpgradeAttackSpdReduction > 0f));
 
-        d += Sep(Colored(st,
+        d += Sep(Colored(st, st.augmentColor,
             $"보너스 -{s.AugmentAttackSpdReduction:0}ms",
             s.AugmentAttackSpdReduction > 0f));
 
@@ -234,7 +231,7 @@ public static class PlayerStatusText
             $"강화 Lv.{s.UpgradeLevelCritChance} {Signed2(s.UpgradeCritChanceBonus)}%p",
             s.UpgradeCritChanceBonus > 0f));
 
-        d += Sep(Colored(st,
+        d += Sep(Colored(st, st.augmentColor,
             $"보너스 {Signed2(s.AugmentCritChanceBonus)}%p",
             s.AugmentCritChanceBonus > 0f));
 
@@ -248,7 +245,7 @@ public static class PlayerStatusText
     //  문자열 조립 도우미
     // ══════════════════════════════════════════════════════════
     //
-    // 세부 내역은 "· 로 이어붙인 조각들" 입니다.
+    // 세부 내역은 "구분자로 이어붙인 조각들" 입니다.
     // 기여분이 0 인 조각을 숨기는 옵션이 있어서 조각은 있을 수도 없을 수도 있습니다.
     // "조각을 만드는 함수" 와 "구분자를 붙이는 함수" 를 나누면
     // 위쪽 Detail 함수들에서 if 문이 전부 사라집니다.
@@ -265,13 +262,17 @@ public static class PlayerStatusText
     /// TMP 리치 텍스트로 색을 입힙니다.
     /// &lt;color=#RRGGBB&gt; 태그를 지원하므로 텍스트를 여러 개로 쪼개지 않고
     /// 한 줄 안에서 부분 색상을 줄 수 있습니다. (Rich Text 가 켜져 있어야 합니다)
+    ///
+    /// ★ [수정] 색을 매개변수로 받도록 바꿨습니다.
+    ///   예전에는 augmentColor 로 고정돼 있어서, 각성 조각을 다른 색으로 칠할 수 없었습니다.
+    ///   "이 함수가 정하던 것"을 호출자에게 넘기는 흔한 리팩터링입니다.
     /// </summary>
-    private static string Colored(Style st, string text, bool visible = true)
+    private static string Colored(Style st, Color color, string text, bool visible = true)
     {
         string body = Part(st, text, visible);
         if (string.IsNullOrEmpty(body)) return string.Empty;
 
-        return $"<color=#{ColorUtility.ToHtmlStringRGB(st.augmentColor)}>{body}</color>";
+        return $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{body}</color>";
     }
 
     /// <summary>소수 둘째 자리까지, 부호를 항상 붙여서. (0.05 → "+0.05")</summary>

@@ -4,6 +4,32 @@
 // ★ 비용 공식(CalculateCost)은 LevelUpManager.stat.cs 한 곳에만 존재합니다.
 //   UI가 공식을 복사해 가면, 밸런스를 조정할 때 화면에 뜨는 금액과
 //   실제로 빠져나가는 금액이 어긋납니다. 그래서 계산은 매니저가 책임집니다.
+//
+// ═══ ★ 이번 수정 — 위 원칙을 이 파일 스스로 어기고 있던 부분 정리 ═══════════
+//
+// [1] 누적 비용을 '등차수열 공식'이 아니라 CalculateCost 를 N번 더해서 구합니다.
+//
+//   예전 코드는 이렇게 계산했습니다.
+//       total = baseCost × n + costPerLevel × (n × lv + n(n−1)/2)
+//
+//   수학적으로는 정확합니다. 문제는 이 식이 **"1회 비용 = baseCost + costPerLevel × 레벨"
+//   이라는 사실을 한 번 더 적어둔 것**이라는 점입니다. 즉 비용 공식이 두 벌이었습니다.
+//
+//   나중에 비용 곡선을 바꾸면(예: 후반에 비용이 가파르게 오르는 지수 곡선)
+//   CalculateCost 는 새 공식으로 결제하는데, 여기는 옛 등차수열로 합계를 보여줍니다.
+//     → 화면엔 "10만" 인데 실제로는 30만이 빠져나감
+//     → 또는 버튼은 켜져 있는데 눌러도 골드가 모자라 실패
+//   에러 없이 숫자만 조용히 틀리는, 가장 찾기 어려운 종류입니다.
+//
+//   CalculateCost 를 더하기만 하면 비용 공식이 어떻게 바뀌든 자동으로 맞습니다.
+//
+//   [성능] 강화창의 최대 배수는 ×100 이라 한 번에 최대 100번 더하기입니다.
+//         4개 행 × 초당 최대 10번 갱신이어도 초당 수천 번의 정수 덧셈이라
+//         **체감 가능한 비용이 아닙니다.** 닫힌 식이 빠르긴 하지만, 여기선 그 차이보다
+//         "공식이 한 곳에만 있다"는 안전함이 훨씬 값집니다.
+//
+// [2] 상한 계산(남은 레벨)을 stat.cs 의 ClampToRemaining() 으로 통일했습니다.
+// ══════════════════════════════════════════════════════════════════════
 
 using UnityEngine;
 
@@ -25,28 +51,18 @@ public partial class LevelUpManager
         if (!IsReady || times <= 0) return 0L;
 
         int currentLv = GetUpgradeLevelValue(type);
-        int remain    = MAX_UPGRADE_LEVEL - currentLv;
-        if (remain <= 0) return 0L;
+        int n         = ClampToRemaining(currentLv, times);
+        if (n <= 0) return 0L;
 
-        int n = Mathf.Min(times, remain);
         var (config, _) = GetConfigAndLevel(type);
 
-        // ── 등차수열의 합 ────────────────────────────────
-        // 1회 비용 = baseCost + costPerLevel × 레벨   (레벨이 1 오를 때마다 costPerLevel 씩 증가)
-        // 따라서 currentLv 부터 n회분의 합은
-        //   Σ(k=0..n-1) [ baseCost + costPerLevel × (currentLv + k) ]
-        //   = baseCost × n + costPerLevel × ( n × currentLv + n(n-1)/2 )
-        //
-        // ★ for 루프로 100번 더해도 되지만, 닫힌 식이면 배수가 아무리 커져도 비용이 일정합니다.
-        //   그리고 등차수열이라 Mathf.Pow 같은 float 오차가 끼어들 여지가 없습니다.
-        //   n(n-1) 은 항상 짝수라 /2 에서 나머지가 버려질 걱정도 없습니다.
-        //
-        // ★ 중간 계산을 long 으로 올린 이유:
-        //   int 로 두면 n × currentLv 단계에서 21억을 넘는 순간 음수로 뒤집혀
-        //   "비용이 마이너스 = 공짜"처럼 보입니다. 지금 설정값에선 안 넘지만,
-        //   costPerLevel 이나 상한을 올리는 순간 조용히 터지는 종류의 버그입니다.
-        long total = (long)config.baseCost * n
-                   + (long)config.costPerLevel * ((long)n * currentLv + (long)n * (n - 1) / 2);
+        // ★ 합계는 long 으로 받습니다.
+        //   1회 비용(int)은 작아도, 100회를 더하면 int 범위를 넘을 수 있습니다.
+        //   long 변수에 int 를 더하면 C# 이 자동으로 long 덧셈을 하므로 안전합니다.
+        //   (반대로 int 변수에 모으면 21억을 넘는 순간 음수로 뒤집혀 "공짜"처럼 보입니다)
+        long total = 0L;
+        for (int k = 0; k < n; k++)
+            total += CalculateCost(config, currentLv + k);
 
         buyableCount = n;
         return total;
@@ -65,18 +81,17 @@ public partial class LevelUpManager
         if (!IsReady || gold <= 0 || limit <= 0) return 0;
 
         int currentLv = GetUpgradeLevelValue(type);
-        int remain    = MAX_UPGRADE_LEVEL - currentLv;
-        if (remain <= 0) return 0;
+        int max       = ClampToRemaining(currentLv, limit);
+        if (max <= 0) return 0;
 
         var (config, _) = GetConfigAndLevel(type);
 
         int  count = 0;
         long spent = 0L;
-        int  max   = Mathf.Min(limit, remain);
 
-        // ★ 여기는 닫힌 식 대신 루프입니다.
-        //   "합이 gold 를 넘지 않는 최대 n" 은 2차 부등식이라 닫힌 식이 오히려 부정확해집니다
-        //   (제곱근 반올림에서 1회 차이가 납니다). 최대 5000회라 루프가 안전합니다.
+        // ★ 여기도 CalculateCost 를 하나씩 더합니다. (위와 같은 이유)
+        //   "합이 gold 를 넘지 않는 최대 n" 은 어차피 하나씩 더해봐야 정확하게 구해집니다.
+        //   최대 5000회라 루프가 안전합니다.
         for (int i = 0; i < max; i++)
         {
             long next = spent + CalculateCost(config, currentLv + i);

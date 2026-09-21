@@ -1,5 +1,8 @@
 // LevelUpManager의 세이브 연동 partial.
 // 레벨/경험치/강화레벨/전투스탯을 SaveData와 주고받는다.
+//
+// ★ 이번 수정: 공격 속도와 치명타 확률을 세이브 값이 아니라 '강화 레벨'에서 다시 계산해 복원합니다.
+//   RestoreAttackSpd() 는 더 이상 필요 없어서 제거했습니다. (아래 ApplyFrom 주석 참고)
 
 using UnityEngine;
 
@@ -22,6 +25,10 @@ partial class LevelUpManager
         d.baseDamage         = stat.baseDamage;
         d.critical           = stat.Critical;
         d.criticalMultiplier = stat.CriticalMultiplier;
+
+        // ※ 공격 주기는 이제 불러올 때 쓰이지 않지만 계속 기록합니다.
+        //   SaveData 의 필드를 지우거나 이름을 바꾸면 호환성이 깨질 수 있고,
+        //   세이브 파일을 열어봤을 때 현재 값을 눈으로 확인하는 용도로도 쓸모가 있습니다.
         d.attackSpd          = stat.AttackSpd;
     }
 
@@ -44,9 +51,27 @@ partial class LevelUpManager
 
         // ★ 오염된 세이브(0) 자가 치유 — 0/음수면 기본값으로 복구
         stat.baseDamage         = d.baseDamage         > 0  ? d.baseDamage         : 20;
-        stat.Critical           = d.critical           > 0  ? d.critical           : 3f;
         stat.CriticalMultiplier = d.criticalMultiplier > 0  ? d.criticalMultiplier : 1.5f;
-        stat.AttackSpd          = RestoreAttackSpd(d.attackSpd, stat.UpgradeLevelAttackSpd);
+
+        // ★ [수정] 치명타 확률도 공격 속도와 마찬가지로 강화 레벨에서 다시 계산합니다.
+        //   PlayerStat 에 "전투 스탯 — 강화로만 상승" 이라고 적혀 있듯이,
+        //   이 값을 바꾸는 건 강화뿐이라 레벨만 있으면 항상 복원할 수 있습니다.
+        //   (증강 카드로 오르는 치명타 확률은 FinalCritical 쪽 레이어라 여기와 무관합니다)
+        stat.Critical = CritChanceForLevel(stat.UpgradeLevelCritChance);
+
+        // ═══ ★ [수정] 공격 주기는 저장값을 믿지 않고 강화 레벨에서 다시 계산합니다 ═══
+        //
+        // 예전에는 d.attackSpd 를 읽고, 범위를 벗어나면(오염) RestoreAttackSpd() 로
+        // "강화 레벨로부터 역산"해서 고쳤습니다. 즉 **원래도 강화 레벨이 진짜 기준**이었고
+        // 저장된 공격 주기는 그걸 베껴둔 사본이었던 셈입니다.
+        //
+        // 사본을 읽고 → 의심하고 → 틀리면 원본으로 다시 계산하는 대신,
+        // 처음부터 원본(레벨)으로 계산하면 오염 검사 자체가 필요 없어집니다.
+        // 사본이 오염돼도 영향이 없으니까요.
+        //
+        // 덤으로, 인스펙터에서 공격 속도 곡선을 바꿔도 다음 실행 때
+        // 새 곡선으로 자동 재계산됩니다. 세이브를 지우지 않아도 됩니다.
+        stat.AttackSpd = AttackSpdForLevel(stat.UpgradeLevelAttackSpd);
 
         // ★★ 여기가 핵심 수정입니다.
         //   원래는 OnLevelUp 을 쏘고 있었습니다. 세이브를 불러온 것뿐인데
@@ -57,23 +82,7 @@ partial class LevelUpManager
         OnExpChanged?.Invoke(stat.Experience);
 
         Debug.Log($"[LevelUp] ApplyFrom 완료 | Lv.{stat.Level}, dmg={stat.baseDamage}, " +
-                  $"lvD={stat.UpgradeLevelDamage} | id={GetInstanceID()}");
-    }
-
-    /// <summary>
-    /// AttackSpd는 [100, 3000] 범위에서만 유효(ApplyGain 하한 100 클램프).
-    /// 범위를 벗어난 저장값(0, 1 등 오염)은 강화 레벨로부터 재구성한다.
-    /// </summary>
-    private float RestoreAttackSpd(float saved, int upgradeLevel)
-    {
-        if (saved >= 100f && saved <= 3000f) return saved;   // 정상값은 그대로
-
-        // ApplyGain 공식 역산: 3000 - gain * 강화레벨, 하한 100
-        float restored = 3000f - attackspdConfig.gainPerUpgrade * upgradeLevel;
-        restored = Mathf.Clamp(restored, 100f, 3000f);
-
-        Debug.LogWarning($"[LevelUp] AttackSpd 오염값({saved}) 감지 → {restored}f로 복구 " +
-                         $"(강화레벨 {upgradeLevel})");
-        return restored;
+                  $"lvD={stat.UpgradeLevelDamage}, lvAS={stat.UpgradeLevelAttackSpd} → " +
+                  $"{stat.AttackSpd:0.0}ms | id={GetInstanceID()}");
     }
 }

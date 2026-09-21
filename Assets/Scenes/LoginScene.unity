@@ -2879,11 +2879,11 @@ MonoBehaviour:
   damageConfig:
     baseCost: 10
     costPerLevel: 15
-    gainPerUpgrade: 5
-  attackspdConfig:
-    baseCost: 150
-    costPerLevel: 50
     gainPerUpgrade: 10
+  attackspdConfig:
+    baseCost: 500
+    costPerLevel: 50
+    gainPerUpgrade: 1
   critChanceConfig:
     baseCost: 300
     costPerLevel: 150

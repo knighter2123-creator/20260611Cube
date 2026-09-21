@@ -78,18 +78,25 @@ public class Bullet : MonoBehaviour
 
         count = Mathf.Max(1, count);
 
-        // ★ 증강 ─────────────────────────────────────────────────────────
-        // 공격력은 세 겹의 곱으로 결정됩니다.
+        // ★ 공격력 레이어 ─────────────────────────────────────────────────
+        // 공격력은 세 겹의 곱으로 결정되고, **그 곱셈은 전부 PlayerStat 안에서** 끝납니다.
         //     baseDamage    강화로 올리는 순수 기본값 (세이브에 저장되는 유일한 값)
-        //   × 증강 배율      AugmentManager — FinalDamage 프로퍼티가 대신 곱해줍니다
-        //   × 버프 배율      PlayerBuffManager.DamageMultiplier (각성 영구 버프가 여기 쌓입니다)
+        //   × 증강 배율      AugmentManager.Attack
+        //   × 각성 영구 버프  PlayerBuffManager.DamageMultiplier
+        //   = stat.FinalDamage
+        //
+        // ★ [수정] 예전에는 여기서 PlayerBuffManager 를 직접 한 번 더 곱했습니다.
+        //   그 결과 FinalDamage 에는 각성 버프가 빠져 있었고, 같은 값을 보여주는
+        //   스탯창은 각성해도 숫자가 안 움직였습니다 — 표시와 실제가 달랐던 거죠.
+        //
+        //   이제 곱하는 지점이 PlayerStat 한 곳뿐이라 **이중 적용이 구조적으로 불가능**합니다.
+        //   여기에 buffMult 를 다시 넣으면 대미지가 두 번 곱해지니 절대 되돌리지 마세요.
         //
         // 각성의 '발사체/연사'는 이 곱셈 레이어에 끼어들지 않습니다.
         // 데미지를 키우는 게 아니라 '발사 횟수'를 늘리는 별개의 축이라서,
-        // 기존 세 레이어를 전혀 건드리지 않고 위에 얹을 수 있습니다.
+        // 기존 레이어를 전혀 건드리지 않고 위에 얹을 수 있습니다.
         // ────────────────────────────────────────────────────────────────
-        float buffMult     = PlayerBuffManager.Instance?.DamageMultiplier ?? 1f;
-        float buffedDamage = stat.FinalDamage * buffMult;
+        float buffedDamage = stat.FinalDamage;
 
         Vector2 spawnPos = (Vector2)firePoint.position;
         Vector2 toTarget = (Vector2)target.transform.position - spawnPos;

@@ -9,6 +9,11 @@ using TMPro;
 /// ★ 변경점: 행마다 있던 ×1/×10/×100 버튼 3개를 없애고,
 ///    패널 상단의 "공용 배수 버튼"(×1/×10/×100) + 행마다 "강화 버튼 1개" 구조로 바꿨습니다.
 ///    선택된 배수는 selectedMultiplier 하나에만 저장되고, 모든 행이 그 값을 함께 봅니다.
+///
+/// ★ 이번 수정: 스탯 수치에 '현재 → 다음' 미리보기 추가
+///   statValueText 툴팁에 원래부터 "예: 10 → 12" 라고 적혀 있었는데, 실제로는 현재 값만
+///   보여주고 있었습니다. 선택한 배수(×1/×10/×100)만큼 강화했을 때의 값을 함께 보여줍니다.
+///   공격 속도는 곡선 방식으로 바뀌어 레벨마다 증가량이 달라서, 이 미리보기가 특히 유용합니다.
 /// </summary>
 public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 {
@@ -90,6 +95,10 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     [Tooltip("비용을 '73만 2800' 처럼 한국식 만/억 단위로 표시합니다")]
     [SerializeField] private bool useKoreanNumberFormat = true;
 
+    [Tooltip("스탯 수치를 '현재 → 강화 후' 로 표시합니다. (선택한 배수만큼 강화했을 때)\n" +
+             "글자가 칸을 넘치면 끄세요 — 그러면 예전처럼 현재 값만 보입니다.")]
+    [SerializeField] private bool showNextValuePreview = true;
+
     [Header("성능")]
     [Tooltip("골드 변화가 잦아도 최소 이 간격으로만 UI를 다시 그립니다 (0 이면 즉시)")]
     [SerializeField] private float refreshInterval = 0.1f;
@@ -151,8 +160,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         //   아예 참조를 끊어 둡니다.
         if (useAsTabPage && upgradePanel != null)
         {
-            Debug.LogWarning("[UpgradeUI] 탭 모드에서는 upgradePanel 을 쓰지 않습니다. " +
-                             "패널을 켜고 끄는 일은 TabWindow 가 합니다. 참조를 무시합니다.", this);
             upgradePanel = null;
         }
 
@@ -345,8 +352,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     /// ★ 원래는 OnGoldChanged 이벤트만으로 골드를 알았습니다.
     ///   그런데 CurrencyManager 는 Start 의 ApplyFrom 에서 이벤트를 한 번 쏘는데,
     ///   UpgradeUI 가 그보다 늦게 구독하면 그 한 번을 놓칩니다.
-    ///   그러면 hasGoldValue 가 false 로 남아, 적을 한 마리 잡아 골드가 움직이기 전까지는
-    ///   "살 수 없는 항목도 버튼이 멀쩡히 켜져 있는" 상태가 됩니다.
     ///   IsLoaded 로 '진짜 0원'과 '아직 안 불러옴'을 구분할 수 있으니 직접 읽습니다.
     /// </summary>
     private void SyncGoldFromManager()
@@ -431,7 +436,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         }
 
         RefreshMultiplierVisual();
-        RefreshAllImmediate();   // 배수가 바뀌면 모든 행의 비용 표시가 바뀐다
+        RefreshAllImmediate();   // 배수가 바뀌면 모든 행의 비용 · 미리보기가 바뀐다
     }
 
     private void RefreshMultiplierVisual()
@@ -590,7 +595,8 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         StatRow row = statRows[i];
         LevelUpManager.StatType type = row.statType;
 
-        // 스탯 수치는 매니저가 없어도 표시할 수 있습니다
+        // 스탯 수치는 매니저가 없어도 표시할 수 있습니다 (일단 현재 값만)
+        // 아래에서 강화 가능하다고 판단되면 '현재 → 다음' 으로 덮어씁니다.
         if (row.statValueText != null)
             row.statValueText.text = GetStatValueString(type);
 
@@ -637,6 +643,15 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         bool canAfford = !knowGold || cachedGold >= totalCost;
         bool usable    = buyable > 0 && (!disableWhenUnaffordable || canAfford);
 
+        // ★ [신규] '현재 → 다음' 미리보기
+        //   buyable(상한에 걸리면 줄어든 횟수)을 넘기므로, 비용 텍스트의 "(x3)" 과 항상 같은 기준입니다.
+        //   골드가 부족해도 보여줍니다 — "이만큼 오르니 모아볼까?" 라는 동기가 되니까요.
+        if (showNextValuePreview && buyable > 0 && row.statValueText != null)
+        {
+            float next = lm.PreviewStatValue(type, buyable);
+            row.statValueText.text = $"{GetStatValueString(type)} → {FormatStatValue(type, next)}";
+        }
+
         if (row.costText != null)
         {
             string costStr = useKoreanNumberFormat
@@ -651,24 +666,71 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         SetButtonInteractable(row.upgradeButton, usable);
     }
 
+    // ══════════════════════════════════════════════
+    //  스탯 수치 문자열
+    // ══════════════════════════════════════════════
+
+    /// <summary>현재 스탯 값을 화면용 문자열로. Player 가 없으면 "-".</summary>
     private string GetStatValueString(LevelUpManager.StatType type)
     {
         var player = Player.Instance;
         if (player == null || player.stat == null) return "-";
 
-        return type switch
+        PlayerStat s = player.stat;
+
+        float raw = type switch
         {
-            LevelUpManager.StatType.Damage     => $"{player.stat.baseDamage}",
-            LevelUpManager.StatType.CritChance => $"{player.stat.Critical:F1} %",
-            LevelUpManager.StatType.CritDamage => $"{player.stat.CriticalMultiplier:F2} x",
-            // ★ AttackSpd 는 '공격 쿨다운(ms)'이라 강화할수록 숫자가 줄어듭니다.
-            //   원본처럼 raw 값을 그대로 보여주면 유저에겐 스탯이 나빠지는 것처럼 보입니다.
-            //   초당 공격 횟수로 환산해 '올라가는 수치'로 표시합니다.
-            LevelUpManager.StatType.Attackspd  => player.stat.AttackSpd > 0f
-                                                    ? $"{1000f / player.stat.AttackSpd:F2} 회/초"
-                                                    : "-",
-            _                                  => "-"
+            LevelUpManager.StatType.Damage     => s.baseDamage,
+            LevelUpManager.StatType.CritChance => s.Critical,
+            LevelUpManager.StatType.CritDamage => s.CriticalMultiplier,
+            LevelUpManager.StatType.Attackspd  => s.AttackSpd,
+            _                                  => float.NaN
         };
+
+        return FormatStatValue(type, raw);
+    }
+
+    /// <summary>
+    /// 스탯 값(PlayerStat 에 저장되는 단위)을 화면용 문자열로 바꿉니다.
+    ///
+    /// ★ [수정] 예전에는 형식 지정이 GetStatValueString 안에 박혀 있었습니다.
+    ///   '다음 값'도 똑같은 모양으로 보여줘야 해서 형식만 따로 뺐습니다.
+    ///   현재 값과 다음 값이 서로 다른 함수로 포맷되면, 한쪽만 고쳤을 때
+    ///   "2.27회/초 → 2.5 회/초" 처럼 모양이 어긋납니다.
+    /// </summary>
+    private static string FormatStatValue(LevelUpManager.StatType type, float raw)
+    {
+        if (float.IsNaN(raw)) return "-";
+
+        switch (type)
+        {
+            case LevelUpManager.StatType.Damage:
+                return $"{raw:N0}";
+
+            case LevelUpManager.StatType.CritChance:
+                // ★ [수정] F1 → F2.
+                //   치명타 확률은 이제 레벨당 약 0.0194% 씩 오릅니다.
+                //   소수 첫째 자리까지만 보여주면 ×1 미리보기가 "40.6 % → 40.6 %" 로
+                //   **아무것도 안 오르는 것처럼** 보입니다. 둘째 자리까지 보여야 변화가 드러납니다.
+                return $"{raw:F2} %";
+
+            case LevelUpManager.StatType.CritDamage:
+                return $"{raw:F2} x";
+
+            case LevelUpManager.StatType.Attackspd:
+                // ★ AttackSpd 는 '공격 쿨다운(ms)'이라 강화할수록 숫자가 줄어듭니다.
+                //   raw 값을 그대로 보여주면 유저에겐 스탯이 나빠지는 것처럼 보이므로
+                //   초당 공격 횟수로 환산해 '올라가는 수치'로 표시합니다.
+                //
+                //   [수정] 하한을 PlayerStat.MIN_ATTACK_SPD 로 막습니다.
+                //   PlayerStat.FinalAttacksPerSecond(스탯창)와 같은 기준이라,
+                //   강화창과 스탯창이 서로 다른 숫자를 보여줄 수 없습니다.
+                //   (0 나누기 방어도 겸합니다)
+                return $"{1000f / Mathf.Max(raw, PlayerStat.MIN_ATTACK_SPD):F2} 회/초";
+
+            default:
+                return "-";
+        }
     }
 
     private void SetButtonInteractable(Button btn, bool interactable)
