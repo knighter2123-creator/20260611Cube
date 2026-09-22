@@ -17,7 +17,7 @@ MonoBehaviour:
   description: "\uC82C\uC744 \uD68D\uB4DD\uD569\uB2C8\uB2E4."
   icon: {fileID: 0}
   rarity: 3
-  weight: 100
+  weight: 10
   maxStack: 0
   baseAmount: 1000
   scaleWithStage: 0

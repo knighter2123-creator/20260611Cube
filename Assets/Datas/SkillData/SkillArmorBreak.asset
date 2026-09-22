@@ -14,11 +14,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SkillArmorBreak
   skillName: "\uD30C\uC1C4"
   damage: 15
-  cooldown: 5
+  damageByGrade:
+    enabled: 1
+    rare: 15
+    epic: 20
+    legendary: 30
+  cooldown: 10
+  cooldownByGrade:
+    enabled: 1
+    rare: 7
+    epic: 5
+    legendary: 3
+  icon: {fileID: 0}
   effectPrefab: {fileID: 6594491484790588987, guid: 1385d7bbfa36d1c4ab2517d22f2cb447,
     type: 3}
   effectDuration: 0.5
+  description: "[\uD30C\uC1C4] \uBC29\uC5B4\uB825 \uAC10\uC18C"
   armorBreakRate: 0.3
+  armorBreakRateByGrade:
+    enabled: 1
+    rare: 0.1
+    epic: 0.2
+    legendary: 0.3
   armorBreakDuration: 2
+  armorBreakDurationByGrade:
+    enabled: 1
+    rare: 3
+    epic: 4
+    legendary: 5
   armorBreakEffectPrefab: {fileID: 6049042011142818999, guid: 0d58e80edc72d4048be15ae979acb392,
     type: 3}

@@ -13,5 +13,19 @@ MonoBehaviour:
   m_Name: SkillAttack
   m_EditorClassIdentifier: Assembly-CSharp::SkillAttack
   skillName: "\uAE30\uBCF8 \uACF5\uACA9"
-  damage: 10
-  cooldown: 4
+  damage: 5
+  damageByGrade:
+    enabled: 1
+    rare: 10
+    epic: 20
+    legendary: 30
+  cooldown: 7
+  cooldownByGrade:
+    enabled: 1
+    rare: 5
+    epic: 4
+    legendary: 3
+  icon: {fileID: 0}
+  effectPrefab: {fileID: 0}
+  effectDuration: 0.5
+  description: "[\uACF5\uACA9] \uC77C\uBC18 \uACF5\uACA9"

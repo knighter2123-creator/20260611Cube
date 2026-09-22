@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AugmentSpawnRate
   id: ep_SpawnRate
   displayName: "\uC801 \uC0DD\uC131 \uC8FC\uAE30 \uAC10\uC18C"
-  description: "15\uCD08\uAC04 \uC801\uC758 \uC0DD\uC131 \uC8FC\uAE30\uAC00 20% \uBE68\uB77C\uC9D1\uB2C8\uB2E4."
+  description: "20\uCD08\uAC04 \uC801\uC758 \uC0DD\uC131 \uC8FC\uAE30\uAC00 20% \uBE68\uB77C\uC9D1\uB2C8\uB2E4."
   icon: {fileID: 0}
   rarity: 2
   weight: 100
   maxStack: 0
   multiplier: 0.8
-  duration: 15
+  duration: 25

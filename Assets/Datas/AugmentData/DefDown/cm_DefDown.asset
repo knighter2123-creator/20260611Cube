@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AugmentDefenseDown
   id: cm_DefDown
   displayName: "\uC801 \uBC29\uC5B4\uB825 \uAC10\uC18C"
-  description: "10\uCD08\uAC04 \uC801\uC758 \uBC29\uC5B4\uB825\uC774 10% \uAC10\uC18C\uD569\uB2C8\uB2E4."
+  description: "20\uCD08\uAC04 \uC801\uC758 \uBC29\uC5B4\uB825\uC774 10% \uAC10\uC18C\uD569\uB2C8\uB2E4."
   icon: {fileID: 0}
   rarity: 0
-  weight: 100
+  weight: 70
   maxStack: 0
   multiplier: 0.9
-  duration: 10
+  duration: 20

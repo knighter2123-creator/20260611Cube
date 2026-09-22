@@ -17,6 +17,6 @@ MonoBehaviour:
   description: "\uCE58\uBA85\uD0C0 \uACF5\uACA9\uB825 * 0.5%"
   icon: {fileID: 0}
   rarity: 2
-  weight: 100
+  weight: 60
   maxStack: 0
   amount: 0.5

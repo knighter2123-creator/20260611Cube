@@ -13,9 +13,26 @@ MonoBehaviour:
   m_Name: SkillExplosion
   m_EditorClassIdentifier: Assembly-CSharp::SkillExplosion
   skillName: "\uD3ED\uBC1C"
-  damage: 30
-  cooldown: 7
+  damage: 15
+  damageByGrade:
+    enabled: 1
+    rare: 30
+    epic: 40
+    legendary: 50
+  cooldown: 15
+  cooldownByGrade:
+    enabled: 1
+    rare: 10
+    epic: 7
+    legendary: 5
+  icon: {fileID: 0}
   effectPrefab: {fileID: 1777368103255146055, guid: 04c78b265e7c7764b9df9ec3bee5916b,
     type: 3}
   effectDuration: 0.65
+  description: "[\uD3ED\uBC1C] \uB2E4\uC218 \uC801 \uAD11\uC5ED \uACF5\uACA9"
   explosionRadius: 3
+  explosionRadiusByGrade:
+    enabled: 0
+    rare: 0
+    epic: 0
+    legendary: 0

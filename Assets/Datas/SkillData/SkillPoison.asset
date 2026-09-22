@@ -13,8 +13,37 @@ MonoBehaviour:
   m_Name: SkillPoison
   m_EditorClassIdentifier: Assembly-CSharp::SkillPoison
   skillName: "\uB9F9\uB3C5"
-  damage: 15
-  cooldown: 5
+  damage: 7
+  damageByGrade:
+    enabled: 1
+    rare: 10
+    epic: 15
+    legendary: 20
+  cooldown: 7
+  cooldownByGrade:
+    enabled: 1
+    rare: 6
+    epic: 5
+    legendary: 4
+  icon: {fileID: 0}
+  effectPrefab: {fileID: 0}
+  effectDuration: 0.5
+  description: "[\uB9F9\uB3C5] \uB3C4\uD2B8 \uB300\uBBF8\uC9C0"
   dotDamage: 5
+  dotDamageByGrade:
+    enabled: 1
+    rare: 5
+    epic: 5
+    legendary: 10
   dotInterval: 1
+  dotIntervalByGrade:
+    enabled: 1
+    rare: 1
+    epic: 1
+    legendary: 2
   dotDuration: 5
+  dotDurationByGrade:
+    enabled: 0
+    rare: 5
+    epic: 5
+    legendary: 5

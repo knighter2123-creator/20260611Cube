@@ -135,8 +135,10 @@ public class CompanionDetailPanel : MonoBehaviour
 
             if (skill != null)
             {
-                sb.Append('\n').Append("스킬 피해   <b>플레이어 공격력 + ").Append(skill.damage.ToString("0.#")).Append("</b>");
-                sb.Append('\n').Append("재사용 대기 <b>").Append(skill.cooldown.ToString("0.#")).Append("초</b>");
+                // ★ [등급] 에셋의 원래 숫자(= 일반 등급 값)가 아니라 '이 동료 등급의' 값을 보여줍니다.
+                //   전투(Companion / CalcDamage)와 같은 함수를 부르므로 화면 수치와 실제 동작이 어긋나지 않습니다.
+                sb.Append('\n').Append("스킬 피해   <b>플레이어 공격력 + ").Append(skill.GetDamage(data.grade).ToString("0.#")).Append("</b>");
+                sb.Append('\n').Append("재사용 대기 <b>").Append(skill.GetCooldown(data.grade).ToString("0.#")).Append("초</b>");
             }
             statsText.text = sb.ToString();
         }
@@ -165,7 +167,8 @@ public class CompanionDetailPanel : MonoBehaviour
         {
             // ★ 스킬마다 다른 효과 문장은 스킬 스스로 만듭니다 (ActiveSkill.GetEffectSummary).
             //   여기서 'skill is SkillSlow' 같은 분기를 하지 않으므로, 새 스킬을 추가해도 이 파일은 그대로입니다.
-            string summary = skill.GetEffectSummary();
+            // ★ [등급] 둔화율·스턴 시간 등도 등급마다 다르므로 이 동료의 등급을 넘깁니다.
+            string summary = skill.GetEffectSummary(data.grade);
             string desc    = skill.description;
 
             sb.Clear();

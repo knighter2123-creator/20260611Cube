@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1ca85a630b086d2468ecb33ccdb2420f, type: 3}
-  m_Name: World 1 Set
+  m_Name: World 4 Set
   m_EditorClassIdentifier: Assembly-CSharp::WorldEnemySet
-  world: 1
+  world: 4
   normalPrefab: {fileID: 8197083033936464343, guid: c4dd1d77c66f13348ac39e4f612fdae3,
     type: 3}
   bossPrefab: {fileID: 2431723932254382337, guid: 9dbaee4187b85b44f810079739c829a8,
