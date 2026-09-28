@@ -144,8 +144,6 @@ public partial class GameSettingManager : MonoBehaviour
         //   "토글이 아무 영향이 없다"로 보인다.
         //   Push/Pop 은 참조 카운트라 다른 연출과 겹쳐도 안전하다.
         BloomController.Instance?.Push();
-
-        Time.timeScale = 0f;
     }
 
     public void Close()

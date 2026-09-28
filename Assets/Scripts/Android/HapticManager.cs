@@ -71,7 +71,6 @@ public partial class HapticManager : MonoBehaviour
     public bool IsSupported { get; private set; }
 
     // ───────────────────────── JNI 캐시 ─────────────────────────
-    // JNI 객체 생성은 비용이 있어서 매번 만들면 안 된다. 최초 1회만 만들고 들고 있는다.
 #if UNITY_ANDROID && !UNITY_EDITOR
     private const int DEFAULT_AMPLITUDE = -1;   // VibrationEffect.DEFAULT_AMPLITUDE
     private const int NO_REPEAT         = -1;   // createWaveform 의 repeat 인자

@@ -3,7 +3,9 @@ using UnityEngine;
 /// <summary>
 /// 웨이포인트를 따라 이동하는 컴포넌트.
 ///
-/// ★ 이번 수정: 스테이지별 속도 배율(spawnSpeedMult) 레이어 추가
+/// ★ 이번 수정: 스폰 위치 흩뿌리기용 pathOffset 레이어 추가
+///   (EnemyRespawn이 enemiesPerSpawn > 1일 때, 겹쳐서 태어나는 적들을
+///    살짝 떨어뜨려 배치하기 위해 씀 — "일반적 생성주기 개편" 문서 §9 참고)
 ///
 /// ─── 핵심 설계 원칙: "속도를 직접 대입하지 않는다" (학습 포인트) ──────────
 /// 초보자가 가장 많이 하는 실수:
@@ -21,6 +23,11 @@ using UnityEngine;
 ///
 /// 각 배율은 서로를 모릅니다. 슬로우가 끝나도 slowMultiplier만 1로 돌아가고
 /// 스테이지 배율(1-5의 1.5배)은 그대로 유지됩니다. 이게 핵심이에요.
+///
+/// 이번에 추가한 pathOffset도 같은 원칙입니다 — 목표 좌표(waypoint) 자체는
+/// 절대 건드리지 않고, "읽을 때 더해서" 계산합니다. 모든 웨이포인트에
+/// 똑같이 더해지므로, 적이 가는 길 전체가 살짝 평행 이동한 것처럼 보입니다
+/// (특정 지점에서만 어긋나거나 다시 겹치는 일이 없습니다).
 /// ────────────────────────────────────────────────────────────────────
 /// </summary>
 public class TargetMove : MonoBehaviour
@@ -37,9 +44,13 @@ public class TargetMove : MonoBehaviour
 
     // ── 속도 배율 레이어 (speed를 직접 건드리지 않고 곱으로 합성) ──
     private float baseSpeed;                 // 프리팹 원본값 (Awake에서 1회 보관)
-    private float spawnSpeedMult  = 1f;      // ★ 신규: 스테이지 변형 (1-5 = 1.5배 등)
+    private float spawnSpeedMult  = 1f;      // 스테이지 변형 (1-5 = 1.5배 등)
     private float slowMultiplier  = 1f;      // 1 = 정상, 0.7 = 30% 둔화
     private bool  isStunned       = false;
+
+    // ★ 신규: 경로 전체를 평행 이동시키는 오프셋 (스폰 위치 흩뿌리기용)
+    //   x, y만 사용합니다. z는 initialZ가 따로 관리하므로 항상 무시됩니다.
+    private Vector3 pathOffset = Vector3.zero;
 
     /// <summary>
     /// 실제 이동에 쓰이는 속도. 스테이지 배율·둔화·스턴이 합성된 결과.
@@ -58,7 +69,7 @@ public class TargetMove : MonoBehaviour
 
     void Awake()
     {
-        baseSpeed = speed;   // ★ 풀 재사용 대비 원본 보관 (이후 speed는 읽지 않음)
+        baseSpeed = speed;   // 풀 재사용 대비 원본 보관 (이후 speed는 읽지 않음)
     }
 
     // ── 스폰 시 스테이지 배율 API ──────────────────
@@ -73,6 +84,16 @@ public class TargetMove : MonoBehaviour
     /// </summary>
     public void SetSpawnSpeedMultiplier(float mult) => spawnSpeedMult = Mathf.Max(0.01f, mult);
 
+    /// <summary>
+    /// ★ 신규: 이 적이 따라갈 경로 전체를 살짝 평행 이동시킵니다.
+    /// SetupPath()보다 먼저 불러도, 나중에 불러도 상관없습니다 — Update()가
+    /// 매 프레임 다시 계산하므로 순서에 민감하지 않습니다 (SetSpawnSpeedMultiplier와의 차이).
+    /// 다만 ResetForSpawn() "이후"에 불러야 합니다 (아래 ResetForSpawn 참고).
+    ///
+    /// z는 무시합니다 — Z축은 initialZ가 렌더링 순서 보정용으로 따로 관리합니다.
+    /// </summary>
+    public void SetPathOffset(Vector2 offset) => pathOffset = new Vector3(offset.x, offset.y, 0f);
+
     // ── 디버프용 API ───────────────────────────────
     public void SetSlowMultiplier(float mult) => slowMultiplier = Mathf.Clamp01(mult);
     public void ClearSlow()                   => slowMultiplier = 1f;
@@ -82,16 +103,18 @@ public class TargetMove : MonoBehaviour
     /// 풀에서 꺼낼 때 호출 — 디버프와 경로 진행도를 전부 초기화.
     /// (Enemy.ResetDebuffs() 안에서 _move?.ResetForSpawn() 으로 불립니다)
     ///
-    /// ★ spawnSpeedMult도 여기서 1로 되돌립니다.
-    ///   1-5(빠른 적)에서 죽은 인스턴스가 풀에 들어갔다가
-    ///   1-6에서 다시 나올 때 1.5배 속도를 그대로 들고 나오면 안 되니까요.
+    /// ★ pathOffset도 여기서 반드시 0으로 되돌립니다.
+    ///   이번에 흩뿌려서 태어난 적이 죽어서 풀에 들어갔다가, 다음번엔
+    ///   enemiesPerSpawn이 1인 스테이지에서 다시 나올 때 예전 오프셋을
+    ///   그대로 들고 나오면 안 되니까요.
     ///   이게 오브젝트 풀링의 가장 흔한 버그 유형입니다:
-    ///   "이전 생애의 상태가 남아있다."
+    ///   "이전 생애의 상태가 남아있다." (spawnSpeedMult와 완전히 같은 이유)
     /// </summary>
     public void ResetForSpawn()
     {
-        spawnSpeedMult     = 1f;   // ★ 신규
+        spawnSpeedMult     = 1f;
         slowMultiplier     = 1f;
+        pathOffset         = Vector3.zero;   // ★ 신규
         isStunned          = false;
         currentTargetIndex = 0;
         isInitialized      = false;
@@ -123,8 +146,11 @@ public class TargetMove : MonoBehaviour
         Transform target = waypoints[currentTargetIndex];
         if (target == null) return;
 
-        Vector3 targetPosition = target.position;
-        targetPosition.z = initialZ;   // Z축 렌더링 사라짐 방지
+        // ★ pathOffset을 더해서 "이 적만의" 목표 지점을 계산합니다.
+        //   모든 웨이포인트에 똑같은 오프셋이 더해지므로, 경로 전체가
+        //   그만큼 평행 이동한 것처럼 움직입니다 (특정 구간에서만 튀지 않음).
+        Vector3 targetPosition = target.position + pathOffset;
+        targetPosition.z = initialZ;   // Z축 렌더링 사라짐 방지 (pathOffset.z는 항상 0이라 순서 무관)
 
         transform.position = Vector3.MoveTowards(
             transform.position, targetPosition, CurrentSpeed * Time.deltaTime);

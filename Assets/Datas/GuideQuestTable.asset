@@ -12,21 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0c0367f9865bea746a0f91d1355bcdd2, type: 3}
   m_Name: GuideQuestTable
   m_EditorClassIdentifier: Assembly-CSharp::GuideQuestTable
-  gemBase: 100
+  gemBase: 300
   gemGrowth: 1.1
   gemCap: 5000
   goldBase: 100
-  goldGrowth: 1.5
+  goldGrowth: 1.2
   goldCap: 0
   baseCycle: 0200000000000000010000000300000004000000
   evolveLevels: 1e000000320000004600000064000000c8000000
   killBase: 5
   killPerCycle: 0
   stagesPerChapter: 10
-  stageStep: 5
+  stageStep: 1
   statBase: 5
-  statPerCycle: 5
-  summonBase: 1
-  summonPerCycle: 1
+  statPerCycle: 0
   levelBase: 5
   levelPerCycle: 5

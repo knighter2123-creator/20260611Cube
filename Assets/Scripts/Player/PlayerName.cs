@@ -1,15 +1,8 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;   // ★ 신규: 클릭/터치 감지(IPointerClickHandler)에 필요
 
-/// <summary>
-/// MainScene 의 닉네임 "표시 전용" 컴포넌트. (기존 PlayerName.cs 를 덮어쓰기)
-///
-/// 바뀐 점
-///   - 이름 변경 팝업·버튼 기능을 전부 제거했습니다. 이름은 LoginScene 에서 한 번만 정합니다.
-///   - PlayerPrefs 대신 PlayerProfile(= SaveData.playerName)에서 읽습니다.
-///   - nickNameText 필드 이름은 그대로라 인스펙터 연결이 유지됩니다.
-///     (지운 필드들 — 버튼·팝업 — 의 연결값은 유니티가 알아서 무시합니다)
-/// </summary>
+
 public class PlayerName : MonoBehaviour
 {
     // 이름이 없을 때(에디터에서 MainScene 을 바로 실행한 경우 등) 보여줄 값
@@ -21,9 +14,12 @@ public class PlayerName : MonoBehaviour
     [Tooltip("{0} 자리에 이름이 들어갑니다. 예: \"유저 : {0}\"")]
     [SerializeField] private string format = "{0}";
 
+   
+
     private void OnEnable()
     {
         PlayerProfile.OnNameRegistered += HandleNameRegistered;
+        PlayerProfile.OnNameChanged    += HandleNameRegistered;   // ★ 신규: 개명 시에도 같은 방식으로 새로고침
         Refresh();   // 켜질 때마다 새로 읽음 → UI 가 이름 사본을 들고 있지 않음
     }
 
@@ -31,6 +27,7 @@ public class PlayerName : MonoBehaviour
     {
         // 람다가 아닌 이름 있는 메서드라 정확히 해제됨
         PlayerProfile.OnNameRegistered -= HandleNameRegistered;
+        PlayerProfile.OnNameChanged    -= HandleNameRegistered;   // ★ 신규
     }
 
     private void HandleNameRegistered(string _) => Refresh();

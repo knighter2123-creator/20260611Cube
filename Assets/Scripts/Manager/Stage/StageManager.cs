@@ -5,7 +5,22 @@ using TMPro;
 /// <summary>
 /// 스테이지 진행(킬 카운트 / 제한 시간 / 클리어·실패 / 월드-스테이지 번호) 담당.
 ///
-/// ★ 이번 수정은 StageClear() 안의 딱 한 줄입니다. "★ 증강" 을 검색하세요.
+/// ★ 이번 수정 — "킬 카운트(스테이지 카운트) 도달 시 잡몹 즉시 전체 삭제 후 보스 등장"
+///   기존에는 killGoal에 도달하면 새 잡몹 스폰만 멈추고(EnemyRespawn.bossSpawned),
+///   그 순간 이미 화면에 남아 걸어다니던 잡몹은 자연히 죽거나 끝까지 도달할 때까지
+///   그대로 남아 있었습니다. 이제는 그 잡몹들을 "죽이지 않고" 즉시 전부 풀로 반환한 뒤
+///   보스를 등장시킵니다. "★ 킬카운트" 를 검색하세요.
+///
+///   원래 NextStage()(스테이지 전환 시 잔여 적 정리)에 있던 로직을
+///   ClearAllActiveEnemies()로 뽑아내 ReportEnemyKill()에서도 재사용했습니다
+///   (같은 코드를 두 곳에 복사하면 한쪽만 고치는 실수가 나기 쉽다는 게
+///    바로 아래 NotifyRespawner()의 주석에도 이미 적혀 있던 원칙입니다).
+///
+///   ★ 검토 후 추가 수정 — ClearAllActiveEnemies()에서 e.isDead = true 를 세팅합니다.
+///   Die()를 거치지 않고 강제로 풀에 반환하면 isDead가 false로 남는데, 그 상태에서
+///   "한 프레임 늦게 도착한" TakeDamage() 호출이 같은 적을 다시 죽여 보상/카운트가
+///   중복되거나 풀에 이중 반환될 수 있어서입니다. 자세한 이유는 해당 메서드 내부
+///   주석 참고.
 ///
 /// 나머지 코드는 원본 그대로입니다.
 /// (이 클래스는 partial 이므로, ShowBossNotice / ApplyFrom 등은
@@ -124,6 +139,23 @@ public partial class StageManager : MonoBehaviour
         {
             bossSpawned = true;
 
+            // ★ 킬카운트 ─────────────────────────────────────────────────
+            // 스테이지 카운트(킬 카운트)에 도달한 순간, 아직 화면에 남아 있는
+            // 잡몹을 죽이지 않고 즉시 전부 풀로 반환합니다.
+            //
+            // 왜 "죽이지" 않는가: Enemy.Die()를 부르면 GrantRewards()가 같이 돌아서
+            // 남아 있던 마리 수만큼 골드/경험치가 추가로 지급되고, ReportKill()로
+            // 킬 카운트/가이드 퀘스트/미션까지 한 번 더 보고됩니다. 그러면 "몇 마리를
+            // 잡아야 보스가 나오는가"라는 규칙 자체가 흔들립니다. 그래서 Die()를
+            // 거치지 않고 ClearAllActiveEnemies()로 바로 풀에 돌려보냅니다
+            // (스테이지 전환 시 잔여 적을 치우는 방식과 완전히 동일합니다).
+            //
+            // 방금 killGoal을 채운 그 적 자신은 이미 Enemy.Die()에서
+            // Active 목록에서 제거된 뒤라(맨 위 Active.Remove(this)),
+            // 여기서 다시 건드리지 않습니다 — 이중 반환 걱정이 없습니다.
+            // ─────────────────────────────────────────────────────────────
+            ClearAllActiveEnemies();
+
             // ★ 보스 출현 알림
             ShowBossNotice();
 
@@ -212,6 +244,29 @@ public partial class StageManager : MonoBehaviour
 
     private void NextStage()
     {
+        // ★ 잔여 적 정리 — ClearAllActiveEnemies()로 추출 (아래 참고)
+        ClearAllActiveEnemies();
+
+        InitStage();
+
+        //   월드·스테이지 번호를 함께 넘겨 프리팹과 속도 배율까지 갱신합니다.
+        NotifyRespawner();
+
+        // ★ 증강 — 증강 매니저에도 "지금 몇 스테이지인지" 알려줍니다.
+        //   등급 상승 보정(월드가 오를수록 고등급이 잘 나옴)과
+        //   '이번 스테이지 동안' 버프 정리에 쓰입니다.
+        AugmentManager.Instance?.SetCurrentStage(currentWorld, currentStage);
+    }
+
+    /// <summary>
+    /// ★ 신규(추출) — 지금 살아있는 일반 적(Enemy.Active)을 전부 즉시 풀로 반환합니다.
+    /// Die()를 거치지 않으므로 보상 지급도, 처치 보고(킬 카운트/가이드 퀘스트/미션)도 일어나지 않습니다.
+    ///
+    /// 원래는 NextStage() 안에만 있던 로직입니다. killGoal 도달 시(ReportEnemyKill)에도
+    /// 똑같이 "잡몹을 죽이지 않고 즉시 치운다"가 필요해서 메서드로 뽑아 두 곳에서 재사용합니다.
+    /// </summary>
+    private void ClearAllActiveEnemies()
+    {
         // OnDisable에서 자기 자신을 제거하므로 역순 순회
         //
         // ─── 왜 역순인가? (학습 포인트) ─────────────────────────────
@@ -225,22 +280,27 @@ public partial class StageManager : MonoBehaviour
             Enemy e = list[i];
             if (e == null) continue;
 
+            // ★ 수정 — Die()를 거치지 않고 강제로 치우기 때문에, "나 죽었다"를 나타내는
+            // isDead를 여기서 대신 세워줘야 합니다.
+            //
+            // 왜 필요한가: 총알(발사체)이 이미 날아가고 있다가 한 프레임 늦게
+            // TakeDamage()를 호출하는 경우가 있습니다. 방금 여기서 풀로 반환한 적인데
+            // isDead가 여전히 false라면, 그 뒤늦은 TakeDamage() 호출이 (이미 반환되어
+            // 대기 중이거나, 심하면 다른 스폰에 재사용된) 같은 오브젝트에 대해 Die()를
+            // 한 번 더 실행시킵니다.
+            //   → 보상(골드/경험치) 중복 지급, 킬 카운트/미션 중복 집계,
+            //     그리고 ObjectPoolManager.Return()이 같은 오브젝트에 대해 두 번 불려
+            //     풀 내부 리스트가 꼬이는(이중 반환) 문제로 이어질 수 있습니다.
+            // Enemy.TakeDamage() 맨 앞의 `if (isDead) return;` 가드가 이걸 막아주므로,
+            // Die()를 부르지 않고 치울 때는 isDead를 직접 세워서 같은 가드를 켜 둡니다.
+            e.isDead = true;
+
             e.RemoveHpBar();
             if (ObjectPoolManager.Instance != null)
                 ObjectPoolManager.Instance.Return(e.gameObject);
             else
                 e.gameObject.SetActive(false);
         }
-
-        InitStage();
-
-        //   월드·스테이지 번호를 함께 넘겨 프리팹과 속도 배율까지 갱신합니다.
-        NotifyRespawner();
-
-        // ★ 증강 — 증강 매니저에도 "지금 몇 스테이지인지" 알려줍니다.
-        //   등급 상승 보정(월드가 오를수록 고등급이 잘 나옴)과
-        //   '이번 스테이지 동안' 버프 정리에 쓰입니다.
-        AugmentManager.Instance?.SetCurrentStage(currentWorld, currentStage);
     }
 
     /// <summary>
