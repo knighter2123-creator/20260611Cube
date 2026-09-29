@@ -8,6 +8,8 @@ using UnityEngine.UI;
 /// 패널 열기/닫기, 버튼, timeScale, 뒤로가기를 전담한다.
 ///
 /// 블룸/진동 슬라이더·토글 바인딩은 GameSettingManager.Bindings.cs 에 분리되어 있다.
+/// ★ [계정 삭제] 버튼·확인 팝업은 GameSettingManager.AccountReset.cs 에 분리되어 있다.
+///   이 파일에서 바뀐 곳은 "★ [계정 삭제]" 로 표시한 네 군데뿐이다. (OnEscape, Start, Open, Close)
 /// </summary>
 public partial class GameSettingManager : MonoBehaviour
 {
@@ -19,6 +21,9 @@ public partial class GameSettingManager : MonoBehaviour
     [SerializeField] private Button returnToLoginButton;
     [SerializeField] private Button resumeButton;
     [SerializeField] private Button quitGameButton;
+
+    [Tooltip("★ 튜토리얼 다시 보기 버튼 (설정 패널 안). 비워 두면 기능만 꺼지고 에러는 나지 않습니다.")]
+    [SerializeField] private Button tutorialButton;
 
     [Header("디버그")]
     [Tooltip("패널이 열리고 닫힐 때 '무엇이 눌렸는지'를 콘솔에 찍습니다. 원인 파악 후 끄세요.")]
@@ -82,7 +87,30 @@ public partial class GameSettingManager : MonoBehaviour
 
     private bool OnEscape()
     {
+        // ★ 튜토리얼 중에는 설정 패널을 열지 않고 튜토리얼 스킵으로 처리한다.
+        //   평소엔 TutorialManager 가 Begin 때 핸들러를 "나중에" 등록하므로(스택 = 나중 것 먼저)
+        //   이 코드까지 오지 않는다. 등록 순서가 꼬였을 때를 대비한 안전망일 뿐이다.
+        if (TutorialManager.IsRunning)
+        {
+            TutorialManager.Instance.Skip();
+            return true;
+        }
+
+        // ★ [계정 삭제] 초기화가 진행 중이면 뒤로가기를 "삼킨다"(true).
+        //   false 를 돌려주면 다른 핸들러(게임 종료 확인 등)로 넘어가 버려,
+        //   씬을 내리는 도중에 엉뚱한 창이 뜰 수 있다.
+        if (AccountReset.IsRunning) return true;
+
         if (!refsOk) return false;   // 아직 준비 안 됐으면 다른 핸들러에게 넘긴다
+
+        // ★ [계정 삭제] 확인 팝업이 떠 있으면 뒤로가기는 "팝업만 닫기".
+        //   안드로이드 관례: 뒤로가기는 가장 위에 있는 것 하나만 닫는다.
+        //   이게 없으면 팝업이 떠 있는 채로 설정 패널 전체가 닫혀 버린다.
+        if (IsDeleteConfirmOpen)
+        {
+            HideDeleteConfirm();
+            return true;
+        }
 
         ToggleSettings();
         return true;
@@ -108,6 +136,20 @@ public partial class GameSettingManager : MonoBehaviour
         resumeButton.onClick.AddListener(Close);
         returnToLoginButton.onClick.AddListener(ReturnToLogin);
         quitGameButton.onClick.AddListener(QuitGame);
+
+        // ★ 튜토리얼 버튼은 선택 항목: 없어도 설정 패널 자체는 정상 동작해야 하므로 refsOk 에 넣지 않는다
+        if (tutorialButton != null)
+        {
+            tutorialButton.onClick.RemoveAllListeners();
+            tutorialButton.onClick.AddListener(OpenTutorial);
+        }
+        else
+        {
+            Debug.LogWarning("[Setting] tutorialButton 미할당 — '튜토리얼 다시 보기'가 비활성화됩니다.", this);
+        }
+
+        // ★ [계정 삭제] 튜토리얼 버튼과 같은 이유로 선택 항목 — refsOk 에 넣지 않는다 (AccountReset.cs 파일)
+        SetupAccountReset();
     }
 
     private bool ValidateReferences()
@@ -130,6 +172,8 @@ public partial class GameSettingManager : MonoBehaviour
     public void Open()
     {
         if (IsOpen || !refsOk) return;
+        if (TutorialManager.IsRunning) return;   // ★ 튜토리얼 위에 설정 패널이 겹쳐 열리지 않게
+        if (AccountReset.IsRunning) return;      // ★ [계정 삭제] 씬을 내리는 도중에 다시 열리지 않게
         if (!GuardFrame("열기")) return;
 
         LogWhoClicked("열기");
@@ -156,6 +200,10 @@ public partial class GameSettingManager : MonoBehaviour
         UnbindAll();        // 리스너 해제. 안 하면 열 때마다 쌓인다 (Bindings.cs)
 
         BloomController.Instance?.Pop();   // Open 의 Push 와 짝
+
+        // ★ [계정 삭제] 패널과 함께 확인 팝업도 닫는다.
+        //   안 하면 다음에 설정을 열 때 "정말 삭제하시겠습니까?" 가 떠 있는 채로 열린다.
+        HideDeleteConfirm();
 
         IsOpen = false;
         settingsPanel.SetActive(false);
@@ -212,6 +260,32 @@ public partial class GameSettingManager : MonoBehaviour
 
         GameObject go = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
         Debug.Log($"[Setting] {action} — 클릭된 오브젝트: {(go != null ? go.name : "(키보드 또는 코드 호출)")}", go);
+    }
+
+    // ─────────────────────────────────────────────
+    // ★ 튜토리얼 다시 보기 (기존 유저용)
+    // ─────────────────────────────────────────────
+
+    /// <summary>
+    /// 순서가 중요합니다.
+    ///   ① Close()  : 리스너 해제(UnbindAll), 블룸 Pop, 배속 복원 — 패널을 닫을 때 해야 할 일이 전부 여기 있다.
+    ///                 SetActive(false) 만 하면 블룸 refCount 가 남고 리스너가 쌓인다.
+    ///   ② Begin()  : timeScale 0.
+    ///   ①에서 배속이 잠깐 복원되지만 같은 프레임 안에 ②가 0 으로 내리므로 게임은 한 프레임도 흐르지 않는다.
+    ///   튜토리얼이 끝나면 TutorialManager 가 다시 배속을 복원한다.
+    /// </summary>
+    private void OpenTutorial()
+    {
+        if (TutorialManager.Instance == null)
+        {
+            Debug.LogWarning("[Setting] 씬에 TutorialManager 가 없습니다.", this);
+            return;
+        }
+
+        Close();
+        if (IsOpen) return;   // GuardFrame 등으로 닫기가 거부됐다면 튜토리얼도 시작하지 않는다
+
+        TutorialManager.Instance.Begin();
     }
 
     // ─────────────────────────────────────────────

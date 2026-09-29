@@ -16,6 +16,8 @@ using UnityEngine;
 ///   - 이 클래스는 값을 따로 들고 있지 않고(캐시 없음) 매번 SaveManager.Current 를 읽습니다.
 ///     → SaveManager.DeleteSave() 로 세이브를 지우면 이름도 자연스럽게 함께 사라집니다.
 ///       (이전 버전의 PlayerPrefs 방식은 세이브를 지워도 이름만 남는 문제가 있었음)
+///
+/// ★ [계정 삭제] 이번 변경: 파일 맨 아래 DeleteLegacyPrefsForReset() 하나만 추가. 기존 코드는 그대로입니다.
 /// </summary>
 public static class PlayerProfile
 {
@@ -255,6 +257,25 @@ public static class PlayerProfile
 
         PlayerPrefs.DeleteKey(LEGACY_PREFS_KEY);
         PlayerPrefs.Save();
+    }
+
+    // ───────── ★ [계정 삭제] ─────────
+
+    /// <summary>
+    /// ★ 신규. 계정 삭제(AccountReset) 전용 — 예전 PlayerPrefs 이름 키를 지웁니다.
+    ///
+    /// [왜 필요한가]
+    ///   이 클래스는 이름을 SaveData 에만 두므로 save.json 을 지우면 이름도 사라집니다.
+    ///   그런데 위 MigrateLegacyIfNeeded() 는 "세이브 파일이 아직 없으면" 키를 일부러 남겨 둡니다.
+    ///   그 키가 남은 채로 계정을 삭제하면, LoginScene 이 시작될 때 이관 코드가 옛 이름을 다시 가져와
+    ///   "계정을 지웠는데 이름만 살아 있는" 상태가 됩니다.
+    ///
+    /// PlayerPrefs.Save() 는 부르지 않습니다 — AccountReset 이 여러 삭제를 모아 한 번에 부릅니다.
+    /// 이름 자체(SaveData.playerName)는 SaveManager.TryDeleteSaveFile() 이 Current 를 비울 때 함께 사라집니다.
+    /// </summary>
+    public static void DeleteLegacyPrefsForReset()
+    {
+        PlayerPrefs.DeleteKey(LEGACY_PREFS_KEY);
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

@@ -73,4 +73,10 @@ public class SaveData
     public long lastIdleClaimTime = 0;   // 마지막 정산 시각 (DateTime.ToBinary())
     public MissionSaveData missionData = new MissionSaveData();
     public GuideQuestSaveData guideQuest = new GuideQuestSaveData();
+
+    // ── 튜토리얼 ──
+    // ★ 새 세이브(신규 유저)는 false → MainScene 에서 자동 팝업.
+    //   이 필드가 생기기 전의 구버전 세이브(기존 유저)는 SaveManager.Load() 에서 true 로 바꿔 준다.
+    //   (JsonUtility 는 JSON 에 없는 필드를 초기값(false)으로 두기 때문에, 그냥 두면 기존 유저에게도 뜬다)
+    public bool tutorialDone = false;
 }
