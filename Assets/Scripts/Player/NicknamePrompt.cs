@@ -18,8 +18,13 @@ using UnityEngine;
 ///   이 오브젝트가 없는 씬(에디터 테스트 등)에서도 아무 문제가 없습니다.
 ///
 /// [팝업을 닫으면('나중에')]
-///   같은 세이브로 플레이하는 동안 자동으로는 다시 안 띄웁니다. 앱을 다시 켜면 조건을 만족할 때 한 번 더 뜹니다.
-///   그 사이에도 네임플레이트를 눌러 언제든 무료로 정할 수 있습니다 (NicknameChangePanel 이 이름 유무로 모드 결정).
+///   ★ [자동 팝업 1회] 이제 앱을 다시 켜도 자동으로는 다시 뜨지 않습니다.
+///   "자동 팝업을 띄웠다" 를 세이브(SaveData.nicknamePromptShown)에 기록하기 때문입니다.
+///   이후에는 네임플레이트를 눌러 언제든 무료로 정할 수 있습니다 (NicknameChangePanel 이 이름 유무로 모드 결정).
+///
+/// ★ [도달 전 설정 잠금] 목표 스테이지 도달 "전" 에는 닉네임을 정할 수 없습니다.
+///   NicknameChangePanel 이 IsFirstNameUnlocked 를 보고, 잠겨 있으면 입력을 막은 '잠김' 화면으로 엽니다.
+///   도달 여부를 판단하는 규칙(목표 월드/스테이지)은 이 컴포넌트 한 곳에만 있습니다.
 /// </summary>
 public class NicknamePrompt : MonoBehaviour
 {
@@ -41,12 +46,13 @@ public class NicknamePrompt : MonoBehaviour
     private static int  lastStage;
     private static event Action StageNotified;
 
-    // 이 세이브에서 이미 자동으로 띄웠는가.
-    // bool 이 아니라 "띄웠을 때의 SaveManager" 를 기억하는 이유:
-    //   계정 삭제는 앱을 끄지 않고 SaveManager 를 새로 만들어 새 게임을 시작합니다.
-    //   bool 이면 true 가 그대로 남아 새 게임에서 팝업이 안 뜹니다.
-    //   SaveManager 를 기억해 두면, 새 SaveManager 와 비교했을 때 달라서 다시 띄웁니다.
-    private static SaveManager promptedFor;
+    // ★ [자동 팝업 1회] 예전의 promptedFor(메모리에만 있던 "이번 실행에서 띄웠나") 는 지웠습니다.
+    //   메모리 값은 앱을 끄면 사라져서 재접속하면 다시 떴습니다. 이제 세이브에 기록합니다 (MarkPromptShown).
+    //   세이브에 두면 계정 삭제(save.json 삭제) 때 자동으로 함께 지워져, 새 게임에서는 다시 뜹니다.
+
+    // ★ [도달 전 설정 잠금] 지금 씬에서 켜져 있는 NicknamePrompt.
+    //   NicknameChangePanel 이 "잠겨 있나" 를 물어볼 때, 목표 스테이지 값(인스펙터)을 가진 인스턴스가 필요합니다.
+    private static NicknamePrompt active;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -54,9 +60,30 @@ public class NicknamePrompt : MonoBehaviour
         hasStage = false;
         lastWorld = lastStage = 0;
         StageNotified = null;
-        promptedFor = null;
+        active = null;
         warnedNoNotify = false;
     }
+
+    // ───────── ★ [도달 전 설정 잠금] 외부(NicknameChangePanel)에서 묻는 곳 ─────────
+
+    /// <summary>
+    /// 이름이 없는 플레이어가 지금 닉네임을 "처음" 정할 수 있는가 (= 목표 스테이지에 도달했는가).
+    /// NicknamePrompt 가 없는 씬에서는 true (잠금 규칙이 없으면 예전처럼 허용 — 다른 씬의 기능을 막지 않기 위해).
+    /// </summary>
+    public static bool IsFirstNameUnlocked
+    {
+        get
+        {
+            if (active == null) return true;
+            return hasStage && active.IsReached(lastWorld, lastStage);
+        }
+    }
+
+    /// <summary>잠겨 있을 때 보여 줄 안내 문구. 목표 스테이지 숫자를 인스펙터 값에서 만들어 두 곳에 숫자가 따로 적히지 않게 합니다.</summary>
+    public static string LockedMessage =>
+        active != null
+            ? $"{active.requiredWorld}-{active.requiredStage} 스테이지에 도달하면\n닉네임을 정할 수 있습니다"
+            : "아직 닉네임을 정할 수 없습니다";
 
     /// <summary>
     /// StageManager 가 스테이지를 시작할 때마다 부릅니다.
@@ -111,12 +138,14 @@ public class NicknamePrompt : MonoBehaviour
 
     private void OnEnable()
     {
+        active = this;   // ★ [도달 전 설정 잠금]
         StageNotified += TryPrompt;
         TryPrompt();   // 구독 전에 이미 알림이 왔을 수 있으므로 한 번 확인 (이벤트 기반의 기본 짝)
     }
 
     private void OnDisable()
     {
+        if (active == this) active = null;   // ★ 나를 가리킬 때만 비움 (다른 인스턴스를 지우지 않게 — 싱글턴 OnDestroy 와 같은 패턴)
         StageNotified -= TryPrompt;
         pending = null;   // 비활성화되면 코루틴은 유니티가 알아서 멈춤 → 참조만 비움
 
@@ -140,12 +169,35 @@ public class NicknamePrompt : MonoBehaviour
         if (!hasStage || !IsReached(lastWorld, lastStage)) return false;
 
         // SaveManager 가 없으면(에디터에서 MainScene 바로 실행) 등록해도 저장할 곳이 없으므로 띄우지 않음.
-        // 있으면, 이 세이브에서 이미 띄웠는지 확인.
         SaveManager sm = SaveManager.Instance;
-        if (sm == null) return false;
-        if (promptedFor == sm) return false;
+        if (sm == null || sm.Current == null) return false;
+
+        // ★ [자동 팝업 1회] 이 세이브에서 이미 자동으로 띄웠으면 다시 안 띄움 (앱을 다시 켜도 유지)
+        if (sm.Current.nicknamePromptShown) return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// ★ [자동 팝업 1회] "자동 팝업을 띄웠다" 를 세이브에 기록하고 바로 저장합니다.
+    ///
+    /// [왜 팝업을 '띄울 때' 기록하나 (취소할 때가 아니라)]
+    ///   취소 버튼만 기준으로 하면, 팝업이 떠 있는 채로 앱을 강제 종료한 경우 다음 접속에 또 뜹니다.
+    ///   "한 번 보여 줬으면 끝" 이 요청이므로 보여 주는 순간 기록합니다.
+    ///
+    /// [왜 바로 Save() 하나]
+    ///   다음 자동 저장(홈 버튼·종료)까지 기다리면, 그 전에 앱이 죽었을 때 기록이 사라져 재접속 시 또 뜹니다.
+    ///   여기는 게임 씬(매니저가 진짜 값을 들고 있음)이라 전체 Save() 가 안전합니다.
+    ///   값은 SaveManager.Current 에 직접 넣습니다 — Save() 는 Current 를 바탕으로 매니저 값을 덧씌우므로
+    ///   이 필드는 그대로 파일까지 갑니다 (playerName 과 같은 방식).
+    /// </summary>
+    private static void MarkPromptShown()
+    {
+        SaveManager sm = SaveManager.Instance;
+        if (sm == null || sm.Current == null) return;
+
+        sm.Current.nicknamePromptShown = true;
+        sm.Save();
     }
 
     private bool IsReached(int world, int stage)
@@ -170,8 +222,8 @@ public class NicknamePrompt : MonoBehaviour
         // 기다리는 사이 상황이 바뀌었을 수 있으므로 다시 확인 (예: 그 사이 네임플레이트로 이름을 정함)
         if (!ShouldPrompt()) yield break;
 
-        promptedFor = SaveManager.Instance;
-        Debug.Log($"[NicknamePrompt] {lastWorld}-{lastStage} 도달, 이름 없음 → 닉네임 설정 팝업");
+        MarkPromptShown();   // ★ [자동 팝업 1회] 예전: promptedFor = SaveManager.Instance (메모리에만 기억)
+        Debug.Log($"[NicknamePrompt] {lastWorld}-{lastStage} 도달, 이름 없음 → 닉네임 설정 팝업 (자동 팝업은 이번 1회)");
         panel.Open();
     }
 }

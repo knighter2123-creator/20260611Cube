@@ -30,26 +30,12 @@ public class Login_Name : MonoBehaviour
     [FormerlySerializedAs("submitButton")]
     [SerializeField] private Button startButton;
 
-    [Header("(정리 대상) 예전 이름 입력 팝업")]
-    [Tooltip("더 이상 쓰지 않습니다. 예전 namePopup 연결을 이어받아 시작 시 숨기기만 합니다.\n" +
-             "씬에서 팝업 오브젝트를 지운 뒤 이 칸이 비어도 괜찮습니다.")]
-    // ★ 필드 이름이 namePopup → legacyNamePopup 으로 바뀌었지만 FormerlySerializedAs 덕분에
-    //   씬에 연결돼 있던 팝업 참조가 끊기지 않습니다. 이 한 줄이 없으면 팝업이 켜진 채로 저장된 씬에서
-    //   작동하지 않는 팝업이 화면을 가리게 됩니다 (예전엔 Awake 가 숨겨 줬으므로).
-    [FormerlySerializedAs("namePopup")]
-    [SerializeField] private GameObject legacyNamePopup;
+    
 
     // 로딩을 시작했는지. 버튼 연타로 씬 로딩이 두 번 호출되는 것을 막습니다.
     private bool isLoading;
 
-    private void Awake()
-    {
-        if (legacyNamePopup != null)
-        {
-            legacyNamePopup.SetActive(false);
-            Debug.Log("[Login_Name] 예전 이름 입력 팝업을 숨겼습니다. 이제 쓰지 않으니 LoginScene 에서 지워도 됩니다.", legacyNamePopup);
-        }
-    }
+   
 
     private void Start()
     {
@@ -81,12 +67,6 @@ public class Login_Name : MonoBehaviour
     }
 
     // ───────── 예전 팝업 API (호환용) ─────────
-
-    [System.Obsolete("이름 입력은 MainScene 으로 옮겨졌습니다. 이 호출은 지워도 됩니다.")]
-    public void ClosePopup()
-    {
-        if (legacyNamePopup != null) legacyNamePopup.SetActive(false);
-    }
 
     [System.Obsolete("이름 입력은 MainScene 으로 옮겨졌습니다. 항상 false 입니다.")]
     public bool IsPopupOpen => false;

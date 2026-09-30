@@ -4,10 +4,46 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "GuideQuestTable", menuName = "Game/Guide Quest Table")]
 public class GuideQuestTable : ScriptableObject
 {
-    [Header("보상 — 보석 (스테이지 / 소환 / 레벨업 / 각성)")]
-    [SerializeField] private int   gemBase   = 10;
-    [SerializeField] private float gemGrowth = 1.06f;
-    [SerializeField] private int   gemCap    = 5000;
+    // ──────────────────────────────────────────────
+    //  ★ [보석 보상 퀘스트별 조정] 이번 변경
+    // ──────────────────────────────────────────────
+    //  예전: 보석 퀘스트 4종(스테이지/소환/레벨업/각성)이 모두 같은 공식
+    //        gemBase × gemGrowth^step (상한 gemCap) 을 써서, 같은 단계면 항상 같은 양이었습니다.
+    //  지금: 퀘스트 종류마다 "조정값" 을 하나씩 얹습니다.
+    //        - 배율(multiplier)    : gemBase × 배율   (예: 각성 ×5)
+    //        - 고정값(fixedAmount) : 0보다 크면 gemBase 를 무시하고 항상 이 값 (예: 소환 항상 100)
+    //
+    //  ★ [보석 성장·상한 삭제] 이번 변경
+    //    gemGrowth(단계마다 복리 증가)와 gemCap(상한)을 없앴습니다.
+    //    → 보석 보상은 이제 단계가 올라도 변하지 않는 "고정 보상" 입니다 (gemBase × 배율, 또는 고정값).
+    //    상한은 "계속 커지는 값을 멈추는" 장치였으므로, 커지지 않게 된 지금은 필요 없어 종류별 상한(cap)도 함께 뺐습니다.
+    //    골드 보상(goldBase / goldGrowth / goldCap)은 그대로 단계마다 증가합니다.
+    //
+    //  [삭제한 필드가 에셋에 남는 문제는?]
+    //    GuideQuestTable.asset 파일 안에는 gemGrowth/gemCap 값이 텍스트로 남아 있지만,
+    //    유니티는 스크립트에 없는 필드를 그냥 무시합니다(에러 없음). 다음에 에셋을 저장할 때 정리됩니다.
+
+    [System.Serializable]
+    public class GemRewardAdjust
+    {
+        [Tooltip("gemBase 에 곱할 배율. 1 = gemBase 그대로. 결과는 반올림(0.5 올림), 0 으로 해도 최소 1개는 지급됩니다")]
+        [Min(0f)] public float multiplier = 1f;
+
+        [Tooltip("0보다 크면 gemBase·배율을 쓰지 않고 항상 이 양을 지급합니다. 0 = gemBase × 배율 사용")]
+        [Min(0)] public int fixedAmount = 0;
+    }
+
+    [Header("보상 — 보석 기본값 (스테이지 / 소환 / 레벨업 / 각성)")]
+    [Tooltip("보석 퀘스트 1회 보상의 기준값. 단계가 올라도 늘어나지 않습니다.\n" +
+             "종류별 조정(배율 1, 고정 0)이 기본값이면 모든 보석 퀘스트가 이 값만큼 지급합니다.")]
+    [SerializeField] private int gemBase = 10;
+
+    // ★ [보석 보상 퀘스트별 조정] "= new ..." 초기화 덕분에 기존 에셋에서도 배율 1 / 고정 0 으로 채워집니다.
+    [Header("보상 — 보석 퀘스트별 조정")]
+    [SerializeField] private GemRewardAdjust stageClearGem = new GemRewardAdjust();
+    [SerializeField] private GemRewardAdjust summonGem     = new GemRewardAdjust();
+    [SerializeField] private GemRewardAdjust levelUpGem    = new GemRewardAdjust();
+    [SerializeField] private GemRewardAdjust evolveGem     = new GemRewardAdjust();
 
     [Header("보상 — 골드 (적 처치 / 스탯 강화)")]
     [SerializeField] private int   goldBase   = 500;
@@ -188,7 +224,7 @@ public class GuideQuestTable : ScriptableObject
             type       = type,
             rewardType = GuideQuest.GetRewardType(type)   // 종류에 따라 재화 결정
         };
-        q.rewardAmount = CalcReward(q.rewardType, step);
+        q.rewardAmount = CalcReward(q.rewardType, type, step);   // ★ 퀘스트 종류(type)도 넘김
 
         switch (type)
         {
@@ -231,26 +267,69 @@ public class GuideQuestTable : ScriptableObject
         return q;
     }
 
-    /// <summary>재화 종류별 보상 계산. 단계가 오를수록 복리 증가.</summary>
-    private int CalcReward(CurrencyType currency, int step)
+    /// <summary>
+    /// 재화 종류별 보상 계산.
+    ///   골드 : 단계가 오를수록 복리 증가 (예전 그대로, 상한 goldCap)
+    ///   보석 : ★ 단계(step)와 무관한 고정 보상 — gemBase × 종류별 배율, 또는 종류별 고정값
+    /// </summary>
+    private int CalcReward(CurrencyType currency, GuideQuestType type, int step)
     {
-        int   baseValue;
-        float growth;
-        int   cap;
-
+        // 골드 — 변경 없음
         if (currency == CurrencyType.Gold)
-        {
-            baseValue = goldBase; growth = goldGrowth; cap = goldCap;
-        }
-        else
-        {
-            baseValue = gemBase;  growth = gemGrowth;  cap = gemCap;
-        }
+            return Compound(goldBase, goldGrowth, goldCap, step, 1f);
 
-        double v = baseValue * System.Math.Pow(growth, step);
+        // 보석 — 종류별 조정값 (해당 없는 종류면 null → gemBase 그대로)
+        GemRewardAdjust adjust = GetGemAdjust(type);
+
+        // 고정값이 있으면 공식 대신 그 값 (단계와 무관)
+        if (adjust != null && adjust.fixedAmount > 0)
+            return adjust.fixedAmount;
+
+        float multiplier = adjust != null ? adjust.multiplier : 1f;
+
+        // ★ [보석 성장·상한 삭제] 성장률 1(= 단계와 무관), 상한 0(= 없음) 으로 같은 계산 함수를 재사용합니다.
+        //   1^step 은 항상 1 이므로 결과는 gemBase × multiplier (반올림, 최소 1).
+        //   계산을 따로 만들지 않고 Compound 를 재사용하면 반올림·오버플로·최소 1 규칙이 골드와 항상 같게 유지됩니다.
+        return Compound(gemBase, 1f, 0, step, multiplier);
+    }
+
+    /// <summary>
+    /// ★ [보석 보상 퀘스트별 조정] 퀘스트 종류 → 보석 조정값.
+    /// switch 로 한 곳에 모아 두어, 나중에 보석 퀘스트 종류가 늘면 여기에 한 줄만 추가하면 됩니다.
+    /// 목록에 없는 종류(null)는 gemBase 를 그대로 줍니다 — 새 종류를 추가하고 깜빡해도 보상이 0이 되지 않게.
+    /// </summary>
+    private GemRewardAdjust GetGemAdjust(GuideQuestType type)
+    {
+        switch (type)
+        {
+            case GuideQuestType.StageClear:      return stageClearGem;
+            case GuideQuestType.SummonCompanion: return summonGem;
+            case GuideQuestType.LevelUp:         return levelUpGem;
+            case GuideQuestType.EvolveClear:     return evolveGem;
+            default:                             return null;
+        }
+    }
+
+    /// <summary>
+    /// 복리 공식 base × growth^step × multiplier, 상한 cap(0 = 무제한), 최소 1.
+    /// (예전 CalcReward 본문을 그대로 옮기고 multiplier 만 추가 — 골드/보석이 같은 계산을 공유)
+    /// </summary>
+    private static int Compound(int baseValue, float growth, int cap, int step, float multiplier)
+    {
+        double v = baseValue * System.Math.Pow(growth, step) * multiplier;
+
+        // 안전장치: 단계가 아주 커지면 Pow 가 무한대가 되고, 거기에 배율 0 을 곱하면 NaN(숫자 아님)이 됩니다.
+        // NaN 은 어떤 비교도 false 라 아래 상한 검사를 그냥 통과하므로 먼저 걸러 냅니다.
+        // (지금은 골드 배율이 항상 1, 보석은 성장률 1 이라 실제로는 생기지 않지만, 값이 바뀌어도 안전하게)
+        if (double.IsNaN(v)) v = 0;
         if (v > int.MaxValue) v = int.MaxValue;   // int 오버플로 방지
 
-        int amount = (int)System.Math.Round(v);
+        // ★ [배포 전 검토] 반올림 방식을 "사사오입" 으로 명시.
+        //   C# 의 Math.Round(x) 기본값은 '은행가 반올림(짝수 쪽으로)' 이라 22.5 → 22, 12.5 → 12 가 됩니다.
+        //   예: gemBase 15 × 배율 1.5 = 22.5 → 기획자는 23 을 기대하는데 22 가 지급됨.
+        //   보석은 이제 '기준값 × 배율' 이라 정확히 .5 가 자주 나오므로 AwayFromZero(0.5 는 올림)로 고정합니다.
+        //   골드는 1.12^단계 같은 값이라 정확히 .5 가 거의 안 나와서 사실상 변화가 없습니다.
+        int amount = (int)System.Math.Round(v, System.MidpointRounding.AwayFromZero);
         if (cap > 0 && amount > cap) amount = cap;
         return amount < 1 ? 1 : amount;
     }
@@ -259,6 +338,7 @@ public class GuideQuestTable : ScriptableObject
     private void OnValidate()
     {
         if (stagesPerChapter < 1) stagesPerChapter = 10;
+        if (gemBase < 1) gemBase = 1;   // ★ [보석 성장·상한 삭제] 0 이하면 어차피 최소 1 로 지급되므로 인스펙터 값도 맞춰 둠
         if (stageStep < 1) stageStep = 1;
         if (killBase  < 1) killBase  = 1;
         if (levelBase < 1) levelBase = 1;

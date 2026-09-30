@@ -27,7 +27,8 @@ public class FragmentEntry
 public class SaveData
 {
     public int saveVersion = 1;
-
+    public bool nicknamePromptShown;   // 닉네임 자동 팝업을 이미 띄웠는가 (기본 false)
+    
     // ── 레벨 / 경험치 ──
     public int level         = 1;
     public long experience    = 0;

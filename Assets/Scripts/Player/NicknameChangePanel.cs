@@ -22,6 +22,13 @@ using UnityEngine.UI;
 ///      닫힌 뒤에도 구독 하나가 남습니다. 이제 자동 팝업과 네임플레이트 클릭이 겹칠 수 있어 필요해졌습니다.
 ///   4. 비활성으로 저장된 패널에서 Open() 이 처음 불려도 안전하게 (EnsureInit, 아래 Awake 주석 참고)
 ///   5. 구독 해제를 CurrencyManager.Instance 가 아니라 "구독했던 대상" 으로 (boundCurrency)
+///
+/// ★ [도달 전 설정 잠금] 이번 변경
+///   이름이 없고 목표 스테이지에 아직 도달하지 않았으면(NicknamePrompt.IsFirstNameUnlocked == false)
+///   '잠김' 모드로 엽니다 — 입력칸·확인 버튼을 막고 "1-5 스테이지에 도달하면…" 안내를 보여 줍니다.
+///   팝업 자체를 안 여는 대신 잠김 화면을 보여 주는 이유: 네임플레이트를 눌렀는데 아무 반응이 없으면
+///   유저는 고장으로 받아들입니다. 새 UI 없이 기존 제목/비용 문구 칸을 그대로 재사용합니다.
+///   이미 이름이 있는 플레이어의 '변경(보석)' 은 잠그지 않습니다 (기존 유저 영향 없음).
 /// </summary>
 public class NicknameChangePanel : MonoBehaviour
 {
@@ -56,6 +63,7 @@ public class NicknameChangePanel : MonoBehaviour
 
     private bool opening;            // Open() 안에서 SetActive(true) 하는 그 순간에만 true (Awake 가 닫지 않게)
     private bool isRegisterMode;     // 열 때 정해진 모드. 열려 있는 동안은 바뀌지 않음
+    private bool isLocked;           // ★ [도달 전 설정 잠금] 최초 설정인데 아직 목표 스테이지 전 → 입력 불가
     private bool initialized;
 
     // 구독한 CurrencyManager 를 기억해 두고 "그 대상에서" 해제합니다.
@@ -116,6 +124,9 @@ public class NicknameChangePanel : MonoBehaviour
 
         isRegisterMode = !PlayerProfile.HasName;
 
+        // ★ [도달 전 설정 잠금] 잠금은 '최초 설정' 에만 적용. 도달 여부 판단은 NicknamePrompt 한 곳에 맡깁니다.
+        isLocked = isRegisterMode && !NicknamePrompt.IsFirstNameUnlocked;
+
         // 혹시 남아 있는 구독이 있으면 먼저 정리 (Close() 를 거치지 않고 꺼졌던 경우 대비 — 이중 구독 방지)
         Unsubscribe();
 
@@ -130,6 +141,10 @@ public class NicknameChangePanel : MonoBehaviour
             // 최초 설정은 빈 칸, 변경은 현재 이름으로 채움 (같은 이름 확인 시 보석 안 씀 — TryChangeName 참고)
             nameInputField.text = isRegisterMode ? string.Empty : PlayerProfile.Name;
             nameInputField.characterLimit = PlayerProfile.MAX_LENGTH;
+
+            // ★ [도달 전 설정 잠금] 잠김이면 입력 자체를 막음. 매번 열 때 다시 설정해야
+            //   '잠김으로 한 번 연 뒤 → 도달 후 다시 열었을 때' 입력칸이 막힌 채로 남지 않습니다.
+            nameInputField.interactable = !isLocked;
         }
         SetError(string.Empty);
 
@@ -167,6 +182,18 @@ public class NicknameChangePanel : MonoBehaviour
 
     private void RefreshCostText()
     {
+        // ★ [도달 전 설정 잠금] 잠김: 안내 문구 + 확인 버튼 비활성 (보석 부족과 같은 빨간색 = "지금은 안 됨" 표시 통일)
+        if (isLocked)
+        {
+            if (costText != null)
+            {
+                costText.text  = NicknamePrompt.LockedMessage;
+                costText.color = insufficientColor;
+            }
+            if (confirmButton != null) confirmButton.interactable = false;
+            return;
+        }
+
         if (isRegisterMode)
         {
             // 최초 설정: 무료 — 항상 누를 수 있음
@@ -197,6 +224,14 @@ public class NicknameChangePanel : MonoBehaviour
     private void OnClickConfirm()
     {
         if (nameInputField == null) return;
+
+        // ★ [도달 전 설정 잠금] 버튼을 막아 두었지만, 코드 경로(키보드 완료 키 등)로 들어와도 등록되지 않게 한 번 더.
+        //   화면에서 막는 것과 동작에서 막는 것을 둘 다 두는 이유: 화면 쪽은 인스펙터 연결 실수로 풀릴 수 있습니다.
+        if (isLocked)
+        {
+            SetError(NicknamePrompt.LockedMessage);
+            return;
+        }
 
         // 모드에 따라 PlayerProfile 의 다른 창구를 부릅니다. 규칙 검사·저장은 전부 PlayerProfile 이 합니다.
         string error;
