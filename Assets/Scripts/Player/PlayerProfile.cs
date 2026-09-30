@@ -7,8 +7,9 @@ using UnityEngine;
 /// ★ 핵심 설계: "읽기는 누구나, 쓰기는 딱 한 번" — 단, 이제 예외가 하나 생겼습니다.
 ///   - Name / HasName  : 어느 씬에서든 읽을 수 있음
 ///   - TryRegister()   : 이름이 아직 없을 때만 성공 → 이후 호출은 전부 거절 (최초 등록, 무료)
-///   - TryChangeName() : ★ 신규. 이미 이름이 있을 때만 성공 → 보석을 소모하는 "유료 개명"
-///     (MainScene 네임플레이트 클릭 전용. LoginScene 의 최초 등록 흐름과는 별개의 창구입니다)
+///                       ★ 이제 MainScene 에서 호출됩니다 (NicknamePrompt → NicknameChangePanel '최초 설정' 모드)
+///   - TryChangeName() : 이미 이름이 있을 때만 성공 → 보석을 소모하는 "유료 개명"
+///     (최초 등록과는 별개의 창구입니다. 둘 다 NicknameChangePanel 이 이름 유무로 골라 부릅니다)
 ///
 /// ★ 저장 위치: SaveData.playerName (save.json)
 ///   - SaveManager 는 LoginScene 의 Awake 에서 파일을 Current 로 읽어 두므로,
@@ -18,6 +19,11 @@ using UnityEngine;
 ///       (이전 버전의 PlayerPrefs 방식은 세이브를 지워도 이름만 남는 문제가 있었음)
 ///
 /// ★ [계정 삭제] 이번 변경: 파일 맨 아래 DeleteLegacyPrefsForReset() 하나만 추가. 기존 코드는 그대로입니다.
+///
+/// ★ [닉네임 인게임 이동] 이번 변경 (전부 "★ [닉네임 인게임 이동]" 으로 표시)
+///   최초 등록(TryRegister)이 LoginScene 이 아니라 MainScene(특정 스테이지 도달)에서 일어납니다.
+///   → TryRegister 의 저장 방법만 "지금 어느 단계인가" 에 따라 고르도록 바꿨습니다 (RegisterSave).
+///     규칙(최초 1회·무료·Validate)과 이벤트(OnNameRegistered)는 그대로입니다.
 /// </summary>
 public static class PlayerProfile
 {
@@ -116,7 +122,7 @@ public static class PlayerProfile
 
         data.playerName = cleaned;
 
-        Persist();
+        RegisterSave();   // ★ [닉네임 인게임 이동] 예전: Persist()
 
         Debug.Log($"[PlayerProfile] 이름 등록 완료: {cleaned}");
         OnNameRegistered?.Invoke(cleaned);
@@ -152,8 +158,9 @@ public static class PlayerProfile
 
         if (!HasName)
         {
-            // 정상 플로우라면 MainScene 에 도달한 시점엔 이미 이름이 있어야 합니다.
-            // (에디터에서 MainScene 을 바로 실행한 경우 등을 방어)
+            // ★ [닉네임 인게임 이동] 이제는 이름 없이 MainScene 을 플레이하는 것이 정상입니다.
+            //   NicknameChangePanel 이 이름이 없으면 '최초 설정' 모드(TryRegister)로 열리므로
+            //   정상 흐름에선 여기 오지 않습니다. 다른 곳에서 잘못 불렀을 때를 위한 방어입니다.
             error = "등록된 이름이 없습니다. 먼저 이름을 설정해 주세요.";
             return false;
         }
@@ -197,7 +204,36 @@ public static class PlayerProfile
     // ───────── 파일 기록 ─────────
 
     /// <summary>
-    /// Current 에 넣은 이름을 파일에 확정합니다. (TryRegister 전용 — TryChangeName 은 SaveManager.Save() 사용)
+    /// ★ [닉네임 인게임 이동] TryRegister 전용 저장. "게임 씬에 들어갔는가" 로 저장 방법을 고릅니다.
+    ///
+    ///   게임 씬 진입 후 (지금의 정상 경로 — MainScene 스테이지 도달)
+    ///     → SaveManager.Save(). 매니저들이 이미 ApplyFrom 을 받아 진짜 값을 들고 있으므로
+    ///       전체 저장이 안전하고, 이름과 함께 그 시점의 진행(레벨·골드…)도 한 번에 기록됩니다.
+    ///       (TryChangeName 이 Save() 를 쓰는 것과 같은 이유)
+    ///
+    ///   게임 씬 진입 전 (LoginScene — 이제 정상 흐름에선 오지 않지만, 누군가 부를 경우 대비)
+    ///     → 예전 그대로 Persist(). 이때 Save() 를 부르면 매니저 초기값이 세이브를 덮어씁니다.
+    ///       (참고: 그 경우 SaveManager.Save() 는 IsGameplayStarted 검사로 어차피 무시되므로,
+    ///        Persist 로 보내지 않으면 이름이 파일에 전혀 기록되지 않습니다)
+    ///
+    /// 기준을 "씬 이름" 이 아니라 SaveManager.IsGameplayStarted 로 둔 이유:
+    ///   저장이 안전한지 판단하는 규칙을 SaveManager 한 곳에만 두기 위해서입니다.
+    ///   여기서 씬 이름을 따로 검사하면, 나중에 씬 구성이 바뀔 때 두 곳 중 한 곳만 고치게 됩니다.
+    /// </summary>
+    private static void RegisterSave()
+    {
+        SaveManager sm = SaveManager.Instance;
+        if (sm == null) return;
+
+        if (sm.IsGameplayStarted)
+            sm.Save();
+        else
+            Persist();
+    }
+
+    /// <summary>
+    /// Current 에 넣은 이름을 파일에 확정합니다. (LoginScene 전용 — 예전 이름 이관, 게임 시작 전 등록.
+    /// MainScene 의 등록/개명은 SaveManager.Save() 사용 — 위 RegisterSave 참고)
     ///
     /// ★ SaveManager.Save() 를 쓰지 않는 이유
     ///   Save() 는 살아있는 모든 매니저의 CaptureTo() 를 먼저 호출합니다.

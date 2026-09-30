@@ -2381,6 +2381,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerName
   nickNameText: {fileID: 1352736683}
   format: '{0}'
+  namePanel: {fileID: 0}
 --- !u!1 &115965730
 GameObject:
   m_ObjectHideFlags: 0
@@ -24838,6 +24839,7 @@ GameObject:
   - component: {fileID: 1168123243}
   - component: {fileID: 1168123245}
   - component: {fileID: 1168123244}
+  - component: {fileID: 1168123246}
   m_Layer: 5
   m_Name: Name Change Panel
   m_TagString: Untagged
@@ -24907,6 +24909,30 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1168123242}
   m_CullTransparentMesh: 1
+--- !u!114 &1168123246
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1168123242}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c985b08c9d216f942b749183000a1246, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NicknameChangePanel
+  panelRoot: {fileID: 0}
+  titleText: {fileID: 0}
+  nameInputField: {fileID: 499347151}
+  costText: {fileID: 635247229}
+  errorText: {fileID: 0}
+  confirmButton: {fileID: 1151659745}
+  cancelButton: {fileID: 1021839788}
+  registerTitle: "\uB2C9\uB124\uC784 \uC124\uC815"
+  changeTitle: "\uB2C9\uB124\uC784 \uBCC0\uACBD"
+  registerCostMsg: "\uCCAB \uC124\uC815\uC740 \uBB34\uB8CC\uC785\uB2C8\uB2E4"
+  affordableColor: {r: 1, g: 1, b: 1, a: 1}
+  insufficientColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &1168187699
 GameObject:
   m_ObjectHideFlags: 0
@@ -41971,8 +41997,8 @@ GameObject:
   - component: {fileID: 2122405799}
   - component: {fileID: 2122405801}
   - component: {fileID: 2122405800}
-  - component: {fileID: 2122405802}
   - component: {fileID: 2122405803}
+  - component: {fileID: 2122405804}
   m_Layer: 5
   m_Name: Player NamePlate
   m_TagString: Untagged
@@ -42039,26 +42065,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2122405798}
   m_CullTransparentMesh: 1
---- !u!114 &2122405802
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2122405798}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c985b08c9d216f942b749183000a1246, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NicknameChangePanel
-  panelRoot: {fileID: 1168123242}
-  nameInputField: {fileID: 499347151}
-  costText: {fileID: 635247229}
-  errorText: {fileID: 0}
-  confirmButton: {fileID: 1151659745}
-  cancelButton: {fileID: 1021839788}
-  affordableColor: {r: 1, g: 1, b: 1, a: 1}
-  insufficientColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &2122405803
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -42103,7 +42109,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2122405802}
+      - m_Target: {fileID: 1168123246}
         m_TargetAssemblyTypeName: NicknameChangePanel, Assembly-CSharp
         m_MethodName: Open
         m_Mode: 1
@@ -42115,6 +42121,22 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &2122405804
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2122405798}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a3b635e68410304285f34311e1db0a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NicknamePrompt
+  panel: {fileID: 1168123246}
+  requiredWorld: 1
+  requiredStage: 5
+  openDelay: 1.5
 --- !u!1 &2125710066
 GameObject:
   m_ObjectHideFlags: 0

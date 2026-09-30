@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;   // ★ [게임 시작 전 저장 차단] sceneLoaded
 
 /// <summary>
 /// 세이브 파일 입출력 + 저장 오케스트레이션.
@@ -15,6 +16,17 @@ using UnityEngine;
 ///   3. SavePath 를 static 으로 — 2번이 쓰기 위해. 경로 문자열은 여전히 이 한 곳에만 있다
 ///   4. Awake 에서 잠금 해제 — "새 SaveManager 가 태어났다 = 초기화가 끝났다"
 ///   5. OnDestroy 에서 Instance 정리 — 다른 매니저들과 같은 패턴
+///
+/// ★ [게임 시작 전 저장 차단] 이번에 바뀐 곳 (전부 "★ [게임 시작 전 저장 차단]" 으로 표시)
+///   LoginScene / LoadingScene 에서는 매니저들이 아직 ApplyFrom() 을 받기 전이라,
+///   이때 Save() 가 불리면 매니저들의 '초기값' 이 CaptureTo() 로 불러온 데이터를 덮어쓴다.
+///   (기존 유저라면 진행이 초기값으로, 신규 유저라면 SaveData 기본값 baseDamage 0 등으로 저장)
+///   구글 로그인 창이 뜰 때 앱이 일시정지되며 OnApplicationPause → Save() 가 불리므로
+///   이제는 로그인하는 모든 유저가 이 경로를 밟는다. 그래서 게임 씬에 들어가기 전에는 Save() 를 막는다.
+///   6. preGameScenes (인스펙터) — "아직 게임 시작 전" 으로 볼 씬 이름 목록
+///   7. IsGameplayStarted — 게임 씬에 한 번이라도 들어갔는가 (인스턴스 값, 계정 삭제 시 새로 시작)
+///   8. Save() 입구에서 IsGameplayStarted 가 false 면 무시
+///   WriteCurrentToDisk()(이름 저장, PlayerProfile.Persist) 는 막지 않는다 — 게임 시작 전 저장의 정식 경로.
 /// </summary>
 public class SaveManager : MonoBehaviour
 {
@@ -110,11 +122,83 @@ public class SaveManager : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────
+    // ★ [게임 시작 전 저장 차단]
+    // ─────────────────────────────────────────────
+
+    [Header("게임 시작 전 저장 차단")]
+    [Tooltip("매니저들이 세이브를 적용(ApplyFrom)받기 전의 씬 이름들.\n" +
+             "이 씬들만 거친 상태에서는 Save() 가 무시됩니다. 씬 이름을 바꾸면 여기도 같이 바꾸세요.")]
+    [SerializeField] private string[] preGameScenes = { "LoginScene", "LoadingScene" };
+
+    /// <summary>
+    /// 이번 SaveManager 가 태어난 뒤 게임 씬(preGameScenes 가 아닌 씬)에 한 번이라도 들어갔는가.
+    ///
+    /// [왜 한 번 true 가 되면 다시 false 로 안 돌아가는가]
+    ///   MainScene → '로그인 화면으로 돌아가기' 로 LoginScene 에 와도, 매니저들은 DontDestroyOnLoad 로
+    ///   살아 있고 이미 진짜 값을 들고 있다. 이때의 Save() 는 안전하고, 오히려 해야 하는 저장이다.
+    ///   위험한 건 "이번 실행에서 아직 게임 씬을 한 번도 안 거친" 상태뿐이다.
+    ///
+    /// [왜 static 이 아니라 인스턴스 값인가]
+    ///   계정 삭제는 SaveManager 를 파괴하고 새로 만든다. 새 SaveManager 는 다시 "게임 시작 전" 이어야 하므로
+    ///   인스턴스와 수명을 같이 하는 편이 맞다. (IsSaveLocked 가 static 인 이유와 정반대)
+    /// </summary>
+    public bool IsGameplayStarted { get; private set; }
+
+    // sceneLoaded 로 불리는 함수. 씬이 로드될 때마다 "게임 씬인가" 를 확인한다.
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        CheckGameplayScene(scene);
+    }
+
+    private void CheckGameplayScene(Scene scene)
+    {
+        if (IsGameplayStarted) return;              // 이미 true — 다시 볼 필요 없음
+        if (IsPreGameScene(scene.name)) return;     // 로그인/로딩 — 아직 게임 시작 전
+
+        IsGameplayStarted = true;
+        Debug.Log($"[SaveManager] 게임 씬 진입('{scene.name}') — 이제부터 Save() 허용");
+    }
+
+    /// <summary>
+    /// 오타 방어. 목록의 이름이 실제 씬 이름과 다르면(예: "Loading" vs "LoadingScene")
+    /// 그 씬이 '게임 씬' 으로 취급되어 차단이 조용히 풀린다. 에러는 안 나고 저장만 망가지는 종류라 로그로 알린다.
+    /// </summary>
+    private void ValidatePreGameScenes()
+    {
+        if (preGameScenes == null || preGameScenes.Length == 0)
+        {
+            Debug.LogWarning("[SaveManager] preGameScenes 가 비어 있습니다 — 게임 시작 전 저장 차단이 동작하지 않습니다.");
+            return;
+        }
+        foreach (string s in preGameScenes)
+        {
+            // Build Settings 에 등록된 씬 이름인지 확인 (등록 안 된 이름 = 오타일 가능성이 큼)
+            if (!Application.CanStreamedLevelBeLoaded(s))
+                Debug.LogWarning($"[SaveManager] preGameScenes 의 '{s}' 가 Build Settings 에 없습니다. 씬 이름을 확인하세요.");
+        }
+    }
+
+    private bool IsPreGameScene(string sceneName)
+    {
+        if (preGameScenes == null) return false;
+        foreach (string s in preGameScenes)
+        {
+            if (s == sceneName) return true;
+        }
+        return false;
+    }
+
+    // ─────────────────────────────────────────────
 
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        // ★ [게임 시작 전 저장 차단] DontDestroyOnLoad "전에" 내가 놓여 있던 씬을 기억합니다.
+        //   DontDestroyOnLoad 를 부르는 순간 gameObject.scene 은 "DontDestroyOnLoad" 라는 특수 씬으로 바뀝니다.
+        Scene bornScene = gameObject.scene;
+
         DontDestroyOnLoad(gameObject);
 
         // ★ [계정 삭제] 잠금 해제 지점.
@@ -129,6 +213,24 @@ public class SaveManager : MonoBehaviour
         }
 
         Load();
+
+        // ★ [게임 시작 전 저장 차단]
+        //   구독은 중복 제거 return "아래" 에서 한다 — 곧 죽을 복제본이 구독하면 안 되니까.
+        //   SceneManager.sceneLoaded 는 static 이벤트라 OnDestroy 에서 반드시 해제해야 한다.
+        ValidatePreGameScenes();
+        SceneManager.sceneLoaded += OnSceneLoaded;
+
+        // 내가 태어난 씬도 한 번 확인한다.
+        // (에디터에서 SaveManager 가 있는 게임 씬으로 바로 실행한 경우 → 처음부터 게임 씬이므로 바로 true)
+        //
+        // ★ [재검토 수정] 예전에는 SceneManager.GetActiveScene() 을 봤는데, 그건 "지금 활성 씬" 입니다.
+        //   계정 삭제(AccountReset)는 빈 임시 씬을 만들어 활성으로 둔 채 LoginScene 을 불러옵니다.
+        //   그 사이 새 SaveManager 의 Awake 가 돌면 활성 씬이 아직 임시 씬일 수 있고,
+        //   임시 씬은 preGameScenes 에 없으니 "게임 씬" 으로 판단 → 차단이 풀린 채로 LoginScene 이 시작됩니다.
+        //   그러면 계정 삭제 직후 LoginScene 에서 홈 버튼만 눌러도 초기값 세이브가 만들어지는
+        //   바로 그 문제(공격력 0)가 되살아납니다.
+        //   "내가 놓여 있던 씬" 은 씬 전환 타이밍과 상관없이 항상 LoginScene 이므로 이쪽이 정확합니다.
+        CheckGameplayScene(bornScene);
     }
 
     // ★ [계정 삭제] 다른 매니저(ManagerRoot, HapticManager ...)와 같은 패턴.
@@ -137,6 +239,11 @@ public class SaveManager : MonoBehaviour
     //   정리해 두지 않으면 죽은 인스턴스의 Save() 가 그대로 실행됩니다.
     void OnDestroy()
     {
+        // ★ [게임 시작 전 저장 차단] static 이벤트 구독 해제.
+        //   계정 삭제로 이 SaveManager 가 파괴된 뒤에도 구독이 남으면, 다음 씬 로드 때
+        //   죽은 오브젝트의 함수가 불린다. (구독하지 않은 복제본에서 해제해도 아무 일 없음)
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+
         if (Instance == this) Instance = null;
     }
 
@@ -149,6 +256,15 @@ public class SaveManager : MonoBehaviour
         if (IsSaveLocked)
         {
             Debug.Log("[SaveManager] 저장 잠금 중 — Save() 무시");
+            return;
+        }
+
+        // ★ [게임 시작 전 저장 차단] 매니저들이 ApplyFrom 전이면 CaptureTo 가 초기값을 모은다.
+        //   이 시점에 바뀐 값은 이름뿐인데, 이름은 PlayerProfile 이 WriteCurrentToDisk() 로 이미 저장했다.
+        //   그래서 여기서 건너뛰어도 잃는 데이터가 없다.
+        if (!IsGameplayStarted)
+        {
+            Debug.Log("[SaveManager] 게임 시작 전(매니저 ApplyFrom 전) — Save() 무시");
             return;
         }
 
@@ -277,7 +393,9 @@ public class SaveManager : MonoBehaviour
 
     void OnApplicationPause(bool paused)
     {
-        if (paused) Save();   // 모바일: 백그라운드 전환 시 (잠금 중이면 Save() 가 알아서 무시)
+        // 모바일: 백그라운드 전환 시. 구글 로그인 계정 선택 창이 떠도 여기로 온다.
+        // (잠금 중이거나 게임 시작 전이면 Save() 가 알아서 무시)
+        if (paused) Save();
     }
 
     void OnApplicationQuit()

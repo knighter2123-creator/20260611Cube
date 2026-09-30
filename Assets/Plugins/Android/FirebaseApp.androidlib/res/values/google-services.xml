@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@string/gcm_defaultSenderId,@string/google_storage_bucket,@string/project_id,@string/google_api_key,@string/google_crash_reporting_api_key,@string/google_app_id">
+  <string name="gcm_defaultSenderId" translatable="false">16009766661</string>
+  <string name="google_storage_bucket" translatable="false">tower-def-2d.firebasestorage.app</string>
+  <string name="project_id" translatable="false">tower-def-2d</string>
+  <string name="google_api_key" translatable="false">AIzaSyB_b_EDngQOrkkeYFp07TEuDl0Jh0P06Dc</string>
+  <string name="google_crash_reporting_api_key" translatable="false">AIzaSyB_b_EDngQOrkkeYFp07TEuDl0Jh0P06Dc</string>
+  <string name="google_app_id" translatable="false">1:16009766661:android:4f326ff08f919c0b50396c</string>
+</resources>

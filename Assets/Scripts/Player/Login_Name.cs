@@ -1,5 +1,3 @@
-using System.Collections;
-using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
@@ -7,161 +5,94 @@ using UnityEngine.UI;
 /// <summary>
 /// LoginScene 의 "게임 시작" 버튼 처리.
 ///
-/// 흐름 (이름 확인은 LoadingScene 으로 가기 "전"에 끝남)
-///   [게임 시작] ─┬─ 이름 있음 → LoadingScene → MainScene
-///                └─ 이름 없음 → 이름 입력 팝업
-///                                 ├─ [확인] 검사 통과 → 등록 → LoadingScene → MainScene
-///                                 │         검사 실패 → 팝업에 오류 문구
-///                                 └─ [취소] 팝업 닫기
+/// ★ [닉네임 인게임 이동] 이번 변경 (2026-09-30)
+///   닉네임은 이제 LoginScene 이 아니라 MainScene 에서 "특정 스테이지 도달" 시 정합니다
+///   (NicknamePrompt → NicknameChangePanel 의 '최초 설정' 모드 → PlayerProfile.TryRegister).
+///   그래서 이 스크립트는 이름 확인 없이 바로 시작합니다.
+///
+///   흐름:  [게임 시작] ─→ LoadingScene → MainScene
+///
+///   바뀐 곳
+///   1. OnClickStart: 이름 확인/팝업 없이 바로 PlayToMain
+///   2. StartGame() 을 public 으로 추가 — 다른 버튼(GoogleLoginButtonUI.onStartGame 등)이
+///      인스펙터에서 "같은 시작 함수" 를 부를 수 있게. (OnClickStart 는 private 이라 인스펙터 목록에 안 보임)
+///   3. 이름 입력 팝업 코드 제거. 단, 씬에 남아 있는 팝업 오브젝트가 켜진 채 보이지 않도록
+///      legacyNamePopup 으로 참조를 이어받아(FormerlySerializedAs) 자동으로 숨깁니다.
+///   4. ClosePopup / IsPopupOpen 은 다른 스크립트(뒤로가기 처리 등)가 부르고 있을 수 있어
+///      컴파일이 깨지지 않도록 남겨 두고 [Obsolete] 로 표시했습니다 → 경고가 뜨는 곳이 호출부입니다.
 ///
 /// ★ 시작 버튼의 인스펙터 OnClick 목록은 비워 두세요. 리스너는 코드(Start)에서 등록합니다.
-///   예전 PlayToMain 이 OnClick 에 연결돼 있었다면, 이름 확인을 건너뛰고 로딩으로 가는 구멍이 됩니다.
-///
-/// ★ 이 스크립트는 팝업(namePopup) "밖"의 항상 켜진 오브젝트에 붙이세요.
-///   팝업 안에 붙이면 namePopup.SetActive(false) 때 자기 자신도 꺼져서 버튼이 반응하지 않습니다.
 /// </summary>
 public class Login_Name : MonoBehaviour
 {
     [Header("시작 버튼")]
-    // 필드 이름을 submitButton → startButton 으로 바꿨습니다.
-    // FormerlySerializedAs 가 있으면 인스펙터에 연결해 둔 기존 버튼 참조가 끊기지 않습니다.
+    // FormerlySerializedAs: 예전 필드 이름(submitButton)으로 저장된 인스펙터 연결을 그대로 이어받음
     [FormerlySerializedAs("submitButton")]
     [SerializeField] private Button startButton;
 
-    [Header("이름 입력 팝업")]
-    [SerializeField] private GameObject     namePopup;      // 팝업 루트 (시작 시 자동으로 꺼짐)
-    [SerializeField] private TMP_InputField nameInput;
-    [SerializeField] private Button         confirmButton;
-    [SerializeField] private Button         cancelButton;   // 없으면 비워둬도 됨
-    [SerializeField] private TMP_Text       errorText;      // 없으면 비워둬도 됨
-    [SerializeField] private TMP_Text       guideText;      // 없으면 비워둬도 됨
+    [Header("(정리 대상) 예전 이름 입력 팝업")]
+    [Tooltip("더 이상 쓰지 않습니다. 예전 namePopup 연결을 이어받아 시작 시 숨기기만 합니다.\n" +
+             "씬에서 팝업 오브젝트를 지운 뒤 이 칸이 비어도 괜찮습니다.")]
+    // ★ 필드 이름이 namePopup → legacyNamePopup 으로 바뀌었지만 FormerlySerializedAs 덕분에
+    //   씬에 연결돼 있던 팝업 참조가 끊기지 않습니다. 이 한 줄이 없으면 팝업이 켜진 채로 저장된 씬에서
+    //   작동하지 않는 팝업이 화면을 가리게 됩니다 (예전엔 Awake 가 숨겨 줬으므로).
+    [FormerlySerializedAs("namePopup")]
+    [SerializeField] private GameObject legacyNamePopup;
 
     // 로딩을 시작했는지. 버튼 연타로 씬 로딩이 두 번 호출되는 것을 막습니다.
     private bool isLoading;
 
     private void Awake()
     {
-        // 팝업은 처음에 항상 닫힌 상태로 시작 (씬에서 켜둔 채 저장해도 안전)
-        if (namePopup != null) namePopup.SetActive(false);
+        if (legacyNamePopup != null)
+        {
+            legacyNamePopup.SetActive(false);
+            Debug.Log("[Login_Name] 예전 이름 입력 팝업을 숨겼습니다. 이제 쓰지 않으니 LoginScene 에서 지워도 됩니다.", legacyNamePopup);
+        }
     }
 
     private void Start()
     {
-        // 예전 PlayerPrefs 에 이름이 있던 유저 → SaveData 로 1회 이관
+        // 예전 PlayerPrefs 에 이름이 있던 유저 → SaveData 로 1회 이관 (기존 그대로)
         // (SaveManager.Awake 가 먼저 끝나 있으므로 Start 에서 호출하면 안전)
         PlayerProfile.MigrateLegacyIfNeeded();
 
-        if (startButton   != null) startButton.onClick.AddListener(OnClickStart);
-        if (confirmButton != null) confirmButton.onClick.AddListener(OnClickConfirm);
-        if (cancelButton  != null) cancelButton.onClick.AddListener(ClosePopup);
-
-        if (nameInput != null)
-        {
-            // 글자 수 제한을 PlayerProfile 의 상수와 맞춤 → 숫자가 두 곳에 따로 적히지 않음
-            nameInput.characterLimit = PlayerProfile.MAX_LENGTH;
-            nameInput.onValueChanged.AddListener(OnInputChanged);
-            nameInput.onSubmit.AddListener(OnInputSubmit);   // 키보드의 Enter / 완료 키
-        }
-
-        if (guideText != null)
-            guideText.text =
-                $"{PlayerProfile.MIN_LENGTH}~{PlayerProfile.MAX_LENGTH}자 (한글·영문·숫자)\n" +
-                "<color=#FF8080>정한 이름은 이후 변경할 수 없습니다.</color>";
+        if (startButton != null) startButton.onClick.AddListener(OnClickStart);
     }
 
     private void OnDestroy()
     {
-        // 이름 있는 메서드로 구독했기 때문에 -= / RemoveListener 로 정확히 해제할 수 있습니다.
-        if (startButton   != null) startButton.onClick.RemoveListener(OnClickStart);
-        if (confirmButton != null) confirmButton.onClick.RemoveListener(OnClickConfirm);
-        if (cancelButton  != null) cancelButton.onClick.RemoveListener(ClosePopup);
-        if (nameInput != null)
-        {
-            nameInput.onValueChanged.RemoveListener(OnInputChanged);
-            nameInput.onSubmit.RemoveListener(OnInputSubmit);
-        }
+        // 이름 있는 메서드로 구독했기 때문에 RemoveListener 로 정확히 해제할 수 있습니다.
+        if (startButton != null) startButton.onClick.RemoveListener(OnClickStart);
     }
 
-    // ───────── 버튼 ─────────
+    // ───────── 시작 ─────────
 
-    /// <summary>게임 시작 버튼. (Start 에서 코드로 연결됨 — 인스펙터에 또 연결하면 두 번 호출됨)</summary>
-    private void OnClickStart()
+    private void OnClickStart() => StartGame();
+
+    /// <summary>
+    /// 게임 시작의 단 하나의 입구. 시작 버튼과, 인스펙터로 연결한 다른 버튼(예: 구글 로그인 성공)이
+    /// 모두 여기로 들어옵니다. 시작 경로가 하나여야 연타 방지(isLoading) 같은 규칙이 한 곳에서 지켜집니다.
+    /// </summary>
+    public void StartGame()
     {
-        if (isLoading) return;
-
-        if (PlayerProfile.HasName)
-            PlayToMain();          // 이미 이름이 있으면 팝업 없이 바로 시작
-        else
-            OpenPopup();
-    }
-
-    private void OnClickConfirm()
-    {
-        if (isLoading) return;
-
-        string raw = nameInput != null ? nameInput.text : string.Empty;
-
-        if (!PlayerProfile.TryRegister(raw, out string error))
-        {
-            ShowError(error);
-            return;
-        }
-
-        ClosePopup();
+        if (isLoading) return;   // 이미 로딩 중이면 무시 (두 버튼을 거의 동시에 눌러도 한 번만)
         PlayToMain();
     }
 
-    private void OnInputSubmit(string _) => OnClickConfirm();
+    // ───────── 예전 팝업 API (호환용) ─────────
 
-    // 다시 입력하기 시작하면 이전 오류 문구를 지움
-    private void OnInputChanged(string _) => ShowError(string.Empty);
-
-    // ───────── 팝업 ─────────
-
-    private void OpenPopup()
-    {
-        if (namePopup == null)
-        {
-            Debug.LogError("[Login_Name] namePopup 이 연결되지 않았습니다.");
-            return;
-        }
-
-        namePopup.SetActive(true);
-        ShowError(string.Empty);
-
-        if (nameInput != null)
-        {
-            nameInput.text = string.Empty;
-            // SetActive(true) 직후에 바로 활성화하면 무시될 수 있어 한 프레임 뒤에 처리
-            StartCoroutine(FocusInputNextFrame());
-        }
-    }
-
-    private IEnumerator FocusInputNextFrame()
-    {
-        yield return null;   // 한 프레임 대기
-        if (nameInput != null && IsPopupOpen)
-            nameInput.ActivateInputField();   // 모바일: 가상 키보드가 올라옴
-    }
-
-    /// <summary>팝업 닫기. 안드로이드 뒤로가기 핸들러에 연결할 때도 이 함수를 쓰면 됩니다.</summary>
+    [System.Obsolete("이름 입력은 MainScene 으로 옮겨졌습니다. 이 호출은 지워도 됩니다.")]
     public void ClosePopup()
     {
-        if (namePopup != null) namePopup.SetActive(false);
+        if (legacyNamePopup != null) legacyNamePopup.SetActive(false);
     }
 
-    public bool IsPopupOpen => namePopup != null && namePopup.activeSelf;
-
-    private void ShowError(string message)
-    {
-        if (errorText == null) return;
-        errorText.text = message;
-        errorText.gameObject.SetActive(!string.IsNullOrEmpty(message));
-    }
+    [System.Obsolete("이름 입력은 MainScene 으로 옮겨졌습니다. 항상 false 입니다.")]
+    public bool IsPopupOpen => false;
 
     // ───────── 씬 이동 (기존 코드 유지) ─────────
 
-    // private 인 이유: 이름 확인(OnClickStart / OnClickConfirm)을 거치지 않고는 호출될 수 없게
     private void PlayToMain()
     {
         isLoading = true;

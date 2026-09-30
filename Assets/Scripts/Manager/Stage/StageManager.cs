@@ -322,6 +322,8 @@ public partial class StageManager : MonoBehaviour
         }
 
         EnemyRespawn.Instance.ResetStage(currentStatMult, currentWorld, currentStage);
+        
+        NicknamePrompt.NotifyStage(currentWorld, currentStage);
     }
 
     private void InitStage()
