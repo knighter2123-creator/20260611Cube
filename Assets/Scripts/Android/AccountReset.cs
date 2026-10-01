@@ -50,6 +50,13 @@ using UnityEngine.UI;   // ★ [검토 후 추가] 입력 차단막(Image, Graph
 ///     Destroy() 는 즉시 지우지 않고 프레임 끝에 지웁니다. 그 전에 LoginScene 이 로드되면
 ///     새 ManagerRoot 의 Awake 가 "기존 루트가 아직 있네" 하고 자기 자신을 지워 버립니다.
 ///     (ManagerRoot.Awake 의 중복 제거 규칙) 한 프레임 쉬면 옛 루트의 OnDestroy 가 Instance 를 비운 뒤라 안전합니다.
+///
+/// ★ [계정별 세이브] 이번 변경 (전부 "★ [계정별 세이브]" 로 표시)
+///   "매니저를 전부 새로 만들고 LoginScene 부터 다시" 는 계정 전환에도 똑같이 필요합니다
+///   (매니저들이 이전 계정의 레벨·골드를 메모리에 들고 있으므로). 그래서 2단계(RestartFromLogin)를 재사용합니다.
+///   1. TryBeginAccountSwitch — TryWipe 의 "지우지 않는" 버전: 저장 잠금만 걸고 재시작 준비
+///   2. 로그 문구를 '계정 삭제' / '계정 전환' 으로 구분 (pendingReason)
+///   3. TryWipe 가 지우는 세이브·증강은 이제 "지금 계정" 의 것만 (SaveManager / AugmentManager 쪽에서 처리)
 /// </summary>
 public class AccountReset : MonoBehaviour
 {
@@ -57,6 +64,7 @@ public class AccountReset : MonoBehaviour
     public static bool IsRunning { get; private set; }
 
     private static string pendingLoginScene;
+    private static string pendingReason;   // ★ [계정별 세이브] 로그용: "계정 삭제" / "계정 전환"
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -64,6 +72,7 @@ public class AccountReset : MonoBehaviour
         // Reload Domain 을 끈 에디터에서 이전 플레이의 값이 남지 않게 (SaveManager 와 같은 이유)
         IsRunning = false;
         pendingLoginScene = null;
+        pendingReason = null;
     }
 
     // ═════════════════════════════════════════════════════════
@@ -119,8 +128,45 @@ public class AccountReset : MonoBehaviour
 
         IsRunning = true;
         pendingLoginScene = loginSceneName;
+        pendingReason = "계정 삭제";
 
         Debug.Log("[AccountReset] 진행 데이터 삭제 완료. RestartFromLogin() 으로 매니저를 새로 만듭니다.");
+        return true;
+    }
+
+    /// <summary>
+    /// ★ [계정별 세이브] 계정 전환용 1단계 — TryWipe 와 같지만 아무것도 지우지 않습니다.
+    /// 저장 잠금만 걸어서, 매니저들이 파괴되는 동안 "이전 계정 값" 이 새 계정 파일에 기록되지 않게 합니다.
+    /// (호출한 쪽은 잠금 뒤에 SaveManager.SetActiveAccount(새 계정) → RestartFromLogin() 순서로 부릅니다)
+    ///
+    /// [왜 잠금이 꼭 필요한가]
+    ///   계정을 바꾼 순간부터 SavePath 는 새 계정 파일을 가리킵니다. 그런데 매니저들은 아직 이전 계정 값을 들고 있어서,
+    ///   씬을 내리는 동안 누가 Save() 를 한 번만 불러도(OnDestroy, 홈 버튼) 이전 계정 진행이 새 계정 파일로 들어갑니다.
+    ///   잠금은 새 SaveManager 가 태어날 때(= 이전 매니저가 모두 사라졌을 때) 풀립니다 — 계정 삭제와 같은 원리.
+    /// </summary>
+    public static bool TryBeginAccountSwitch(string loginSceneName, out string error)
+    {
+        error = string.Empty;
+
+        if (IsRunning)
+        {
+            error = "이미 다른 재시작이 진행 중입니다.";
+            return false;
+        }
+
+        // TryWipe 와 같은 이유 — 되돌릴 수 없는 일을 시작하기 "전에" 씬을 불러올 수 있는지 확인
+        if (!Application.CanStreamedLevelBeLoaded(loginSceneName))
+        {
+            error = "로그인 화면을 찾을 수 없습니다.";
+            Debug.LogError($"[AccountReset] '{loginSceneName}' 씬을 로드할 수 없어 계정 전환을 하지 않습니다.");
+            return false;
+        }
+
+        SaveManager.LockForReset();
+
+        IsRunning = true;
+        pendingLoginScene = loginSceneName;
+        pendingReason = "계정 전환";
         return true;
     }
 
@@ -275,10 +321,12 @@ public class AccountReset : MonoBehaviour
             SaveManager.UnlockAfterReset();
         }
 
+        string reason = pendingReason ?? "재시작";   // ★ [계정별 세이브] 로그용
         IsRunning = false;
         pendingLoginScene = null;
+        pendingReason = null;
 
-        Debug.Log("[AccountReset] 계정 초기화 완료 — 첫 실행 상태로 LoginScene 에 도착했습니다.");
+        Debug.Log($"[AccountReset] {reason} 완료 — 매니저를 새로 만들고 LoginScene 에 도착했습니다. (계정: {SaveManager.ActiveAccountLabel})");
         Destroy(gameObject);   // 할 일을 다 했으니 자기 자신도 정리
     }
 

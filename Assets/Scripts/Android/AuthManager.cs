@@ -21,6 +21,18 @@ using UnityEngine;
 ///
 /// [세이브] CaptureTo/ApplyFrom 이 없다 → save.json 스키마·저장 흐름과 무관.
 ///          로그인 상태는 Firebase 가 기기에 따로 보관한다 (save.json / PlayerPrefs 와 별개).
+///
+/// ★ [이메일 로그인] 이번 변경 (전부 "★ [이메일 로그인]" 으로 표시, 기존 구글 로그인 코드는 그대로)
+///   SignUpWithEmail / SignInWithEmail — Firebase 의 이메일·비밀번호 로그인.
+///   구글 로그인과 달리 네이티브 플러그인이 필요 없어서 **에디터(Device Simulator)에서도 동작**합니다.
+///   → 에디터에서 Firebase 로그인 흐름(UID 발급, 콘솔 Users 목록, 로그인 상태 유지)을 바로 테스트할 수 있습니다.
+///   ⚠ 이메일 로그인으로 받는 것은 "구글 ID 토큰" 이 아니라 "Firebase 사용자(UID)" 입니다 (아래 이메일 로그인 영역 주석 참고).
+///   LastError — 실패 사유(한국어). UI 가 StateChanged 를 받고 읽어서 표시합니다.
+///
+/// ★ [로그아웃] 이번 변경 (전부 "★ [로그아웃]" 으로 표시)
+///   1. SignOut: 로그인 처리 중이면 무시 / 자동 로그인 상태에서도 구글 계정까지 로그아웃 (계정 선택 창이 다시 뜨게)
+///   2. Email, SignInProviderLabel — 로그아웃 UI 가 "어느 계정으로 로그인돼 있는지" 보여 주는 용도
+///   로그아웃은 Firebase 로그인 상태만 지웁니다. 앱 종료·씬 이동·세이브 삭제는 하지 않습니다.
 /// </summary>
 public class AuthManager : MonoBehaviour
 {
@@ -60,6 +72,41 @@ public class AuthManager : MonoBehaviour
     public static bool IsGoogleSignInSupported => Application.platform == RuntimePlatform.Android;
     public string Uid         => IsSignedIn ? auth.CurrentUser.UserId : null;
     public string DisplayName => IsSignedIn ? auth.CurrentUser.DisplayName : null;
+
+    /// <summary>★ [로그아웃] 로그인한 계정의 이메일 (구글/이메일 공통). 로그아웃 버튼 옆 "어느 계정인지" 표시용.</summary>
+    public string Email => IsSignedIn ? auth.CurrentUser.Email : null;
+
+    /// <summary>
+    /// ★ [로그아웃] 어떤 방식으로 로그인했는가 — "Google" / "이메일" / "" (로그인 안 됨 / 알 수 없음).
+    /// FirebaseUser.ProviderData 에는 연결된 로그인 방식마다 ProviderId 가 들어 있습니다.
+    ///   "google.com" = 구글,  "password" = 이메일·비밀번호
+    /// (계정 연동을 하면 둘 다 들어 있을 수 있어서, 구글을 먼저 확인합니다)
+    /// </summary>
+    public string SignInProviderLabel
+    {
+        get
+        {
+            if (!IsSignedIn) return string.Empty;
+
+            bool hasGoogle = false, hasPassword = false;
+            foreach (IUserInfo info in auth.CurrentUser.ProviderData)
+            {
+                if (info.ProviderId == "google.com") hasGoogle = true;
+                else if (info.ProviderId == "password") hasPassword = true;
+            }
+            if (hasGoogle)   return "Google";
+            if (hasPassword) return "이메일";
+            return string.Empty;
+        }
+    }
+
+    // ★ [이메일 로그인] 마지막 실패 사유 (UI 표시용, 한국어). 새 시도를 시작하면 비워집니다.
+    //   이벤트 인자로 넘기지 않고 프로퍼티로 두는 이유: StateChanged 는 "상태가 바뀌었다" 만 알리고
+    //   값은 구독자가 Instance 에서 직접 읽는 규칙이라 (UI 가 늦게 켜져도 같은 값을 읽을 수 있음).
+    public string LastError { get; private set; }
+
+    /// <summary>★ [이메일 로그인] Firebase 비밀번호 최소 길이 (Firebase 규칙: 6자). UI 안내 문구도 이 값을 씁니다.</summary>
+    public const int MIN_PASSWORD_LENGTH = 6;
 
     private FirebaseAuth auth;
 
@@ -178,6 +225,7 @@ public class AuthManager : MonoBehaviour
 
         if (!TryConfigureGoogleSignIn()) return;
 
+        LastError = null;   // ★ [이메일 로그인] 이전 이메일 로그인 실패 문구가 구글 시도 중에 남아 보이지 않게
         SetSigningIn(true);
 
         try
@@ -309,6 +357,161 @@ public class AuthManager : MonoBehaviour
         });
     }
 
+    // ───────────────────────────── ★ [이메일 로그인] ─────────────────────────────
+    //
+    //  [구글 로그인과 무엇이 다른가]
+    //    구글 : 구글 ID 토큰(구글이 발급) → Firebase 에 넘겨 로그인
+    //    이메일: 이메일·비밀번호를 Firebase 에 직접 보내 로그인 — 중간에 "구글 토큰" 이 없습니다.
+    //    둘 다 결과는 똑같이 Firebase 사용자(UID) 이고, 그 뒤의 게임 흐름(StateChanged, IsSignedIn, Uid)도 같습니다.
+    //    서버 검증 등에 쓸 "토큰" 이 필요하면 구글 토큰이 아니라 Firebase ID 토큰(auth.CurrentUser.TokenAsync)을 씁니다.
+    //
+    //  [먼저 해 둘 것]
+    //    Firebase 콘솔 > Authentication > 로그인 방법(Sign-in method) > '이메일/비밀번호' 사용 설정.
+    //    안 켜면 OperationNotAllowed 오류가 납니다.
+    //
+    //  [같은 이메일로 구글 로그인도 하면?]
+    //    Firebase 기본 설정(이메일당 계정 1개)에서는, 같은 주소로 구글 로그인을 하면 구글 쪽이 우선되어
+    //    이메일·비밀번호 방식이 그 계정에서 빠질 수 있습니다. 테스트용으로는 서로 다른 주소를 쓰세요.
+
+    /// <summary>★ [이메일 로그인] 새 계정 만들기. 성공하면 바로 로그인된 상태가 됩니다.</summary>
+    public void SignUpWithEmail(string email, string password)
+    {
+        if (!TryBeginEmailAuth(email, password, out string cleanEmail)) return;
+
+        // ★ [배포 전 검토] try/catch — Firebase 호출이 '부르는 순간' 예외를 던지면(드묾) 결과 콜백이 영영 오지 않아
+        //   IsSigningIn 이 true 로 굳고 모든 로그인 버튼이 잠긴 채 남습니다. 구글 로그인 쪽 SignIn() 과 같은 방어입니다.
+        try
+        {
+            auth.CreateUserWithEmailAndPasswordAsync(cleanEmail, password)
+                .ContinueWithOnMainThread(task => OnEmailAuthFinished(task, "회원가입"));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Auth] 이메일 회원가입 호출 실패: {e}");
+            Fail("회원가입에 실패했습니다.");
+        }
+    }
+
+    /// <summary>★ [이메일 로그인] 기존 계정으로 로그인.</summary>
+    public void SignInWithEmail(string email, string password)
+    {
+        if (!TryBeginEmailAuth(email, password, out string cleanEmail)) return;
+
+        try   // 위 SignUpWithEmail 의 try/catch 와 같은 이유
+        {
+            auth.SignInWithEmailAndPasswordAsync(cleanEmail, password)
+                .ContinueWithOnMainThread(task => OnEmailAuthFinished(task, "로그인"));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Auth] 이메일 로그인 호출 실패: {e}");
+            Fail("로그인에 실패했습니다.");
+        }
+    }
+
+    /// <summary>
+    /// 이메일 로그인/가입 공통 시작 검사. 통과하면 '진행 중' 상태로 바꿉니다.
+    /// 서버에 보내기 전에 걸러낼 수 있는 것(빈 칸, 비밀번호 길이)은 여기서 막습니다 — 네트워크 왕복 없이 바로 안내.
+    /// </summary>
+    private bool TryBeginEmailAuth(string email, string password, out string cleanEmail)
+    {
+        cleanEmail = (email ?? string.Empty).Trim();   // 앞뒤 공백은 흔한 입력 실수라 지워 줌 (비밀번호는 공백도 글자라 그대로)
+
+        if (!IsReady)
+        {
+            Fail("아직 로그인 준비 중입니다. 잠시 후 다시 시도해 주세요.");
+            return false;
+        }
+        if (IsSigningIn || IsSignedIn) return false;   // 연타 / 이미 로그인됨 (구글 로그인과 같은 규칙)
+
+        if (cleanEmail.Length == 0)
+        {
+            Fail("이메일을 입력해 주세요.");
+            return false;
+        }
+        if (string.IsNullOrEmpty(password) || password.Length < MIN_PASSWORD_LENGTH)
+        {
+            Fail($"비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다.");
+            return false;
+        }
+
+        LastError = null;        // 새 시도 → 이전 오류 문구 지움
+        SetSigningIn(true);      // 내부에서 Notify → UI 버튼 비활성
+        return true;
+    }
+
+    /// <summary>
+    /// 이메일 로그인/가입 결과 처리.
+    /// task 의 타입을 적지 않고(Task) 받는 이유: Firebase SDK 버전에 따라 결과가 FirebaseUser 또는 AuthResult 로 달라서,
+    /// 결과값 대신 auth.CurrentUser 를 읽으면 버전을 올려도 이 코드는 그대로 동작합니다 (구글 로그인 쪽과 같은 방식).
+    /// </summary>
+    private void OnEmailAuthFinished(Task task, string actionName)
+    {
+        if (this == null) return;   // 기다리는 사이 매니저가 파괴됐을 수 있음 (계정 삭제 등)
+
+        if (task.IsCanceled)
+        {
+            Fail($"{actionName}이(가) 취소되었습니다.");
+            return;
+        }
+
+        if (task.IsFaulted)
+        {
+            string message = ToKoreanMessage(task.Exception);
+            Debug.LogError($"[Auth] 이메일 {actionName} 실패: {message}\n{task.Exception}");
+            Fail(message);
+            return;
+        }
+
+        if (IsSignedIn)
+            Debug.Log($"[Auth] 이메일 {actionName} 완료. UID: {Uid}");
+        else
+            Debug.LogError($"[Auth] 이메일 {actionName}은(는) 끝났는데 CurrentUser 가 없습니다.");
+
+        SetSigningIn(false);   // Notify → UI 갱신 (GoogleLoginButtonUI 등도 '로그인됨' 으로 바뀜)
+    }
+
+    /// <summary>실패 사유를 남기고 '진행 중' 을 풉니다. (Notify 는 SetSigningIn 이 함)</summary>
+    private void Fail(string message)
+    {
+        LastError = message;
+        SetSigningIn(false);
+    }
+
+    /// <summary>
+    /// Firebase 오류 코드를 유저에게 보여 줄 한국어 문구로 바꿉니다.
+    /// FirebaseException.ErrorCode 는 숫자라, AuthError 열거형으로 바꾸면 어떤 오류인지 이름으로 구분할 수 있습니다.
+    ///
+    /// ⚠ 최근 Firebase 프로젝트는 '이메일 열거 보호' 가 기본으로 켜져 있어서, 없는 계정·틀린 비밀번호를
+    ///   구분하지 않고 InvalidCredential 하나로 돌려줍니다 (남이 "이 이메일이 가입돼 있나" 알아내지 못하게).
+    ///   그래서 두 경우를 같은 문구로 안내합니다.
+    /// </summary>
+    private static string ToKoreanMessage(AggregateException ex)
+    {
+        if (ex != null)
+        {
+            foreach (Exception e in ex.Flatten().InnerExceptions)
+            {
+                if (!(e is FirebaseException fe)) continue;
+
+                switch ((AuthError)fe.ErrorCode)
+                {
+                    case AuthError.InvalidEmail:         return "이메일 형식이 올바르지 않습니다.";
+                    case AuthError.EmailAlreadyInUse:    return "이미 가입된 이메일입니다. 로그인해 주세요.";
+                    case AuthError.WeakPassword:         return $"비밀번호가 너무 약합니다. ({MIN_PASSWORD_LENGTH}자 이상)";
+                    case AuthError.WrongPassword:
+                    case AuthError.UserNotFound:
+                    case AuthError.InvalidCredential:    return "이메일 또는 비밀번호가 맞지 않습니다.";
+                    case AuthError.UserDisabled:         return "사용이 중지된 계정입니다.";
+                    case AuthError.NetworkRequestFailed: return "인터넷 연결을 확인해 주세요.";
+                    case AuthError.OperationNotAllowed:  return "이메일 로그인이 꺼져 있습니다. (개발자: Firebase 콘솔에서 이메일/비밀번호 사용 설정)";
+                    default:                             return $"로그인에 실패했습니다. ({(AuthError)fe.ErrorCode})";
+                }
+            }
+        }
+        return "로그인에 실패했습니다.";
+    }
+
     // ───────────────────────────── 로그아웃 ─────────────────────────────
 
     /// <summary>
@@ -317,15 +520,45 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     public void SignOut()
     {
+        // ★ [로그아웃] 로그인 처리 중에는 무시.
+        //   구글 창이나 이메일 요청이 진행 중일 때 로그아웃하면, 잠시 뒤 그 결과가 도착하면서
+        //   "로그아웃했는데 다시 로그인돼 있는" 상태가 됩니다. 버튼도 막아 두지만 여기서 한 번 더 막습니다.
+        if (IsSigningIn)
+        {
+            Debug.LogWarning("[Auth] 로그인 처리 중이라 로그아웃을 건너뜁니다.");
+            return;
+        }
+
+        // 어떤 방식(구글/이메일)으로 로그인했든 Firebase 로그아웃은 같습니다 — 기기에 저장된 로그인 상태가 지워짐
         if (auth != null) auth.SignOut();
 
-        // DefaultInstance 는 Configuration 이 들어간 뒤에만 만들 수 있고, 미지원 플랫폼에는 플러그인이 없다
-        if (isGoogleConfigured && IsGoogleSignInSupported)
-            GoogleSignIn.DefaultInstance.SignOut();
+        // ★ [로그아웃] 구글 쪽 로그아웃 — 이걸 해야 다음 구글 로그인 때 "계정 선택 창" 이 다시 뜹니다.
+        //   예전에는 isGoogleConfigured 일 때만 했는데, 앱을 다시 켜서 '자동 로그인' 된 상태에서는
+        //   이번 실행에 구글 설정을 한 번도 안 했으므로(false) 구글 로그아웃이 건너뛰어졌습니다.
+        //   → 그러면 다음 구글 로그인이 계정 선택 없이 예전 계정으로 바로 들어가 계정을 바꿀 수 없었습니다.
+        //   그래서 필요하면 여기서 설정을 먼저 넣고 로그아웃합니다 (이메일로 로그인했던 경우에도 무해).
+        if (IsGoogleSignInSupported && TryConfigureGoogleSignIn())
+        {
+            try
+            {
+                GoogleSignIn.DefaultInstance.SignOut();
+            }
+            catch (Exception e)
+            {
+                // 네이티브 플러그인 쪽 예외. Firebase 로그아웃은 이미 끝났으므로 게임 진행에는 지장 없음 → 로그만
+                Debug.LogWarning($"[Auth] 구글 로그아웃 중 예외 (Firebase 로그아웃은 완료): {e.Message}");
+            }
+        }
 
         Debug.Log("[Auth] 로그아웃");
-        SetSigningIn(false);
+        LastError = null;   // ★ [이메일 로그인] 로그아웃하면 이전 실패 문구도 지움
+        SetSigningIn(false);   // Notify → 로그인 화면 UI 들이 '로그인 전' 상태로 돌아감
     }
+
+    // ★ [이메일 로그인] 에디터 테스트용: 컴포넌트 우클릭 → 로그아웃 (Firebase 는 로그인 상태를 기억하므로
+    //   같은 계정으로 다시 테스트하거나 다른 계정으로 바꿀 때 필요합니다)
+    [ContextMenu("테스트: 로그아웃")]
+    private void DebugSignOut() => SignOut();
 
     // ───────────────────────────── 내부 도우미 ─────────────────────────────
 

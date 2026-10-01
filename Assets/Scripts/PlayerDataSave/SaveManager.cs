@@ -27,6 +27,15 @@ using UnityEngine.SceneManagement;   // ★ [게임 시작 전 저장 차단] sc
 ///   7. IsGameplayStarted — 게임 씬에 한 번이라도 들어갔는가 (인스턴스 값, 계정 삭제 시 새로 시작)
 ///   8. Save() 입구에서 IsGameplayStarted 가 false 면 무시
 ///   WriteCurrentToDisk()(이름 저장, PlayerProfile.Persist) 는 막지 않는다 — 게임 시작 전 저장의 정식 경로.
+///
+/// ★ [계정별 세이브] 이번에 바뀐 곳 (전부 "★ [계정별 세이브]" 로 표시)
+///   한 기기에서 여러 계정(구글/이메일)으로 로그인해도 진행이 섞이지 않게, 세이브 파일을 계정마다 나눕니다.
+///     게스트(로그인 안 함) → save.json            ← 예전 파일 이름 그대로 = 기존 데이터가 곧 게스트 데이터 (변환 불필요)
+///     계정 (Firebase UID)  → save_<UID>.json
+///   9.  ActiveAccountId — 지금 어느 계정의 파일을 쓰는가. PlayerPrefs 에 기억해 두어 앱을 다시 켜도 같은 파일을 바로 읽음
+///   10. SavePath 가 ActiveAccountId 에 따라 바뀜 (경로 계산은 여전히 PathFor 한 곳)
+///   11. SaveFileExists / TryMoveSaveFile / SetActiveAccount — 계정 전환(AccountSwitch)이 쓰는 도구
+///   어느 계정으로 바꿀지, 게스트 진행을 옮길지는 AccountSwitch.cs 가 결정합니다. 이 파일은 "파일 위치" 만 압니다.
 /// </summary>
 public class SaveManager : MonoBehaviour
 {
@@ -38,7 +47,118 @@ public class SaveManager : MonoBehaviour
     //   인스턴스 데이터를 하나도 안 쓰는 계산이라 static 이어도 의미가 같습니다.
     //   이렇게 해야 SaveManager 가 없는 상황에서도 "어느 파일을 지울지" 를 알 수 있습니다.
     //   ("save.json" 이라는 이름을 AccountReset 에 한 번 더 적으면, 나중에 한쪽만 바뀌는 순간 초기화가 조용히 고장납니다)
-    private static string SavePath => Path.Combine(Application.persistentDataPath, "save.json");
+    //   ★ [계정별 세이브] 이제 "지금 계정" 의 파일 경로입니다 (아래 PathFor 참고).
+    private static string SavePath => PathFor(ActiveAccountId);
+
+    // ─────────────────────────────────────────────
+    // ★ [계정별 세이브] 계정 → 파일
+    // ─────────────────────────────────────────────
+
+    // 마지막으로 쓴 계정을 기억하는 PlayerPrefs 키.
+    // [왜 기억하나] SaveManager 는 Awake 에서 바로 세이브를 읽는데, 그때는 Firebase 가 아직 준비 전이라
+    //   "지금 누가 로그인돼 있는지" 모릅니다. 지난번 계정을 기억해 두면, 평소처럼 같은 계정으로 다시 켠 경우
+    //   처음부터 맞는 파일을 읽어서 계정 전환(매니저 재시작)이 일어나지 않습니다.
+    private const string ACTIVE_ACCOUNT_PREF_KEY = "SAVE_ACTIVE_ACCOUNT_V1";
+    private const string GUEST_FILE_NAME = "save.json";   // 예전 파일 이름 그대로 — 기존 유저 데이터를 옮기지 않아도 됨
+
+    private static string activeAccountId;
+    private static bool   activeAccountLoaded;   // PlayerPrefs 에서 한 번 읽었는가 (매번 읽지 않게)
+
+    /// <summary>
+    /// 지금 세이브 파일의 주인. 빈 문자열("") = 게스트(로그인 안 함), 그 외 = Firebase UID.
+    /// static 인 이유: 계정 전환·계정 삭제 때 SaveManager 자신이 파괴·재생성되는데, 새 SaveManager 가
+    /// Awake 에서 "어느 파일을 읽을지" 알아야 하기 때문입니다 (IsSaveLocked 가 static 인 것과 같은 이유).
+    /// </summary>
+    public static string ActiveAccountId
+    {
+        get
+        {
+            if (!activeAccountLoaded)
+            {
+                activeAccountId     = PlayerPrefs.GetString(ACTIVE_ACCOUNT_PREF_KEY, string.Empty);
+                activeAccountLoaded = true;
+            }
+            return activeAccountId;
+        }
+    }
+
+    /// <summary>로그 표시용 이름 ("게스트" 또는 UID 앞 6자리)</summary>
+    public static string ActiveAccountLabel =>
+        IsGuestAccount(ActiveAccountId) ? "게스트" : ActiveAccountId.Substring(0, System.Math.Min(6, ActiveAccountId.Length)) + "…";
+
+    public static bool IsGuestAccount(string accountId) => string.IsNullOrEmpty(accountId);
+
+    /// <summary>
+    /// 계정별로 PlayerPrefs 키 뒤에 붙일 꼬리표. 게스트는 "" (= 예전 키 그대로), 계정은 "_UID".
+    /// 세이브 파일 이름과 같은 규칙을 PlayerPrefs 저장(증강)에도 쓰게 하려고 공개합니다.
+    /// </summary>
+    public static string KeySuffixFor(string accountId) =>
+        IsGuestAccount(accountId) ? string.Empty : "_" + SanitizeForFileName(accountId);
+
+    /// <summary>계정의 세이브 파일 경로. 경로 규칙은 이 함수 한 곳에만 있습니다.</summary>
+    public static string PathFor(string accountId)
+    {
+        string fileName = IsGuestAccount(accountId) ? GUEST_FILE_NAME : $"save{KeySuffixFor(accountId)}.json";
+        return Path.Combine(Application.persistentDataPath, fileName);
+    }
+
+    public static bool SaveFileExists(string accountId) => File.Exists(PathFor(accountId));
+
+    /// <summary>
+    /// 지금 계정을 바꾸고 기억합니다 (다음 앱 실행 때도 이 계정 파일부터 읽음).
+    /// ⚠ 파일을 다시 읽지는 않습니다. 메모리(Current, 매니저들)를 어떻게 맞출지는 AccountSwitch 가 정합니다.
+    /// </summary>
+    public static void SetActiveAccount(string accountId)
+    {
+        activeAccountId     = accountId ?? string.Empty;
+        activeAccountLoaded = true;
+        PlayerPrefs.SetString(ACTIVE_ACCOUNT_PREF_KEY, activeAccountId);
+        PlayerPrefs.Save();   // 바로 앱이 꺼져도 다음 실행에 맞는 파일을 읽도록 즉시 기록
+        Debug.Log($"[SaveManager] 사용 계정 변경 → {ActiveAccountLabel} ({PathFor(activeAccountId)})");
+    }
+
+    /// <summary>
+    /// 한 계정의 세이브 파일을 다른 계정 이름으로 "옮깁니다" (복사 아님 — 원본은 사라짐).
+    /// 게스트 진행을 처음 로그인한 계정이 가져갈 때 씁니다.
+    ///   - 대상 파일이 이미 있으면 덮어쓰지 않고 실패 (그 계정의 진행을 지우면 안 되므로)
+    ///   - 원본 파일이 없으면 옮길 것이 없으므로 성공 (새 게임 상태 그대로 넘어감)
+    /// File.Move 는 같은 저장소 안에서 이름만 바꾸는 동작이라, 중간에 앱이 꺼져도 "반쯤 복사된 파일" 이 생기지 않습니다.
+    /// </summary>
+    public static bool TryMoveSaveFile(string fromAccountId, string toAccountId, out string error)
+    {
+        error = string.Empty;
+        string from = PathFor(fromAccountId);
+        string to   = PathFor(toAccountId);
+        if (from == to) return true;
+
+        try
+        {
+            if (File.Exists(to))
+            {
+                error = "대상 계정의 세이브가 이미 있습니다.";
+                return false;
+            }
+            if (File.Exists(from)) File.Move(from, to);
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            error = e.Message;   // 외부 저장소라 try-catch (TryDeleteSaveFile 과 같은 기준)
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// UID 를 파일 이름에 넣기 전에 안전한 글자만 남깁니다. (Firebase UID 는 보통 영문·숫자뿐이지만,
+    /// 파일 이름에 쓸 수 없는 글자가 섞이면 저장이 조용히 실패하므로 방어)
+    /// </summary>
+    private static string SanitizeForFileName(string id)
+    {
+        var sb = new System.Text.StringBuilder(id.Length);
+        foreach (char c in id)
+            sb.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_');
+        return sb.ToString();
+    }
 
     // ─────────────────────────────────────────────
     // ★ [계정 삭제] 저장 잠금
@@ -69,13 +189,17 @@ public class SaveManager : MonoBehaviour
     private static void ResetStatics()
     {
         IsSaveLocked = false;
+
+        // ★ [계정별 세이브] 메모리 값은 비우고 다음에 PlayerPrefs 에서 다시 읽게 함 (실제 앱 재시작과 같은 상태)
+        activeAccountId     = null;
+        activeAccountLoaded = false;
     }
 
-    /// <summary>저장을 잠급니다. 계정 초기화(AccountReset)만 호출하세요.</summary>
+    /// <summary>저장을 잠급니다. 매니저를 새로 만드는 쪽(AccountReset — 계정 삭제·계정 전환)만 호출하세요.</summary>
     public static void LockForReset()
     {
         IsSaveLocked = true;
-        Debug.Log("[SaveManager] 저장 잠금 — 계정 초기화 시작");
+        Debug.Log("[SaveManager] 저장 잠금 — 매니저 재시작(계정 삭제/전환) 시작");
     }
 
     /// <summary>
@@ -327,6 +451,7 @@ public class SaveManager : MonoBehaviour
         if (!HasSave())
         {
             Current = new SaveData();   // 첫 실행 — 기본값
+            Debug.Log($"[SaveManager] 세이브 없음 — 새 데이터로 시작 (계정: {ActiveAccountLabel})");   // ★ [계정별 세이브]
             return;
         }
 
@@ -352,7 +477,7 @@ public class SaveManager : MonoBehaviour
             if (!json.Contains("\"tutorialDone\""))
                 Current.tutorialDone = true;
 
-            Debug.Log("[SaveManager] 불러오기 완료");
+            Debug.Log($"[SaveManager] 불러오기 완료 (계정: {ActiveAccountLabel})");   // ★ [계정별 세이브] 어느 계정 파일인지
         }
         catch (System.Exception e)
         {

@@ -1818,11 +1818,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45f7341b23942ac4ab93d705029d1965, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameSettingManager
+  deleteAccountButton: {fileID: 0}
+  deleteConfirmPopup: {fileID: 0}
+  deleteConfirmButton: {fileID: 0}
+  deleteCancelButton: {fileID: 0}
+  deleteDimButton: {fileID: 0}
+  deleteStatusText: {fileID: 0}
   settingsPanel: {fileID: 288529731}
   openSettingsButton: {fileID: 508341512}
   returnToLoginButton: {fileID: 277486480}
   resumeButton: {fileID: 278829968}
   quitGameButton: {fileID: 1033668207}
+  tutorialButton: {fileID: 0}
   logInteractions: 0
   bloomSlider: {fileID: 1145726880}
   bloomValueLabel: {fileID: 0}
@@ -3365,6 +3372,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerName
   nickNameText: {fileID: 1304691290}
   format: '{0}'
+  namePanel: {fileID: 0}
 --- !u!224 &410248066
 RectTransform:
   m_ObjectHideFlags: 0
@@ -16702,55 +16710,6 @@ Texture2D:
     offset: 0
     size: 0
     path: 
---- !u!1 &1485356030
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1485356032}
-  - component: {fileID: 1485356031}
-  m_Layer: 0
-  m_Name: mouse cursor manager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1485356031
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1485356030}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 09034ac53080bb349be803759957ac42, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CustomCursor
-  cursorTexture: {fileID: -8328923581568760697, guid: 721062cdbedf0ab40b0ee97408b4bbd5,
-    type: 3}
-  hotspot: {x: 0, y: 0}
-  dontDestroyOnLoad: 1
-  reapplyOnFocus: 1
---- !u!4 &1485356032
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1485356030}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1497543929
 GameObject:
   m_ObjectHideFlags: 0
@@ -23516,7 +23475,6 @@ SceneRoots:
   - {fileID: 410248066}
   - {fileID: 96071556}
   - {fileID: 1419786330}
-  - {fileID: 1485356032}
   - {fileID: 2034947568}
   - {fileID: 2083012587}
   - {fileID: 259788245}

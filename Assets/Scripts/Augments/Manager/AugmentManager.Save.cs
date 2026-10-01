@@ -24,6 +24,16 @@ using UnityEngine;
 ///
 ///   ※ 근본 해결은 증강 저장을 SaveData 로 합치는 것입니다 (증강카드 리팩토링 정리 문서 A-4).
 ///     합치면 save.json 하나만 지우면 되므로 2번이 필요 없어집니다. 이번에는 범위를 넓히지 않았습니다.
+///
+/// ★ [계정별 세이브] 이번에 바뀐 곳 (전부 "★ [계정별 세이브]" 로 표시)
+///   증강은 save.json 이 아니라 PlayerPrefs 에 있어서, 세이브 파일만 계정별로 나누면 증강은 계속 섞입니다.
+///   그래서 PlayerPrefs 키에도 세이브 파일과 같은 계정 꼬리표를 붙입니다.
+///     게스트 → "AUGMENT_SAVE_V1"        (예전 키 그대로 → 기존 데이터 변환 불필요)
+///     계정   → "AUGMENT_SAVE_V1_<UID>"
+///   4. KeyFor() — 실제로 읽고 쓰는 키 = 인스펙터 키 + 계정 꼬리표 (규칙은 SaveManager.KeySuffixFor 한 곳)
+///   5. DeleteAllSavesForReset — "지금 계정" 의 증강만 지움 (다른 계정 증강은 보존)
+///   6. MoveSavesBetweenAccounts — 게스트 진행을 계정이 가져갈 때 증강도 함께 옮김
+///   AugmentManager 본체(카드 효과·배율 계산)는 바꾸지 않았습니다.
 /// </summary>
 public partial class AugmentManager
 {
@@ -55,6 +65,13 @@ public partial class AugmentManager
     ///   ids    = ["Aug_Attack_15", "Aug_Crit_25"]
     ///   counts = [3,               1            ]
     /// </summary>
+    /// <summary>
+    /// ★ [계정별 세이브] 실제로 PlayerPrefs 에 쓰는 키. 인스펙터 키(baseKey) + 계정 꼬리표.
+    /// usedSaveKeys 에는 꼬리표 없는 baseKey 를 적어 두고, 쓸 때마다 이 함수로 붙입니다
+    /// → 계정이 바뀌어도 "어떤 baseKey 들을 썼는지" 목록은 그대로 재사용됩니다.
+    /// </summary>
+    private static string KeyFor(string baseKey, string accountId) => baseKey + SaveManager.KeySuffixFor(accountId);
+
     [Serializable]
     private class AugmentSaveData
     {
@@ -91,7 +108,7 @@ public partial class AugmentManager
             i++;
         }
 
-        PlayerPrefs.SetString(saveKey, JsonUtility.ToJson(data));
+        PlayerPrefs.SetString(KeyFor(saveKey, SaveManager.ActiveAccountId), JsonUtility.ToJson(data));   // ★ [계정별 세이브]
         PlayerPrefs.Save();
     }
 
@@ -105,11 +122,15 @@ public partial class AugmentManager
         usedSaveKeys.Add(saveKey);   // ★ [계정 삭제] saveEnabled 가 꺼져 있어도 키는 기억 (예전에 켜서 저장했을 수 있음)
 
         if (!saveEnabled) return;
-        if (!PlayerPrefs.HasKey(saveKey)) return;
+
+        // ★ [계정별 세이브] 지금 계정의 키. Load 가 불리는 순간의 계정 기준이므로,
+        //   계정이 바뀌면 AccountSwitch 가 매니저를 새로 만들어 이 Load 가 새 계정으로 다시 불리게 합니다.
+        string key = KeyFor(saveKey, SaveManager.ActiveAccountId);
+        if (!PlayerPrefs.HasKey(key)) return;
 
         try
         {
-            var data = JsonUtility.FromJson<AugmentSaveData>(PlayerPrefs.GetString(saveKey));
+            var data = JsonUtility.FromJson<AugmentSaveData>(PlayerPrefs.GetString(key));
             if (data?.ids == null || data.counts == null) return;
 
             // 두 배열 길이가 어긋난 파일이 들어와도 터지지 않게 짧은 쪽 기준으로 돕니다.
@@ -152,19 +173,50 @@ public partial class AugmentManager
     /// </summary>
     public static void DeleteAllSavesForReset()
     {
-        PlayerPrefs.DeleteKey(DEFAULT_SAVE_KEY);
+        // ★ [계정별 세이브] "지금 계정" 의 키만 지웁니다. 같은 기기의 다른 계정 증강은 남겨야 합니다.
+        string account = SaveManager.ActiveAccountId;
+
+        PlayerPrefs.DeleteKey(KeyFor(DEFAULT_SAVE_KEY, account));
 
         foreach (string key in usedSaveKeys)
-            if (!string.IsNullOrEmpty(key)) PlayerPrefs.DeleteKey(key);
+            if (!string.IsNullOrEmpty(key)) PlayerPrefs.DeleteKey(KeyFor(key, account));
 
-        Debug.Log($"[Augment] 계정 삭제 — 증강 저장 삭제 (키 {usedSaveKeys.Count + 1}개 확인)");
+        Debug.Log($"[Augment] 계정 삭제 — 증강 저장 삭제 (계정 {SaveManager.ActiveAccountLabel}, 키 {usedSaveKeys.Count + 1}개 확인)");
+    }
+
+    /// <summary>
+    /// ★ [계정별 세이브] 한 계정의 증강 저장을 다른 계정으로 "옮깁니다" (원본 키는 지움).
+    /// 게스트 진행을 처음 로그인한 계정이 가져갈 때 세이브 파일과 함께 부릅니다.
+    /// 대상 계정에 이미 저장이 있으면 그 키는 건드리지 않습니다 (그 계정의 진행을 덮어쓰지 않게).
+    /// 확인하는 키: 기본 키 + 이번 실행에서 쓰인 키 (DeleteAllSavesForReset 와 같은 범위).
+    /// </summary>
+    public static void MoveSavesBetweenAccounts(string fromAccountId, string toAccountId)
+    {
+        var baseKeys = new HashSet<string>(usedSaveKeys) { DEFAULT_SAVE_KEY };
+        int moved = 0;
+
+        foreach (string baseKey in baseKeys)
+        {
+            if (string.IsNullOrEmpty(baseKey)) continue;
+
+            string from = KeyFor(baseKey, fromAccountId);
+            string to   = KeyFor(baseKey, toAccountId);
+            if (from == to || !PlayerPrefs.HasKey(from) || PlayerPrefs.HasKey(to)) continue;
+
+            PlayerPrefs.SetString(to, PlayerPrefs.GetString(from));
+            PlayerPrefs.DeleteKey(from);
+            moved++;
+        }
+
+        PlayerPrefs.Save();   // 세이브 파일 이동과 짝이 맞게 즉시 기록
+        Debug.Log($"[Augment] 증강 저장 이동: {moved}개 키");
     }
 
     /// <summary>저장 데이터를 통째로 지웁니다. 개발 중 초기화용.</summary>
     [ContextMenu("테스트: 저장 데이터 삭제")]
     private void DeleteSave()
     {
-        PlayerPrefs.DeleteKey(saveKey);
+        PlayerPrefs.DeleteKey(KeyFor(saveKey, SaveManager.ActiveAccountId));   // ★ [계정별 세이브] 지금 계정만
         PlayerPrefs.Save();
         Debug.Log("[Augment] 저장 데이터를 삭제했습니다.");
     }
