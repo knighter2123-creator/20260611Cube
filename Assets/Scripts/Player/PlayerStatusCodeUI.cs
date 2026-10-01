@@ -9,7 +9,6 @@ using UnityEngine.UI;
 ///
 /// 씬 작업이 거의 없습니다. 빈 오브젝트에 이 컴포넌트 하나만 붙이면
 /// 캔버스 · 버튼 · 패널 · 텍스트를 전부 스크립트가 만듭니다.
-/// (프리팹으로 배치하는 버전은 PlayerStatusUI 입니다. **둘 중 하나만 쓰세요.**)
 ///
 /// ─────────────────────────────────────────────────────────────
 /// [partial 로 두 파일에 나눈 기준 — AugmentSelectUI 와 같은 방식]
@@ -203,33 +202,15 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
         var lm = LevelUpManager.Instance;
         if (lm != boundLm)
         {
-            if (boundLm != null)
-            {
-                boundLm.OnLevelUp      -= HandleLevelChanged;
-                boundLm.OnExpChanged   -= HandleExpChanged;
-                boundLm.OnStatRestored -= HandleLevelChanged;
-                boundLm.OnStatUpgraded -= HandleStatUpgraded;
-            }
-
-            boundLm = lm;
-
-            if (boundLm != null)
-            {
-                boundLm.OnLevelUp      += HandleLevelChanged;
-                boundLm.OnExpChanged   += HandleExpChanged;
-                boundLm.OnStatRestored += HandleLevelChanged;
-                boundLm.OnStatUpgraded += HandleStatUpgraded;
-            }
+            UnbindLevelUp();
+            BindLevelUp(lm);
         }
 
         var am = AugmentManager.Instance;
         if (am != boundAm)
         {
-            if (boundAm != null) boundAm.OnChanged -= RefreshIfOpen;
-
-            boundAm = am;
-
-            if (boundAm != null) boundAm.OnChanged += RefreshIfOpen;
+            UnbindAugment();
+            BindAugment(am);
         }
     }
 
@@ -241,6 +222,26 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     /// </summary>
     private void Unsubscribe()
     {
+        UnbindLevelUp();
+        UnbindAugment();
+    }
+
+    // 구독(+=) 과 해제(-=) 목록을 한 쌍의 함수에만 둡니다.
+    // 이벤트를 하나 추가할 때 두 함수만 나란히 고치면 되고, 한쪽만 고치는 실수가 줄어듭니다.
+
+    private void BindLevelUp(LevelUpManager lm)
+    {
+        boundLm = lm;
+        if (boundLm == null) return;
+
+        boundLm.OnLevelUp      += HandleLevelChanged;
+        boundLm.OnExpChanged   += HandleExpChanged;
+        boundLm.OnStatRestored += HandleLevelChanged;
+        boundLm.OnStatUpgraded += HandleStatUpgraded;
+    }
+
+    private void UnbindLevelUp()
+    {
         if (boundLm != null)
         {
             boundLm.OnLevelUp      -= HandleLevelChanged;
@@ -248,10 +249,18 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
             boundLm.OnStatRestored -= HandleLevelChanged;
             boundLm.OnStatUpgraded -= HandleStatUpgraded;
         }
-
-        if (boundAm != null) boundAm.OnChanged -= RefreshIfOpen;
-
         boundLm = null;
+    }
+
+    private void BindAugment(AugmentManager am)
+    {
+        boundAm = am;
+        if (boundAm != null) boundAm.OnChanged += RefreshIfOpen;
+    }
+
+    private void UnbindAugment()
+    {
+        if (boundAm != null) boundAm.OnChanged -= RefreshIfOpen;
         boundAm = null;
     }
 

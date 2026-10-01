@@ -8,6 +8,6 @@ public class EnemyHpBar : MonoBehaviour
     public void UpdateHp(float current, float max)
     {
         if (slider != null)
-            slider.value = current / max;
+            slider.value = max > 0f ? current / max : 0f;
     }
 }

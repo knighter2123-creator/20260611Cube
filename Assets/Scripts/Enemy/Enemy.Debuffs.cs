@@ -4,6 +4,8 @@ using UnityEngine;
 /// <summary>
 /// 스킬 디버프 로직 (둔화 / 방어력 감소 / 독 / 스턴)
 /// 속도는 TargetMove의 배율 API를 통해서만 조작합니다 — 직접 대입 금지.
+///
+/// 같은 디버프가 다시 걸리면 이전 코루틴을 멈추고 새로 시작합니다(지속시간 갱신, 중첩 없음).
 /// </summary>
 public partial class Enemy
 {
@@ -36,7 +38,7 @@ public partial class Enemy
         StopAllDebuffs();
 
         _armorBreakMultiplier = 1f;
-        if (_sr != null) _sr.color = _originalColor;
+        SetTint(_originalColor);
 
         _move?.ResetForSpawn();
     }
@@ -46,21 +48,19 @@ public partial class Enemy
     // ──────────────────────────────────────────
     public void ApplySlow(float rate, float duration)
     {
-        if (isDead || _move == null) return;
-
-        StopCoroutineIfRunning(ref _slowCoroutine);
-        _slowCoroutine = StartCoroutine(SlowRoutine(rate, duration));
+        if (_move == null) return;
+        RestartDebuff(ref _slowCoroutine, SlowRoutine(rate, duration));
     }
 
     private IEnumerator SlowRoutine(float rate, float duration)
     {
         _move.SetSlowMultiplier(1f - rate);   // 누적이 아니라 대입 — 겹쳐도 안전
-        if (_sr != null) _sr.color = SlowColor;
+        SetTint(SlowColor);
 
         yield return new WaitForSeconds(duration);
 
         _move.ClearSlow();
-        if (_sr != null) _sr.color = _originalColor;
+        SetTint(_originalColor);
         _slowCoroutine = null;
     }
 
@@ -69,15 +69,12 @@ public partial class Enemy
     // ──────────────────────────────────────────
     public void ApplyArmorBreak(float rate, float duration)
     {
-        if (isDead) return;
-
-        StopCoroutineIfRunning(ref _armorBreakCoroutine);
-        _armorBreakCoroutine = StartCoroutine(ArmorBreakRoutine(rate, duration));
+        RestartDebuff(ref _armorBreakCoroutine, ArmorBreakRoutine(rate, duration));
     }
 
     private IEnumerator ArmorBreakRoutine(float rate, float duration)
     {
-        _armorBreakMultiplier = Mathf.Max(1f - rate, 0.01f);   // 0 나눗셈 방지
+        _armorBreakMultiplier = Mathf.Max(1f - rate, 0.01f);   // 방어력이 음수가 되지 않도록 하한
 
         yield return new WaitForSeconds(duration);
 
@@ -90,15 +87,12 @@ public partial class Enemy
     // ──────────────────────────────────────────
     public void ApplyDot(float dotDamage, float dotInterval, float duration)
     {
-        if (isDead) return;
-
-        StopCoroutineIfRunning(ref _dotCoroutine);
-        _dotCoroutine = StartCoroutine(DotRoutine(dotDamage, dotInterval, duration));
+        RestartDebuff(ref _dotCoroutine, DotRoutine(dotDamage, dotInterval, duration));
     }
 
     private IEnumerator DotRoutine(float dotDamage, float dotInterval, float duration)
     {
-        var wait    = new WaitForSeconds(dotInterval);
+        var   wait    = new WaitForSeconds(dotInterval);
         float elapsed = 0f;
 
         while (elapsed < duration)
@@ -117,10 +111,8 @@ public partial class Enemy
     // ──────────────────────────────────────────
     public void ApplyStun(float duration)
     {
-        if (isDead || _move == null) return;
-
-        StopCoroutineIfRunning(ref _stunCoroutine);
-        _stunCoroutine = StartCoroutine(StunRoutine(duration));
+        if (_move == null) return;
+        RestartDebuff(ref _stunCoroutine, StunRoutine(duration));
     }
 
     private IEnumerator StunRoutine(float duration)
@@ -136,11 +128,26 @@ public partial class Enemy
     // ──────────────────────────────────────────
     //  유틸
     // ──────────────────────────────────────────
+
+    /// <summary>살아 있을 때만, 같은 종류의 이전 디버프를 끊고 새로 시작합니다.</summary>
+    private void RestartDebuff(ref Coroutine slot, IEnumerator routine)
+    {
+        if (isDead) return;
+
+        StopCoroutineIfRunning(ref slot);
+        slot = StartCoroutine(routine);
+    }
+
     private void StopCoroutineIfRunning(ref Coroutine co)
     {
         if (co == null) return;
         StopCoroutine(co);
         co = null;
+    }
+
+    private void SetTint(Color color)
+    {
+        if (_sr != null) _sr.color = color;
     }
 
     /// <summary>Die() / ResetDebuffs()에서 호출 — 모든 디버프 코루틴 일괄 정리</summary>

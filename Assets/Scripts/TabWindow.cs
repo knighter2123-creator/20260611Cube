@@ -38,7 +38,7 @@ public interface IStatFocusTarget
 /// 강화 / 스탯 등을 탭으로 전환하는 단일 창.
 ///
 /// ★ 이 컴포넌트는 창 '밖'의 항상 켜져 있는 오브젝트에 붙입니다.
-///   (SettingsPanel / PlayerStatusUI 와 같은 규칙입니다.
+///   (SettingsPanel / PlayerStatusCodeUI 와 같은 규칙입니다.
 ///    창 안에 붙이면 창이 꺼진 동안 이 스크립트도 꺼져서 '여는 동작' 자체가 불가능해집니다)
 ///
 /// 책임 분배:

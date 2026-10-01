@@ -139,35 +139,31 @@ public class EnemyDeathEffect : MonoBehaviour
         SetValues(0f, 1f);
 
         // ① 녹색이 확 든다
-        float t = 0f;
-        while (t < tintInTime)
-        {
-            t += Time.deltaTime;
-            SetValues(Mathf.Clamp01(t / tintInTime), 1f);
-            yield return null;
-        }
-        SetValues(1f, 1f);
+        yield return Animate(tintInTime, k => SetValues(k, 1f));
 
         // ② 잠깐 유지
-        if (holdTime > 0f)
-        {
-            float h = 0f;
-            while (h < holdTime) { h += Time.deltaTime; yield return null; }
-        }
+        yield return Animate(holdTime, null);
 
         // ③ 페이드아웃
-        t = 0f;
-        while (t < fadeOutTime)
-        {
-            t += Time.deltaTime;
-            SetValues(1f, 1f - Mathf.Clamp01(t / fadeOutTime));
-            yield return null;
-        }
-        SetValues(1f, 0f);
+        yield return Animate(fadeOutTime, k => SetValues(1f, 1f - k));
 
         Finish();
     }
 
+    /// <summary>duration 동안 매 프레임 0→1 진행도를 onStep에 넘기고, 마지막엔 정확히 1로 끝냅니다.</summary>
+    private static IEnumerator Animate(float duration, Action<float> onStep)
+    {
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            onStep?.Invoke(Mathf.Clamp01(t / duration));
+            yield return null;
+        }
+        onStep?.Invoke(1f);
+    }
+
+    /// <summary>연출 종료(정상 종료/강제 비활성화 공통) — 머티리얼을 복구하고 대기 중인 콜백을 1회 호출.</summary>
     private void Finish()
     {
         IsPlaying = false;
@@ -240,12 +236,6 @@ public class EnemyDeathEffect : MonoBehaviour
     private void OnDisable()
     {
         if (!IsPlaying && !swapped) return;
-
-        IsPlaying = false;
-        Restore();
-
-        Action cb = pending;
-        pending = null;
-        cb?.Invoke();
+        Finish();
     }
 }
