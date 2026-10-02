@@ -15,34 +15,42 @@ public class CompanionManager : MonoBehaviour
     [Header("세이브 복원용 DB (모든 CompanionData)")]
     [SerializeField] private CompanionDatabase database;
 
-    private List<CompanionData> ownedCompanionData = new List<CompanionData>();
-    private List<Companion>     ownedCompanions    = new List<Companion>();
+    private readonly List<CompanionData> ownedCompanionData = new List<CompanionData>();
+    private readonly List<Companion>     ownedCompanions    = new List<Companion>();
 
     // 셀 좌표 → 배치된 동료 (점유 관리, 라이브 뷰)
     private readonly Dictionary<Vector3Int, Companion> occupied = new Dictionary<Vector3Int, Companion>();
 
     // 배치 의도 (소유 인덱스 → 셀). 씬을 넘어 유지되며 세이브에 직렬화됨.
     private readonly Dictionary<int, Vector3Int> placementByIndex = new Dictionary<int, Vector3Int>();
-    
-    private bool loaded;
-    
+
+    // 현재 타일맵에 RestoreIntoScene 이 끝났는가. true 일 때만 occupied 가 '진짜 배치 상태' 입니다.
+    private bool restoredIntoScene;
+
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);   // ✅ GachaSystem과 동일하게 스스로 지속
 
-        if (SaveManager.Instance != null)
+        // CompanionFragment 와 같은 규칙 — 자기 데이터는 자기가 불러온다.
+        if (SaveManager.Instance == null)
         {
-            if(SaveManager.Instance.HasSave())
-                ApplyFrom(SaveManager.Instance.Current);
-            loaded = true;
+            Debug.LogError("[CompanionManager] SaveManager 가 아직 준비되지 않아 동료를 복원하지 못했습니다. " +
+                           "Project Settings → Script Execution Order 에서 SaveManager 를 -100 으로 지정하세요.");
+            return;
         }
 
-        if (!loaded) return;
+        if (SaveManager.Instance.HasSave())
+            ApplyFrom(SaveManager.Instance.Current);
     }
 
-    public void BindPlaceableTilemap(Tilemap tilemap) => placeableTilemap = tilemap;
+    public void BindPlaceableTilemap(Tilemap tilemap)
+    {
+        // 다른 타일맵으로 바뀌면 그 씬에는 아직 복원 전입니다 (occupied 가 현재 씬을 반영하지 않음).
+        if (placeableTilemap != tilemap) restoredIntoScene = false;
+        placeableTilemap = tilemap;
+    }
 
     // ──────────────────────────────────────────────
     //  세이브 연동
@@ -51,6 +59,8 @@ public class CompanionManager : MonoBehaviour
     /// <summary>보유 동료 id 목록 + 배치를 SaveData에 기록.</summary>
     public void CaptureTo(SaveData d)
     {
+        if (d == null) return;
+
         // 보유 목록 (기존 그대로)
         d.ownedCompanionIds.Clear();
         foreach (var data in ownedCompanionData)
@@ -65,9 +75,13 @@ public class CompanionManager : MonoBehaviour
         }
 
         // ── 배치 ──
-        // 배치 가능한 씬이고 실제로 배치된 동료가 있을 때만 스냅샷 갱신.
-        // occupied가 비어 있으면(로드 직후·회수 상태 등) 기존 배치를 덮어쓰지 않고 보존.
-        if (placeableTilemap != null && occupied.Count > 0)
+        // 배치 가능한 씬에서 '복원이 끝난 뒤' 에만 스냅샷 갱신. 그 전(로드 직후·다른 씬)이면 기존 배치를 보존.
+        //
+        // ★ [수정] 예전 조건은 occupied.Count > 0 이었습니다.
+        //   그러면 "아직 복원 전이라 비어 있음" 과 "유저가 전부 회수해서 비어 있음" 을 구분하지 못해,
+        //   마지막 동료까지 회수하고 저장해도 옛 배치가 그대로 남아 → 재시작하면 회수한 동료가 다시 나타났습니다.
+        //   개수(상태) 대신 "이 씬에 복원했는가"(사건) 를 기준으로 — CompanionFragment.loaded 와 같은 원칙입니다.
+        if (placeableTilemap != null && restoredIntoScene)
         {
             SavePlacementSnapshot();
 
@@ -110,17 +124,23 @@ public class CompanionManager : MonoBehaviour
         ownedCompanions.Clear();   // 오브젝트는 RestoreIntoScene에서 재생성
         occupied.Clear();
 
-        foreach (string id in d.ownedCompanionIds)
+        if (d.ownedCompanionIds != null)
         {
-            CompanionData data = database.GetById(id);
-            if (data != null) ownedCompanionData.Add(data);
-            else Debug.LogWarning($"[CompanionManager] id '{id}'에 해당하는 CompanionData를 DB에서 찾지 못함");
+            foreach (string id in d.ownedCompanionIds)
+            {
+                CompanionData data = database.GetById(id);
+                if (data != null) ownedCompanionData.Add(data);
+                else Debug.LogWarning($"[CompanionManager] id '{id}'에 해당하는 CompanionData를 DB에서 찾지 못함");
+            }
         }
 
         // 저장된 배치 의도 복원
         placementByIndex.Clear();
-        foreach (var p in d.companionPlacements)
-            placementByIndex[p.ownedIndex] = new Vector3Int(p.cellX, p.cellY, p.cellZ);
+        if (d.companionPlacements != null)
+        {
+            foreach (var p in d.companionPlacements)
+                placementByIndex[p.ownedIndex] = new Vector3Int(p.cellX, p.cellY, p.cellZ);
+        }
 
         Debug.Log($"[CompanionManager] 세이브 복원 — 동료 {ownedCompanionData.Count}명 / 배치 {placementByIndex.Count}개");
     }
@@ -133,7 +153,7 @@ public class CompanionManager : MonoBehaviour
         if (data == null) return false;
 
         // 이미 보유(복원 포함)한 동료면 신규 획득 아님 → 조각 처리로 넘김
-        if (ownedCompanionData.Exists(c => c != null && c.id == data.id))
+        if (IsOwned(data.id))
         {
             Debug.Log($"[CompanionManager] {data.companionName}은(는) 이미 보유 중 — 신규 획득 아님");
             return false;
@@ -163,8 +183,7 @@ public class CompanionManager : MonoBehaviour
         if (data == null)        { Debug.LogError("[CompanionManager] CompanionData가 null입니다."); return null; }
         if (data.prefab == null) { Debug.LogError($"[CompanionManager] {data.companionName}의 prefab이 null입니다."); return null; }
 
-        GameObject obj = Instantiate(data.prefab);
-        obj.transform.SetParent(transform);
+        GameObject obj       = Instantiate(data.prefab, transform, true);   // 기존 SetParent(transform) 과 같은 월드 기준
         Companion  companion = obj.GetComponent<Companion>();
         if (companion == null)
         {
@@ -237,6 +256,8 @@ public class CompanionManager : MonoBehaviour
             if (companion != null)
                 PlaceCompanion(companion, cell);
         }
+
+        restoredIntoScene = true;
     }
 
     // ──────────────────────────────────────────────
@@ -282,6 +303,8 @@ public class CompanionManager : MonoBehaviour
 
     public void RetrieveCompanion(Companion companion)
     {
+        if (companion == null) return;
+
         Vector3Int? found = null;
         foreach (var kv in occupied)
             if (kv.Value == companion) { found = kv.Key; break; }
@@ -314,9 +337,39 @@ public class CompanionManager : MonoBehaviour
     // ──────────────────────────────────────────────
     //  조회
     // ──────────────────────────────────────────────
-    public List<Companion>     GetOwnedCompanions()    => ownedCompanions;
-    public List<CompanionData> GetOwnedCompanionData() => ownedCompanionData;
-    public int                 MaxCompanions           => maxCompanions;   // 배치 가능한 최대 수 (읽기 전용)
+    // ★ 읽기 전용으로 내줍니다. 바깥에서 Add/Remove 하면 ownedCompanions[i] ↔ ownedCompanionData[i]
+    //   짝이 어긋나 세이브의 ownedIndex 가 엉뚱한 동료를 가리키게 됩니다. 변경은 이 매니저의 메서드로만.
+    public IReadOnlyList<Companion>     GetOwnedCompanions()    => ownedCompanions;
+    public IReadOnlyList<CompanionData> GetOwnedCompanionData() => ownedCompanionData;
+    public int                          MaxCompanions           => maxCompanions;   // 배치 가능한 최대 수 (읽기 전용)
+
+    /// <summary>이 id 의 동료를 보유(도감 등록)했는가.</summary>
+    public bool IsOwned(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+        foreach (CompanionData c in ownedCompanionData)
+            if (c != null && c.id == id) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 보유 동료 오브젝트를 id 로 찾는다. (인스턴스 비교 금지 — 에셋 참조가 달라도 id 가 같으면 같은 동료)
+    /// 리스트 아이템 / 배치 컨트롤러가 각자 같은 검색을 하던 것을 여기로 모았습니다.
+    /// </summary>
+    public Companion FindOwnedCompanion(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        foreach (Companion c in ownedCompanions)
+            if (c != null && c.Id == id) return c;
+        return null;
+    }
+
+    /// <summary>이 id 의 동료가 지금 맵에 배치돼 있는가.</summary>
+    public bool IsPlaced(string id)
+    {
+        Companion c = FindOwnedCompanion(id);
+        return c != null && c.IsPlaced;
+    }
 
     // ★ [수정] '오브젝트 수'가 아니라 '배치 수' 기준. (오브젝트는 이제 보유한 만큼 전부 만들어지므로)
     public bool                IsFull                  => occupied.Count >= maxCompanions;

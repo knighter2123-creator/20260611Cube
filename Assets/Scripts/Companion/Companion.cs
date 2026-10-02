@@ -4,13 +4,14 @@ public class Companion : MonoBehaviour
 {
     private CompanionData data;
 
-    private ActiveSkill skill => data?.ownedSkill;
+    private ActiveSkill skill => data != null ? data.ownedSkill : null;   // ScriptableObject 라 ?. 대신 유니티식 null 검사
 
     private float skillTimer = 0f;
     private bool  isPlaced   = false;
 
     public bool          IsPlaced      => isPlaced;
     public string        CompanionName => data != null ? data.companionName : "unknown";
+    public string        Id            => data != null ? data.id : null;
     public CompanionData Data          => data;
     public ActiveSkill   OwnedSkill    => skill;
 
@@ -20,6 +21,11 @@ public class Companion : MonoBehaviour
     public void Init(CompanionData companionData)
     {
         data = companionData;
+        if (data == null)
+        {
+            Debug.LogError("[Companion] Init 에 null 데이터가 들어왔습니다.", this);
+            return;
+        }
 
         if (data.ownedSkill == null)
             Debug.LogWarning($"[Companion] {data.companionName}에 스킬이 없습니다.");
@@ -71,25 +77,30 @@ public class Companion : MonoBehaviour
     // ──────────────────────────────────────────────
     //  적 탐지
     // ──────────────────────────────────────────────
+    // ★ [수정] FindGameObjectsWithTag + GetComponent → Enemy.Active 목록
+    //   쿨다운이 찼는데 범위 안에 적이 없으면 이 함수는 '매 프레임' 불립니다.
+    //   FindGameObjectsWithTag 는 부를 때마다 새 배열을 만들어 동료 수 × 프레임만큼 GC 쓰레기가 쌓였습니다.
+    //   Enemy.Active 는 적이 OnEnable/OnDisable 에서 스스로 등록·해제하는 목록이라 할당이 없고,
+    //   Player.FindTarget 과 같은 기준으로 적을 찾게 됩니다.
+    //   거리 비교는 제곱 거리로 합니다 (Sqrt 생략 — 대소 비교 결과는 같음).
     private Enemy FindClosestEnemy()
     {
-        GameObject[] enemies      = GameObject.FindGameObjectsWithTag("Enemy");
-        float        closestDist  = Mathf.Infinity;
-        Enemy        closestEnemy = null;
+        Vector3 myPos        = transform.position;
+        float   rangeSqr     = data.detectRange * data.detectRange;
+        float   closestSqr   = float.MaxValue;
+        Enemy   closestEnemy = null;
 
-        foreach (GameObject enemyObj in enemies)
+        var enemies = Enemy.Active;
+        for (int i = 0; i < enemies.Count; i++)
         {
-            float dist = Vector3.Distance(transform.position, enemyObj.transform.position);
-            if (dist > data.detectRange) continue;
-
-            Enemy e = enemyObj.GetComponent<Enemy>();
+            Enemy e = enemies[i];
             if (e == null || e.isDead) continue;
 
-            if (dist < closestDist)
-            {
-                closestDist  = dist;
-                closestEnemy = e;
-            }
+            float sqr = (e.transform.position - myPos).sqrMagnitude;
+            if (sqr > rangeSqr || sqr >= closestSqr) continue;
+
+            closestSqr   = sqr;
+            closestEnemy = e;
         }
 
         return closestEnemy;

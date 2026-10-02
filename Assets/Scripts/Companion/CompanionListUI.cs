@@ -99,7 +99,8 @@ public class CompanionListUI : MonoBehaviour, ITabPage
         foreach (Transform child in companionListContent)
             Destroy(child.gameObject);
 
-        List<CompanionData> owned = CompanionManager.Instance?.GetOwnedCompanionData();
+        CompanionManager cm = CompanionManager.Instance;
+        IReadOnlyList<CompanionData> owned = cm != null ? cm.GetOwnedCompanionData() : null;
         if (owned == null || owned.Count == 0)
         {
             Debug.Log("[CompanionListUI] 보유 동료 없음");
@@ -108,9 +109,16 @@ public class CompanionListUI : MonoBehaviour, ITabPage
 
         foreach (CompanionData data in owned)
         {
+            if (data == null) continue;
+
             GameObject item = Instantiate(companionItemPrefab, companionListContent);
-            CompanionListItem ui = item.GetComponent<CompanionListItem>();
-            ui?.Setup(data);
+
+            // ★ GetComponent 결과에 ?. 를 쓰지 않습니다. 에디터에서는 컴포넌트가 없을 때 '가짜 null' 객체가 와서
+            //   ?. 를 통과해 버립니다. TryGetComponent 는 할당도 없고 그런 함정도 없습니다.
+            if (item.TryGetComponent(out CompanionListItem ui))
+                ui.Setup(data);
+            else
+                Debug.LogWarning("[CompanionListUI] 아이템 프리팹에 CompanionListItem 이 없습니다.", companionItemPrefab);
         }
     }
 }

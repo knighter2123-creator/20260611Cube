@@ -49,24 +49,24 @@ public class CompanionFragment : MonoBehaviour
 
     public void AddFragment(CompanionData data, int amount = 1)
     {
-        if (data == null) return;
+        if (data == null || string.IsNullOrEmpty(data.id)) return;
 
-        if (!fragments.ContainsKey(data.id))
-            fragments[data.id] = 0;
+        fragments.TryGetValue(data.id, out int current);   // 없으면 0
+        int next = current + amount;
+        fragments[data.id] = next;
 
-        fragments[data.id] += amount;
-        OnFragmentChanged?.Invoke(data.id, fragments[data.id]);
-
-        Debug.Log($"[Fragment] {data.companionName}({data.id}) 조각 +{amount} → 현재 {fragments[data.id]}개");
+        OnFragmentChanged?.Invoke(data.id, next);
+        Debug.Log($"[Fragment] {data.companionName}({data.id}) 조각 +{amount} → 현재 {next}개");
     }
 
     public int GetFragment(CompanionData data)
     {
-        if (data == null) return 0;
+        if (data == null || string.IsNullOrEmpty(data.id)) return 0;
         return fragments.TryGetValue(data.id, out int count) ? count : 0;
     }
 
-    public Dictionary<string, int> GetAllFragments() => fragments;
+    // 읽기 전용으로 내줍니다 — 바깥에서 고치면 OnFragmentChanged 가 안 나가 UI 가 어긋납니다.
+    public IReadOnlyDictionary<string, int> GetAllFragments() => fragments;
 
     // ── 세이브 연동 ────────────────────────────────
 

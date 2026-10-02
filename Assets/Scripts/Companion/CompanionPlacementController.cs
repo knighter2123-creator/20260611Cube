@@ -85,6 +85,8 @@ public class CompanionPlacementController : MonoBehaviour
     private const string MsgInvalidCell = "배치할 수 없는 위치입니다.";
 
     private static readonly List<RaycastResult> uiHits = new List<RaycastResult>(8);
+    private PointerEventData pointerData;
+    private EventSystem      pointerDataOwner;
 
     void Awake()
     {
@@ -132,7 +134,7 @@ public class CompanionPlacementController : MonoBehaviour
         //   안 된다는 걸 알게 됩니다. 입구에서 막는 게 친절합니다.
         //   이 경우 OnPlacementBegan 을 쏘지 않으므로 탭 창도 그대로 열려 있습니다.
         CompanionManager cm = CompanionManager.Instance;
-        if (cm != null && !IsAlreadyPlaced(cm, data) && CountPlaced(cm) >= cm.MaxCompanions)
+        if (cm != null && !cm.IsPlaced(data.id) && cm.IsFull)
         {
             ShowNotice(MsgFull);
             return;
@@ -202,13 +204,16 @@ public class CompanionPlacementController : MonoBehaviour
         //   그런데 UI 버튼은 정상적으로 눌립니다 → 다른 장치(마우스 등)는 올바른 좌표를 주고 있다는 뜻입니다.
         //   Pointer.current 는 '마지막으로 신호를 보낸 장치' 일 뿐이라, 좌표가 고장 난 장치가 잡힐 수 있습니다.
         //   → 모든 장치를 훑어서 '눌린 + 좌표가 유효한' 쪽을 씁니다. (UI 입력 모듈이 하는 방식과 같습니다)
+        //
+        // ★ [수정] 배치 대기가 아니면 장치를 훑지 않습니다. (예전엔 읽고 나서 버렸음 — 매 프레임 헛일)
+        //   눌림/뗌은 wasPressedThisFrame 로 '이번 프레임' 만 보므로, 대기 전 프레임을 읽지 않아도 놓치는 입력이 없습니다.
+        if (!isPlacing) return;
+
         // 좌표 유효성 검사(화면 영역)에 카메라가 필요하므로 먼저 확보합니다.
         // (씬 재로드 등으로 참조가 끊겼을 수 있음)
         if (cam == null) cam = Camera.main;
 
         PointerSample input = ReadPointers();
-
-        if (!isPlacing) return;
 
         // 우클릭으로 취소 — 데스크톱/에디터 전용 (터치엔 우클릭 없음)
         if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
@@ -382,8 +387,7 @@ public class CompanionPlacementController : MonoBehaviour
         if (pendingData == null) { CancelPlacement(); return; }
 
         // 보유 동료 중에서 배치할 인스턴스를 id로 찾는다 (인스턴스 비교 금지)
-        Companion target = cm.GetOwnedCompanions()
-            .Find(c => c != null && c.Data != null && c.Data.id == pendingData.id);
+        Companion target = cm.FindOwnedCompanion(pendingData.id);
 
         if (target == null)
         {
@@ -396,7 +400,7 @@ public class CompanionPlacementController : MonoBehaviour
 
         // ★ [추가] 확정 직전에 한 번 더 확인합니다 (대기 중에 다른 경로로 배치가 늘었을 수 있음).
         //   이미 배치된 동료를 옮기는 경우는 수가 늘지 않으므로 통과시킵니다.
-        if (!target.IsPlaced && CountPlaced(cm) >= cm.MaxCompanions)
+        if (!target.IsPlaced && cm.IsFull)
         {
             ShowNotice(MsgFull);
             CancelPlacement();
@@ -422,27 +426,10 @@ public class CompanionPlacementController : MonoBehaviour
     }
 
     // ══════════════════════════════════════════════
-    //  배치 수 / 알림
+    //  알림
     // ══════════════════════════════════════════════
-
-    /// <summary>
-    /// 지금 맵에 배치된 동료 수.
-    /// </summary>
-    private static int CountPlaced(CompanionManager cm) => cm.PlacedCount;
-    //  ★ 배치 수는 '점유 셀' 을 관리하는 CompanionManager 가 가장 정확히 압니다.
-    //    그 값을 그대로 물어봅니다 (같은 사실을 두 곳에서 세지 않기).
-
-    /// <summary>이 동료가 이미 맵에 있는가 (있으면 '옮기기'라 수가 늘지 않음)</summary>
-    private static bool IsAlreadyPlaced(CompanionManager cm, CompanionData data)
-    {
-        List<Companion> list = cm.GetOwnedCompanions();
-        if (list == null) return false;
-
-        foreach (Companion c in list)
-            if (c != null && c.Data != null && c.Data.id == data.id)
-                return c.IsPlaced;
-        return false;
-    }
+    //  ★ 배치 수 / '이미 배치됨' 판정은 점유 셀을 관리하는 CompanionManager 에 직접 묻습니다
+    //    (cm.IsFull / cm.IsPlaced). 같은 사실을 두 곳에서 세지 않기.
 
     /// <summary>짧은 알림을 noticeSeconds 동안 띄웁니다. (연속 호출 시 앞의 알림을 덮어씀)</summary>
     private void ShowNotice(string message)
@@ -507,9 +494,17 @@ public class CompanionPlacementController : MonoBehaviour
         EventSystem es = EventSystem.current;
         if (es == null) return false;
 
+        // 탭마다 new 하지 않고 재사용 (EventSystem 이 바뀌었으면 새로 만듦)
+        if (pointerData == null || pointerDataOwner != es)
+        {
+            pointerData      = new PointerEventData(es);
+            pointerDataOwner = es;
+        }
+        pointerData.Reset();
+        pointerData.position = screenPos;
+
         uiHits.Clear();
-        PointerEventData ped = new PointerEventData(es) { position = screenPos };
-        es.RaycastAll(ped, uiHits);
+        es.RaycastAll(pointerData, uiHits);
 
         if (uiHits.Count == 0) return false;
 

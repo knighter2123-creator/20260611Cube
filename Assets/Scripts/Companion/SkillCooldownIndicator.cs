@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// 필요한 UI(월드 캔버스 / 원형 배경 / 라디얼 필 / 남은시간 텍스트)를 코드로 자동 생성하므로
 /// 프리팹 세팅이 전혀 필요 없습니다.
 ///
-/// 사용법 : SkillCooldownIndicator.Begin(companion, skill.icon, skill.cooldown);
+/// 사용법 : SkillCooldownIndicator.Begin(companion, skill.icon, skill.GetCooldown(grade));
 /// </summary>
 [DisallowMultipleComponent]
 public class SkillCooldownIndicator : MonoBehaviour
@@ -41,6 +41,7 @@ public class SkillCooldownIndicator : MonoBehaviour
     private float _endTime;
     private bool  _running;
     private float _flashUntil;
+    private int   _lastTextKey = int.MinValue;   // 마지막으로 표시한 숫자 (같으면 문자열 재생성 생략)
 
     /// <summary>현재 쿨다운 중인지</summary>
     public bool IsCoolingDown => _running;
@@ -67,9 +68,11 @@ public class SkillCooldownIndicator : MonoBehaviour
     {
         EnsureBuilt();
 
-        _duration = Mathf.Max(0.01f, cooldown);
-        _endTime  = Time.time + _duration;
-        _running  = true;
+        _duration    = Mathf.Max(0.01f, cooldown);
+        _endTime     = Time.time + _duration;
+        _running     = true;
+        _flashUntil  = 0f;               // 반짝이는 도중 다시 시작해도 연출이 겹치지 않게
+        _lastTextKey = int.MinValue;     // 숫자를 처음부터 다시 그리게
 
         if (icon != null) _icon.sprite = icon;
         _icon.enabled = _icon.sprite != null;
@@ -93,6 +96,10 @@ public class SkillCooldownIndicator : MonoBehaviour
     {
         if (_root == null) return;
 
+        // ★ 쿨다운도 반짝임도 없으면 UI 가 숨겨진 상태라 할 일이 없습니다.
+        //   동료마다 붙어 있는 컴포넌트라 쉬는 동안의 매 프레임 계산을 건너뜁니다.
+        if (!_running && _flashUntil <= 0f) return;
+
         // 부모가 좌우 반전(scale.x = -1)돼도 UI는 항상 정방향 유지
         Vector3 ls = transform.localScale;
         float k = worldSize / 100f;
@@ -111,9 +118,17 @@ public class SkillCooldownIndicator : MonoBehaviour
             if (showRemainText && _text != null)
             {
                 _text.enabled = true;
-                _text.text = remain >= 1f
-                    ? Mathf.CeilToInt(remain).ToString()
-                    : remain.ToString("0.0");
+
+                // ★ 표시되는 숫자가 바뀔 때만 문자열을 만듭니다. (ToString 은 매번 새 문자열 → GC)
+                //   1초 이상: 정수 단위(양수 키) / 1초 미만: 0.1초 단위(음수 키) — 두 표기가 같은 키를 갖지 않게 부호로 나눕니다.
+                int key = remain >= 1f ? Mathf.CeilToInt(remain) : -1 - Mathf.RoundToInt(remain * 10f);
+                if (key != _lastTextKey)
+                {
+                    _lastTextKey = key;
+                    _text.text = remain >= 1f
+                        ? Mathf.CeilToInt(remain).ToString()
+                        : remain.ToString("0.0");
+                }
             }
 
             if (remain <= 0f)

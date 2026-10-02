@@ -6,7 +6,7 @@ using UnityEngine;
 /// ★ 도감 아이템과 상세창이 둘 다 등급을 그립니다.
 ///   각자 switch 문을 가지면 나중에 "에픽 색 좀 바꾸자" 할 때 한쪽만 바뀝니다.
 ///   같은 규칙은 한 곳에 — KoreanNumberFormatter 와 같은 판단입니다.
-///   (가챠 결과 화면이나 CompanionListItem 에 등급 색이 따로 있다면 이걸 쓰게 바꾸는 걸 권합니다)
+///   CompanionListItem 도 이제 이 색을 씁니다. (가챠 결과 화면에 등급 색이 따로 있다면 그쪽도 바꾸는 걸 권합니다)
 /// </summary>
 public static class CompanionGradeStyle
 {

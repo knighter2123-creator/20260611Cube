@@ -241,7 +241,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         CompanionManager cm = CompanionManager.Instance;
         if (cm == null) return;
 
-        List<CompanionData> owned = cm.GetOwnedCompanionData();
+        IReadOnlyList<CompanionData> owned = cm.GetOwnedCompanionData();
         if (owned == null) return;
 
         foreach (CompanionData d in owned)
@@ -269,7 +269,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         CompanionManager cm = CompanionManager.Instance;
         if (cm == null) return;   // 매니저가 없으면 전부 미획득으로 표시 (도감은 그래도 뜸)
 
-        List<CompanionData> owned = cm.GetOwnedCompanionData();
+        IReadOnlyList<CompanionData> owned = cm.GetOwnedCompanionData();
         if (owned == null) return;
 
         foreach (CompanionData d in owned)
