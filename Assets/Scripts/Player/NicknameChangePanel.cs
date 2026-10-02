@@ -15,20 +15,15 @@ using UnityEngine.UI;
 /// 이 스크립트는 화면(입력값 받기 · 비용/에러 표시)만 담당하고, 실제 유효성 검사·보석 차감·저장은
 /// 전부 PlayerProfile 에 맡깁니다 (UI 가 규칙을 중복 구현하지 않게).
 ///
-/// ★ [닉네임 인게임 이동] 이번 변경
-///   1. 최초 설정 모드 추가 (제목/비용 문구/확인 동작이 모드에 따라 바뀜)
-///   2. IsOpen 추가 — NicknamePrompt 가 "이미 열려 있으면 기다리기" 에 사용
-///   3. Open() 두 번 호출 방어 — 두 번 열면 OnGemChanged 가 두 번 구독되고 Close 는 한 번만 해제해서
-///      닫힌 뒤에도 구독 하나가 남습니다. 이제 자동 팝업과 네임플레이트 클릭이 겹칠 수 있어 필요해졌습니다.
-///   4. 비활성으로 저장된 패널에서 Open() 이 처음 불려도 안전하게 (EnsureInit, 아래 Awake 주석 참고)
-///   5. 구독 해제를 CurrencyManager.Instance 가 아니라 "구독했던 대상" 으로 (boundCurrency)
-///
-/// ★ [도달 전 설정 잠금] 이번 변경
+/// [잠김 모드]
 ///   이름이 없고 목표 스테이지에 아직 도달하지 않았으면(NicknamePrompt.IsFirstNameUnlocked == false)
-///   '잠김' 모드로 엽니다 — 입력칸·확인 버튼을 막고 "1-5 스테이지에 도달하면…" 안내를 보여 줍니다.
+///   입력칸·확인 버튼을 막고 "1-5 스테이지에 도달하면…" 안내를 보여 줍니다.
 ///   팝업 자체를 안 여는 대신 잠김 화면을 보여 주는 이유: 네임플레이트를 눌렀는데 아무 반응이 없으면
-///   유저는 고장으로 받아들입니다. 새 UI 없이 기존 제목/비용 문구 칸을 그대로 재사용합니다.
-///   이미 이름이 있는 플레이어의 '변경(보석)' 은 잠그지 않습니다 (기존 유저 영향 없음).
+///   유저는 고장으로 받아들입니다. 이미 이름이 있는 플레이어의 '변경(보석)' 은 잠그지 않습니다.
+///
+/// [중복 열기 방어]
+///   자동 팝업과 네임플레이트 클릭이 겹칠 수 있습니다. 두 번 열면 OnGemChanged 가 두 번 구독되므로
+///   Open() 은 이미 열려 있으면 무시합니다.
 /// </summary>
 public class NicknameChangePanel : MonoBehaviour
 {
@@ -37,7 +32,7 @@ public class NicknameChangePanel : MonoBehaviour
     [SerializeField] private GameObject panelRoot;
 
     [Header("입력")]
-    [SerializeField] private TMP_Text titleText;    // ★ 신규(선택): "닉네임 설정" / "닉네임 변경"
+    [SerializeField] private TMP_Text titleText;    // (선택) "닉네임 설정" / "닉네임 변경"
     [SerializeField] private TMP_InputField nameInputField;
     [SerializeField] private TMP_Text costText;     // 변경: "변경 시 보석 3000 소모" / 최초: "첫 설정은 무료입니다"
     [SerializeField] private TMP_Text errorText;    // 실패 사유 표시 (비어 있으면 숨김)
@@ -120,7 +115,7 @@ public class NicknameChangePanel : MonoBehaviour
     public void Open()
     {
         EnsureInit();
-        if (IsOpen) return;   // 이미 열려 있으면 무시 (구독 중복 방지 — 위 요약 3번)
+        if (IsOpen) return;   // 이미 열려 있으면 무시 (구독 중복 방지)
 
         isRegisterMode = !PlayerProfile.HasName;
 
@@ -182,41 +177,34 @@ public class NicknameChangePanel : MonoBehaviour
 
     private void RefreshCostText()
     {
-        // ★ [도달 전 설정 잠금] 잠김: 안내 문구 + 확인 버튼 비활성 (보석 부족과 같은 빨간색 = "지금은 안 됨" 표시 통일)
+        // 잠김: 보석 부족과 같은 빨간색 = "지금은 안 됨" 표시 통일
         if (isLocked)
         {
-            if (costText != null)
-            {
-                costText.text  = NicknamePrompt.LockedMessage;
-                costText.color = insufficientColor;
-            }
-            if (confirmButton != null) confirmButton.interactable = false;
+            ShowCost(NicknamePrompt.LockedMessage, canConfirm: false);
             return;
         }
 
+        // 최초 설정: 무료 — 항상 누를 수 있음
         if (isRegisterMode)
         {
-            // 최초 설정: 무료 — 항상 누를 수 있음
-            if (costText != null)
-            {
-                costText.text  = registerCostMsg;
-                costText.color = affordableColor;
-            }
-            if (confirmButton != null) confirmButton.interactable = true;
+            ShowCost(registerCostMsg, canConfirm: true);
             return;
         }
 
         int cost = PlayerProfile.CHANGE_NAME_GEM_COST;
         int gem  = CurrencyManager.Instance != null ? CurrencyManager.Instance.Gem : 0;
-        bool enough = gem >= cost;
+        ShowCost($"변경 시 보석 {cost} 소모", canConfirm: gem >= cost);
+    }
 
+    /// <summary>비용 문구와 확인 버튼 상태를 함께 정합니다. 누를 수 없으면 문구도 빨간색.</summary>
+    private void ShowCost(string message, bool canConfirm)
+    {
         if (costText != null)
         {
-            costText.text  = $"변경 시 보석 {cost} 소모";
-            costText.color = enough ? affordableColor : insufficientColor;
+            costText.text  = message;
+            costText.color = canConfirm ? affordableColor : insufficientColor;
         }
-
-        if (confirmButton != null) confirmButton.interactable = enough;
+        if (confirmButton != null) confirmButton.interactable = canConfirm;
     }
 
     // ───────────────────────────── 확인 ─────────────────────────────
@@ -235,9 +223,9 @@ public class NicknameChangePanel : MonoBehaviour
 
         // 모드에 따라 PlayerProfile 의 다른 창구를 부릅니다. 규칙 검사·저장은 전부 PlayerProfile 이 합니다.
         string error;
-        bool ok;
-        if (isRegisterMode) ok = PlayerProfile.TryRegister(nameInputField.text, out error);
-        else                ok = PlayerProfile.TryChangeName(nameInputField.text, out error);
+        bool ok = isRegisterMode
+            ? PlayerProfile.TryRegister(nameInputField.text, out error)
+            : PlayerProfile.TryChangeName(nameInputField.text, out error);
 
         if (ok) Close();
         else    SetError(error);

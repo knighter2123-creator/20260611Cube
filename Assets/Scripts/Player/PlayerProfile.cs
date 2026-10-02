@@ -4,26 +4,15 @@ using UnityEngine;
 /// <summary>
 /// 플레이어 이름을 읽고 "최초 1회" 등록하는 단 하나의 창구.
 ///
-/// ★ 핵심 설계: "읽기는 누구나, 쓰기는 딱 한 번" — 단, 이제 예외가 하나 생겼습니다.
+/// 설계: "읽기는 누구나, 쓰기는 정해진 창구로만"
 ///   - Name / HasName  : 어느 씬에서든 읽을 수 있음
-///   - TryRegister()   : 이름이 아직 없을 때만 성공 → 이후 호출은 전부 거절 (최초 등록, 무료)
-///                       ★ 이제 MainScene 에서 호출됩니다 (NicknamePrompt → NicknameChangePanel '최초 설정' 모드)
-///   - TryChangeName() : 이미 이름이 있을 때만 성공 → 보석을 소모하는 "유료 개명"
-///     (최초 등록과는 별개의 창구입니다. 둘 다 NicknameChangePanel 이 이름 유무로 골라 부릅니다)
+///   - TryRegister()   : 이름이 아직 없을 때만 성공 (최초 등록, 무료)
+///   - TryChangeName() : 이미 이름이 있을 때만 성공 (보석을 소모하는 유료 개명)
+///   두 창구는 NicknameChangePanel 이 이름 유무로 골라 부릅니다.
 ///
-/// ★ 저장 위치: SaveData.playerName (save.json)
-///   - SaveManager 는 LoginScene 의 Awake 에서 파일을 Current 로 읽어 두므로,
-///     LoginScene 의 Start 시점에는 이미 이름 유무를 알 수 있습니다.
+/// 저장 위치: SaveData.playerName (save.json)
 ///   - 이 클래스는 값을 따로 들고 있지 않고(캐시 없음) 매번 SaveManager.Current 를 읽습니다.
-///     → SaveManager.DeleteSave() 로 세이브를 지우면 이름도 자연스럽게 함께 사라집니다.
-///       (이전 버전의 PlayerPrefs 방식은 세이브를 지워도 이름만 남는 문제가 있었음)
-///
-/// ★ [계정 삭제] 이번 변경: 파일 맨 아래 DeleteLegacyPrefsForReset() 하나만 추가. 기존 코드는 그대로입니다.
-///
-/// ★ [닉네임 인게임 이동] 이번 변경 (전부 "★ [닉네임 인게임 이동]" 으로 표시)
-///   최초 등록(TryRegister)이 LoginScene 이 아니라 MainScene(특정 스테이지 도달)에서 일어납니다.
-///   → TryRegister 의 저장 방법만 "지금 어느 단계인가" 에 따라 고르도록 바꿨습니다 (RegisterSave).
-///     규칙(최초 1회·무료·Validate)과 이벤트(OnNameRegistered)는 그대로입니다.
+///     → 세이브를 지우면 이름도 자연스럽게 함께 사라집니다.
 /// </summary>
 public static class PlayerProfile
 {
@@ -31,7 +20,7 @@ public static class PlayerProfile
     public const int MIN_LENGTH = 2;
     public const int MAX_LENGTH = 6;   // 기존 PlayerName.cs 의 제한(6자)을 그대로 유지
 
-    // ★ 신규: 개명(닉네임 변경) 1회당 소모되는 보석. 기획 수치가 정해지면 이 한 줄만 바꾸면 됩니다.
+    // 개명(닉네임 변경) 1회당 소모되는 보석. 기획 수치가 정해지면 이 한 줄만 바꾸면 됩니다.
     //   (NicknameChangePanel 의 비용 안내 텍스트도 이 상수를 그대로 읽으므로 UI 표기가 자동으로 맞습니다)
     public const int CHANGE_NAME_GEM_COST = 3000;
 
@@ -44,7 +33,7 @@ public static class PlayerProfile
     /// <summary>이름이 처음 정해진 순간 한 번 호출됩니다. (UI 갱신용)</summary>
     public static event System.Action<string> OnNameRegistered;
 
-    /// <summary>★ 신규: 이름이 "변경"된 순간 호출됩니다 (TryChangeName 성공 시). UI 갱신용.</summary>
+    /// <summary>이름이 "변경"된 순간 호출됩니다 (TryChangeName 성공 시). UI 갱신용.</summary>
     public static event System.Action<string> OnNameChanged;
 
     /// <summary>
@@ -55,7 +44,7 @@ public static class PlayerProfile
     private static void ResetStatics()
     {
         OnNameRegistered = null;
-        OnNameChanged = null;   // ★ 신규 이벤트도 같은 이유로 비워야 합니다
+        OnNameChanged = null;
     }
 
     // ───────── 읽기 ─────────
@@ -67,6 +56,18 @@ public static class PlayerProfile
     public static string Name => Data?.playerName ?? string.Empty;
 
     public static bool HasName => !string.IsNullOrEmpty(Name);
+
+    /// <summary>쓰기 창구 공통 — 저장 시스템이 준비됐는지 확인합니다.</summary>
+    private static bool TryGetData(out SaveData data, out string error)
+    {
+        data  = Data;
+        error = string.Empty;
+        if (data != null) return true;
+
+        error = "저장 시스템을 찾을 수 없습니다.";
+        Debug.LogError("[PlayerProfile] SaveManager 가 없습니다. LoginScene 부터 실행하세요.");
+        return false;
+    }
 
     // ───────── 검사 ─────────
 
@@ -102,13 +103,8 @@ public static class PlayerProfile
     /// </summary>
     public static bool TryRegister(string raw, out string error)
     {
-        SaveData data = Data;
-        if (data == null)
-        {
-            error = "저장 시스템을 찾을 수 없습니다.";
-            Debug.LogError("[PlayerProfile] SaveManager 가 없습니다. LoginScene 부터 실행하세요.");
+        if (!TryGetData(out SaveData data, out error))
             return false;
-        }
 
         if (HasName)
         {
@@ -122,7 +118,7 @@ public static class PlayerProfile
 
         data.playerName = cleaned;
 
-        RegisterSave();   // ★ [닉네임 인게임 이동] 예전: Persist()
+        RegisterSave();
 
         Debug.Log($"[PlayerProfile] 이름 등록 완료: {cleaned}");
         OnNameRegistered?.Invoke(cleaned);
@@ -132,7 +128,7 @@ public static class PlayerProfile
     // ───────── 쓰기 (MainScene, 보석 소모 개명) ─────────
 
     /// <summary>
-    /// ★ 신규. MainScene 네임플레이트 클릭 → NicknameChangePanel 에서 호출되는 "유료 개명".
+    /// MainScene 네임플레이트 클릭 → NicknameChangePanel 에서 호출되는 "유료 개명".
     /// TryRegister 와 정반대 조건입니다: 이미 이름이 있어야만 성공합니다.
     ///
     /// [TryRegister 와 저장 경로(Persist)를 공유하지 않는 이유]
@@ -148,19 +144,13 @@ public static class PlayerProfile
     /// </summary>
     public static bool TryChangeName(string raw, out string error)
     {
-        SaveData data = Data;
-        if (data == null)
-        {
-            error = "저장 시스템을 찾을 수 없습니다.";
-            Debug.LogError("[PlayerProfile] SaveManager 가 없습니다.");
+        if (!TryGetData(out SaveData data, out error))
             return false;
-        }
 
         if (!HasName)
         {
-            // ★ [닉네임 인게임 이동] 이제는 이름 없이 MainScene 을 플레이하는 것이 정상입니다.
-            //   NicknameChangePanel 이 이름이 없으면 '최초 설정' 모드(TryRegister)로 열리므로
-            //   정상 흐름에선 여기 오지 않습니다. 다른 곳에서 잘못 불렀을 때를 위한 방어입니다.
+            // NicknameChangePanel 은 이름이 없으면 '최초 설정' 모드(TryRegister)로 열리므로
+            // 정상 흐름에선 여기 오지 않습니다. 다른 곳에서 잘못 불렀을 때를 위한 방어입니다.
             error = "등록된 이름이 없습니다. 먼저 이름을 설정해 주세요.";
             return false;
         }
@@ -204,7 +194,7 @@ public static class PlayerProfile
     // ───────── 파일 기록 ─────────
 
     /// <summary>
-    /// ★ [닉네임 인게임 이동] TryRegister 전용 저장. "게임 씬에 들어갔는가" 로 저장 방법을 고릅니다.
+    /// TryRegister 전용 저장. "게임 씬에 들어갔는가" 로 저장 방법을 고릅니다.
     ///
     ///   게임 씬 진입 후 (지금의 정상 경로 — MainScene 스테이지 도달)
     ///     → SaveManager.Save(). 매니저들이 이미 ApplyFrom 을 받아 진짜 값을 들고 있으므로
@@ -298,7 +288,7 @@ public static class PlayerProfile
     // ───────── ★ [계정 삭제] ─────────
 
     /// <summary>
-    /// ★ 신규. 계정 삭제(AccountReset) 전용 — 예전 PlayerPrefs 이름 키를 지웁니다.
+    /// 계정 삭제(AccountReset) 전용 — 예전 PlayerPrefs 이름 키를 지웁니다.
     ///
     /// [왜 필요한가]
     ///   이 클래스는 이름을 SaveData 에만 두므로 save.json 을 지우면 이름도 사라집니다.

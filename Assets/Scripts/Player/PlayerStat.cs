@@ -3,46 +3,18 @@ using UnityEngine;
 /// <summary>
 /// 플레이어의 모든 수치를 담는 데이터 덩어리.
 ///
-/// ─────────────────────────────────────────────────────────────
-/// [스탯 출처 분리]
-///
 /// 이 클래스는 "최종 결과값"만이 아니라 **그 값이 어디서 왔는지**를 알려줍니다.
 ///
-///   기본값(const)  +  강화 기여분(계산)  =  baseDamage       ← 세이브에 저장되는 값
-///                                        × 증강 배율        ← 매 프레임 계산
-///                                        × 각성 영구 버프    ← ★ 이번에 추가
-///                                        = FinalDamage      ← 실제 대미지
+///   기본값(const)  +  강화 기여분  =  baseDamage       ← 세이브에 저장되는 값
+///                                 × 증강 배율        ← 이번 판 한정 (AugmentManager)
+///                                 × 각성 영구 버프    ← PlayerBuffManager (세이브는 따로)
+///                                 = FinalDamage      ← 실제 대미지
 ///
-/// 중요한 원칙: **합계가 항상 실제 값과 일치해야 한다.**
-/// 그래서 "강화 기여분 = 현재값 − 기본값" 으로 역산합니다.
-/// ─────────────────────────────────────────────────────────────
-///
-/// ═══ ★ 이번 수정 — 각성 영구 버프를 레이어로 편입 ════════════════════
-///
-/// [무엇이 문제였나]
-/// 각성 영구 버프(PlayerBuffManager.DamageMultiplier)는 지금까지
-/// **Bullet.LaunchVolley() 안에서 발사 직전에만** 곱해졌습니다.
-///
-///     float buffMult = PlayerBuffManager.Instance?.DamageMultiplier ?? 1f;
-///     float buffedDamage = stat.FinalDamage * buffMult;   // ← 여기서만
-///
-/// 그래서 FinalDamage 에는 버프가 없었고, 스탯창은 FinalDamage 를 보여주므로
-/// **각성으로 공격력이 30% 올라도 스탯창 숫자가 전혀 움직이지 않았습니다.**
-/// 실제 대미지만 조용히 1.3배가 되고 있었죠.
-///
-/// 이 클래스에 직접 적어두신 문장이 정확히 이 상황을 가리킵니다 —
-/// **"화면에 보이는 수치와 실제 동작이 다른 것은 가장 나쁜 종류의 버그입니다."**
-///
-/// [어떻게 고쳤나]
-/// 버프를 FinalDamage 안으로 들여오고, Bullet 쪽의 곱셈을 제거했습니다.
-/// 곱하는 지점이 하나로 모이므로 이중 적용이 구조적으로 불가능해집니다.
-///
-/// [세이브에 영향이 없는 이유]
-/// FinalDamage 는 필드가 아니라 **프로퍼티**입니다. 값을 저장하지 않고
-/// 읽을 때마다 계산하죠. 세이브에 기록되는 건 baseDamage 하나뿐이고,
-/// 버프는 SaveData.damageMultiplier 에 따로 저장됩니다.
-/// 그래서 이 변경으로 저장 구조가 바뀌지 않고, 무한 인플레도 생기지 않습니다.
-/// ══════════════════════════════════════════════════════════════════
+/// 원칙
+///   · 합계가 항상 실제 값과 일치해야 합니다 → 기여분은 "현재값 − 기본값" 으로 역산합니다.
+///   · 배율은 FinalDamage 한 곳에서만 곱합니다 → Bullet 등에서 다시 곱하면 이중 적용입니다.
+///   · Final* 는 필드가 아니라 프로퍼티입니다 → 직렬화되지 않으므로 세이브 구조가 바뀌지 않고,
+///     껐다 켤 때마다 배율이 다시 곱해지는 무한 인플레도 생기지 않습니다.
 /// </summary>
 [System.Serializable]
 public class PlayerStat
@@ -62,7 +34,7 @@ public class PlayerStat
     /// <summary>치명타 확률 상한 (%). LevelUpManager.ApplyGain 의 클램프와 같은 값.</summary>
     public const float MAX_CRITICAL = 100f;
 
-    /// <summary>공격 쿨타임 하한 (초). Player.HandleAttack 의 Mathf.Max 와 같은 값.</summary>
+    /// <summary>공격 쿨타임 하한 (초). FinalAttackCooldown 이 이 값으로 하한을 겁니다.</summary>
     public const float MIN_ATTACK_COOLDOWN = MIN_ATTACK_SPD / 1000f;
 
     // ══════════════════════════════════════════════════════════
@@ -79,7 +51,7 @@ public class PlayerStat
     [Header("기본 공격 스탯")]
     public float attackRange = BASE_ATTACK_RANGE;
 
-    /// <summary>공격 1회 사이의 대기 시간(초). 3000ms → 3.0초</summary>
+    /// <summary>공격 1회 사이의 대기 시간(초, 하한 적용 전). 3000ms → 3.0초</summary>
     public float attackCooldown => AttackSpd / 1000f;
 
     // ══════════════════════════════════════════════════════════
@@ -101,46 +73,27 @@ public class PlayerStat
     public int UpgradeLevelCritDamage = 0;
 
     // ══════════════════════════════════════════════════════════
-    //  ★ 최종 스탯 (증강 + 각성 버프 반영)
+    //  최종 스탯 (증강 + 각성 버프 반영)
     // ══════════════════════════════════════════════════════════
-    //
-    // [왜 필드가 아니라 프로퍼티(=>)인가 — 핵심 학습 포인트]
-    //
-    // baseDamage 에 배율을 직접 곱해서 저장하면 이런 문제가 생깁니다.
-    //   · 증강/각성을 얻을 때마다 baseDamage 가 커지고, 그 값이 세이브에 기록됨
-    //   · 게임을 껐다 켜면 "저장된 커진 값" 위에 또 곱해짐 → 무한 인플레
-    //   · 강화로 오른 건지 배율로 오른 건지 구분 불가
-    //
-    // 프로퍼티는 값을 저장하지 않고 "읽을 때마다 계산"합니다.
-    // [System.Serializable] 클래스에서 프로퍼티는 직렬화되지 않으므로 세이브 구조도 그대로입니다.
 
     /// <summary>
-    /// 최종 공격력. 대미지 계산에는 이 값을 쓰세요.
-    ///
-    /// ★ 이제 각성 영구 버프까지 포함합니다.
-    ///   Bullet 쪽에서 PlayerBuffManager 를 따로 곱하면 **이중 적용**이 되니
-    ///   절대 다시 넣지 마세요. 곱하는 곳은 여기 한 군데뿐이어야 합니다.
+    /// 최종 공격력(증강 + 각성 영구 버프 포함). 대미지 계산에는 이 값을 쓰세요.
+    /// 배율을 곱하는 곳은 여기 한 군데뿐이어야 합니다.
     /// </summary>
     public float FinalDamage => DamageAfterAugment * PermanentDamageMultiplier;
 
     /// <summary>증강 치명타 대미지가 반영된 최종 치명타 배수.</summary>
-    public float FinalCriticalMultiplier => CriticalMultiplier + AugmentManager.CritDamage;
+    public float FinalCriticalMultiplier => CriticalMultiplier + AugmentCritDamageBonus;
 
-    /// <summary>치명타 확률(%). 지금은 증강 대상이 아니지만, 카드를 추가하면 여기에 얹으면 됩니다.</summary>
+    /// <summary>치명타 확률(%). 상한 MAX_CRITICAL.</summary>
     public float FinalCritical => Mathf.Min(Critical + AugmentCritChanceBonus, MAX_CRITICAL);
 
-    /// <summary>
-    /// 치명타가 터졌을 때 실제로 들어가는 대미지. 스탯창 "치명타 공격력" 표시용.
-    /// FinalDamage 를 쓰므로 각성 버프가 자동으로 반영됩니다.
-    /// </summary>
+    /// <summary>치명타가 터졌을 때 실제로 들어가는 대미지. 스탯창 "치명타 공격력" 표시용.</summary>
     public float FinalCriticalDamage => FinalDamage * FinalCriticalMultiplier;
 
     /// <summary>
-    /// 실제로 적용되는 공격 쿨타임(초).
-    ///
-    /// ★ Player.HandleAttack() 이 Mathf.Max(attackCooldown, MIN_ATTACK_COOLDOWN) 로
-    ///   하한을 걸고 있습니다. 표시용 계산도 같은 상수를 통과시켜야
-    ///   "화면엔 20회/초인데 실제론 10회/초" 같은 일이 생기지 않습니다.
+    /// 실제로 적용되는 공격 쿨타임(초). Player.HandleAttack 과 스탯창이 모두 이 값을 씁니다
+    /// → "화면엔 20회/초인데 실제론 10회/초" 같은 불일치가 구조적으로 생기지 않습니다.
     /// </summary>
     public float FinalAttackCooldown => Mathf.Max(attackCooldown, MIN_ATTACK_COOLDOWN);
 
@@ -151,7 +104,7 @@ public class PlayerStat
     public bool IsAttackSpeedCapped => AttackSpd <= MIN_ATTACK_SPD;
 
     // ══════════════════════════════════════════════════════════
-    //  ★ 스탯 출처 분리 — 스탯창 세부 내역 표시용
+    //  스탯 출처 분리 — 스탯창 세부 내역 표시용
     // ══════════════════════════════════════════════════════════
     //
     // 규칙: 기본 + 강화 = baseDamage.  그 위에 증강 배율, 다시 각성 배율.
@@ -170,31 +123,21 @@ public class PlayerStat
     public float AugmentAttackMultiplier => AugmentManager.Attack;
 
     /// <summary>
-    /// 증강까지만 적용한 공격력. 각성 버프는 아직 곱하지 않은 중간값입니다.
-    ///
-    /// ★ 이 중간값을 굳이 이름 붙여 꺼내는 이유
-    ///   기여분을 계산하려면 "그 레이어를 지나기 전후"가 둘 다 필요합니다.
-    ///   중간값이 없으면 각 기여분을 저마다 다시 곱해서 구하게 되고,
-    ///   그러면 공식이 여러 곳에 복사돼 언젠가 하나가 어긋납니다.
+    /// 증강까지만 적용한 공격력(각성 버프 전 중간값).
+    /// 레이어별 기여분은 "그 레이어 전후의 차이" 라서, 중간값을 한 곳에 두어야 공식이 복사되지 않습니다.
     /// </summary>
     public float DamageAfterAugment => baseDamage * AugmentAttackMultiplier;
 
     /// <summary>
     /// 증강 배율 때문에 늘어난 공격력의 절대량. "×1.45" 가 몇으로 보이는지 알려줍니다.
-    ///
-    /// ★ [수정] 예전에는 FinalDamage − baseDamage 였습니다.
-    ///   FinalDamage 에 각성 버프가 들어오면서, 그대로 두면 **각성분까지
-    ///   증강 기여분으로 합산**되어 스탯창이 거짓말을 하게 됩니다.
-    ///   레이어를 하나 끼워 넣을 때는 그 레이어를 쓰던 식들을 반드시 같이 봐야 합니다.
+    /// (FinalDamage − baseDamage 로 구하면 각성분까지 섞이므로 중간값 기준으로 계산합니다)
     /// </summary>
     public float AugmentDamageBonus => DamageAfterAugment - baseDamage;
 
     // ── 공격력: ④ 각성 영구 버프 ──
     /// <summary>
     /// 각성 스테이지 클리어로 누적된 영구 대미지 배율 (1 = 버프 없음).
-    ///
     /// PlayerBuffManager 가 아직 없으면(씬 단독 테스트 등) 1을 돌려줍니다.
-    /// 예전 Bullet 의 `?? 1f` 와 같은 역할이라 동작이 달라지지 않습니다.
     /// </summary>
     public float PermanentDamageMultiplier =>
         PlayerBuffManager.Instance != null ? PlayerBuffManager.Instance.DamageMultiplier : 1f;
@@ -212,10 +155,8 @@ public class PlayerStat
     public float PureBaseCritical        => Critical - UpgradeCritChanceBonus;
 
     /// <summary>
-    /// 증강으로 오른 치명타 확률(%p).
-    /// 지금은 해당 증강 카드가 없어서 항상 0 입니다.
-    /// 나중에 카드를 만들면 AugmentManager 에 CritChance static 접근자를 추가하고
-    /// 이 한 줄만 바꾸면 스탯창이 자동으로 반영합니다.
+    /// 증강으로 오른 치명타 확률(%p). 해당 증강 카드가 아직 없어서 항상 0 입니다.
+    /// 카드를 만들면 AugmentManager 에 접근자를 추가하고 이 한 줄만 바꾸면 스탯창까지 자동 반영됩니다.
     /// </summary>
     public float AugmentCritChanceBonus => 0f;
 
@@ -237,9 +178,7 @@ public class PlayerStat
     /// <summary>
     /// 게임 최초 시작 시에만 호출합니다. (Player.Start() → 세이브가 없을 때만)
     /// 모든 값이 위의 const 를 참조하므로, 밸런스를 바꿀 때 const 만 고치면 됩니다.
-    ///
-    /// ※ 각성 영구 버프는 여기서 건드리지 않습니다. 그건 PlayerBuffManager 가
-    ///   세이브에서 관리하는 별개의 값이고, 이 클래스는 읽기만 합니다.
+    /// 각성 영구 버프는 PlayerBuffManager 가 따로 관리하므로 여기서 건드리지 않습니다.
     /// </summary>
     public void InitFull()
     {

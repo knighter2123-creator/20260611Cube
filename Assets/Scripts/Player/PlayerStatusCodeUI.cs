@@ -61,17 +61,6 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
              "비워두면 예전처럼 targetCanvas 바로 아래에 만듭니다.")]
     [SerializeField] private RectTransform buildParent;
 
-    /// <summary>
-    /// 실제로 UI 를 붙일 부모. Build.cs 가 이걸 씁니다.
-    ///
-    /// ★ targetCanvas 필드를 없애고 Panel 로 바꾸지 않은 이유
-    ///   targetCanvas 는 '부모 지정' 외에도 일을 합니다 —
-    ///   씬에 Canvas 가 없으면 만들어 주고, 해상도 기준을 잡고, EventSystem 유무를 경고합니다.
-    ///   필드를 통째로 갈아치우면 그 안전장치들이 함께 사라집니다.
-    ///   부모만 갈아끼우면 나머지는 그대로 살아 있습니다.
-    /// </summary>
-    public RectTransform BuildParent => buildParent;
-
     [Tooltip("체크하면 Start 에서 UI 를 만듭니다. 끄면 처음 열 때 만듭니다(메모리 절약)")]
     [SerializeField] private bool buildOnStart = true;
 
@@ -90,6 +79,7 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     //  런타임 상태
     // ══════════════════════════════════════════════════════════
     private bool isOpen;
+    private bool tabModeApplied;
     private Coroutine animRoutine;
 
     // ★ bool 플래그가 아니라 '구독한 인스턴스' 를 들고 비교합니다.
@@ -125,10 +115,12 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     /// <summary>
     /// 탭 모드에서 반드시 꺼야 하는 설정들을 코드로 강제합니다.
     /// 인스펙터에서 하나만 빠뜨려도 증상이 애매하게 나타나는 것들이라 여기서 못을 박습니다.
+    /// Start 와 Open 양쪽에서 불리지만(아래 Open 주석 참고) 실제 적용과 경고는 한 번만 합니다.
     /// </summary>
     private void ApplyTabModeSettings()
     {
-        if (!useAsTabPage) return;
+        if (!useAsTabPage || tabModeApplied) return;
+        tabModeApplied = true;
 
         // ① Status 버튼을 만들면 안 됩니다.
         //    진입점은 화살표 하나로 통일했고, 자동 생성된 버튼이 탭 내용 안에 생기면
@@ -175,6 +167,9 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     private void OnDestroy()
     {
         Unsubscribe();
+
+        // 외부 버튼은 이 컴포넌트보다 오래 살 수 있으므로 걸어 둔 리스너를 풀어 줍니다.
+        if (externalOpenButton != null) externalOpenButton.onClick.RemoveListener(Toggle);
     }
 
     // ══════════════════════════════════════════════════════════
@@ -361,6 +356,13 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
 
     private void PlayAnim(bool opening)
     {
+        // 열고 닫기를 빠르게 반복해도 코루틴이 겹치지 않게 이전 것을 먼저 멈춥니다.
+        if (animRoutine != null)
+        {
+            StopCoroutine(animRoutine);
+            animRoutine = null;
+        }
+
         // 연출을 끈 경우 / 아직 안 만든 경우는 즉시 반영하고 끝냅니다.
         if (!animate || panelRoot == null)
         {
@@ -370,8 +372,6 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
             return;
         }
 
-        // 열고 닫기를 빠르게 반복해도 코루틴이 겹치지 않게 이전 것을 먼저 멈춥니다.
-        if (animRoutine != null) StopCoroutine(animRoutine);
         animRoutine = StartCoroutine(AnimateRoutine(opening));
     }
 

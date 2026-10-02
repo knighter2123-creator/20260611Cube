@@ -16,10 +16,6 @@ using UnityEngine;
 ///
 /// static 클래스인 이유: 상태가 없습니다. 같은 PlayerStat 을 넣으면 항상 같은 문자열이 나옵니다.
 /// ─────────────────────────────────────────────────────────────
-///
-/// ★ 이번 수정: 공격력 내역에 '각성' 레이어 추가
-///   각성 영구 버프가 PlayerStat.FinalDamage 안으로 들어오면서,
-///   스탯창에도 그 기여분을 한 조각 더 보여줍니다.
 /// </summary>
 public static class PlayerStatusText
 {
@@ -77,14 +73,8 @@ public static class PlayerStatusText
         [Tooltip("증강(이번 판 한정) 기여분을 강조할 색")]
         public Color augmentColor = new Color(1f, 0.82f, 0.35f);
 
-        // ★ 추가된 필드.
-        //   [Serializable] 클래스에 필드를 새로 넣으면, 기존에 씬/프리팹에 저장돼 있던
-        //   Style 에는 이 값이 없으므로 위의 초기화값이 그대로 적용됩니다.
-        //   즉 인스펙터를 다시 만질 필요가 없습니다. (색을 바꾸고 싶을 때만 건드리세요)
-        //
-        //   증강과 다른 색을 쓰는 이유: 증강은 이번 판이 끝나면 사라지고,
-        //   각성은 영구입니다. 성격이 다른 두 보너스를 같은 색으로 칠하면
-        //   플레이어가 "이 수치가 계속 남는 건가?"를 구분할 수 없습니다.
+        // 증강과 다른 색을 쓰는 이유: 증강은 이번 판이 끝나면 사라지고, 각성은 영구입니다.
+        // 같은 색으로 칠하면 플레이어가 "이 수치가 계속 남는 건가?"를 구분할 수 없습니다.
         [Tooltip("각성(영구) 기여분을 강조할 색")]
         public Color awakenColor = new Color(0.55f, 0.85f, 1f);
     }
@@ -258,10 +248,6 @@ public static class PlayerStatusText
     /// TMP 리치 텍스트로 색을 입힙니다.
     /// &lt;color=#RRGGBB&gt; 태그를 지원하므로 텍스트를 여러 개로 쪼개지 않고
     /// 한 줄 안에서 부분 색상을 줄 수 있습니다. (Rich Text 가 켜져 있어야 합니다)
-    ///
-    /// ★ [수정] 색을 매개변수로 받도록 바꿨습니다.
-    ///   예전에는 augmentColor 로 고정돼 있어서, 각성 조각을 다른 색으로 칠할 수 없었습니다.
-    ///   "이 함수가 정하던 것"을 호출자에게 넘기는 흔한 리팩터링입니다.
     /// </summary>
     private static string Colored(Style st, Color color, string text, bool visible = true)
     {

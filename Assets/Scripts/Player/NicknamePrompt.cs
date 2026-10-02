@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// ★ 신규. MainScene 전용 — 특정 스테이지에 도달했는데 아직 닉네임이 없으면 닉네임 설정 팝업을 띄웁니다.
+/// MainScene 전용 — 특정 스테이지에 도달했는데 아직 닉네임이 없으면 닉네임 설정 팝업을 띄웁니다.
 ///
 /// [흐름]
 ///   StageManager (스테이지 시작/불러오기 때마다)
@@ -54,6 +54,9 @@ public class NicknamePrompt : MonoBehaviour
     //   NicknameChangePanel 이 "잠겨 있나" 를 물어볼 때, 목표 스테이지 값(인스펙터)을 가진 인스턴스가 필요합니다.
     private static NicknamePrompt active;
 
+    // "StageManager 에 NotifyStage 줄을 안 넣었다" 는 경고를 앱 실행 중 한 번만 띄우기 위한 표시
+    private static bool warnedNoNotify;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -100,9 +103,6 @@ public class NicknamePrompt : MonoBehaviour
     // ───────── 인스턴스 ─────────
 
     private Coroutine pending;   // 기다리는 중인 팝업 (중복 예약 방지)
-
-    // "StageManager 에 NotifyStage 줄을 안 넣었다" 는 경고를 앱 실행 중 한 번만 띄우기 위한 표시
-    private static bool warnedNoNotify;
 
     private void Awake()
     {
@@ -222,7 +222,7 @@ public class NicknamePrompt : MonoBehaviour
         // 기다리는 사이 상황이 바뀌었을 수 있으므로 다시 확인 (예: 그 사이 네임플레이트로 이름을 정함)
         if (!ShouldPrompt()) yield break;
 
-        MarkPromptShown();   // ★ [자동 팝업 1회] 예전: promptedFor = SaveManager.Instance (메모리에만 기억)
+        MarkPromptShown();
         Debug.Log($"[NicknamePrompt] {lastWorld}-{lastStage} 도달, 이름 없음 → 닉네임 설정 팝업 (자동 팝업은 이번 1회)");
         panel.Open();
     }
