@@ -61,12 +61,12 @@ public partial class AugmentSelectUI
         AugmentUIFactory.Stretch(dim.rectTransform);
 
         // ── 제목 / 부제 ────────────────────────────────────
-        var title = AugmentUIFactory.CreateText("Title", canvasGo.transform,
-            titleText, TitleFontSize, TMPro.FontStyles.Bold, nameColor);
+        var title = CreateText("Title", canvasGo.transform,
+            titleText, TitleFontSize, FontStyles.Bold, nameColor);
         AugmentUIFactory.AnchorHorizontalBand(title.rectTransform, TitleAnchorY, 100f);
 
-        var subtitle = AugmentUIFactory.CreateText("Subtitle", canvasGo.transform,
-            subtitleText, SubtitleFontSize, TMPro.FontStyles.Normal, descColor);
+        var subtitle = CreateText("Subtitle", canvasGo.transform,
+            subtitleText, SubtitleFontSize, FontStyles.Normal, descColor);
         AugmentUIFactory.AnchorHorizontalBand(subtitle.rectTransform, SubtitleAnchorY, 60f);
 
         BuildCardArea(canvasGo.transform);
@@ -111,8 +111,8 @@ public partial class AugmentSelectUI
         timerFill.fillOrigin = 0;
         timerFill.fillAmount = 1f;
 
-        timerLabel = AugmentUIFactory.CreateText("TimerLabel", parent,
-            "", TimerFontSize, TMPro.FontStyles.Normal, descColor);
+        timerLabel = CreateText("TimerLabel", parent,
+            "", TimerFontSize, FontStyles.Normal, descColor);
         AugmentUIFactory.AnchorHorizontalBand(timerLabel.rectTransform, TimerTextAnchorY, 44f);
     }
 
@@ -255,6 +255,18 @@ public partial class AugmentSelectUI
         AugmentUIFactory.SetFixedSize(icon.gameObject, IconSize, IconSize);
     }
 
+    /// <summary>
+    /// 이 창의 모든 텍스트는 여기를 거칩니다. 인스펙터의 uiFont(한글 폰트)를 한 곳에서 적용하기 위해서입니다.
+    /// 비워 두면 TMP Settings 의 기본 폰트를 그대로 씁니다.
+    /// </summary>
+    private TextMeshProUGUI CreateText(string name, Transform parent, string text,
+                                       float size, FontStyles style, Color color)
+    {
+        var tmp = AugmentUIFactory.CreateText(name, parent, text, size, style, color);
+        if (uiFont != null) tmp.font = uiFont;
+        return tmp;
+    }
+
     /// <summary>이름 / 설명 / 보유 스택 묶음.</summary>
     private void BuildCardTexts(RectTransform parent, AugmentCard card,
                                 Color rarityColor, bool iconOnTop)
@@ -267,20 +279,20 @@ public partial class AugmentSelectUI
         le.flexibleWidth  = 1f;
         le.flexibleHeight = 1f;
 
-        var nameAlign = iconOnTop ? TMPro.TextAlignmentOptions.Top
-                                  : TMPro.TextAlignmentOptions.Left;
-        var descAlign = iconOnTop ? TMPro.TextAlignmentOptions.Top
-                                  : TMPro.TextAlignmentOptions.TopLeft;
+        var nameAlign = iconOnTop ? TextAlignmentOptions.Top
+                                  : TextAlignmentOptions.Left;
+        var descAlign = iconOnTop ? TextAlignmentOptions.Top
+                                  : TextAlignmentOptions.TopLeft;
 
         // 이름 — 등급 색으로 칠하면 등급이 한눈에 들어옵니다.
-        var nameTmp = AugmentUIFactory.CreateText("Name", texts,
-            card.DisplayName, CardNameFontSize, TMPro.FontStyles.Bold, rarityColor);
+        var nameTmp = CreateText("Name", texts,
+            card.DisplayName, CardNameFontSize, FontStyles.Bold, rarityColor);
         nameTmp.alignment = nameAlign;
         AugmentUIFactory.SetTextHeight(nameTmp, 48f);
 
         // 설명
-        var descTmp = AugmentUIFactory.CreateText("Desc", texts,
-            card.GetDescription(), CardDescFontSize, TMPro.FontStyles.Normal, descColor);
+        var descTmp = CreateText("Desc", texts,
+            card.GetDescription(), CardDescFontSize, FontStyles.Normal, descColor);
         descTmp.alignment          = descAlign;
         descTmp.textWrappingMode = TextWrappingModes.Normal;
         AugmentUIFactory.SetTextHeight(descTmp, 76f);
@@ -290,8 +302,8 @@ public partial class AugmentSelectUI
         if (!card.IsPermanent || stack <= 0) return;
 
         string stackText = card.MaxStack > 0 ? $"보유 {stack} / {card.MaxStack}" : $"보유 {stack}";
-        var stackTmp = AugmentUIFactory.CreateText("Stack", texts,
-            stackText, StackFontSize, TMPro.FontStyles.Normal,
+        var stackTmp = CreateText("Stack", texts,
+            stackText, StackFontSize, FontStyles.Normal,
             new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.85f));
         stackTmp.alignment = nameAlign;
         AugmentUIFactory.SetTextHeight(stackTmp, 32f);

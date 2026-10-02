@@ -13,20 +13,13 @@ using UnityEngine;
 ///   그래서 등급은 Rare 이상으로 두는 걸 권합니다.
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Augment/치명타 대미지", fileName = "_Critdmg")]
-public class AugmentCritDamage : AugmentCard
+public class AugmentCritDamage : AugmentPermanent
 {
     [Header("효과")]
     [Tooltip("0.25 = 치명타 대미지 배수에 +0.25 (예: 1.5배 → 1.75배)")]
     [SerializeField] private float amount = 0.25f;
 
-    public override bool IsPermanent => true;
-
     protected override string GetValueText() => $"{amount * 100f:0.#}%p";
-
-    public override void Apply(AugmentManager manager, bool isRestore)
-    {
-        manager.AddPermanentStack(this);
-    }
 
     public override void ContributePermanent(AugmentManager manager)
     {

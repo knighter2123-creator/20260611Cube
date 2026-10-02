@@ -71,13 +71,16 @@ public partial class AugmentSelectUI
             yield return null;
         }
 
-        // 코루틴이 중간에 끊겨도 최종 상태가 남도록 마지막에 확정값을 씁니다.
+        // 프레임 시간이 튀어도 최종 상태가 정확히 남도록 마지막에 확정값을 씁니다.
+        // (중간에 끊기는 경우는 StopIntro 가 같은 확정값을 씁니다)
         rootGroup.alpha = 1f;
         for (int i = 0; i < rts.Count; i++)
         {
             rts[i].localScale = Vector3.one;
             if (group[i] != null) group[i].alpha = 1f;
         }
+
+        introRoutine = null;
     }
 
     // ─────────────────────────────────────────────────────────

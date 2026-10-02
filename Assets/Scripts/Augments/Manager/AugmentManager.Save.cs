@@ -17,28 +17,19 @@ using UnityEngine;
 ///
 /// 임시 버프는 저장하지 않습니다. 게임을 껐다 켰으면 이미 만료된 것으로 봅니다.
 ///
-/// ★ [계정 삭제] 이번에 바뀐 곳 (전부 "★ [계정 삭제]" 로 표시)
-///   1. Save() 가 SaveManager 의 저장 잠금을 따른다
-///   2. DeleteAllSavesForReset() — 계정 삭제 시 증강 저장을 지우는 static 창구
-///   3. 기본 키를 상수로 뺐다 (값은 그대로 "AUGMENT_SAVE_V1")
+/// [저장 위치 — PlayerPrefs, 계정별 키]
+///   증강은 save.json 이 아니라 PlayerPrefs 에 있으므로 키에 세이브 파일과 같은 계정 꼬리표를 붙입니다.
+///     게스트 → "AUGMENT_SAVE_V1"
+///     계정   → "AUGMENT_SAVE_V1_&lt;UID&gt;"
+///   꼬리표 규칙은 SaveManager.KeySuffixFor 한 곳에 있습니다 (KeyFor 참고).
+///   save.json 과 따로 있어서 SaveManager 의 저장 잠금을 직접 확인하고(Save),
+///   계정 삭제·이전도 전용 static 창구(DeleteAllSavesForReset / MoveSavesBetweenAccounts)로 처리합니다.
 ///
-///   ※ 근본 해결은 증강 저장을 SaveData 로 합치는 것입니다 (증강카드 리팩토링 정리 문서 A-4).
-///     합치면 save.json 하나만 지우면 되므로 2번이 필요 없어집니다. 이번에는 범위를 넓히지 않았습니다.
-///
-/// ★ [계정별 세이브] 이번에 바뀐 곳 (전부 "★ [계정별 세이브]" 로 표시)
-///   증강은 save.json 이 아니라 PlayerPrefs 에 있어서, 세이브 파일만 계정별로 나누면 증강은 계속 섞입니다.
-///   그래서 PlayerPrefs 키에도 세이브 파일과 같은 계정 꼬리표를 붙입니다.
-///     게스트 → "AUGMENT_SAVE_V1"        (예전 키 그대로 → 기존 데이터 변환 불필요)
-///     계정   → "AUGMENT_SAVE_V1_<UID>"
-///   4. KeyFor() — 실제로 읽고 쓰는 키 = 인스펙터 키 + 계정 꼬리표 (규칙은 SaveManager.KeySuffixFor 한 곳)
-///   5. DeleteAllSavesForReset — "지금 계정" 의 증강만 지움 (다른 계정 증강은 보존)
-///   6. MoveSavesBetweenAccounts — 게스트 진행을 계정이 가져갈 때 증강도 함께 옮김
-///   AugmentManager 본체(카드 효과·배율 계산)는 바꾸지 않았습니다.
+///   ※ 근본 해결은 증강 저장을 SaveData 로 합치는 것입니다 (save.json 하나만 지우면 되도록).
 /// </summary>
 public partial class AugmentManager
 {
-    // ★ [계정 삭제] 기본 키를 상수로. 아래 saveKey 의 초기값과 DeleteAllSavesForReset 가 같은 값을 보게 합니다.
-    //   (값이 같으므로 이미 씬에 저장된 인스펙터 값에는 아무 영향이 없습니다)
+    // 기본 키. saveKey 의 초기값과 DeleteAllSavesForReset 가 같은 값을 보게 합니다.
     public const string DEFAULT_SAVE_KEY = "AUGMENT_SAVE_V1";
 
     [Header("저장")]
@@ -47,7 +38,7 @@ public partial class AugmentManager
 
     [SerializeField] private string saveKey = DEFAULT_SAVE_KEY;
 
-    // ★ [계정 삭제] 이번 실행 중에 실제로 쓰인 키 목록.
+    // 이번 실행 중에 실제로 쓰인 키 목록 (계정 꼬리표 없는 baseKey).
     //
     //   saveKey 는 인스펙터에서 바꿀 수 있는 값입니다. 누군가 "AUGMENT_SAVE_V2" 로 바꿔 두면
     //   계정 삭제가 기본 키만 지우고 진짜 데이터는 남기는 일이 생깁니다.
@@ -55,6 +46,16 @@ public partial class AugmentManager
     //   동작해야 해서 인스턴스의 saveKey 를 직접 읽을 수 없습니다.
     //   그래서 인스턴스가 저장/복구할 때마다 자기 키를 여기에 적어 둡니다. static 이라 인스턴스가 사라져도 남습니다.
     private static readonly HashSet<string> usedSaveKeys = new HashSet<string>();
+
+    /// <summary>
+    /// 실제로 PlayerPrefs 에 쓰는 키. 인스펙터 키(baseKey) + 계정 꼬리표.
+    /// usedSaveKeys 에는 꼬리표 없는 baseKey 를 적어 두고, 쓸 때마다 이 함수로 붙입니다
+    /// → 계정이 바뀌어도 "어떤 baseKey 들을 썼는지" 목록은 그대로 재사용됩니다.
+    /// </summary>
+    private static string KeyFor(string baseKey, string accountId) => baseKey + SaveManager.KeySuffixFor(accountId);
+
+    /// <summary>현재 로그인 계정 기준으로 이 인스턴스가 읽고 쓰는 키.</summary>
+    private string CurrentKey => KeyFor(saveKey, SaveManager.ActiveAccountId);
 
     /// <summary>
     /// 저장 형식.
@@ -65,13 +66,6 @@ public partial class AugmentManager
     ///   ids    = ["Aug_Attack_15", "Aug_Crit_25"]
     ///   counts = [3,               1            ]
     /// </summary>
-    /// <summary>
-    /// ★ [계정별 세이브] 실제로 PlayerPrefs 에 쓰는 키. 인스펙터 키(baseKey) + 계정 꼬리표.
-    /// usedSaveKeys 에는 꼬리표 없는 baseKey 를 적어 두고, 쓸 때마다 이 함수로 붙입니다
-    /// → 계정이 바뀌어도 "어떤 baseKey 들을 썼는지" 목록은 그대로 재사용됩니다.
-    /// </summary>
-    private static string KeyFor(string baseKey, string accountId) => baseKey + SaveManager.KeySuffixFor(accountId);
-
     [Serializable]
     private class AugmentSaveData
     {
@@ -86,7 +80,7 @@ public partial class AugmentManager
     {
         if (!saveEnabled) return;
 
-        // ★ [계정 삭제] 이 파일은 save.json 이 아니라 PlayerPrefs 에 따로 저장합니다.
+        // 이 파일은 save.json 이 아니라 PlayerPrefs 에 따로 저장합니다.
         //   그래서 SaveManager 의 잠금이 자동으로 적용되지 않습니다.
         //   초기화 도중(MainScene 이 내려가는 사이) 이 Save() 가 불리면
         //   방금 지운 증강 스택이 그대로 다시 기록되므로, 같은 잠금을 여기서도 확인합니다.
@@ -108,7 +102,7 @@ public partial class AugmentManager
             i++;
         }
 
-        PlayerPrefs.SetString(KeyFor(saveKey, SaveManager.ActiveAccountId), JsonUtility.ToJson(data));   // ★ [계정별 세이브]
+        PlayerPrefs.SetString(CurrentKey, JsonUtility.ToJson(data));
         PlayerPrefs.Save();
     }
 
@@ -119,13 +113,13 @@ public partial class AugmentManager
     {
         permanentStacks.Clear();
 
-        usedSaveKeys.Add(saveKey);   // ★ [계정 삭제] saveEnabled 가 꺼져 있어도 키는 기억 (예전에 켜서 저장했을 수 있음)
+        usedSaveKeys.Add(saveKey);   // saveEnabled 가 꺼져 있어도 키는 기억 (예전에 켜서 저장했을 수 있음)
 
         if (!saveEnabled) return;
 
-        // ★ [계정별 세이브] 지금 계정의 키. Load 가 불리는 순간의 계정 기준이므로,
+        // 지금 계정의 키. Load 가 불리는 순간의 계정 기준이므로,
         //   계정이 바뀌면 AccountSwitch 가 매니저를 새로 만들어 이 Load 가 새 계정으로 다시 불리게 합니다.
-        string key = KeyFor(saveKey, SaveManager.ActiveAccountId);
+        string key = CurrentKey;
         if (!PlayerPrefs.HasKey(key)) return;
 
         try
@@ -160,7 +154,7 @@ public partial class AugmentManager
     }
 
     // ─────────────────────────────────────────────────────────
-    //  ★ [계정 삭제] 초기화
+    //  계정 삭제 / 이전
     // ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -173,7 +167,7 @@ public partial class AugmentManager
     /// </summary>
     public static void DeleteAllSavesForReset()
     {
-        // ★ [계정별 세이브] "지금 계정" 의 키만 지웁니다. 같은 기기의 다른 계정 증강은 남겨야 합니다.
+        // "지금 계정" 의 키만 지웁니다. 같은 기기의 다른 계정 증강은 남겨야 합니다.
         string account = SaveManager.ActiveAccountId;
 
         PlayerPrefs.DeleteKey(KeyFor(DEFAULT_SAVE_KEY, account));
@@ -185,7 +179,7 @@ public partial class AugmentManager
     }
 
     /// <summary>
-    /// ★ [계정별 세이브] 한 계정의 증강 저장을 다른 계정으로 "옮깁니다" (원본 키는 지움).
+    /// 한 계정의 증강 저장을 다른 계정으로 "옮깁니다" (원본 키는 지움).
     /// 게스트 진행을 처음 로그인한 계정이 가져갈 때 세이브 파일과 함께 부릅니다.
     /// 대상 계정에 이미 저장이 있으면 그 키는 건드리지 않습니다 (그 계정의 진행을 덮어쓰지 않게).
     /// 확인하는 키: 기본 키 + 이번 실행에서 쓰인 키 (DeleteAllSavesForReset 와 같은 범위).
@@ -216,7 +210,7 @@ public partial class AugmentManager
     [ContextMenu("테스트: 저장 데이터 삭제")]
     private void DeleteSave()
     {
-        PlayerPrefs.DeleteKey(KeyFor(saveKey, SaveManager.ActiveAccountId));   // ★ [계정별 세이브] 지금 계정만
+        PlayerPrefs.DeleteKey(CurrentKey);   // 지금 계정만
         PlayerPrefs.Save();
         Debug.Log("[Augment] 저장 데이터를 삭제했습니다.");
     }

@@ -64,15 +64,9 @@ public class AugmentPool : ScriptableObject
                 continue;   // 이미 꽉 찬 카드는 안 나오게
             }
 
-            // ★ 최종 가중치로 걸러야 합니다.
-            //
-            //   원래는 카드 개별 weight 만 보고 후보에 넣었는데,
-            //   등급 배수(예: legendaryMultiplier = 0)를 곱하면 최종 가중치가 0이 될 수 있습니다.
-            //   그러면 후보 목록에는 들어가 있지만 추첨에서는 절대 안 뽑히고,
-            //   아래 total <= 0 검사에 걸려 루프가 break 되면서
-            //   "3장을 요청했는데 2장만 나오는" 증상이 됩니다.
-            //
-            //   후보 자격은 "뽑힐 가능성이 있는가"로 판단해야 한다는 이야기입니다.
+            // 후보 자격은 "뽑힐 가능성이 있는가" — 개별 weight 가 아니라 최종 가중치로 거릅니다.
+            // 등급 배수가 0 이면 최종 가중치가 0 이 되어, 후보에 넣어도 절대 안 뽑히고
+            // "3장을 요청했는데 2장만 나오는" 증상이 됩니다.
             float w = GetWeight(c, world);
             if (w <= 0f) { zeroWeight++; continue; }
 
@@ -97,10 +91,11 @@ public class AugmentPool : ScriptableObject
 
         // 3) 가중치 추첨을 pick 번 반복.
         //    한 번 뽑은 카드는 후보에서 빼서 같은 카드가 두 장 뜨는 걸 막습니다.
+        float total = 0f;
+        for (int i = 0; i < weights.Count; i++) total += weights[i];
+
         for (int n = 0; n < pick; n++)
         {
-            float total = 0f;
-            for (int i = 0; i < weights.Count; i++) total += weights[i];
             if (total <= 0f) break;
 
             // [가중치 추첨의 원리]
@@ -117,6 +112,7 @@ public class AugmentPool : ScriptableObject
             }
 
             result.Add(candidates[chosen]);
+            total -= weights[chosen];   // 뽑힌 후보의 무게만큼 총합에서 뺍니다 (다시 더하지 않음)
             candidates.RemoveAt(chosen);
             weights.RemoveAt(chosen);
         }

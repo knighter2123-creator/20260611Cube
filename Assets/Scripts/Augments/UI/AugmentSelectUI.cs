@@ -12,12 +12,7 @@ using UnityEngine.UI;
 ///   AugmentSelectUI.Build.cs  ← "어떻게 생겼는가" (캔버스·카드 생성)
 ///   AugmentSelectUI.Anim.cs   ← "어떻게 움직이는가" (등장/선택 연출, 타이머)
 ///
-/// [왜 나눴나]
-/// 원래는 한 파일에 600줄이 넘었고, 창을 여는 로직을 고치려는데
-/// 스프라이트를 그리는 코드가 눈앞에 계속 지나갔습니다.
-/// 파일을 열었을 때 "지금 내가 고치려는 것"만 보이는 게 좋은 구조입니다.
-///
-/// 프로젝트의 Enemy.cs / Enemy.Debuffs.cs 와 같은 방식이에요.
+/// 파일을 열었을 때 "지금 내가 고치려는 것"만 보이도록 나눴습니다.
 /// 컴파일하면 완전히 같은 하나의 클래스라 성능 차이는 전혀 없습니다.
 ///
 /// [일시정지 처리]
@@ -93,6 +88,7 @@ public partial class AugmentSelectUI : MonoBehaviour
     private bool      isOpen;
     private bool      picked;
     private float     savedTimeScale = 1f;
+    private Coroutine introRoutine;
     private Coroutine timerRoutine;
 
     // ─────────────────────────────────────────────────────────
@@ -142,7 +138,7 @@ public partial class AugmentSelectUI : MonoBehaviour
 
         if (audioSource != null && openSfx != null) audioSource.PlayOneShot(openSfx);
 
-        StartCoroutine(PlayIntro());   // → Anim.cs
+        introRoutine = StartCoroutine(PlayIntro());   // → Anim.cs
 
         if (autoPickSeconds > 0f)
             timerRoutine = StartCoroutine(AutoPickCountdown(cards));   // → Anim.cs
@@ -163,7 +159,10 @@ public partial class AugmentSelectUI : MonoBehaviour
         if (picked) return;      // 연타로 두 장 먹는 사고 방지
         picked = true;
 
-        if (timerRoutine != null) { StopCoroutine(timerRoutine); timerRoutine = null; }
+        // 등장 연출 도중에 고르면 두 코루틴이 같은 alpha/scale 을 매 프레임 번갈아 덮어씁니다.
+        // 등장 연출을 끊고 최종 상태로 확정한 뒤 선택 연출을 시작합니다.
+        StopIntro();
+        StopTimer();
         if (audioSource != null && pickSfx != null) audioSource.PlayOneShot(pickSfx);
 
         StartCoroutine(PlayPickAndClose(card, cardGo));   // → Anim.cs
@@ -174,7 +173,8 @@ public partial class AugmentSelectUI : MonoBehaviour
         if (!isOpen) return;
         isOpen = false;
 
-        if (timerRoutine != null) { StopCoroutine(timerRoutine); timerRoutine = null; }
+        StopIntro();
+        StopTimer();
 
         if (pauseGame) Time.timeScale = savedTimeScale;
 
@@ -193,6 +193,34 @@ public partial class AugmentSelectUI : MonoBehaviour
     {
         if (isOpen && pauseGame) Time.timeScale = savedTimeScale;
         isOpen = false;
+
+        // 꺼지면 코루틴은 유니티가 조용히 멈춥니다. 핸들만 비워 다음 Show 에서 꼬이지 않게 합니다.
+        introRoutine = null;
+        timerRoutine = null;
+    }
+
+    private void StopTimer()
+    {
+        if (timerRoutine != null) StopCoroutine(timerRoutine);
+        timerRoutine = null;
+    }
+
+    /// <summary>등장 연출을 끊고, 끝났을 때와 같은 상태(완전 불투명 · 원래 크기)로 확정합니다.</summary>
+    private void StopIntro()
+    {
+        if (introRoutine == null) return;
+
+        StopCoroutine(introRoutine);
+        introRoutine = null;
+
+        if (rootGroup != null) rootGroup.alpha = 1f;
+        for (int i = 0; i < spawnedCards.Count; i++)
+        {
+            if (spawnedCards[i] == null) continue;
+            spawnedCards[i].transform.localScale = Vector3.one;
+            var cg = spawnedCards[i].GetComponent<CanvasGroup>();
+            if (cg != null) cg.alpha = 1f;
+        }
     }
 
     // ─────────────────────────────────────────────────────────

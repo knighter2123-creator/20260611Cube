@@ -184,6 +184,9 @@ public partial class AugmentManager : MonoBehaviour
         card.Apply(this, isRestore: false);
 
         // 영구 카드였다면 스택이 늘었으니 배율을 다시 계산합니다.
+        // ※ OnChanged 는 여기서 따로 쏘지 않습니다. 값이 바뀌는 경로(RecalculatePermanent /
+        //   임시 버프의 RecalculateTemp)가 이미 한 번씩 알리므로, 또 쏘면 구독 UI 가 두 번 갱신됩니다.
+        //   즉시 보상 카드는 증강 값을 바꾸지 않습니다(재화·경험치는 각 매니저가 알립니다).
         if (card.IsPermanent)
         {
             RecalculatePermanent();
@@ -193,8 +196,6 @@ public partial class AugmentManager : MonoBehaviour
         if (logEnabled)
             Debug.Log($"[Augment] 선택: {card.DisplayName} / 공격력 x{attackMultiplier:0.##}, " +
                       $"치명타 +{critDamageBonus * 100f:0.#}%p");
-
-        OnChanged?.Invoke();
     }
 
     // ─────────────────────────────────────────────────────────

@@ -1,12 +1,21 @@
 using System;
 using UnityEngine;
 
-partial class LevelUpManager : MonoBehaviour
+/// <summary>
+/// 플레이어 레벨 · 경험치 · 스탯 강화의 중앙 관리자.
+///
+/// partial 로 네 파일에 나뉘어 있습니다.
+///   LevelUpManager.cs           ← 지금 이 파일. 싱글턴 / 이벤트 / 초기화 / 경험치
+///   LevelUpManager.stat.cs      ← 스탯 강화 (비용 · 레벨 → 수치 공식)
+///   LevelUpManager.MultiCost.cs ← N회 누적 비용
+///   LevelUpManager.Save.cs      ← 세이브 연동
+/// </summary>
+public partial class LevelUpManager : MonoBehaviour
 {
     // ──────────────────────────────────────────────
     //  싱글턴
     // ──────────────────────────────────────────────
-    public static LevelUpManager Instance;
+    public static LevelUpManager Instance { get; private set; }
 
     private PlayerStat stat;
 
@@ -55,8 +64,8 @@ partial class LevelUpManager : MonoBehaviour
 
     /// <summary>
     /// PlayerStat이 주입되어 강화/경험치 API를 쓸 수 있는 상태인가.
-    /// ★ Instance는 있는데 stat이 null인 구간이 존재합니다. UI는 이걸 봐야
-    ///   "비용 0 / 레벨 0" 같은 거짓 정보를 표시하지 않습니다.
+    /// Instance는 있는데 stat이 null인 구간이 존재합니다. UI는 이걸 봐야
+    /// "비용 0 / 레벨 0" 같은 거짓 정보를 표시하지 않습니다.
     /// </summary>
     public bool IsReady => stat != null;
 
@@ -78,41 +87,48 @@ partial class LevelUpManager : MonoBehaviour
         if (stat != null)
         {
             // 씬 전환: 메모리의 옛 stat(최신 강화 반영)을 새 PlayerStat에 그대로 이전
-            playerStat.Level         = stat.Level;
-            playerStat.Experience    = stat.Experience;
-            playerStat.MaxExperience = stat.MaxExperience;
-
-            // ★ 강화 레벨 복원 (누락분)
-            playerStat.UpgradeLevelDamage     = stat.UpgradeLevelDamage;
-            playerStat.UpgradeLevelAttackSpd  = stat.UpgradeLevelAttackSpd;
-            playerStat.UpgradeLevelCritChance = stat.UpgradeLevelCritChance;
-            playerStat.UpgradeLevelCritDamage = stat.UpgradeLevelCritDamage;
-
-            // ★ 강화로 누적된 실제 전투 스탯 복원 (누락분 — 이게 빠져서 dmg가 리셋됐음)
-            playerStat.baseDamage          = stat.baseDamage;
-            playerStat.Critical            = stat.Critical;
-            playerStat.CriticalMultiplier  = stat.CriticalMultiplier;
-            playerStat.AttackSpd           = stat.AttackSpd;
-
+            CopyProgress(stat, playerStat);
             stat = playerStat;
-
-            // ★ 여기서 OnLevelUp 을 쏘면 "씬만 바꿔도 레벨업 연출이 터집니다".
-            //   복원은 레벨업이 아니므로 전용 이벤트로 분리했습니다.
-            OnStatRestored?.Invoke(stat.Level);
-            OnExpChanged?.Invoke(stat.Experience);
+            NotifyRestored();
+            return;
         }
+
+        stat = playerStat;
+        if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
+            ApplyFrom(SaveManager.Instance.Current);   // 안에서 NotifyRestored
         else
-        {
-            stat = playerStat;
-            if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
-                ApplyFrom(SaveManager.Instance.Current);
-            else
-            {
-                // 세이브가 없어도 UI는 초기값으로 한 번 갱신돼야 합니다
-                OnStatRestored?.Invoke(stat.Level);
-                OnExpChanged?.Invoke(stat.Experience);
-            }
-        }
+            NotifyRestored();                          // 세이브가 없어도 UI는 초기값으로 한 번 갱신돼야 합니다
+    }
+
+    /// <summary>
+    /// 진행도(레벨 · 경험치 · 강화 레벨 · 강화로 오른 전투 스탯)를 통째로 옮깁니다.
+    /// 필드 목록을 한 곳에만 두어야, 스탯을 추가했을 때 씬 전환에서 하나만 빠지는 일이 없습니다.
+    /// </summary>
+    private static void CopyProgress(PlayerStat from, PlayerStat to)
+    {
+        to.Level         = from.Level;
+        to.Experience    = from.Experience;
+        to.MaxExperience = from.MaxExperience;
+
+        to.UpgradeLevelDamage     = from.UpgradeLevelDamage;
+        to.UpgradeLevelAttackSpd  = from.UpgradeLevelAttackSpd;
+        to.UpgradeLevelCritChance = from.UpgradeLevelCritChance;
+        to.UpgradeLevelCritDamage = from.UpgradeLevelCritDamage;
+
+        to.baseDamage         = from.baseDamage;
+        to.Critical           = from.Critical;
+        to.CriticalMultiplier = from.CriticalMultiplier;
+        to.AttackSpd          = from.AttackSpd;
+    }
+
+    /// <summary>
+    /// 복원 알림. 여기서 OnLevelUp 을 쏘면 "씬만 바꿔도 / 세이브만 불러와도 레벨업 연출이 터집니다".
+    /// 복원은 레벨업이 아니므로 전용 이벤트로 알립니다.
+    /// </summary>
+    private void NotifyRestored()
+    {
+        OnStatRestored?.Invoke(stat.Level);
+        OnExpChanged?.Invoke(stat.Experience);
     }
 
     public void ResetStat()
@@ -133,31 +149,17 @@ partial class LevelUpManager : MonoBehaviour
         {
             stat.Experience -= stat.MaxExperience;
             stat.Level++;
-            stat.MaxExperience = CalculateMaxExp(stat.Level); // 레벨별 필요 경험치 계산
+            stat.MaxExperience = CalculateMaxExp(stat.Level);
 
             OnLevelUp?.Invoke(stat.Level);
             OnExpChanged?.Invoke(stat.Experience);
         }
     }
 
-    /// <summary>레벨에 따른 필요 경험치 공식 (인스펙터 설정으로 교체 가능)</summary>
-    private long CalculateMaxExp(int level)
+    /// <summary>레벨에 따른 필요 경험치. 100 → 115 → 132 ... (1.15배 증가)</summary>
+    private static long CalculateMaxExp(int level)
     {
-        // 100 → 115 → 132 ... (1.15배 증가)
-        double value = 100.0 * System.Math.Pow(1.15, level - 1);
-        return (long)System.Math.Max(1.0, System.Math.Round(value)); // 0 방지 가드
-    }
-
-    // StatType → (UpgradeConfig, 현재 강화 레벨)
-    private (UpgradeConfig config, int level) GetConfigAndLevel(StatType type)
-    {
-        return type switch
-        {
-            StatType.Damage     => (damageConfig,     stat.UpgradeLevelDamage),
-            StatType.CritChance => (critChanceConfig, stat.UpgradeLevelCritChance),
-            StatType.CritDamage => (critDamageConfig, stat.UpgradeLevelCritDamage),
-            StatType.Attackspd  => (attackspdConfig,  stat.UpgradeLevelAttackSpd),
-            _                   => throw new ArgumentOutOfRangeException(nameof(type))
-        };
+        double value = 100.0 * Math.Pow(1.15, level - 1);
+        return (long)Math.Max(1.0, Math.Round(value)); // 0 방지 가드
     }
 }

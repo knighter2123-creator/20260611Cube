@@ -10,7 +10,7 @@ using UnityEngine;
 /// 밸런스가 터진다 싶으면 additive 를 켜서 합연산으로 바꿀 수 있습니다.
 /// </summary>
 [CreateAssetMenu(menuName = "Game/Augment/공격력", fileName = "_Atk")]
-public class AugmentAttack : AugmentCard
+public class AugmentAttack : AugmentPermanent
 {
     [Header("효과")]
     [Tooltip("0.15 = 공격력 15% 증가")]
@@ -19,16 +19,7 @@ public class AugmentAttack : AugmentCard
     [Tooltip("체크하면 합연산(+15%씩 더하기), 해제하면 곱연산(×1.15씩 곱하기)")]
     [SerializeField] private bool additive = false;
 
-    public override bool IsPermanent => true;
-
     protected override string GetValueText() => $"{amount * 100f:0.#}%";
-
-    public override void Apply(AugmentManager manager, bool isRestore)
-    {
-        // 영구 카드는 "스택을 1 올린다" 가 전부입니다.
-        // 실제 배율 계산은 매니저가 ContributePermanent 를 스택 수만큼 불러서 처리합니다.
-        manager.AddPermanentStack(this);
-    }
 
     public override void ContributePermanent(AugmentManager manager)
     {
