@@ -187,34 +187,11 @@ public class AwakeningManager : MonoBehaviour
 
         SaveManager save = SaveManager.Instance;
 
-        // ★ 경고는 한 번만 남깁니다.
-        //   Refresh()는 씬이 로드될 때마다 돌기 때문에, 그냥 LogWarning을 두면
-        //   연결 하나 빠뜨렸을 때 콘솔이 같은 줄로 가득 차서 정작 봐야 할
-        //   다른 에러가 스크롤 밖으로 밀려납니다.
-        //   "주기적으로 실행되는 코드 안의 로그"는 항상 이 점을 의심해야 합니다.
-        if (table == null)
-        {
-            if (!warnedNoTable)
-            {
-                warnedNoTable = true;
-                Debug.LogWarning("[각성] 보상 테이블이 연결되지 않았습니다. 각성 효과가 적용되지 않습니다.", this);
-            }
-        }
-        else if (save == null)
-        {
-            if (!warnedNoSave)
-            {
-                warnedNoSave = true;
-                Debug.LogWarning("[각성] SaveManager가 없어 각성 단계를 읽을 수 없습니다.", this);
-            }
-        }
-        else
+        if (CanRead(save))
         {
             for (int i = 0; i < table.TierCount; i++)
             {
-                string id = table.GetStageId(i);
-                if (string.IsNullOrEmpty(id)) continue;            // 연결 안 된 칸은 건너뜀
-                if (!save.IsEvolveRewardClaimed(id)) continue;     // 아직 못 깬 단계
+                if (!IsTierCleared(i, save)) continue;   // 연결 안 된 칸이거나 아직 못 깬 단계
 
                 level++;
                 AwakeningRewardTable.Tier tier = table.GetTier(i);
@@ -262,6 +239,43 @@ public class AwakeningManager : MonoBehaviour
         OnChanged?.Invoke();
     }
 
+    /// <summary>
+    /// 테이블과 세이브가 둘 다 있어야 계산할 수 있습니다. 없으면 경고를 '한 번만' 남깁니다.
+    /// Refresh()는 씬이 로드될 때마다 돌기 때문에, 매번 경고하면 콘솔이 같은 줄로 가득 차
+    /// 정작 봐야 할 다른 에러가 밀려납니다.
+    /// </summary>
+    private bool CanRead(SaveManager save)
+    {
+        if (table == null)
+        {
+            if (!warnedNoTable)
+            {
+                warnedNoTable = true;
+                Debug.LogWarning("[각성] 보상 테이블이 연결되지 않았습니다. 각성 효과가 적용되지 않습니다.", this);
+            }
+            return false;
+        }
+
+        if (save == null)
+        {
+            if (!warnedNoSave)
+            {
+                warnedNoSave = true;
+                Debug.LogWarning("[각성] SaveManager가 없어 각성 단계를 읽을 수 없습니다.", this);
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>i번 티어를 깼는가. 스테이지가 연결되지 않은 칸은 영원히 false 입니다.</summary>
+    private bool IsTierCleared(int index, SaveManager save)
+    {
+        string id = table.GetStageId(index);
+        return !string.IsNullOrEmpty(id) && save.IsEvolveRewardClaimed(id);
+    }
+
     // ══════════════════════════════════════════════
     //  에디터 테스트
     // ══════════════════════════════════════════════
@@ -285,7 +299,7 @@ public class AwakeningManager : MonoBehaviour
             for (int i = 0; i < table.TierCount; i++)
             {
                 string id = table.GetStageId(i);
-                bool   ok = !string.IsNullOrEmpty(id) && SaveManager.Instance.IsEvolveRewardClaimed(id);
+                bool   ok = IsTierCleared(i, SaveManager.Instance);
                 sb.AppendLine($"   {i}. {id ?? "(연결 안 됨)"} → {(ok ? "클리어" : "미클리어")}");
             }
         }

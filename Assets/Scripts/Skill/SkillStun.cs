@@ -34,7 +34,7 @@ public class SkillStun : ActiveSkill
             GrayscaleEffect.Apply(target.gameObject, duration + grayscaleExtra);
     }
 
-    // ★ [도감] 효과 요약 (회색 연출 시간은 게임 규칙이 아니라 연출이라 적지 않습니다)
+    // 효과 요약 (회색 연출 시간은 게임 규칙이 아니라 연출이라 적지 않습니다)
     public override string GetEffectSummary(CompanionGrade grade)
         => $"적 1체에게 피해 + {FormatSeconds(GetStunDuration(grade))} 동안 기절";
 

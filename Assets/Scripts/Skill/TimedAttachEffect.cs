@@ -21,21 +21,25 @@ public class TimedAttachEffect : MonoBehaviour
 
         GameObject obj = Instantiate(prefab, parent);
         obj.transform.localPosition = Vector3.zero;   // 적 중심에 부착 (오프셋은 프리팹에서 조정)
-        
+
         // 부모(적) 스케일에 영향받지 않게 이펙트 본래 크기로 고정
-        Vector3 baseScale = prefab.transform.localScale;
+        Vector3 baseScale   = prefab.transform.localScale;
         Vector3 parentLossy = parent.lossyScale;
         obj.transform.localScale = new Vector3(
-            parentLossy.x != 0 ? baseScale.x / parentLossy.x : baseScale.x,
-            parentLossy.y != 0 ? baseScale.y / parentLossy.y : baseScale.y,
-            parentLossy.z != 0 ? baseScale.z / parentLossy.z : baseScale.z);
-        
+            Unscale(baseScale.x, parentLossy.x),
+            Unscale(baseScale.y, parentLossy.y),
+            Unscale(baseScale.z, parentLossy.z));
+
         var effect = obj.GetComponent<TimedAttachEffect>();
         if (effect == null) effect = obj.AddComponent<TimedAttachEffect>();
 
         effect._id = id;
         effect.Play(duration);
     }
+
+    // 부모 스케일로 나눠 원래 크기를 되찾습니다. 0 이면 나눌 수 없으니 그대로 둡니다.
+    private static float Unscale(float value, float parentScale)
+        => parentScale != 0f ? value / parentScale : value;
 
     public void Play(float duration)
     {

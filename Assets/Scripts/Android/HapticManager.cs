@@ -95,13 +95,15 @@ public partial class HapticManager : MonoBehaviour
         }
         Instance = this;
 
-
         userEnabled = PlayerPrefs.GetInt(PrefKey, 1) == 1;
         InitVibrator();
     }
 
     private void OnDestroy()
     {
+        // 설정 패널이 닫히기 전에 매니저가 파괴되면(계정 삭제 등) 토글에 리스너가 남습니다. 짝을 맞춰 끊습니다.
+        UnbindToggle();
+
         // static 이 파괴된 오브젝트를 붙잡지 않게 정리. (다른 매니저들과 같은 패턴)
         if (Instance == this) Instance = null;
     }
@@ -208,7 +210,7 @@ public partial class HapticManager : MonoBehaviour
 
 #if UNITY_ANDROID && !UNITY_EDITOR
     /// <summary>
-    /// ★ 신규 — 진동의 "용도"를 시스템에 알린다. (VibrationAttributes, API 30+)
+    /// 진동의 "용도"를 시스템에 알린다. (VibrationAttributes, API 30+)
     ///
     /// [왜 필요한가]
     ///   용도를 지정하지 않으면 USAGE_UNKNOWN 으로 분류된다.
@@ -285,21 +287,8 @@ public partial class HapticManager : MonoBehaviour
     /// <param name="ignoreCooldown">쿨다운을 무시할지. 결정적인 연출에만 true.</param>
     public void Vibrate(int durationMs, int amplitude = 255, bool ignoreCooldown = false)
     {
-        // ★ 조용한 early return 을 전부 걷어냈다.
-        //   "진동이 안 온다"의 원인이 설정인지, 기기인지, 쿨다운인지,
-        //   애초에 호출이 안 된 건지를 구분할 방법이 없으면 고칠 수가 없다.
-        if (!userEnabled)  { LogBlocked("유저 설정이 꺼져 있음 (PlayerPrefs haptic_enabled = 0)"); return; }
-        if (!IsSupported)  { LogBlocked("IsSupported = false — 위쪽 '초기화 완료' 로그를 확인하세요"); return; }
         if (durationMs <= 0) { LogBlocked($"durationMs = {durationMs}"); return; }
-
-        // 방치형에서 레벨이 한 번에 5개 오르면 진동도 5번 겹친다.
-        // "따다다닥" 하고 손이 떨려서 연출이 아니라 고장처럼 느껴진다.
-        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval)
-        {
-            LogBlocked($"쿨다운 {minInterval}s 안에 재호출됨");
-            return;
-        }
-        lastVibrateTime = Time.unscaledTime;
+        if (!TryPassGate(ignoreCooldown)) return;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (vibrator == null || vibrationEffectClass == null) return;
@@ -335,8 +324,7 @@ public partial class HapticManager : MonoBehaviour
     /// </summary>
     public void VibratePattern(long[] timingsMs, int[] amplitudes = null, bool ignoreCooldown = false)
     {
-        if (!userEnabled || !IsSupported) return;
-        if (timingsMs == null || timingsMs.Length == 0) return;
+        if (timingsMs == null || timingsMs.Length == 0) { LogBlocked("timingsMs 가 비어 있음"); return; }
 
         // ★ 추가된 검사 — createWaveform 은 두 배열의 길이가 다르면
         //   IllegalArgumentException 을 던진다. 이전 코드는 확인하지 않아서
@@ -348,8 +336,7 @@ public partial class HapticManager : MonoBehaviour
             amplitudes = null;
         }
 
-        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval) return;
-        lastVibrateTime = Time.unscaledTime;
+        if (!TryPassGate(ignoreCooldown)) return;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (vibrator == null || vibrationEffectClass == null) return;
@@ -388,6 +375,29 @@ public partial class HapticManager : MonoBehaviour
 #else
         Debug.Log($"[Haptic] (에디터) 패턴 진동 {timingsMs.Length}단계");
 #endif
+    }
+
+    /// <summary>
+    /// 단발·패턴 진동 공통 관문 — 유저 설정 / 기기 지원 / 쿨다운. 통과하면 쿨다운 시각을 갱신합니다.
+    ///
+    /// ★ 막힐 때마다 이유를 남깁니다 (조용한 early return 금지).
+    ///   "진동이 안 온다"의 원인이 설정인지, 기기인지, 쿨다운인지 구분할 방법이 없으면 고칠 수가 없습니다.
+    /// </summary>
+    private bool TryPassGate(bool ignoreCooldown)
+    {
+        if (!userEnabled) { LogBlocked("유저 설정이 꺼져 있음 (PlayerPrefs haptic_enabled = 0)"); return false; }
+        if (!IsSupported) { LogBlocked("IsSupported = false — 위쪽 '초기화 완료' 로그를 확인하세요"); return false; }
+
+        // 방치형에서 레벨이 한 번에 5개 오르면 진동도 5번 겹친다.
+        // "따다다닥" 하고 손이 떨려서 연출이 아니라 고장처럼 느껴진다.
+        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval)
+        {
+            LogBlocked($"쿨다운 {minInterval}s 안에 재호출됨");
+            return false;
+        }
+
+        lastVibrateTime = Time.unscaledTime;
+        return true;
     }
 
     private void LogBlocked(string reason)

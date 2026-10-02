@@ -31,10 +31,9 @@ public class SkillExplosion : ActiveSkill
             var (finalDamage, isCritical) = CalcDamage(caster);
             enemy.TakeDamage(finalDamage, isCritical);
         }
-        // ※ 원래 있던 hitCount 는 어디서도 읽지 않아 지웠습니다 (동작 차이 없음).
     }
 
-    // ★ [도감] 효과 요약
+    // 효과 요약
     public override string GetEffectSummary(CompanionGrade grade)
         => $"대상 주변 반경 {GetExplosionRadius(grade):0.#} 안의 모든 적에게 피해 (적마다 치명타 따로 판정)";
 

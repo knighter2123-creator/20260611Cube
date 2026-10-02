@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// ★ 신규. 게임 시작 직전에 "지금 로그인한 계정" 과 "지금 읽고 있는 세이브의 주인" 을 맞춥니다.
+/// 게임 시작 직전에 "지금 로그인한 계정" 과 "지금 읽고 있는 세이브의 주인" 을 맞춥니다.
 /// Login_Name.StartGame() 이 씬 이동 직전에 PrepareForStart() 를 부릅니다.
 /// (게스트 시작 / 구글 로그인 성공 / 이메일 로그인 성공 — 세 경로 모두 Login_Name.StartGame 으로 모이므로 한 곳에서 처리)
 ///
@@ -19,11 +19,11 @@ using UnityEngine;
 ///          (계정 삭제의 RestartFromLogin 을 그대로 재사용) → 새 LoginScene 에서 자동으로 게임 시작
 ///        → 매니저들이 이전 계정의 레벨·골드를 메모리에 들고 있기 때문에, 파일만 바꿔 읽으면 안 됩니다.
 ///
-/// [계정을 아직 모르면] ★ [배포 전 검토] 바뀜
+/// [계정을 아직 모르면]
 ///   Firebase 가 준비 전이거나(앱을 켜자마자 시작) 로그인 처리 중이면 NotReady 를 돌려줍니다.
 ///   Login_Name 이 잠깐(기본 3초) 기다렸다가 다시 묻고, 그래도 모르면(오프라인·Firebase 오류) "지금 계정 그대로" 시작합니다.
-///   예전에는 바로 "지금 계정 그대로" 시작했는데, 그러면 A 가 로그아웃하고 앱을 끈 기기에서
-///   다음 사람이 켜자마자 시작을 누르면 A 의 진행으로 들어가 A 파일에 저장되는 틈이 있었습니다.
+///   (바로 "지금 계정 그대로" 시작하면, A 가 로그아웃하고 앱을 끈 기기에서 다음 사람이
+///    켜자마자 시작을 누를 때 A 의 진행으로 들어가 A 파일에 저장되는 틈이 생깁니다)
 /// </summary>
 public static class AccountSwitch
 {
@@ -62,7 +62,7 @@ public static class AccountSwitch
         SaveManager sm = SaveManager.Instance;
         if (sm == null) return StartResult.Proceed;   // 에디터에서 게임 씬 바로 실행 등 — 판단할 세이브가 없음
 
-        // ★ [배포 전 검토] 로그인 시스템 자체가 없으면(씬에 AuthManager 없음) 기다릴 이유가 없음 → 게스트 규칙 없이 그대로
+        // 로그인 시스템 자체가 없으면(씬에 AuthManager 없음) 기다릴 이유가 없음 → 게스트 규칙 없이 그대로
         if (AuthManager.Instance == null) return StartResult.Proceed;
 
         if (!TryGetSignedInAccount(out string target))

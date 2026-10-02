@@ -18757,7 +18757,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 600cf6516de60824c946d598089d603b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CompanionPlacementController
-  companionListPanel: {fileID: 0}
   ghost: {fileID: 0}
   validColor: {r: 0, g: 1, b: 0, a: 0.5}
   invalidColor: {r: 1, g: 0, b: 0, a: 0.5}
@@ -18934,7 +18933,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4278190080
-  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -23722,9 +23721,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1710ce479617e714c98390d5a4eadc3c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CompanionListUI
-  useAsTabPage: 1
-  companionListPanel: {fileID: 1740279127}
-  openButton: {fileID: 419671189}
   companionListContent: {fileID: 1853677741}
   companionItemPrefab: {fileID: 1451174931830413201, guid: 24fcf3a04b0888c4e88d270bb0a0146b,
     type: 3}
@@ -34146,15 +34142,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.39215687}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
-  m_Type: 1
+  m_Sprite: {fileID: 4229574389047005653, guid: 1c9bc0d104c01934da10d4333b9dc48b,
+    type: 3}
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4

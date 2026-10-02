@@ -26,11 +26,11 @@ public static class CompanionGradeStyle
     {
         return grade switch
         {
-            CompanionGrade.Normal    => new Color(0.78f, 0.78f, 0.78f),  // 회색
+            CompanionGrade.Normal    => new Color(1.00f, 1.00f, 1.00f),  // 흰색 (RGB 255, 255, 255)
             CompanionGrade.Rare      => new Color(0.30f, 0.62f, 1.00f),  // 파랑
             CompanionGrade.Epic      => new Color(0.72f, 0.42f, 1.00f),  // 보라
             CompanionGrade.Legendary => new Color(1.00f, 0.66f, 0.16f),  // 주황
-            _                        => Color.white
+            _                        => Color.black
         };
     }
 

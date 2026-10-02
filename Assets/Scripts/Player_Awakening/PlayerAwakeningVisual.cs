@@ -148,9 +148,9 @@ public class PlayerAwakeningVisual : MonoBehaviour
         if (targetRenderer == null) ResolveRenderer();
         if (targetRenderer == null) return;
 
-        Sprite want = AwakeningManager.Instance != null
-            ? AwakeningManager.Instance.CurrentSprite
-            : null;
+        // 구독한 매니저 기준으로 읽습니다 (아직 구독 전이면 지금 Instance).
+        AwakeningManager am = boundAm != null ? boundAm : AwakeningManager.Instance;
+        Sprite want = am != null ? am.CurrentSprite : null;
 
         if (want == null) want = baseSprite;   // 0단계이거나 아트 미지정 → 기본 모습
         if (want == null) return;              // 기본 모습조차 없으면 건드리지 않음

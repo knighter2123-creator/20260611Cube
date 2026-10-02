@@ -20,9 +20,8 @@ public class CompanionPlacementController : MonoBehaviour
     //   IsPointerOverUI() 는 "탭 좌표에 UI 가 하나라도 있으면 무시" 하는 방식이라,
     //   반투명 배경 한 장만 깔려 있어도 배치가 영원히 안 됩니다.
     //
-    //   지금까지는 companionListPanel 하나만 직접 껐는데, 탭 창 구조에서는
-    //   꺼야 할 대상이 '창 전체'로 바뀝니다. 그렇다고 이 스크립트가 탭 창을 알 필요는 없죠.
-    //   "배치가 시작됐다" 만 알리고, 비켜주는 건 각자 알아서 하게 둡니다.
+    //   이 스크립트는 어떤 UI 가 화면을 덮고 있는지 모릅니다(알 필요도 없습니다).
+    //   "배치가 시작됐다 / 끝났다" 만 알리고, 비켜주고 되살리는 건 TabWindow 가 합니다.
     //
     // ★ static 이 아니라 인스턴스 이벤트인 이유
     //   이 컴포넌트는 씬에 속해 있어 씬을 넘나들면 파괴/재생성됩니다.
@@ -32,15 +31,6 @@ public class CompanionPlacementController : MonoBehaviour
 
     /// <summary>지금 배치 모드인가. (UI 가 자기를 숨길지 판단할 때 사용)</summary>
     public bool IsPlacing => isPlacing;
-
-    /// <summary>
-    /// 배치 중 숨기도록 설정된 패널 (읽기 전용).
-    /// TabWindow 가 "탭 창과 겹치게 설정됐는지" 검사할 때 씁니다. 탭 창 구조에서는 비어 있어야 정상입니다.
-    /// </summary>
-    public GameObject ListPanelToHide => companionListPanel;
-
-    [Header("배치 중 숨길 동료 리스트 패널")]
-    [SerializeField] private GameObject companionListPanel;   // 인스펙터에서 연결
 
     [Header("배치 미리보기 (선택)")]
     [SerializeField] private SpriteRenderer ghost;        // 반투명 미리보기 스프라이트
@@ -112,20 +102,12 @@ public class CompanionPlacementController : MonoBehaviour
         //   꺼진 컴포넌트도 '메서드 호출'은 됩니다. 그래서 예전에는 isPlacing = true 가 되고
         //   배치 시작 알림까지 나가서 탭 창은 숨는데, Update() 는 돌지 않아 맵을 눌러도 아무 일이 없었습니다.
         //   에러도 없이 창만 사라지는 — 가장 찾기 힘든 형태의 고장입니다.
-        //   흔한 원인: 이 오브젝트가 탭 창 / Companion List Panel 의 '자식'이라 창과 같이 꺼짐.
+        //   흔한 원인: 이 오브젝트가 탭 창의 '자식'이라 창과 같이 꺼짐 (TabWindow 도 같은 실수를 경고합니다).
         if (!isActiveAndEnabled)
         {
             Debug.LogError("[Placement] CompanionPlacementController 가 비활성 상태라 배치를 시작할 수 없습니다. " +
-                           "이 오브젝트가 탭 창(또는 Companion List Panel) 안에 있지 않은지 확인하고, " +
+                           "이 오브젝트가 탭 창 안에 있지 않은지 확인하고, " +
                            "항상 켜져 있는 HUD 쪽으로 옮기세요.", this);
-            return;
-        }
-
-        // ★ [추가] 숨길 패널이 이 컨트롤러의 부모이면, 아래 SetActive(false) 가 자기 자신을 꺼버립니다.
-        if (companionListPanel != null && transform.IsChildOf(companionListPanel.transform))
-        {
-            Debug.LogError("[Placement] Companion List Panel 이 이 컨트롤러의 부모입니다. 패널을 끄면 컨트롤러도 꺼져 배치가 멈춥니다. " +
-                           "탭 창 구조에서는 이 칸을 비워두세요 (창 숨기기는 TabWindow 가 합니다).", this);
             return;
         }
 
@@ -148,8 +130,6 @@ public class CompanionPlacementController : MonoBehaviour
         //   새로운 누름이 한 번 시작돼야 배치가 허용됩니다.
         armed = false;
         warnedNoTilemap  = false;
-
-        if (companionListPanel != null) companionListPanel.SetActive(false);
 
         if (ghost != null)
         {

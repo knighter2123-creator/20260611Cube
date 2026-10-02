@@ -1,65 +1,23 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
-/// 보유 동료 목록.
+/// 보유 동료 목록 — TabWindow 의 한 탭.
 ///
-/// 두 가지 모드로 씁니다.
-///   · 단독 패널 모드 — 기존처럼 열기 버튼으로 패널을 켜고 끕니다.
-///   · 탭 모드       — TabWindow 의 한 탭으로 들어갑니다. 패널을 켜고 끄는 일은 TabWindow 가 합니다.
+/// 창을 열고 닫는 일, 배치 중 창을 숨겼다가 되살리는 일은 전부 TabWindow 가 합니다.
+/// 이 스크립트는 "탭이 보일 때 목록을 그린다" 와 "탭을 떠나면 배치를 취소한다" 만 책임집니다.
 /// </summary>
 public class CompanionListUI : MonoBehaviour, ITabPage
 {
-    [Header("동작 모드")]
-    [Tooltip("TabWindow 안의 한 탭으로 쓸 때 체크하세요.\n" +
-             "체크하면 companionListPanel 과 openButton 을 쓰지 않습니다. TabWindow 가 담당합니다.")]
-    [SerializeField] private bool useAsTabPage = false;
-
-    [Header("패널")]
-    [SerializeField] private GameObject companionListPanel;
-
-    [Header("버튼")]
-    [SerializeField] private Button openButton;
-    
-
     [Header("동료 목록")]
     [SerializeField] private Transform  companionListContent;
     [SerializeField] private GameObject companionItemPrefab;
-
-    void Awake()
-    {
-        // ★ 탭 모드에서는 패널 소유권을 TabWindow 에 넘깁니다.
-        //   둘이 같은 오브젝트를 SetActive 하면 "탭을 바꿨는데 목록이 도로 켜지는" 상태가 됩니다.
-        if (useAsTabPage)
-        {
-            companionListPanel = null;
-            openButton         = null;
-        }
-    }
-
-    void Start()
-    {
-        // ★ 원래는 null 검사가 하나도 없었습니다.
-        //   탭 모드처럼 openButton 을 비워두는 구성에서는 이 줄에서 NullReferenceException 이 나고,
-        //   예외가 나면 Start 가 거기서 끊겨 뒤의 초기화가 통째로 실행되지 않습니다.
-        //   "연결을 하나 빠뜨렸을 때 게임이 멈추지 않게" — 스탯창에서 쓴 원칙과 같습니다.
-        if (openButton  != null) openButton.onClick.AddListener(OpenCompanionList);
-
-        if (companionListPanel != null) companionListPanel.SetActive(false);
-    }
-
-    void OnDestroy()
-    {
-        // 등록한 리스너는 등록한 쪽이 해제합니다.
-        if (openButton  != null) openButton.onClick.RemoveListener(OpenCompanionList);
-    }
 
     // ══════════════════════════════════════════════
     //  ITabPage — TabWindow 가 부른다
     // ══════════════════════════════════════════════
 
-    /// <summary>이 탭이 선택됐다 → 목록을 다시 만든다.</summary>
+    /// <summary>이 탭이 선택됐다 (창을 열 때, 배치가 끝나 창이 되살아날 때 포함) → 목록을 다시 만든다.</summary>
     public void OnTabShow() => RefreshCompanionList();
 
     /// <summary>
@@ -68,22 +26,17 @@ public class CompanionListUI : MonoBehaviour, ITabPage
     /// ★ 이걸 빼먹으면 "배치할 위치를 탭하세요" 안내와 반투명 미리보기가 화면에 남은 채
     ///   강화 탭이 열립니다. 그 상태에서 맵을 누르면 동료가 배치돼 버립니다.
     /// </summary>
-    public void OnTabHide() => CompanionPlacementController.Instance?.CancelPlacement();
-
-    // ══════════════════════════════════════════════
-    //  단독 패널 모드
-    // ══════════════════════════════════════════════
-    public void OpenCompanionList()
+    public void OnTabHide()
     {
-        if (companionListPanel != null) companionListPanel.SetActive(true);
-        RefreshCompanionList();
+        CompanionPlacementController pc = CompanionPlacementController.Instance;
+        if (pc != null) pc.CancelPlacement();
     }
 
     // ══════════════════════════════════════════════
     //  목록 갱신
     // ══════════════════════════════════════════════
 
-    /// <summary>보유 동료로 목록을 다시 만든다. (탭을 열 때마다 호출됨)</summary>
+    /// <summary>보유 동료로 목록을 다시 만든다. (탭을 보여줄 때마다 호출됨)</summary>
     public void RefreshCompanionList()
     {
         if (companionListContent == null || companionItemPrefab == null)
@@ -95,9 +48,14 @@ public class CompanionListUI : MonoBehaviour, ITabPage
         // ★ 매번 전부 지우고 다시 만듭니다.
         //   동료가 최대 6명이라 지금은 문제가 없지만, 수가 늘어나면
         //   '이미 있는 아이템은 Setup 만 다시 호출' 하는 재사용 방식으로 바꾸는 게 맞습니다.
-        //   Destroy/Instantiate 는 GC 쓰레기를 만들고, 탭은 자주 열리니까요.
-        foreach (Transform child in companionListContent)
-            Destroy(child.gameObject);
+        //   Destroy 는 프레임 끝에 지우므로, SetActive(false) 로 레이아웃에서 즉시 빼 줍니다.
+        //   (안 그러면 같은 프레임 동안 옛 아이템과 새 아이템이 함께 줄을 섭니다)
+        for (int i = companionListContent.childCount - 1; i >= 0; i--)
+        {
+            GameObject child = companionListContent.GetChild(i).gameObject;
+            child.SetActive(false);
+            Destroy(child);
+        }
 
         CompanionManager cm = CompanionManager.Instance;
         IReadOnlyList<CompanionData> owned = cm != null ? cm.GetOwnedCompanionData() : null;

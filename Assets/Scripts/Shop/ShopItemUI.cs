@@ -63,9 +63,9 @@ public class ShopItemUI : MonoBehaviour
             costText.text = data.CostAmount.ToString("N0");
     }
 
+    // 결과 로그는 ShopManager 가 성공/실패 각각 남깁니다.
     private void OnClickBuy()
     {
-        Debug.Log($"[Shop] OnClickBuy 호출 | 상품={product?.DisplayName} | UI ID={GetInstanceID()}");
-        ShopManager.Instance?.TryPurchase(product);
+        if (ShopManager.Instance != null) ShopManager.Instance.TryPurchase(product);
     }
 }

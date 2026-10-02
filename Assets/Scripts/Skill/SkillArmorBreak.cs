@@ -42,9 +42,9 @@ public class SkillArmorBreak : ActiveSkill
             TimedAttachEffect.Spawn(armorBreakEffectPrefab, target.transform, duration, "ArmorBreak");
     }
 
-    // ★ [도감] 효과 요약
+    // 효과 요약
     //   Enemy.ArmorBreakRoutine 이 _armorBreakMultiplier = 1 - rate 로 쓰므로 rate 는 '감소율' 이 맞습니다.
-    //   (0.4 → 방어력 40% 감소) — 도감 문서의 확인 항목 ① 해결
+    //   (0.4 → 방어력 40% 감소)
     public override string GetEffectSummary(CompanionGrade grade)
         => $"적 1체에게 피해 + {FormatSeconds(GetArmorBreakDuration(grade))} 동안 " +
            $"방어력 {FormatPercent(GetArmorBreakRate(grade))} 감소";

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;   // ★ [검토 후 추가] 입력 차단막(Image, GraphicRaycaster)
+using UnityEngine.UI;   // 입력 차단막(Image, GraphicRaycaster)
 
 /// <summary>
 /// '계정 삭제' — 플레이어 진행 데이터를 지우고 게임을 "막 설치한 상태" 로 다시 시작합니다.
@@ -35,7 +35,7 @@ using UnityEngine.UI;   // ★ [검토 후 추가] 입력 차단막(Image, Graph
 /// [순서 — 이게 이 파일의 전부입니다]
 ///   ① 저장 잠금             SaveManager.LockForReset()
 ///   ② 데이터 삭제           save.json + PlayerPrefs(진행 데이터만)
-///   (+) 입력 차단막         RestartFromLogin() 순간부터 모든 터치 차단 ★ 검토 후 추가
+///   (+) 입력 차단막         RestartFromLogin() 순간부터 모든 터치 차단
 ///   ③ 게임 씬 내리기       빈 임시 씬으로 옮긴 뒤 MainScene 을 언로드   ← 매니저가 "살아 있는" 상태에서
 ///   ④ 매니저 전부 파괴      DontDestroyOnLoad 에 있는 게임 오브젝트 전부
 ///   ⑤ LoginScene 새로 로드  새 ManagerRoot / SaveManager 가 "세이브 없음" 으로 시작 → 잠금 자동 해제
@@ -51,12 +51,11 @@ using UnityEngine.UI;   // ★ [검토 후 추가] 입력 차단막(Image, Graph
 ///     새 ManagerRoot 의 Awake 가 "기존 루트가 아직 있네" 하고 자기 자신을 지워 버립니다.
 ///     (ManagerRoot.Awake 의 중복 제거 규칙) 한 프레임 쉬면 옛 루트의 OnDestroy 가 Instance 를 비운 뒤라 안전합니다.
 ///
-/// ★ [계정별 세이브] 이번 변경 (전부 "★ [계정별 세이브]" 로 표시)
+/// [계정 전환에도 재사용]
 ///   "매니저를 전부 새로 만들고 LoginScene 부터 다시" 는 계정 전환에도 똑같이 필요합니다
-///   (매니저들이 이전 계정의 레벨·골드를 메모리에 들고 있으므로). 그래서 2단계(RestartFromLogin)를 재사용합니다.
-///   1. TryBeginAccountSwitch — TryWipe 의 "지우지 않는" 버전: 저장 잠금만 걸고 재시작 준비
-///   2. 로그 문구를 '계정 삭제' / '계정 전환' 으로 구분 (pendingReason)
-///   3. TryWipe 가 지우는 세이브·증강은 이제 "지금 계정" 의 것만 (SaveManager / AugmentManager 쪽에서 처리)
+///   (매니저들이 이전 계정의 레벨·골드를 메모리에 들고 있으므로).
+///   TryBeginAccountSwitch 는 TryWipe 의 "지우지 않는" 버전 — 저장 잠금만 걸고 같은 RestartFromLogin 을 탑니다.
+///   TryWipe 가 지우는 세이브·증강은 "지금 계정" 의 것만입니다 (SaveManager / AugmentManager 쪽에서 처리).
 /// </summary>
 public class AccountReset : MonoBehaviour
 {
@@ -64,7 +63,7 @@ public class AccountReset : MonoBehaviour
     public static bool IsRunning { get; private set; }
 
     private static string pendingLoginScene;
-    private static string pendingReason;   // ★ [계정별 세이브] 로그용: "계정 삭제" / "계정 전환"
+    private static string pendingReason;   // 로그용: "계정 삭제" / "계정 전환"
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -89,33 +88,14 @@ public class AccountReset : MonoBehaviour
     /// </summary>
     public static bool TryWipe(string loginSceneName, out string error)
     {
-        error = string.Empty;
-
-        if (IsRunning)
-        {
-            error = "이미 초기화가 진행 중입니다.";
-            return false;
-        }
-
-        // ★ 로드할 수 없는 씬 이름이면 "지우기 전에" 멈춥니다.
-        //   지운 뒤에 로드가 실패하면 빈 화면에 갇힌 채 데이터만 사라집니다.
-        //   (Build Settings 의 Scenes In Build 에 없거나 이름 오타)
-        if (!Application.CanStreamedLevelBeLoaded(loginSceneName))
-        {
-            error = "로그인 화면을 찾을 수 없습니다.";
-            Debug.LogError($"[AccountReset] '{loginSceneName}' 씬을 로드할 수 없습니다. " +
-                           "Build Settings 의 Scenes In Build 에 들어 있는지 확인하세요. 아무것도 지우지 않았습니다.");
-            return false;
-        }
-
         // ① 저장 잠금 — 반드시 삭제보다 먼저. 순서가 바뀌면 지운 직후 끼어든 Save() 가 파일을 되살립니다.
-        SaveManager.LockForReset();
+        if (!TryLockForRestart(loginSceneName, "계정 삭제", out error)) return false;
 
         // ② 세이브 파일 삭제
         if (!SaveManager.TryDeleteSaveFile(out string fileError))
         {
             // 파일이 그대로 남아 있으므로 게임을 그대로 계속하면 됩니다. 잠금만 풀어 줍니다.
-            SaveManager.UnlockAfterReset();
+            CancelRestart();
             error = "데이터를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
             Debug.LogError($"[AccountReset] 세이브 파일 삭제 실패로 초기화를 중단합니다: {fileError}");
             return false;
@@ -126,16 +106,12 @@ public class AccountReset : MonoBehaviour
         PlayerProfile.DeleteLegacyPrefsForReset(); // 예전 방식 이름 — 안 지우면 LoginScene 에서 옛 이름이 이관돼 되살아남
         PlayerPrefs.Save();                        // PlayerPrefs 는 Save() 전까지 메모리에만 있음 → 바로 앱이 꺼져도 안전하게
 
-        IsRunning = true;
-        pendingLoginScene = loginSceneName;
-        pendingReason = "계정 삭제";
-
         Debug.Log("[AccountReset] 진행 데이터 삭제 완료. RestartFromLogin() 으로 매니저를 새로 만듭니다.");
         return true;
     }
 
     /// <summary>
-    /// ★ [계정별 세이브] 계정 전환용 1단계 — TryWipe 와 같지만 아무것도 지우지 않습니다.
+    /// 계정 전환용 1단계 — TryWipe 와 같지만 아무것도 지우지 않습니다.
     /// 저장 잠금만 걸어서, 매니저들이 파괴되는 동안 "이전 계정 값" 이 새 계정 파일에 기록되지 않게 합니다.
     /// (호출한 쪽은 잠금 뒤에 SaveManager.SetActiveAccount(새 계정) → RestartFromLogin() 순서로 부릅니다)
     ///
@@ -145,29 +121,48 @@ public class AccountReset : MonoBehaviour
     ///   잠금은 새 SaveManager 가 태어날 때(= 이전 매니저가 모두 사라졌을 때) 풀립니다 — 계정 삭제와 같은 원리.
     /// </summary>
     public static bool TryBeginAccountSwitch(string loginSceneName, out string error)
+        => TryLockForRestart(loginSceneName, "계정 전환", out error);
+
+    /// <summary>
+    /// 재시작 공통 준비 — 진행 중 검사 → 씬 확인 → 저장 잠금 → 대기 상태 기록.
+    ///
+    /// ★ 로드할 수 없는 씬 이름이면 "되돌릴 수 없는 일을 시작하기 전에" 멈춥니다.
+    ///   지운 뒤에 로드가 실패하면 빈 화면에 갇힌 채 데이터만 사라집니다.
+    ///   (Build Settings 의 Scenes In Build 에 없거나 이름 오타)
+    /// </summary>
+    private static bool TryLockForRestart(string loginSceneName, string reason, out string error)
     {
         error = string.Empty;
 
         if (IsRunning)
         {
-            error = "이미 다른 재시작이 진행 중입니다.";
+            error = "이미 초기화가 진행 중입니다.";
             return false;
         }
 
-        // TryWipe 와 같은 이유 — 되돌릴 수 없는 일을 시작하기 "전에" 씬을 불러올 수 있는지 확인
         if (!Application.CanStreamedLevelBeLoaded(loginSceneName))
         {
             error = "로그인 화면을 찾을 수 없습니다.";
-            Debug.LogError($"[AccountReset] '{loginSceneName}' 씬을 로드할 수 없어 계정 전환을 하지 않습니다.");
+            Debug.LogError($"[AccountReset] '{loginSceneName}' 씬을 로드할 수 없어 {reason}을(를) 하지 않습니다. " +
+                           "Build Settings 의 Scenes In Build 에 들어 있는지 확인하세요. 아무것도 바꾸지 않았습니다.");
             return false;
         }
 
         SaveManager.LockForReset();
 
-        IsRunning = true;
+        IsRunning         = true;
         pendingLoginScene = loginSceneName;
-        pendingReason = "계정 전환";
+        pendingReason     = reason;
         return true;
+    }
+
+    /// <summary>TryLockForRestart 를 되돌립니다 (1단계에서 실패했을 때).</summary>
+    private static void CancelRestart()
+    {
+        SaveManager.UnlockAfterReset();
+        IsRunning         = false;
+        pendingLoginScene = null;
+        pendingReason     = null;
     }
 
     // ═════════════════════════════════════════════════════════
@@ -190,7 +185,7 @@ public class AccountReset : MonoBehaviour
         var go = new GameObject("[AccountReset]", typeof(RectTransform));
         DontDestroyOnLoad(go);
 
-        // ★ [검토 후 추가] 입력 차단막 — 이 한 줄을 부르는 순간부터 화면 전체의 터치를 막는다.
+        // 입력 차단막 — 이 한 줄을 부르는 순간부터 화면 전체의 터치를 막는다.
         CreateInputBlocker(go);
 
         var runner = go.AddComponent<AccountReset>();
@@ -198,9 +193,9 @@ public class AccountReset : MonoBehaviour
     }
 
     /// <summary>
-    /// ★ [검토 후 추가] 초기화가 끝날 때까지 모든 UI 터치를 막는 반투명 검은 막.
+    /// 초기화가 끝날 때까지 모든 UI 터치를 막는 반투명 검은 막.
     ///
-    /// [왜 필요한가 — 검토에서 찾은 문제]
+    /// [왜 필요한가]
     ///   MainScene 이 내려가는 데는 몇 프레임이 걸립니다(느린 기기에선 더 김). 그동안 설정 패널의
     ///   '로그인 화면으로 돌아가기' 나 HUD 의 상점·가챠 버튼이 여전히 눌립니다.
     ///   그중 하나라도 SceneManager.LoadScene 을 부르면 초기화 코루틴과 씬 로드가 뒤엉킵니다.
@@ -286,7 +281,7 @@ public class AccountReset : MonoBehaviour
         // (ManagerRoot.Instance = null 등) 가 끝난 뒤에 LoginScene 을 부릅니다. (클래스 주석 참고)
         yield return null;
 
-        // ★ [검토 후 추가] 확인 — 옛 ManagerRoot 가 정말 사라졌는가.
+        // 확인 — 옛 ManagerRoot 가 정말 사라졌는가.
         //   살아 있으면 새 LoginScene 의 루트가 중복으로 자폭하고, 옛 매니저가 옛 값을 들고 계속 일합니다.
         //   잠금은 곧 풀리므로 그 옛 값이 새 세이브에 그대로 기록됩니다 → "삭제했는데 안 지워짐".
         //   에러도 안 나는 종류라 여기서 반드시 잡아 로그를 남기고 강제로 지웁니다.
@@ -321,7 +316,7 @@ public class AccountReset : MonoBehaviour
             SaveManager.UnlockAfterReset();
         }
 
-        string reason = pendingReason ?? "재시작";   // ★ [계정별 세이브] 로그용
+        string reason = pendingReason ?? "재시작";   // 로그용
         IsRunning = false;
         pendingLoginScene = null;
         pendingReason = null;
@@ -345,7 +340,7 @@ public class AccountReset : MonoBehaviour
     ///   (URP 디버그 업데이터, DOTween 같은 트윈 라이브러리 등). 그걸 지우면 우리가 모르는 방식으로 고장납니다.
     ///   그래서 "이 프로젝트의 게임 스크립트(ManagerRoot 와 같은 어셈블리)가 하나라도 붙어 있는 루트" 만 지웁니다.
     ///
-    ///   ★ [검토 후 수정] 기준을 typeof(AccountReset) → typeof(ManagerRoot) 로 바꿨습니다.
+    ///   ★ 기준이 typeof(AccountReset) 가 아니라 typeof(ManagerRoot) 인 이유
     ///     이 파일을 Plugins 나 Standard Assets 폴더에 넣으면 유니티가 다른 어셈블리
     ///     (Assembly-CSharp-firstpass)로 컴파일합니다. 그러면 "같은 어셈블리" 인 매니저가 하나도 없어서
     ///     아무것도 지우지 않고 넘어가고, 초기화가 조용히 실패합니다.

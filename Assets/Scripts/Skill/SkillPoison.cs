@@ -32,17 +32,14 @@ public class SkillPoison : ActiveSkill
 
         var (finalDamage, isCritical) = CalcDamage(caster);
 
-        // DoT 데미지도 '플레이어 공격력 + 독 피해' 에 크리티컬 배율 적용 (원래 공식 그대로, dotDamage 만 등급값)
-        // ★ Stat 이 null 이면 예전엔 여기서 NullReferenceException — 이제는 독 피해만 줍니다.
-        PlayerStat stat = caster != null ? caster.Stat : null;
-        float dotBase  = (stat != null ? stat.baseDamage : 0f) + GetDotDamage(g);
-        float finalDot = (isCritical && stat != null) ? dotBase * stat.CriticalMultiplier : dotBase;
+        // 독 피해도 즉발 피해와 같은 공식 — '플레이어 공격력 + 독 피해' 에 같은 치명타 판정을 적용합니다.
+        float finalDot = WithPlayerAttack(caster, GetDotDamage(g), isCritical);
 
         target.TakeDamage(finalDamage, isCritical);
         target.ApplyDot(finalDot, GetDotInterval(g), GetDotDuration(g));
     }
 
-    // ★ [도감] 효과 요약 — 위 Execute 의 독 피해 공식(플레이어 공격력 + dotDamage)과 같은 말로 적습니다.
+    // 효과 요약 — 위 Execute 의 독 피해 공식(플레이어 공격력 + dotDamage)과 같은 말로 적습니다.
     public override string GetEffectSummary(CompanionGrade grade)
         => $"적 1체에게 피해 + {FormatSeconds(GetDotDuration(grade))} 동안 {FormatSeconds(GetDotInterval(grade))}마다 " +
            $"독 피해(플레이어 공격력 + {GetDotDamage(grade):0.#})";

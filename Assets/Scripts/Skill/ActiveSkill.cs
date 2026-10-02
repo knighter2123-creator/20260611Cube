@@ -35,8 +35,7 @@ public abstract class ActiveSkill : ScriptableObject
     public GameObject effectPrefab;
     public float  effectDuration = 0.5f;
 
-    // ★ [도감] 신규 필드. 기존 스킬 에셋에는 빈 문자열로 채워지므로 아무것도 깨지지 않습니다.
-    //   (세이브 파일과도 무관합니다 — 스킬 에셋은 저장 대상이 아닙니다)
+    // 도감 전용 문구. 스킬 에셋은 세이브 대상이 아니라 저장 구조와 무관합니다.
     [Header("도감 표시")]
     [Tooltip("도감 상세창에 추가로 보여줄 설명 (선택). 비워두면 효과 요약만 표시됩니다.")]
     [TextArea(2, 4)]
@@ -44,9 +43,9 @@ public abstract class ActiveSkill : ScriptableObject
 
     /// <summary>
     /// 쿨다운 하한. 실수로 0 을 넣으면 Companion.Update 가 '매 프레임' 스킬을 쏘게 됩니다.
-    /// 플레이어 공격의 하한(Player.HandleAttack 의 0.1초)과 같은 값으로 맞췄습니다.
+    /// 플레이어 공격 쿨타임 하한과 같은 상수를 써서 두 값이 따로 놀지 않게 합니다.
     /// </summary>
-    public const float MIN_COOLDOWN = 0.1f;
+    public const float MIN_COOLDOWN = PlayerStat.MIN_ATTACK_COOLDOWN;
 
     public abstract void Execute(Enemy target, Companion caster);
 
@@ -98,18 +97,6 @@ public abstract class ActiveSkill : ScriptableObject
     /// </summary>
     public virtual string GetEffectSummary(CompanionGrade grade) => "";
 
-    /// <summary>
-    /// 예전 호출부 호환용 (등급 없이 부르면 일반 등급 기준).
-    /// ※ 새 스킬은 이게 아니라 위의 GetEffectSummary(CompanionGrade) 를 override 하세요.
-    ///
-    /// ★ [재검토] [Obsolete] 를 붙인 이유
-    ///   이걸 부르는 UI 가 남아 있으면, 전설 동료 화면에 '일반 등급 수치' 가 조용히 뜹니다 (에러 없음).
-    ///   Obsolete 를 붙이면 그런 호출부가 콘솔에 '경고'로 드러나므로, 제가 못 본 파일에 남은 곳도 찾을 수 있습니다.
-    ///   (에러가 아니라 경고라 컴파일은 그대로 됩니다)
-    /// </summary>
-    [System.Obsolete("등급이 반영되지 않습니다. GetEffectSummary(data.grade) 처럼 등급을 넘기세요.")]
-    public string GetEffectSummary() => GetEffectSummary(CompanionGrade.Normal);
-
     // 요약 문장에서 같이 쓰는 표기 도우미 — 숫자 표기 규칙을 한 곳에 둡니다.
     // "0.#" 은 소수 첫째 자리까지, 0 이면 생략 (0.4 → 40%, 0.125 → 12.5%)
     protected static string FormatPercent(float rate01) => $"{rate01 * 100f:0.#}%";
@@ -139,36 +126,35 @@ public abstract class ActiveSkill : ScriptableObject
     }
 
     /// <summary>
-    /// 최종 피해 = (플레이어 공격력 + 시전자 등급의 스킬 피해) × (치명타면 배율)
+    /// 최종 피해 = (플레이어 최종 공격력 + 시전자 등급의 스킬 피해) × (치명타면 최종 치명타 배율)
     /// </summary>
     protected (float finalDamage, bool isCritical) CalcDamage(Companion caster)
     {
-        float skillDamage = GetDamage(GradeOf(caster));
-
-        // ★ Player.Instance 가 없으면(씬 전환 중 등) Stat 이 null 입니다.
-        //   예전 코드는 여기서 NullReferenceException 이 났습니다. 스킬 피해만 주고 넘어갑니다.
-        PlayerStat stat = caster != null ? caster.Stat : null;
-        if (stat == null) return (skillDamage, false);
-
-        float base_ = stat.baseDamage + skillDamage;
-        bool  crit  = Random.Range(0f, 100f) < stat.Critical;
-        float final = crit ? base_ * stat.CriticalMultiplier : base_;
-        return (final, crit);
+        PlayerStat stat = StatOf(caster);
+        bool crit = stat != null && Random.Range(0f, 100f) < stat.FinalCritical;
+        return (WithPlayerAttack(caster, GetDamage(GradeOf(caster)), crit), crit);
     }
 
     /// <summary>
-    /// ⚠ 예전 방식 — 등급을 모르므로 항상 '일반' 피해로 계산합니다.
-    /// 지우지 않고 [Obsolete] 로 남긴 이유: 혹시 다른 곳에서 부르고 있어도 컴파일은 되게 하고,
-    /// 콘솔 경고로 "여기를 바꿔야 한다" 는 걸 알려주기 위해서입니다.
+    /// (플레이어 최종 공격력 + extra) 에 치명타면 최종 치명타 배율을 곱한 값.
+    /// 즉발 피해와 독(DoT) 피해가 같은 공식을 씁니다.
+    ///
+    /// 플레이어 공격력은 PlayerStat 의 Final* 값을 씁니다 → 증강(공격력 · 치명타 대미지)과
+    /// 각성 영구 버프가 플레이어 평타와 똑같이 스킬에도 반영됩니다. 버프는 '플레이어 공격력' 몫에만
+    /// 곱해지고, 스킬 자체 피해(extra)는 등급별 고정값 그대로입니다.
+    ///
+    /// Player 가 없으면(씬 전환 중 등) Stat 이 null 이라 extra 만 돌려줍니다 (NullReferenceException 방지).
     /// </summary>
-    [System.Obsolete("등급이 반영되지 않습니다. CalcDamage(caster) 를 쓰세요.")]
-    protected (float finalDamage, bool isCritical) CalcDamage(PlayerStat stat)
+    protected static float WithPlayerAttack(Companion caster, float extra, bool isCritical)
     {
-        float base_ = stat.baseDamage + damage;
-        bool  crit  = Random.Range(0f, 100f) < stat.Critical;
-        float final = crit ? base_ * stat.CriticalMultiplier : base_;
-        return (final, crit);
+        PlayerStat stat = StatOf(caster);
+        if (stat == null) return extra;
+
+        float value = stat.FinalDamage + extra;
+        return isCritical ? value * stat.FinalCriticalMultiplier : value;
     }
+
+    private static PlayerStat StatOf(Companion caster) => caster != null ? caster.Stat : null;
 
     protected void PlayEffect(Vector3 position)
     {
@@ -198,7 +184,7 @@ public abstract class ActiveSkill : ScriptableObject
         damageByGrade?.FillIfEmpty(damage);
         cooldownByGrade?.FillIfEmpty(cooldown);
 
-        // ★ [재검토] 쿨타임 칸 하나만 0 으로 남는 실수는 FillIfEmpty 가 못 잡습니다 (다른 칸에 값이 있으므로).
+        // 쿨타임 칸 하나만 0 으로 남는 실수는 FillIfEmpty 가 못 잡습니다 (다른 칸에 값이 있으므로).
         //   그 등급 동료만 0.1초마다 스킬을 쏘게 되는데 에러가 없어서, 여기서 경고로 알려줍니다.
         //   (피해 0 은 '디버프 전용 스킬' 처럼 일부러 그럴 수 있어서 경고하지 않습니다)
         if (cooldownByGrade != null && cooldownByGrade.HasZeroSlot())
