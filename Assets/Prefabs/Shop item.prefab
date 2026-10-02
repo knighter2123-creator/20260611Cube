@@ -51,6 +51,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ShopItemUI
   iconImage: {fileID: 5350438574832657439}
   nameText: {fileID: 5818414488710728159}
+  rewardImage: {fileID: 2061046620280414759}
   rewardText: {fileID: 4766502980453313742}
   iconTable: {fileID: 11400000, guid: e71c080f547f44c49a25d82af0f15376, type: 2}
   costIcon: {fileID: 5642717930808546535}

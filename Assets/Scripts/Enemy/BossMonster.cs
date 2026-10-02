@@ -32,6 +32,11 @@ public class BossMonster : Enemy
     [Header("보석 보상")]
     [SerializeField] private int baseRewardGem = 100;
 
+    [Header("소환권 보상")]
+    [Tooltip("보스를 처치할 때마다 주는 소환권 수. 스테이지 배율과 무관한 고정값입니다.")]
+    [Min(0)]
+    [SerializeField] private int rewardGachaTicket = 1;
+
     /// <summary>
     /// 스탯 계산. 부모를 먼저 부른 뒤 보스 배율을 "원본 기준"으로 다시 덮어씁니다.
     ///
@@ -51,7 +56,7 @@ public class BossMonster : Enemy
         currentHealth = maxHealth;
     }
 
-    /// <summary>훅 ① — 보스 보상: 골드 + 보석 + 배율 적용된 경험치</summary>
+    /// <summary>훅 ① — 보스 보상: 골드 + 보석 + 소환권 + 배율 적용된 경험치</summary>
     protected override void GrantRewards()
     {
         // base를 부르지 않습니다 — 잡몹용 rewardGold/rewardExp는 쓰지 않으니까요.
@@ -61,6 +66,9 @@ public class BossMonster : Enemy
             Mathf.RoundToInt(baseRewardGold * bossCurrencyMultiplier * goldScale));
 
         CurrencyManager.Instance?.AddGem(baseRewardGem);
+
+        // 저장은 바로 뒤 ReportKill → StageManager.StageClear 의 Save() 에 함께 실립니다.
+        GachaTicket.Add(rewardGachaTicket);
 
         LevelUpManager.Instance?.AddExp(
             Mathf.RoundToInt(baseRewardExp * bossExpMultiplier * statMult));

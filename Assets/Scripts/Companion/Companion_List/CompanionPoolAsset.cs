@@ -24,6 +24,39 @@ public class CompanionPoolAsset : ScriptableObject
     [SerializeField] private List<CompanionData> epic      = new List<CompanionData>();
     [SerializeField] private List<CompanionData> legendary = new List<CompanionData>();
 
+    // 가챠 중복 / 진화 중복 때 받는 조각 수. 가챠(ShopScene)와 도감(StageScene)이 같은 값을 써야 해서
+    // 어느 씬에서든 읽을 수 있는 이 에셋에 둡니다.
+    [Header("중복 시 조각 전환량 (등급별) — 가챠 중복 · 진화 중복 공용")]
+    [Min(0)] [SerializeField] private int fragmentNormal    = 5;
+    [Min(0)] [SerializeField] private int fragmentRare      = 10;
+    [Min(0)] [SerializeField] private int fragmentEpic      = 15;
+    [Min(0)] [SerializeField] private int fragmentLegendary = 20;
+
+    /// <summary>이미 가진 동료를 또 얻었을 때 대신 받는 조각 수.</summary>
+    public int DuplicateFragments(CompanionGrade grade) => grade switch
+    {
+        CompanionGrade.Rare      => fragmentRare,
+        CompanionGrade.Epic      => fragmentEpic,
+        CompanionGrade.Legendary => fragmentLegendary,
+        _                        => fragmentNormal
+    };
+
+    /// <summary>
+    /// 진화 대상 — 바로 위 등급 풀에서 '같은 스킬 에셋' 을 가진 동료. 없으면 null (최고 등급이거나 짝이 없음).
+    ///   예) nm_atk(SkillAttack) → ra_atk(SkillAttack),  ra_Slow(SkillSlow) → 영웅 SkillSlow 가 없으면 null
+    /// 같은 스킬이 여럿이면 풀에 먼저 넣은 쪽 (OnValidate 가 경고합니다).
+    /// </summary>
+    public CompanionData FindEvolution(CompanionData from)
+    {
+        if (from == null || from.ownedSkill == null) return null;
+        if (from.grade >= CompanionGrade.Legendary) return null;
+
+        foreach (CompanionData d in GetPool(from.grade + 1))
+            if (d != null && d.ownedSkill == from.ownedSkill) return d;
+
+        return null;
+    }
+
     /// <summary>
     /// 해당 등급의 풀. 가챠가 뽑을 때 씁니다.
     ///
@@ -60,20 +93,6 @@ public class CompanionPoolAsset : ScriptableObject
         foreach (var d in legendary) yield return d;
     }
 
-    /// <summary>
-    /// 기존 GachaSystem 인스펙터의 리스트를 이 에셋으로 옮길 때 씁니다.
-    /// (GachaSystem 컴포넌트 우클릭 메뉴에서 호출 — 손으로 다시 끌어다 넣지 않아도 됨)
-    /// </summary>
-    public void CopyFrom(IEnumerable<CompanionData> n, IEnumerable<CompanionData> r,
-                         IEnumerable<CompanionData> e, IEnumerable<CompanionData> l)
-    {
-        // null 이 들어와도 터지지 않게 빈 리스트로 받습니다.
-        normal    = n != null ? new List<CompanionData>(n) : new List<CompanionData>();
-        rare      = r != null ? new List<CompanionData>(r) : new List<CompanionData>();
-        epic      = e != null ? new List<CompanionData>(e) : new List<CompanionData>();
-        legendary = l != null ? new List<CompanionData>(l) : new List<CompanionData>();
-    }
-
 #if UNITY_EDITOR
     /// <summary>
     /// 인스펙터에서 값을 바꿀 때마다 에디터가 부릅니다. (빌드에는 포함되지 않음)
@@ -88,6 +107,24 @@ public class CompanionPoolAsset : ScriptableObject
         CheckGrade(rare,      CompanionGrade.Rare);
         CheckGrade(epic,      CompanionGrade.Epic);
         CheckGrade(legendary, CompanionGrade.Legendary);
+
+        CheckDuplicateSkill(rare,      CompanionGrade.Rare);
+        CheckDuplicateSkill(epic,      CompanionGrade.Epic);
+        CheckDuplicateSkill(legendary, CompanionGrade.Legendary);
+    }
+
+    // 한 등급에 같은 스킬 동료가 둘이면 진화 대상이 모호해집니다 (FindEvolution 은 앞쪽만 씀).
+    private void CheckDuplicateSkill(List<CompanionData> list, CompanionGrade grade)
+    {
+        if (list == null) return;
+        var seen = new HashSet<ActiveSkill>();
+        foreach (var d in list)
+        {
+            if (d == null || d.ownedSkill == null) continue;
+            if (!seen.Add(d.ownedSkill))
+                Debug.LogWarning($"[CompanionPool] {grade} 칸에 스킬 '{d.ownedSkill.name}' 을 가진 동료가 둘 이상입니다. " +
+                                 $"아래 등급에서 진화할 때는 먼저 넣은 동료로만 진화합니다 ('{d.companionName}' 은 대상이 아님).", this);
+        }
     }
 
     private void CheckGrade(List<CompanionData> list, CompanionGrade expected)

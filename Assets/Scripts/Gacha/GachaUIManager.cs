@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,6 +14,13 @@ public class GachaUIManager : MonoBehaviour
     [SerializeField] private Button draw1Button;
     [SerializeField] private Button draw10Button;
     [SerializeField] private Button draw100Button;
+
+    [Header("비용 표시 (선택)")]
+    [Tooltip("각 뽑기 버튼의 비용 텍스트. 소환권이 충분하면 \"소환권 N\", 모자라면 \"보석 N\" 으로 바뀝니다.\n" +
+             "비워 두면 버튼 글자는 그대로입니다 (결제 규칙은 똑같이 적용됨).")]
+    [SerializeField] private TMP_Text draw1CostText;
+    [SerializeField] private TMP_Text draw10CostText;
+    [SerializeField] private TMP_Text draw100CostText;
 
     [Header("이동 버튼")]
     [SerializeField] private Button closeResultButton;
@@ -56,6 +64,43 @@ public class GachaUIManager : MonoBehaviour
         closeResultButton.onClick.AddListener(() => ShowGachaPanel());
 
         ShowGachaPanel();
+        RefreshCostTexts();   // OnEnable 시점엔 GachaSystem 이 아직 없을 수 있어 Start 에서 한 번 더
+    }
+
+    private void OnEnable()
+    {
+        GachaTicket.OnChanged += HandleTicketChanged;
+        RefreshCostTexts();
+    }
+
+    private void OnDisable()
+    {
+        GachaTicket.OnChanged -= HandleTicketChanged;   // static 이벤트는 반드시 해제
+    }
+
+    private void HandleTicketChanged(int _) => RefreshCostTexts();
+
+    // ── 비용 표시 — 결제 규칙(소환권 우선)은 GachaSystem 이 정하고, 여기서는 같은 판단을 보여 주기만 합니다 ──
+
+    private void RefreshCostTexts()
+    {
+        SetCostText(draw1CostText,   1);
+        SetCostText(draw10CostText,  10);
+        SetCostText(draw100CostText, 100);
+    }
+
+    private static void SetCostText(TMP_Text label, int count)
+    {
+        if (label == null) return;
+
+        if (GachaSystem.WillPayWithTickets(count))
+        {
+            label.text = $"소환권 {count}";
+            return;
+        }
+
+        int gemCost = GachaSystem.Instance != null ? GachaSystem.Instance.GemCostFor(count) : -1;
+        label.text = gemCost >= 0 ? $"보석 {KoreanNumberFormatter.Format(gemCost)}" : string.Empty;
     }
 
     /// <summary>

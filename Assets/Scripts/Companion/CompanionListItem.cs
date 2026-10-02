@@ -85,9 +85,11 @@ public class CompanionListItem : MonoBehaviour
             SetFragmentText(count);
     }
 
+    // 상세 패널과 같은 형식 ("조각 37 / 100") — 문구 규칙은 CompanionStar 한 곳에 있습니다.
+    // 목록에는 진화 풀이 없어서 최대 성급이어도 "/ 100" 으로 표시합니다 (진화 가능 여부는 상세 패널에서 확인).
     private void SetFragmentText(int count)
     {
-        if (fragmentText != null) fragmentText.text = $"조각 : {count}";
+        if (fragmentText != null) fragmentText.text = CompanionStar.FragmentLabel(count);
     }
 
     public void RefreshActionButtons()

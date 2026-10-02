@@ -163,7 +163,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.99999994
+  m_Radius: 0.5755607
 --- !u!1001 &8820691067353254903
 PrefabInstance:
   m_ObjectHideFlags: 0

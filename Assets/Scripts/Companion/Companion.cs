@@ -40,11 +40,11 @@ public class Companion : MonoBehaviour
 
         skillTimer += Time.deltaTime;
 
-        // ★ [등급] skill.cooldown(일반 값) 대신 '이 동료 등급의' 쿨다운을 읽습니다.
-        //   스킬 에셋은 여러 동료가 같이 쓰므로, 값을 에셋에 쓰지 않고 매번 등급으로 골라 읽기만 합니다.
-        //   (switch 한 번이라 매 프레임 불러도 성능 영향은 무시할 수준)
-        //   skill 이 null 이 아니면 data 도 null 이 아닙니다 (skill => data?.ownedSkill).
-        if (skillTimer >= skill.GetCooldown(data.grade))
+        // skill.cooldown(일반 값) 대신 '이 동료 등급·성급의' 쿨다운을 읽습니다.
+        //   스킬 에셋은 여러 동료가 같이 쓰므로, 값을 에셋에 쓰지 않고 매번 골라 읽기만 합니다.
+        //   (switch 와 사전 조회 한 번이라 매 프레임 불러도 성능 영향은 무시할 수준)
+        //   성급이 오르면 다음 프레임부터 바로 새 쿨다운이 적용됩니다.
+        if (skillTimer >= skill.GetCooldown(this))
         {
             Enemy target = FindClosestEnemy();
             if (target != null)

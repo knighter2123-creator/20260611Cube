@@ -6,11 +6,11 @@ using UnityEngine;
 ///
 /// ★ [등급별 수치] 같은 스킬 에셋을 여러 동료가 같이 쓰므로, 에셋 값을 실행 중에 바꾸지 않습니다.
 ///   대신 '누가 쐈는지(caster)' 의 등급을 보고 그때그때 알맞은 값을 골라 씁니다.
-///   → GetDamage(grade), GetCooldown(grade), 각 스킬의 GetXxx(grade)
+///   → GetDamage(caster), GetCooldown(caster) — 등급과 성급(★)을 함께 반영. 각 스킬의 GetXxx(grade)
 ///
 ///   ✗ skill.damage = 70;              // 에셋이 바뀜 — 같은 스킬을 쓰는 일반 동료도 70 이 되고,
 ///                                     //   에디터에선 플레이를 멈춰도 값이 에셋에 남습니다
-///   ✓ skill.GetDamage(caster 등급)     // 읽기만 함
+///   ✓ skill.GetDamage(caster)          // 읽기만 함
 /// </summary>
 public abstract class ActiveSkill : ScriptableObject
 {
@@ -27,6 +27,13 @@ public abstract class ActiveSkill : ScriptableObject
     public float  cooldown  = 5f;
     [Tooltip("체크 시 희귀/영웅/전설 재사용 대기(초)")]
     public GradeFloat cooldownByGrade = new GradeFloat();
+
+    // 성급(★)별 값. 체크하면 위의 등급별 값 대신 [등급, 성급] 칸을 씁니다 (CompanionStar 규칙).
+    [Header("성급별 수치 (등급 × 성급)")]
+    [Tooltip("체크 시 등급·성급별 피해. 처음 켜면 각 줄이 그 등급의 지금 피해로 채워집니다")]
+    public GradeStarFloat damageByStar = new GradeStarFloat();
+    [Tooltip("체크 시 등급·성급별 재사용 대기(초). 성급이 오를수록 작게 적으세요")]
+    public GradeStarFloat cooldownByStar = new GradeStarFloat();
 
     [Tooltip("동료 머리 위 쿨다운 인디케이터에 표시할 아이콘 (없으면 원형만 표시)")]
     public Sprite icon;
@@ -69,11 +76,35 @@ public abstract class ActiveSkill : ScriptableObject
     protected static float ByGrade(GradeFloat table, float normalValue, CompanionGrade grade)
         => table != null ? table.Get(normalValue, grade) : normalValue;
 
-    public float GetDamage(CompanionGrade grade)
-        => ByGrade(damageByGrade, damage, grade);
+    /// <summary>시전자의 성급. 시전자가 없거나 성급 정보를 읽을 수 없으면 1성으로 봅니다.</summary>
+    public static int StarOf(Companion caster)
+    {
+        if (caster == null || caster.Data == null) return CompanionStar.MIN_STAR;
+        CompanionFragment growth = CompanionFragment.Instance;
+        return growth != null ? growth.GetStar(caster.Data) : CompanionStar.MIN_STAR;
+    }
 
-    public float GetCooldown(CompanionGrade grade)
-        => Mathf.Max(ByGrade(cooldownByGrade, cooldown, grade), MIN_COOLDOWN);
+    // 성급 표 → (꺼져 있으면) 등급별 값 → (꺼져 있으면) 원래 숫자 순서로 찾습니다.
+    private static float ByGradeStar(GradeStarFloat starTable, GradeFloat gradeTable, float normalValue,
+                                     CompanionGrade grade, int star)
+    {
+        float byGrade = ByGrade(gradeTable, normalValue, grade);
+        return starTable != null ? starTable.Get(byGrade, grade, star) : byGrade;
+    }
+
+    /// <summary>등급·성급에 맞는 스킬 피해. 전투와 도감이 같은 함수를 써서 화면과 실제가 어긋나지 않습니다.</summary>
+    public float GetDamage(CompanionGrade grade, int star)
+        => ByGradeStar(damageByStar, damageByGrade, damage, grade, star);
+
+    /// <summary>등급·성급에 맞는 재사용 대기(초). 하한 MIN_COOLDOWN.</summary>
+    public float GetCooldown(CompanionGrade grade, int star)
+        => Mathf.Max(ByGradeStar(cooldownByStar, cooldownByGrade, cooldown, grade, star), MIN_COOLDOWN);
+
+    /// <summary>이 시전자(등급·성급)의 스킬 피해.</summary>
+    public float GetDamage(Companion caster) => GetDamage(GradeOf(caster), StarOf(caster));
+
+    /// <summary>이 시전자(등급·성급)의 재사용 대기.</summary>
+    public float GetCooldown(Companion caster) => GetCooldown(GradeOf(caster), StarOf(caster));
 
     // ══════════════════════════════════════════════
     //  [도감] 효과 요약
@@ -121,18 +152,18 @@ public abstract class ActiveSkill : ScriptableObject
     protected void NotifyCooldown(Companion caster)
     {
         if (caster == null) return;
-        // ★ 게이지 길이도 '시전자 등급의' 쿨다운이어야 실제 재사용 시간과 맞습니다.
-        SkillCooldownIndicator.Begin(caster, icon, GetCooldown(GradeOf(caster)));
+        // ★ 게이지 길이도 '시전자 등급·성급의' 쿨다운이어야 실제 재사용 시간과 맞습니다.
+        SkillCooldownIndicator.Begin(caster, icon, GetCooldown(caster));
     }
 
     /// <summary>
-    /// 최종 피해 = (플레이어 최종 공격력 + 시전자 등급의 스킬 피해) × (치명타면 최종 치명타 배율)
+    /// 최종 피해 = (플레이어 최종 공격력 + 시전자 등급·성급의 스킬 피해) × (치명타면 최종 치명타 배율)
     /// </summary>
     protected (float finalDamage, bool isCritical) CalcDamage(Companion caster)
     {
         PlayerStat stat = StatOf(caster);
         bool crit = stat != null && Random.Range(0f, 100f) < stat.FinalCritical;
-        return (WithPlayerAttack(caster, GetDamage(GradeOf(caster)), crit), crit);
+        return (WithPlayerAttack(caster, GetDamage(caster), crit), crit);
     }
 
     /// <summary>
@@ -189,6 +220,13 @@ public abstract class ActiveSkill : ScriptableObject
         //   (피해 0 은 '디버프 전용 스킬' 처럼 일부러 그럴 수 있어서 경고하지 않습니다)
         if (cooldownByGrade != null && cooldownByGrade.HasZeroSlot())
             Debug.LogWarning($"[ActiveSkill] '{name}' 등급별 쿨타임에 0 인 칸이 있습니다. 그 등급은 {MIN_COOLDOWN}초마다 발사됩니다.", this);
+
+        // 성급 표를 처음 켜면 각 줄을 '그 등급의 지금 값' 으로 채웁니다 (켜는 순간 0 이 되지 않게).
+        damageByStar?.FillIfEmpty(g => ByGrade(damageByGrade, damage, g));
+        cooldownByStar?.FillIfEmpty(g => ByGrade(cooldownByGrade, cooldown, g));
+
+        if (cooldownByStar != null && cooldownByStar.HasZeroSlot())
+            Debug.LogWarning($"[ActiveSkill] '{name}' 성급별 쿨타임에 0 인 칸이 있습니다. 그 칸은 {MIN_COOLDOWN}초마다 발사됩니다.", this);
     }
 #endif
 }

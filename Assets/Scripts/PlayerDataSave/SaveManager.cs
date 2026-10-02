@@ -467,6 +467,8 @@ public class SaveManager : MonoBehaviour
                 Current.ownedCompanionIds = new List<string>();
             if (Current.companionFragments == null)
                 Current.companionFragments = new List<FragmentEntry>();
+            if (Current.companionStars == null)
+                Current.companionStars = new List<StarEntry>();
 
             // ★ 튜토리얼 마이그레이션 — 세이브 파일은 있는데 tutorialDone 키가 없다
             //   = 튜토리얼 기능이 생기기 전부터 플레이하던 기존 유저 → 이미 본 것으로 처리.

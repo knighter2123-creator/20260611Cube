@@ -28,3 +28,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 21e4aaa8f19ba2b499138c9aa2d8c8be, type: 2}
   - {fileID: 11400000, guid: ad3e818b3e148a94691e48c373c83678, type: 2}
   - {fileID: 11400000, guid: c033e34cdb6f7d64696bf5b0be40211f, type: 2}
+  fragmentNormal: 15
+  fragmentRare: 15
+  fragmentEpic: 10
+  fragmentLegendary: 5

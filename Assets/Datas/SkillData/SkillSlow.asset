@@ -13,19 +13,71 @@ MonoBehaviour:
   m_Name: SkillSlow
   m_EditorClassIdentifier: Assembly-CSharp::SkillSlow
   skillName: "\uB454\uD654"
-  damage: 10
+  damage: 5
   damageByGrade:
     enabled: 1
-    rare: 15
-    epic: 20
-    legendary: 30
-  cooldown: 5
+    rare: 10
+    epic: 15
+    legendary: 25
+  cooldown: 7
   cooldownByGrade:
     enabled: 1
-    rare: 4
-    epic: 3
-    legendary: 2
-  icon: {fileID: 0}
+    rare: 6
+    epic: 5
+    legendary: 3
+  damageByStar:
+    enabled: 1
+    normal:
+    - 5
+    - 5
+    - 7
+    - 7
+    - 10
+    rare:
+    - 10
+    - 10
+    - 13
+    - 14
+    - 15
+    epic:
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    legendary:
+    - 22
+    - 23
+    - 24
+    - 25
+    - 25
+  cooldownByStar:
+    enabled: 1
+    normal:
+    - 7
+    - 7
+    - 7
+    - 7
+    - 6
+    rare:
+    - 6
+    - 6
+    - 6
+    - 6
+    - 5
+    epic:
+    - 5
+    - 5
+    - 5
+    - 5
+    - 3
+    legendary:
+    - 3
+    - 3
+    - 3
+    - 3
+    - 2
+  icon: {fileID: 21300000, guid: 63e038f9720fdbc4eb5516284e0887ef, type: 3}
   effectPrefab: {fileID: 0}
   effectDuration: 0.5
   description: "[\uB454\uD654] \uC801 \uC774\uB3D9 \uC18D\uB3C4 \uAC10\uC18C"

@@ -178,6 +178,104 @@ public class CompanionManager : MonoBehaviour
         return true;
     }
 
+    // ──────────────────────────────────────────────
+    //  진화 — 교체 / 제거
+    // ──────────────────────────────────────────────
+    //
+    // ★ 보유 목록은 '순서' 가 곧 배치 기억입니다 (placementByIndex: 목록 인덱스 → 셀, 세이브의 ownedIndex).
+    //   그래서 교체는 같은 인덱스에 끼워 넣고(배치 그대로), 제거는 뒤 인덱스를 한 칸씩 당겨 맞춥니다.
+
+    /// <summary>
+    /// 보유 동료 하나를 다른 동료로 바꿉니다 (진화 — 대상을 아직 안 가진 경우).
+    /// 목록의 같은 자리를 쓰므로, 맵에 배치돼 있었다면 새 동료가 같은 칸에 그대로 섭니다.
+    /// </summary>
+    public bool ReplaceCompanion(CompanionData from, CompanionData to)
+    {
+        if (from == null || to == null) return false;
+        if (IsOwned(to.id))
+        {
+            Debug.LogWarning($"[CompanionManager] {to.companionName}은(는) 이미 보유 중이라 교체할 수 없습니다.");
+            return false;
+        }
+
+        int index = IndexOfOwned(from.id);
+        if (index < 0) return false;
+
+        ownedCompanionData[index] = to;
+
+        // 오브젝트는 RestoreIntoScene 전이면 아직 없을 수 있습니다 (그때는 데이터만 바꾸면 복원 때 새 동료로 생성됨).
+        if (index < ownedCompanions.Count)
+        {
+            Companion old = ownedCompanions[index];
+            Vector3Int? cell = CellOf(old);
+
+            RetrieveCompanion(old);
+            if (old != null) Destroy(old.gameObject);
+
+            Companion next = SpawnCompanionObject(to);
+            ownedCompanions[index] = next;
+
+            if (next != null && cell.HasValue) PlaceCompanion(next, cell.Value);
+        }
+
+        Debug.Log($"[CompanionManager] {from.companionName} → {to.companionName} 교체 (자리 {index})");
+        return true;
+    }
+
+    /// <summary>보유 동료 하나를 목록에서 뺍니다 (진화 — 대상을 이미 가진 경우). 배치돼 있었다면 회수됩니다.</summary>
+    public bool RemoveCompanion(CompanionData data)
+    {
+        if (data == null) return false;
+
+        int index = IndexOfOwned(data.id);
+        if (index < 0) return false;
+
+        if (index < ownedCompanions.Count)
+        {
+            Companion obj = ownedCompanions[index];
+            RetrieveCompanion(obj);
+            if (obj != null) Destroy(obj.gameObject);
+            ownedCompanions.RemoveAt(index);
+        }
+        ownedCompanionData.RemoveAt(index);
+
+        // 배치 기억을 새 인덱스에 맞춥니다.
+        if (restoredIntoScene)
+        {
+            SavePlacementSnapshot();   // 지금 맵(occupied)이 정답 — 그대로 다시 찍음
+        }
+        else
+        {
+            // 맵에 복원 전이면 기억만 손봅니다: 뺀 자리는 지우고, 뒤쪽은 한 칸씩 당김
+            var shifted = new Dictionary<int, Vector3Int>();
+            foreach (var kv in placementByIndex)
+            {
+                if (kv.Key == index) continue;
+                shifted[kv.Key > index ? kv.Key - 1 : kv.Key] = kv.Value;
+            }
+            placementByIndex.Clear();
+            foreach (var kv in shifted) placementByIndex[kv.Key] = kv.Value;
+        }
+
+        Debug.Log($"[CompanionManager] {data.companionName} 보유 목록에서 제거 (자리 {index})");
+        return true;
+    }
+
+    private int IndexOfOwned(string id)
+    {
+        for (int i = 0; i < ownedCompanionData.Count; i++)
+            if (ownedCompanionData[i] != null && ownedCompanionData[i].id == id) return i;
+        return -1;
+    }
+
+    private Vector3Int? CellOf(Companion companion)
+    {
+        if (companion == null) return null;
+        foreach (var kv in occupied)
+            if (kv.Value == companion) return kv.Key;
+        return null;
+    }
+
     private Companion SpawnCompanionObject(CompanionData data)
     {
         if (data == null)        { Debug.LogError("[CompanionManager] CompanionData가 null입니다."); return null; }
@@ -305,10 +403,7 @@ public class CompanionManager : MonoBehaviour
     {
         if (companion == null) return;
 
-        Vector3Int? found = null;
-        foreach (var kv in occupied)
-            if (kv.Value == companion) { found = kv.Key; break; }
-
+        Vector3Int? found = CellOf(companion);
         if (found.HasValue)
         {
             occupied.Remove(found.Value);

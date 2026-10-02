@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// 필요한 UI(월드 캔버스 / 원형 배경 / 라디얼 필 / 남은시간 텍스트)를 코드로 자동 생성하므로
 /// 프리팹 세팅이 전혀 필요 없습니다.
 ///
-/// 사용법 : SkillCooldownIndicator.Begin(companion, skill.icon, skill.GetCooldown(grade));
+/// 사용법 : SkillCooldownIndicator.Begin(companion, skill.icon, skill.GetCooldown(companion));
 /// </summary>
 [DisallowMultipleComponent]
 public class SkillCooldownIndicator : MonoBehaviour

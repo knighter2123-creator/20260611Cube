@@ -13,19 +13,71 @@ MonoBehaviour:
   m_Name: SkillStun
   m_EditorClassIdentifier: Assembly-CSharp::SkillStun
   skillName: "\uAE30\uC808"
-  damage: 10
+  damage: 5
   damageByGrade:
     enabled: 1
-    rare: 20
-    epic: 30
-    legendary: 50
-  cooldown: 12
+    rare: 10
+    epic: 15
+    legendary: 20
+  cooldown: 15
   cooldownByGrade:
     enabled: 1
-    rare: 10
-    epic: 7
-    legendary: 5
-  icon: {fileID: 0}
+    rare: 13
+    epic: 10
+    legendary: 7
+  damageByStar:
+    enabled: 1
+    normal:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    rare:
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    epic:
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    legendary:
+    - 20
+    - 22
+    - 24
+    - 27
+    - 30
+  cooldownByStar:
+    enabled: 1
+    normal:
+    - 15
+    - 15
+    - 15
+    - 15
+    - 13
+    rare:
+    - 13
+    - 13
+    - 12
+    - 12
+    - 10
+    epic:
+    - 10
+    - 10
+    - 10
+    - 8
+    - 6
+    legendary:
+    - 6
+    - 6
+    - 5
+    - 5
+    - 4
+  icon: {fileID: 21300000, guid: fc7d858ca5a182e4d80d339cf0b50df2, type: 3}
   effectPrefab: {fileID: 0}
   effectDuration: 0.5
   description: "[\uAE30\uC808] \uC801 \uC77C\uC2DC \uC815\uC9C0"

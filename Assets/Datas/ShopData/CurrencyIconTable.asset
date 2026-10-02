@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Manager.currency.CurrencyIconTable
   goldIcon: {fileID: 21300000, guid: 39d66829824cb1d4da958035ee18213a, type: 3}
   gemIcon: {fileID: 4097537674764987595, guid: da0e42a9741d9224eb054b044e0af601, type: 3}
+  gachaTicketIcon: {fileID: 21300000, guid: 4b61215c56174cb489119b1357a5b77c, type: 3}

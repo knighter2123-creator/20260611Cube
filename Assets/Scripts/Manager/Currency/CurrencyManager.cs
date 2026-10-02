@@ -176,12 +176,15 @@ public partial class CurrencyManager : MonoBehaviour
         return true;
     }
 
+    // 재화 종류로 지급/차감하는 공용 입구 (상점 상품, 가이드 퀘스트 보상 등).
+    // 소환권은 이 매니저가 들고 있지 않고 GachaTicket 이 세이브에 직접 보관합니다 — 여기서는 넘겨주기만 합니다.
     public void AddCurrency(CurrencyType type, int amount)
     {
         switch (type)
         {
-            case CurrencyType.Gold: AddGold(amount); break;
-            case CurrencyType.Gem:  AddGem(amount);  break;
+            case CurrencyType.Gold:        AddGold(amount);         break;
+            case CurrencyType.Gem:         AddGem(amount);          break;
+            case CurrencyType.GachaTicket: GachaTicket.Add(amount); break;
         }
     }
 
@@ -189,8 +192,9 @@ public partial class CurrencyManager : MonoBehaviour
     {
         switch (type)
         {
-            case CurrencyType.Gold: return SpendGold(amount);
-            case CurrencyType.Gem:  return SpendGem(amount);
+            case CurrencyType.Gold:        return SpendGold(amount);
+            case CurrencyType.Gem:         return SpendGem(amount);
+            case CurrencyType.GachaTicket: return GachaTicket.TrySpend(amount);
             default: return false;
         }
     }

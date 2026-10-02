@@ -24,6 +24,10 @@ public class ShopProductData : ScriptableObject
     [SerializeField] private CurrencyType rewardType = CurrencyType.Gold;
     [SerializeField] private int rewardAmount = 100000;
 
+    [Tooltip("(선택) 보상 수량 옆에 표시할 이미지.\n" +
+             "비워 두면 보상 재화 종류에 맞는 아이콘(CurrencyIconTable)을 자동으로 씁니다 — 골드면 골드, 소환권이면 소환권.")]
+    [SerializeField] private Sprite rewardIcon;
+
     public string Id => id;
     public string Category => category;
     public string DisplayName => displayName;
@@ -34,6 +38,7 @@ public class ShopProductData : ScriptableObject
     public string CashPriceText => cashPriceText;
     public CurrencyType RewardType => rewardType;
     public int RewardAmount => rewardAmount;
+    public Sprite RewardIcon => rewardIcon;   // 비어 있으면 null — 표시하는 쪽이 재화 아이콘으로 대체
 
     private void OnValidate()
     {

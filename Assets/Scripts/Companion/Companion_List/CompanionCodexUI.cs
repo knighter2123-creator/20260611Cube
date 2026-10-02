@@ -80,8 +80,25 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         //   그런데 ?. 는 C# 언어 기능이라 이 유니티 검사를 건너뜁니다.
         //   파괴된 오브젝트에 ?. 를 쓰면 null 이 아니라고 보고 들어가서 MissingReferenceException 이 납니다.
         //   (learnings 의 UnassignedReferenceException 이야기와 같은 뿌리입니다)
-        if (detailPanel != null) detailPanel.Hide();
+        if (detailPanel != null)
+        {
+            detailPanel.Hide();
+            // 진화로 보유 목록이 바뀌면 격자(보유 표시 · 수집 수)를 다시 그립니다.
+            detailPanel.OnOwnedChanged += Refresh;
+        }
     }
+
+    private void OnDestroy()
+    {
+        if (detailPanel != null) detailPanel.OnOwnedChanged -= Refresh;
+    }
+
+    /// <summary>
+    /// 도감에 쓰는 풀 — 내 칸이 비어 있으면 가챠의 풀. 진화 대상도 이 풀에서 찾습니다.
+    /// </summary>
+    private CompanionPoolAsset Pool
+        => poolAsset != null ? poolAsset
+         : GachaSystem.Instance != null ? GachaSystem.Instance.Pool : null;
 
     // ══════════════════════════════════════════════
     //  ITabPage — TabWindow 가 부른다
@@ -173,14 +190,11 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         entries.Clear();
         entryById.Clear();
 
-        // ① 가챠 풀
-        if (poolAsset != null)
+        // ① 가챠 풀 (내 칸 → 없으면 가챠의 풀)
+        CompanionPoolAsset pool = Pool;
+        if (pool != null)
         {
-            foreach (CompanionData d in poolAsset.All()) TryAddEntry(d);
-        }
-        else if (GachaSystem.Instance != null)
-        {
-            foreach (CompanionData d in GachaSystem.Instance.GetAllPoolCompanions()) TryAddEntry(d);
+            foreach (CompanionData d in pool.All()) TryAddEntry(d);
         }
         else if (!warnedNoSource)
         {
@@ -287,6 +301,6 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
             Debug.LogWarning("[CompanionCodexUI] Detail Panel 이 연결되지 않아 상세정보를 열 수 없습니다.", this);
             return;
         }
-        detailPanel.Show(data, isOwned);
+        detailPanel.Show(data, isOwned, Pool);
     }
 }

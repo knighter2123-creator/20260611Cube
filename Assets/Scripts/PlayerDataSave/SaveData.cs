@@ -18,6 +18,14 @@ public class FragmentEntry
     public int    count;
 }
 
+/// <summary>동료 1명의 성급(★). 목록에 없는 동료는 1성입니다.</summary>
+[Serializable]
+public class StarEntry
+{
+    public string companionId;
+    public int    star;
+}
+
 /// <summary>
 /// 디스크에 저장되는 플레이어 진행 데이터 (JsonUtility 직렬화용).
 /// 필드를 추가하면 자동으로 저장/로드 대상에 포함됩니다.
@@ -61,13 +69,18 @@ public class SaveData
     // ── 동료 보유 목록 (CompanionData.id 목록) ──
     public List<string> ownedCompanionIds = new List<string>();
     public List<FragmentEntry> companionFragments = new List<FragmentEntry>();
+    public List<StarEntry>     companionStars     = new List<StarEntry>();   // 2성 이상만 기록 (없으면 1성)
 
     // ── 동료 배치 (보유 인덱스 → 셀) ──
     public List<CompanionPlacement> companionPlacements = new List<CompanionPlacement>();
 
     public int gold = 0;
     public int gem  = 0;
-    
+
+    // ── 소환권 (GachaTicket 이 직접 읽고 씀) ──
+    // 이 필드가 없던 예전 세이브는 0 장으로 읽힙니다 (JsonUtility 의 기본값) — 따로 이관할 것이 없습니다.
+    public int gachaTicket = 0;
+
     // ── 기타 ──
     public string playerName = "";
     public long lastExitTime = 0;
