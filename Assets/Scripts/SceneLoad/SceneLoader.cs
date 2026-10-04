@@ -27,6 +27,7 @@ public class SceneLoader : MonoBehaviour
     public const string GACHA_SCENE   = "ShopScene";
     public const string LOADING_SCENE = "LoadingScene";
     public const string EVOLVE_SCENE  = "EvolveScene";
+    public const string DAILY_DUNGEON_SCENE = "DailyDungeonScene";
 
     [Header("디버그")]
     [Tooltip("중복 인스턴스가 자기 자신을 제거할 때 로그를 남깁니다. 원인 파악 후 끄세요.")]
@@ -71,7 +72,7 @@ public class SceneLoader : MonoBehaviour
     /// </summary>
     private void ValidateSceneNames()
     {
-        string[] names = { LOGIN_SCENE, STAGE_SCENE, GACHA_SCENE, LOADING_SCENE, EVOLVE_SCENE };
+        string[] names = { LOGIN_SCENE, STAGE_SCENE, GACHA_SCENE, LOADING_SCENE, EVOLVE_SCENE, DAILY_DUNGEON_SCENE };
         foreach (string n in names)
         {
             // Build Settings 에 등록된 씬 이름인지 확인 (SaveManager.preGameScenes 검사와 같은 방법)
@@ -98,6 +99,10 @@ public class SceneLoader : MonoBehaviour
 
     // 클리어 후 원래 StageScene으로 복귀
     public void ReturnFromEvolve() => LoadScene(STAGE_SCENE);
+
+    // 일일 던전 입장 (진행 위치는 DailyDungeonContext에 저장돼 있음) / 종료 후 복귀
+    public void GoToDailyDungeon()       => LoadScene(DAILY_DUNGEON_SCENE);
+    public void ReturnFromDailyDungeon() => LoadScene(STAGE_SCENE);
 
     /// <summary>Login → Loading → Stage 경유 이동</summary>
     public void GoToStageWithLoading() => LoadScene(LOADING_SCENE);

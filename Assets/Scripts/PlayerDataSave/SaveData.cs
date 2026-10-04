@@ -26,6 +26,22 @@ public class StarEntry
     public int    star;
 }
 
+/// <summary>던전 1종의 기록. 오늘 입장한 횟수 + 클리어한 최고 난이도.</summary>
+[Serializable]
+public class DailyDungeonRecord
+{
+    public string dungeonId;
+    public int    usedToday;        // 오늘(리셋 이후) 입장한 횟수
+    public int    highestCleared;   // 클리어한 최고 난이도 (0 = 아직 없음)
+}
+
+[Serializable]
+public class DailyDungeonSaveData
+{
+    public long lastResetTicks;     // 마지막으로 입장 횟수를 초기화한 기간의 시작 시각 (DateTime.Ticks)
+    public List<DailyDungeonRecord> records = new List<DailyDungeonRecord>();
+}
+
 /// <summary>
 /// 디스크에 저장되는 플레이어 진행 데이터 (JsonUtility 직렬화용).
 /// 필드를 추가하면 자동으로 저장/로드 대상에 포함됩니다.
@@ -87,6 +103,9 @@ public class SaveData
     public long lastIdleClaimTime = 0;   // 마지막 정산 시각 (DateTime.ToBinary())
     public MissionSaveData missionData = new MissionSaveData();
     public GuideQuestSaveData guideQuest = new GuideQuestSaveData();
+
+    // ── 일일 던전 (DailyDungeonProgress 가 직접 읽고 씀) ──
+    public DailyDungeonSaveData dailyDungeon = new DailyDungeonSaveData();
 
     // ── 튜토리얼 ──
     // ★ 새 세이브(신규 유저)는 false → MainScene 에서 자동 팝업.

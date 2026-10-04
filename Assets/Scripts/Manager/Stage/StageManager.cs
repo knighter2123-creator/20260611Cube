@@ -87,6 +87,18 @@ public partial class StageManager : MonoBehaviour
             return;
         }
 
+        // 1-2) 일일 던전에서 복귀 (진화 스테이지와 같은 방식)
+        if (DailyDungeonContext.HasReturn)
+        {
+            currentWorld    = DailyDungeonContext.ReturnWorld;
+            currentStage    = DailyDungeonContext.ReturnStage;
+            currentStatMult = Mathf.Pow(statMultiplier,
+                (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
+            DailyDungeonContext.ClearReturn();
+            NextStage();
+            return;
+        }
+
         // 2) 세이브된 진행도 복원  ← 이게 없으면 항상 1-1에서 시작
         if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
         {
