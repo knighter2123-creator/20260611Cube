@@ -43,15 +43,15 @@ public partial class MissionManager : MonoBehaviour
         Debug.Log($"[MissionManager] {type} 미션 초기화 완료");
     }
 
-    // 가장 최근의 오전 6시 (그 전이면 어제 6시)
-    private DateTime GetDailyPeriodStart(DateTime now)
+    // 가장 최근의 오전 6시 (그 전이면 어제 6시). 일일 던전 초기화도 이 계산을 공유합니다.
+    public static DateTime GetDailyPeriodStart(DateTime now)
     {
         DateTime sixAm = new DateTime(now.Year, now.Month, now.Day, ResetHour, 0, 0);
         return now < sixAm ? sixAm.AddDays(-1) : sixAm;
     }
 
     // 현재 기간이 속한 "가장 최근 월요일 6시"
-    private DateTime GetWeeklyPeriodStart(DateTime now)
+    private static DateTime GetWeeklyPeriodStart(DateTime now)
     {
         DateTime dailyStart = GetDailyPeriodStart(now); // 이미 6시 경계
         // DayOfWeek: 일=0, 월=1 ... 토=6

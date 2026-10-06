@@ -259,7 +259,7 @@ public class DailyDungeonEntry : MonoBehaviour
         bool canEnter = remaining > 0;
 
         SetText(nameText,   dungeon.displayName);
-        SetText(remainText, $"남은 횟수 {remaining}/{DailyDungeonProgress.TotalEntries(dungeon)}");
+        SetText(remainText, RemainSummary(dungeon));
         SetText(levelText,  $"난이도 {level}");
         SetText(rewardText, $"클리어 보상 : {dungeon.DescribeReward(level)}");
         SetText(enterButtonLabel, canEnter ? labelEnter : labelNoEntry);
@@ -297,13 +297,11 @@ public class DailyDungeonEntry : MonoBehaviour
             return;
         }
 
-        if (confirmPopup == null) { Sweep(dungeon, level); return; }
-
         string msg = $"{dungeon.displayName} 난이도 {level}을(를) 진행 없이 클리어 처리합니다.\n\n" +
                      $"클리어 보상 : {dungeon.DescribeReward(level)}\n" +
-                     $"남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)} (1회 차감)\n\n" +
+                     $"{RemainSummary(dungeon)} (1회 차감)\n\n" +
                      "소탕하시겠습니까?";
-        confirmPopup.Show($"소탕  Lv.{level}", msg, () => Sweep(dungeon, level));
+        AskThen($"소탕  Lv.{level}", msg, () => Sweep(dungeon, level));
     }
 
     private void Sweep(DailyDungeonData dungeon, int level)
@@ -311,22 +309,15 @@ public class DailyDungeonEntry : MonoBehaviour
         // 확인을 누른 시점에 다시 판정합니다 (TrySweep 이 조건을 확인하고, 안 맞으면 아무것도 바꾸지 않음)
         bool ok = DailyDungeonProgress.TrySweep(dungeon, level);
         Refresh();
-        ShowSweepResult(dungeon, level, ok);
-    }
 
-    private void ShowSweepResult(DailyDungeonData dungeon, int level, bool ok)
-    {
-        if (confirmPopup == null) return;
-
-        string remain = $"남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)}";
         if (ok)
-            confirmPopup.ShowMessage("소탕 완료",
+            Notify("소탕 완료",
                 $"{dungeon.displayName}  Lv.{level}\n\n" +
                 $"획득 : {dungeon.DescribeReward(level)}\n\n" +
-                remain);
+                RemainSummary(dungeon));
         else
-            confirmPopup.ShowMessage("소탕 실패",
-                $"소탕할 수 없습니다.\n(입장 횟수 또는 클리어 기록을 확인하세요)\n\n{remain}");
+            Notify("소탕 실패",
+                $"소탕할 수 없습니다.\n(입장 횟수 또는 클리어 기록을 확인하세요)\n\n{RemainSummary(dungeon)}");
     }
 
     private void RefreshBuyEntry(DailyDungeonData dungeon)
@@ -361,21 +352,15 @@ public class DailyDungeonEntry : MonoBehaviour
 
         if (!DailyDungeonProgress.CanAffordNextPurchase(dungeon))
         {
-            if (confirmPopup != null)
-                confirmPopup.ShowMessage("재화 부족",
-                    $"입장 횟수를 추가하려면 {dungeon.DescribeCost(cost)}이(가) 필요합니다.");
-            else
-                Debug.Log($"[일일 던전] 횟수 추가 — {dungeon.DescribeCost(cost)} 부족");
+            Notify("재화 부족", $"입장 횟수를 추가하려면 {dungeon.DescribeCost(cost)}이(가) 필요합니다.");
             return;
         }
-
-        if (confirmPopup == null) { BuyEntry(dungeon, cost); return; }
 
         string msg = $"{dungeon.DescribeCost(cost)}을(를) 사용해\n" +
                      $"{dungeon.displayName} 입장 횟수를 1회 추가합니다.\n\n" +
                      $"오늘 추가한 횟수 {DailyDungeonProgress.PurchasedToday(dungeon)}/{dungeon.MaxExtraEntries}\n\n" +
                      "추가하시겠습니까?";
-        confirmPopup.Show("입장 횟수 추가", msg, () => BuyEntry(dungeon, cost));
+        AskThen("입장 횟수 추가", msg, () => BuyEntry(dungeon, cost));
     }
 
     private void BuyEntry(DailyDungeonData dungeon, int confirmedCost)
@@ -397,6 +382,24 @@ public class DailyDungeonEntry : MonoBehaviour
         if (label != null && label.text != msg) label.text = msg;
     }
 
+    /// <summary>"남은 횟수 2/5"</summary>
+    private static string RemainSummary(DailyDungeonData dungeon)
+        => $"남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)}";
+
+    /// <summary>확인 팝업을 띄우고 확인 시 action 실행. 팝업이 연결돼 있지 않으면 바로 실행합니다.</summary>
+    private void AskThen(string title, string message, Action action)
+    {
+        if (confirmPopup == null) { action(); return; }
+        confirmPopup.Show(title, message, action);
+    }
+
+    /// <summary>알림 팝업 (확인 버튼만). 팝업이 연결돼 있지 않으면 콘솔에만 남깁니다.</summary>
+    private void Notify(string title, string message)
+    {
+        if (confirmPopup != null) confirmPopup.ShowMessage(title, message);
+        else Debug.Log($"[일일 던전] {title} — {message}");
+    }
+
     // ── 입장 ───────────────────────────────────────
 
     private void OnEnterClicked()
@@ -413,9 +416,7 @@ public class DailyDungeonEntry : MonoBehaviour
 
         int level = CurrentLevel();
 
-        if (confirmPopup == null) { Enter(dungeon, level); return; }
-
-        confirmPopup.Show($"{dungeon.displayName}  Lv.{level}", BuildConfirmMessage(dungeon, level), () => Enter(dungeon, level));
+        AskThen($"{dungeon.displayName}  Lv.{level}", BuildConfirmMessage(dungeon, level), () => Enter(dungeon, level));
     }
 
     private string BuildConfirmMessage(DailyDungeonData dungeon, int level)
@@ -427,7 +428,7 @@ public class DailyDungeonEntry : MonoBehaviour
         string msg = $"현재 배치된 동료 {placed}/{max}명으로 입장합니다.\n" +
                      "던전 안에서는 동료 배치를 바꿀 수 없습니다.\n\n" +
                      $"클리어 보상 : {dungeon.DescribeReward(level)}\n" +
-                     $"남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)} (클리어 시 1회 차감)";
+                     $"{RemainSummary(dungeon)} (클리어 시 1회 차감)";
 
         if (placed == 0)
             msg += "\n\n<color=#FF6060>배치된 동료가 없습니다!</color>";
@@ -447,8 +448,7 @@ public class DailyDungeonEntry : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[일일 던전] 입장 — {dungeon.displayName} Lv.{level} " +
-                  $"(남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)})");
+        Debug.Log($"[일일 던전] 입장 — {dungeon.displayName} Lv.{level} ({RemainSummary(dungeon)})");
 
         lastSelectedId = dungeon.id;   // 돌아왔을 때 이 던전이 선택돼 있도록
 

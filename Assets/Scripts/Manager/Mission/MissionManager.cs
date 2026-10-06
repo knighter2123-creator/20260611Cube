@@ -33,7 +33,7 @@ public partial class MissionManager : MonoBehaviour
 
     public enum MissionState { InProgress, Claimable, Claimed }
 
-    private const int ResetHour = 6;                 // am 6
+    public const int ResetHour = 6;                  // am 6 — 일일 던전(DailyDungeonProgress)도 이 기준을 씀
     private const float ResetCheckInterval = 60f;    // 게임 켜둔 채 경계 넘길 때 대비
     
 

@@ -154,27 +154,15 @@ public class DailyDungeonManager : MonoBehaviour
         StartCoroutine(ReturnAfterDelay("시간 초과"));
     }
 
-    /// <summary>보상 지급 + 클리어 기록 + 저장. 씬을 떠나기 전에 반드시 끝나야 합니다.</summary>
+    /// <summary>입장 횟수 차감 + 보상 지급 + 클리어 기록 + 저장 (소탕과 같은 경로). 씬을 떠나기 전에 반드시 끝나야 합니다.</summary>
     private string GrantReward()
     {
         if (ActiveData == null) return "";
 
-        int amount = ActiveData.RewardFor(ActiveLevel);
-
-        if (CurrencyManager.Instance != null)
-            CurrencyManager.Instance.AddCurrency(ActiveData.rewardType, amount);
-        else
-            Debug.LogWarning("[DailyDungeonManager] CurrencyManager 가 없어 보상을 지급하지 못했습니다. LoginScene 부터 실행하세요.");
-
         // 입장 횟수는 클리어했을 때만 차감합니다. (실패하면 횟수 그대로)
         // 입장 UI 가 남은 횟수를 확인하고 들여보냈고, 던전 도중 횟수가 줄어드는 경로는 없으므로 보통 실패하지 않습니다.
-        if (!DailyDungeonProgress.TryConsumeEntry(ActiveData))
+        if (!DailyDungeonProgress.CompleteClear(ActiveData, ActiveLevel))
             Debug.LogWarning($"[DailyDungeonManager] 남은 입장 횟수가 없는데 클리어했습니다 ({ActiveData.id}) — 단독 테스트 실행이 아니라면 확인이 필요합니다.");
-
-        DailyDungeonProgress.RecordClear(ActiveData, ActiveLevel);
-
-        // 소환권은 SaveManager.Current 에 직접 들어가고, 골드는 CurrencyManager.CaptureTo 로 들어갑니다 — Save() 한 번이면 둘 다 기록됩니다.
-        if (SaveManager.Instance != null) SaveManager.Instance.Save();
 
         return ActiveData.DescribeReward(ActiveLevel);
     }

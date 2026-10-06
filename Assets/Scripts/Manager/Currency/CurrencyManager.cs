@@ -188,6 +188,19 @@ public partial class CurrencyManager : MonoBehaviour
         }
     }
 
+    // 재화 종류로 보유량을 확인하는 공용 입구 (차감 전에 버튼 상태/부족 안내를 정할 때).
+    public bool Has(CurrencyType type, int amount)
+    {
+        if (amount <= 0) return true;
+        switch (type)
+        {
+            case CurrencyType.Gold:        return gold >= amount;
+            case CurrencyType.Gem:         return gem  >= amount;
+            case CurrencyType.GachaTicket: return GachaTicket.Count >= amount;
+            default: return false;
+        }
+    }
+
     public bool TrySpendCurrency(CurrencyType type, int amount)
     {
         switch (type)
