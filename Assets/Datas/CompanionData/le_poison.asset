@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   id: le_poison
   companionName: "\uB9F9\uB3C5"
-  icon: {fileID: 21300000, guid: a30e9a59a4ffb884489afda27a4945c3, type: 3}
-  prefab: {fileID: 3211193813486398847, guid: 0b96c565dd9b72344bb6af7df4beeb04, type: 3}
+  icon: {fileID: 21300000, guid: 3aa1cb26afcdc244bb3a95c193575ecb, type: 3}
+  prefab: {fileID: 3211193813486398847, guid: cebffc544c656f647901de0fc9e737d4, type: 3}
   detectRange: 5
   grade: 3
   ownedSkill: {fileID: 11400000, guid: ee382893c8b57f043b83fb935cbbf3ab, type: 2}

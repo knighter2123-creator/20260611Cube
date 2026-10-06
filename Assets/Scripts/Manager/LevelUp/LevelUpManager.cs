@@ -4,11 +4,14 @@ using UnityEngine;
 /// <summary>
 /// 플레이어 레벨 · 경험치 · 스탯 강화의 중앙 관리자.
 ///
-/// partial 로 네 파일에 나뉘어 있습니다.
-///   LevelUpManager.cs           ← 지금 이 파일. 싱글턴 / 이벤트 / 초기화 / 경험치
-///   LevelUpManager.stat.cs      ← 스탯 강화 (비용 · 레벨 → 수치 공식)
+/// partial 로 여러 파일에 나뉘어 있습니다.
+///   LevelUpManager.cs           ← 지금 이 파일. 싱글턴 / 이벤트 / 초기화
+///   LevelUpManager.Exp.cs       ← 경험치 / 레벨업
+///   LevelUpManager.stat.cs      ← 스탯 강화 (설정 · 비용 · 결제)
+///   LevelUpManager.Formula.cs   ← 레벨 → 수치 공식 / 미리보기
 ///   LevelUpManager.MultiCost.cs ← N회 누적 비용
 ///   LevelUpManager.Save.cs      ← 세이브 연동
+///   LevelUpManager.Editor.cs    ← 에디터 전용 테스트
 /// </summary>
 public partial class LevelUpManager : MonoBehaviour
 {
@@ -51,16 +54,11 @@ public partial class LevelUpManager : MonoBehaviour
     public event Action<int> OnStatRestored;
 
     // ══════════════════════════════════════════════
-    //  상수
-    // ══════════════════════════════════════════════
-    private const int MAX_PLAYER_LEVEL = 999;
-
-    // ══════════════════════════════════════════════
     //  프로퍼티
     // ══════════════════════════════════════════════
-    public long CurrentExp   => stat != null ? stat.Experience    : 0;
-    public long MaxExp       => stat != null ? stat.MaxExperience : 100;
-    public int  CurrentLevel => stat != null ? stat.Level         : 1;
+    public long CurrentExp   => stat?.Experience    ?? 0;
+    public long MaxExp       => stat?.MaxExperience ?? 100;
+    public int  CurrentLevel => stat?.Level         ?? 1;
 
     /// <summary>
     /// PlayerStat이 주입되어 강화/경험치 API를 쓸 수 있는 상태인가.
@@ -84,7 +82,7 @@ public partial class LevelUpManager : MonoBehaviour
             return;
         }
 
-        if (stat != null)
+        if (IsReady)
         {
             // 씬 전환: 메모리의 옛 stat(최신 강화 반영)을 새 PlayerStat에 그대로 이전
             CopyProgress(stat, playerStat);
@@ -94,10 +92,11 @@ public partial class LevelUpManager : MonoBehaviour
         }
 
         stat = playerStat;
-        if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
-            ApplyFrom(SaveManager.Instance.Current);   // 안에서 NotifyRestored
+        SaveManager sm = SaveManager.Instance;
+        if (sm != null && sm.HasSave())
+            ApplyFrom(sm.Current);   // 안에서 NotifyRestored
         else
-            NotifyRestored();                          // 세이브가 없어도 UI는 초기값으로 한 번 갱신돼야 합니다
+            NotifyRestored();        // 세이브가 없어도 UI는 초기값으로 한 번 갱신돼야 합니다
     }
 
     /// <summary>
@@ -131,35 +130,5 @@ public partial class LevelUpManager : MonoBehaviour
         OnExpChanged?.Invoke(stat.Experience);
     }
 
-    public void ResetStat()
-    {
-        stat = null;
-    }
-
-    /// <summary>Enemy/Boss 사망 시 호출. 경험치 지급 + 레벨업 처리.</summary>
-    public void AddExp(int amount)
-    {
-        if (stat == null) return;
-
-        stat.Experience += amount;
-        OnExpChanged?.Invoke(stat.Experience);
-
-        // 레벨업 (초과 경험치 이월)
-        while (stat.Experience >= stat.MaxExperience && stat.Level < MAX_PLAYER_LEVEL)
-        {
-            stat.Experience -= stat.MaxExperience;
-            stat.Level++;
-            stat.MaxExperience = CalculateMaxExp(stat.Level);
-
-            OnLevelUp?.Invoke(stat.Level);
-            OnExpChanged?.Invoke(stat.Experience);
-        }
-    }
-
-    /// <summary>레벨에 따른 필요 경험치. 100 → 115 → 132 ... (1.15배 증가)</summary>
-    private static long CalculateMaxExp(int level)
-    {
-        double value = 100.0 * Math.Pow(1.15, level - 1);
-        return (long)Math.Max(1.0, Math.Round(value)); // 0 방지 가드
-    }
+    public void ResetStat() => stat = null;
 }

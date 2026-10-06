@@ -8,7 +8,7 @@ public partial class LevelUpManager
     /// <summary>현재 스탯을 SaveData에 기록 (저장 시 SaveManager가 호출).</summary>
     public void CaptureTo(SaveData d)
     {
-        if (stat == null || d == null) return;
+        if (!IsReady || d == null) return;
 
         d.level         = stat.Level;
         d.experience    = stat.Experience;
@@ -31,7 +31,7 @@ public partial class LevelUpManager
     /// <summary>SaveData를 현재 스탯에 반영 (스탯 준비 후 호출 — Init 참고).</summary>
     public void ApplyFrom(SaveData d)
     {
-        if (stat == null || d == null) return;
+        if (!IsReady || d == null) return;
 
         stat.Level      = d.level > 0 ? d.level : 1;
         stat.Experience = d.experience;
