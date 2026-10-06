@@ -169,7 +169,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DailyDungeonBoss
   currentHealth: 0
-  maxHealth: 100
+  maxHealth: 500
   defence: 5
   rewardGold: 10
   rewardExp: 5

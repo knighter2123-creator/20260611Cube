@@ -1668,9 +1668,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6b326780ee561624cba562bf015194d3, type: 2}
   - {fileID: 11400000, guid: ed52951a800c7994e9819b44d2fc3809, type: 2}
   - {fileID: 11400000, guid: d195ae460a94b9d4aad1bfd7ea0b819f, type: 2}
+  - {fileID: 11400000, guid: 3ee027a6aaba4e6b809e5e8bb70c055c, type: 2}
   - {fileID: 11400000, guid: 37f5add48460e0c4e8fb628b4ffe534e, type: 2}
   - {fileID: 11400000, guid: 1f25b1f3c9b373146b9507d9281fe1a8, type: 2}
   - {fileID: 11400000, guid: a8631d61cc3a16c45a9800adbe592540, type: 2}
+  - {fileID: 11400000, guid: b1a4c8c826c246c998d74f56950bcb8b, type: 2}
   masterMissions:
   - {fileID: 11400000, guid: ac28c345467c47a49a0dbdc08a1ef3f5, type: 2}
   - {fileID: 11400000, guid: 4f575b42b10f4dc46a83a423cd66de6c, type: 2}
@@ -3170,6 +3172,55 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
+--- !u!1 &1242753049
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1242753050}
+  - component: {fileID: 1242753051}
+  m_Layer: 0
+  m_Name: Cursor Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1242753050
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1242753049}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1979724214}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1242753051
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1242753049}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 822f9826e028a9045a438c4a9882c0b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CursorManager
+  cursorSprite: {fileID: 2591735881756571697, guid: 721062cdbedf0ab40b0ee97408b4bbd5,
+    type: 3}
+  hotspot: {x: 0, y: 0}
+  scale: 2
+  cursorMode: 0
 --- !u!1 &1283886753
 GameObject:
   m_ObjectHideFlags: 0
@@ -3436,6 +3487,9 @@ MonoBehaviour:
   emailPanel: {fileID: 1290648457}
   openButton: {fileID: 1854896917}
   closeButton: {fileID: 276859004}
+  openButtonLabel: {fileID: 0}
+  openLabel: "\uC774\uBA54\uC77C\uB85C \uB85C\uADF8\uC778"
+  startLabel: "\uC2DC\uC791\uD558\uAE30"
   emailInput: {fileID: 1097710681}
   passwordInput: {fileID: 878899164}
   signInButton: {fileID: 1168481338}
@@ -5219,6 +5273,7 @@ Transform:
   - {fileID: 1087403861}
   - {fileID: 1045296996}
   - {fileID: 1367810638}
+  - {fileID: 1242753050}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1979724215

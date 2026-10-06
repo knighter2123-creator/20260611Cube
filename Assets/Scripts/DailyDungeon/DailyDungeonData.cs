@@ -33,6 +33,32 @@ public class DailyDungeonData : ScriptableObject
     [Tooltip("최대 난이도")]
     [Min(1)] public int maxLevel = 10;
 
+    [Header("입장 횟수 추가 (하루 기준, 오전 6시 초기화)")]
+    [Tooltip("횟수 추가에 쓰는 재화 (Gold / Gem / GachaTicket)")]
+    public CurrencyType extraEntryCostType = CurrencyType.Gem;
+
+    [Tooltip("n번째 추가의 비용. 배열 길이 = 하루 최대 추가 횟수")]
+    public int[] extraEntryCosts = { 300, 500, 700, 1000, 1500 };
+
+    /// <summary>하루에 추가할 수 있는 최대 횟수.</summary>
+    public int MaxExtraEntries => extraEntryCosts != null ? extraEntryCosts.Length : 0;
+
+    /// <summary>오늘 이미 purchased 번 추가했을 때 다음 추가 비용. 더 추가할 수 없으면 -1.</summary>
+    public int ExtraEntryCost(int purchased)
+        => purchased >= 0 && purchased < MaxExtraEntries ? Mathf.Max(0, extraEntryCosts[purchased]) : -1;
+
+    /// <summary>"보석 300" 같은 비용 문구.</summary>
+    public string DescribeCost(int amount)
+    {
+        switch (extraEntryCostType)
+        {
+            case CurrencyType.Gold:        return $"골드 {NumberFormat.Comma(amount)}";
+            case CurrencyType.Gem:         return $"보석 {NumberFormat.Comma(amount)}";
+            case CurrencyType.GachaTicket: return $"소환권 {amount}장";
+            default:                       return $"{extraEntryCostType} {amount}";
+        }
+    }
+
     [Header("보상")]
     [Tooltip("지급할 재화 (Gold / GachaTicket)")]
     public CurrencyType rewardType = CurrencyType.Gold;

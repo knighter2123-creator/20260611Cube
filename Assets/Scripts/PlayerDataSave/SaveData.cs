@@ -32,6 +32,7 @@ public class DailyDungeonRecord
 {
     public string dungeonId;
     public int    usedToday;        // 오늘(리셋 이후) 입장한 횟수
+    public int    purchasedToday;   // 오늘(리셋 이후) 재화로 추가한 입장 횟수
     public int    highestCleared;   // 클리어한 최고 난이도 (0 = 아직 없음)
 }
 

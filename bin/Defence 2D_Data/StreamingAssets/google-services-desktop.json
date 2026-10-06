@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "16009766661",
+    "project_id": "tower-def-2d",
+    "storage_bucket": "tower-def-2d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:16009766661:android:4f326ff08f919c0b50396c",
+        "android_client_info": {
+          "package_name": "com.KJB.Defence2D"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_b_EDngQOrkkeYFp07TEuDl0Jh0P06Dc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

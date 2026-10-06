@@ -146,6 +146,7 @@ public partial class MissionManager : MonoBehaviour
     public void ReportEnemyKill(int count = 1) => ReportProgress(MissionConditionType.EnemyKill, count);
     public void ReportBossKill(int count = 1)  => ReportProgress(MissionConditionType.BossKill, count);
     public void ReportGachaPull(int count = 1) => ReportProgress(MissionConditionType.GachaPull, count);
+    public void ReportDailyDungeonClear(int count = 1) => ReportProgress(MissionConditionType.DailyDungeonClear, count);
 
     // 해당 타입에서 "수령 완료(claimed)"된 개별 미션 수
     public int CountCompleted(MissionType type)

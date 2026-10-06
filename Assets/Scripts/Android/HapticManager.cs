@@ -195,7 +195,7 @@ public partial class HapticManager : MonoBehaviour
         //   IsSupported 를 false 로 두면 BindToggle 이 toggle.interactable = false 로 만들어서
         //   설정 화면의 진동 토글이 회색으로 죽어 아예 눌리지 않는다.
         //   그래서 에디터에서는 UI 상으로만 '지원됨'으로 취급한다.
-        //   Vibrate() 는 아래 #else 분기를 타서 로그만 찍으므로 안전하다.
+        //   Vibrate() 는 아래 #elif UNITY_EDITOR 분기를 타서 로그만 찍으므로 안전하다.
         IsSupported = editorTreatAsSupported;
 
         // ★ 에디터에서도 초기화 사실을 남긴다.
@@ -312,7 +312,8 @@ public partial class HapticManager : MonoBehaviour
         {
             Debug.LogWarning($"[Haptic] 진동 실패: {e.Message}");
         }
-#else
+#elif UNITY_EDITOR
+        // 에디터에서는 진동 대신 로그만. (PC 빌드에는 들어가지 않습니다)
         Debug.Log($"[Haptic] (에디터) 진동 {durationMs}ms / 세기 {amplitude}");
 #endif
     }

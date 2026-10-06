@@ -1,4 +1,5 @@
 using System;
+using Manager.currency;
 using UnityEngine;
 
 /// <summary>
@@ -13,6 +14,14 @@ using UnityEngine;
 ///   미션과 같은 오전 6시입니다 (MissionManager.ResetHour).
 ///   기록을 읽을 때마다 "지금 기간의 시작 시각" 과 비교해서, 기간이 넘어갔으면 횟수를 0으로 돌립니다.
 ///   그래서 앱을 켜 둔 채 6시를 넘겨도, 다음에 입장 UI 가 갱신될 때 바로 반영됩니다.
+///
+/// [입장 횟수 추가]
+///   던전마다 하루 extraEntryCosts 길이만큼 재화로 횟수를 추가할 수 있습니다 (기본 300 → 500 → 700 → 1000 → 1500).
+///   추가한 횟수도 오전 6시에 함께 초기화됩니다.
+///
+/// [소탕]
+///   이미 클리어한 난이도(최고 클리어 이하)는 던전에 들어가지 않고 바로 보상을 받을 수 있습니다.
+///   입장 횟수는 실제 클리어와 똑같이 1회 차감됩니다.
 ///
 /// [난이도 해금]
 ///   난이도 1은 항상 열려 있고, N 난이도를 깨면 N+1 이 열립니다.
@@ -31,13 +40,52 @@ public static class DailyDungeonProgress
 
     // ── 조회 ───────────────────────────────────────
 
-    /// <summary>오늘 남은 입장 횟수. 세이브를 읽을 수 없으면 0.</summary>
+    /// <summary>오늘 남은 입장 횟수 (기본 + 추가 - 사용). 세이브를 읽을 수 없으면 0.</summary>
     public static int RemainingEntries(DailyDungeonData dungeon)
     {
         DailyDungeonRecord r = GetRecord(dungeon, create: false);
         if (dungeon == null || Data == null) return 0;
         int used = r != null ? r.usedToday : 0;
-        return Mathf.Max(0, dungeon.dailyEntries - used);
+        return Mathf.Max(0, TotalEntries(dungeon) - used);
+    }
+
+    /// <summary>오늘 입장 가능한 총 횟수 = 하루 기본 횟수 + 오늘 추가한 횟수. "남은 횟수 2/4" 의 분모.</summary>
+    public static int TotalEntries(DailyDungeonData dungeon)
+    {
+        if (dungeon == null) return 0;
+        return dungeon.dailyEntries + PurchasedToday(dungeon);
+    }
+
+    /// <summary>오늘 재화로 추가한 입장 횟수.</summary>
+    public static int PurchasedToday(DailyDungeonData dungeon)
+    {
+        DailyDungeonRecord r = GetRecord(dungeon, create: false);
+        return r != null ? r.purchasedToday : 0;
+    }
+
+    /// <summary>오늘 더 추가할 수 있는 횟수.</summary>
+    public static int RemainingPurchases(DailyDungeonData dungeon)
+        => dungeon != null ? Mathf.Max(0, dungeon.MaxExtraEntries - PurchasedToday(dungeon)) : 0;
+
+    /// <summary>다음 1회 추가 비용. 오늘 더 추가할 수 없으면 -1.</summary>
+    public static int NextPurchaseCost(DailyDungeonData dungeon)
+        => dungeon != null ? dungeon.ExtraEntryCost(PurchasedToday(dungeon)) : -1;
+
+    /// <summary>다음 1회 추가 비용을 낼 재화가 있는지.</summary>
+    public static bool CanAffordNextPurchase(DailyDungeonData dungeon)
+    {
+        int cost = NextPurchaseCost(dungeon);
+        if (cost < 0) return false;
+        if (cost == 0) return true;
+
+        CurrencyManager cm = CurrencyManager.Instance;
+        switch (dungeon.extraEntryCostType)
+        {
+            case CurrencyType.Gold:        return cm != null && cm.Gold >= cost;
+            case CurrencyType.Gem:         return cm != null && cm.Gem  >= cost;
+            case CurrencyType.GachaTicket: return GachaTicket.Count >= cost;
+            default:                       return false;
+        }
     }
 
     /// <summary>클리어한 최고 난이도 (0 = 없음).</summary>
@@ -69,6 +117,84 @@ public static class DailyDungeonProgress
         if (RemainingEntries(dungeon) <= 0) return false;
 
         GetRecord(dungeon, create: true).usedToday++;
+
+        // 횟수 차감 = 클리어 확정 (실제 클리어 / 소탕 둘 다 여기를 지남) → 미션 진행.
+        // 저장은 부른 쪽의 Save() 에서 미션 진행까지 함께 기록됩니다 (SaveManager 가 MissionManager.CaptureTo 호출).
+        MissionManager.Instance?.ReportDailyDungeonClear();
+
+        OnChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// 재화를 내고 오늘 입장 횟수를 1회 추가합니다. 하루 최대 횟수를 넘었거나 재화가 부족하면 아무것도 바꾸지 않고 false.
+    /// 차감과 기록이 함께 남도록 여기서 바로 저장합니다 (ShopManager.TryPurchase 와 같은 방식).
+    /// </summary>
+    public static bool TryPurchaseEntry(DailyDungeonData dungeon)
+    {
+        if (dungeon == null || Data == null) return false;
+
+        int cost = NextPurchaseCost(dungeon);
+        if (cost < 0)
+        {
+            Debug.Log($"[DailyDungeon] 횟수 추가 불가 — 오늘 최대({dungeon.MaxExtraEntries}회)까지 추가함 ({dungeon.id})");
+            return false;
+        }
+
+        if (cost > 0)
+        {
+            CurrencyManager cm = CurrencyManager.Instance;
+            bool paid = dungeon.extraEntryCostType == CurrencyType.GachaTicket
+                ? GachaTicket.TrySpend(cost)
+                : cm != null && cm.TrySpendCurrency(dungeon.extraEntryCostType, cost);
+            if (!paid)
+            {
+                Debug.Log($"[DailyDungeon] 횟수 추가 실패 — {dungeon.DescribeCost(cost)} 부족 ({dungeon.id})");
+                return false;
+            }
+        }
+
+        GetRecord(dungeon, create: true).purchasedToday++;
+        SaveManager.Instance?.Save();
+
+        Debug.Log($"[DailyDungeon] 입장 횟수 추가 — {dungeon.id} ({dungeon.DescribeCost(cost)}, " +
+                  $"오늘 {PurchasedToday(dungeon)}/{dungeon.MaxExtraEntries}회)");
+        OnChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>이미 클리어한 난이도인지 — 소탕은 이 난이도만 가능합니다.</summary>
+    public static bool CanSweep(DailyDungeonData dungeon, int level)
+        => dungeon != null && level >= 1 && level <= HighestCleared(dungeon) && RemainingEntries(dungeon) > 0;
+
+    /// <summary>
+    /// 소탕 — 던전을 진행하지 않고 클리어 처리합니다. 클리어한 난이도만 가능하고, 실제 클리어와 똑같이
+    /// 보상 지급 + 입장 횟수 1회 차감 + 저장을 합니다 (DailyDungeonManager.GrantReward 와 같은 순서).
+    /// 조건이 안 맞으면 아무것도 바꾸지 않고 false.
+    /// </summary>
+    public static bool TrySweep(DailyDungeonData dungeon, int level)
+    {
+        if (dungeon == null || Data == null) return false;
+        if (!CanSweep(dungeon, level))
+        {
+            Debug.Log($"[DailyDungeon] 소탕 불가 — {dungeon.id} Lv.{level} " +
+                      $"(최고 클리어 {HighestCleared(dungeon)}, 남은 횟수 {RemainingEntries(dungeon)})");
+            return false;
+        }
+
+        CurrencyManager cm = CurrencyManager.Instance;
+        if (cm == null)
+        {
+            Debug.LogWarning("[DailyDungeon] CurrencyManager 가 없어 소탕 보상을 지급할 수 없습니다.");
+            return false;
+        }
+
+        if (!TryConsumeEntry(dungeon)) return false;
+        cm.AddCurrency(dungeon.rewardType, dungeon.RewardFor(level));
+        SaveManager.Instance?.Save();
+
+        Debug.Log($"[DailyDungeon] 소탕 — {dungeon.displayName} Lv.{level} : {dungeon.DescribeReward(level)} " +
+                  $"(남은 횟수 {RemainingEntries(dungeon)}/{TotalEntries(dungeon)})");
         OnChanged?.Invoke();
         return true;
     }
@@ -112,7 +238,7 @@ public static class DailyDungeonProgress
         if (dd.lastResetTicks >= periodStart) return;
 
         foreach (DailyDungeonRecord r in dd.records)
-            if (r != null) r.usedToday = 0;
+            if (r != null) { r.usedToday = 0; r.purchasedToday = 0; }
 
         dd.lastResetTicks = periodStart;
         Debug.Log("[DailyDungeon] 일일 입장 횟수 초기화");

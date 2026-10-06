@@ -21,6 +21,10 @@ public class DungeonConfirmPopup : MonoBehaviour
 
     private Action onConfirm;
 
+    // 알림 모드(확인 버튼만)에서는 확인 버튼을 가운데로 옮기고, 확인/취소 모드에서는 원래 자리로 되돌립니다.
+    private RectTransform confirmRect;
+    private Vector2       confirmOriginalPos;
+
     public bool IsOpen => panel != null && panel.activeSelf;
 
     void Awake()
@@ -30,6 +34,12 @@ public class DungeonConfirmPopup : MonoBehaviour
 
         if (confirmButton != null) confirmButton.onClick.AddListener(Confirm);
         if (cancelButton  != null) cancelButton.onClick.AddListener(Hide);
+
+        if (confirmButton != null)
+        {
+            confirmRect        = confirmButton.GetComponent<RectTransform>();
+            confirmOriginalPos = confirmRect.anchoredPosition;
+        }
     }
 
     void OnDestroy()
@@ -44,7 +54,22 @@ public class DungeonConfirmPopup : MonoBehaviour
     public void Show(string title, string message, Action confirmAction)
     {
         onConfirm = confirmAction;
+        if (cancelButton != null) cancelButton.gameObject.SetActive(true);
+        if (confirmRect  != null) confirmRect.anchoredPosition = confirmOriginalPos;
+        Open(title, message);
+    }
 
+    /// <summary>알림만 띄웁니다 (확인 버튼만, 누르면 닫힘). 소탕 결과 등.</summary>
+    public void ShowMessage(string title, string message)
+    {
+        onConfirm = null;
+        if (cancelButton != null) cancelButton.gameObject.SetActive(false);
+        if (confirmRect  != null) confirmRect.anchoredPosition = new Vector2(0f, confirmOriginalPos.y);
+        Open(title, message);
+    }
+
+    private void Open(string title, string message)
+    {
         if (titleText != null)
         {
             titleText.text = title;

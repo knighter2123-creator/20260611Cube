@@ -44,13 +44,14 @@ public partial class HapticManager
         // Time.timeScale 이 0이라 WaitForSeconds 는 영원히 끝나지 않습니다.
         var gap = new WaitForSecondsRealtime(1.2f);
 
+        // ★ Handheld 클래스는 모바일 빌드에만 존재합니다. #if 밖에 두면 PC(Windows) 빌드가 컴파일 에러로 실패합니다.
+#if UNITY_ANDROID && !UNITY_EDITOR
         // ── ① 유니티 기본 ──
         // 가장 단순한 경로. 이것만 되면 우리 JNI 코드 쪽에 문제가 있다는 뜻입니다.
         Debug.Log("[Haptic] ① Handheld.Vibrate() — 유니티 기본 (약 500ms)");
         Handheld.Vibrate();
         yield return gap;
 
-#if UNITY_ANDROID && !UNITY_EDITOR
         if (vibrator == null || vibrationEffectClass == null)
         {
             Debug.LogError("[Haptic] Vibrator 를 못 잡아 ②~④ 를 건너뜁니다. 초기화 로그를 확인하세요.");
@@ -91,7 +92,7 @@ public partial class HapticManager
         TryVibrate(() => vibrator.Call("vibrate", 400L), "④");
         yield return gap;
 #else
-        Debug.Log("[Haptic] (에디터) ②~④ 는 실기기에서만 동작합니다.");
+        Debug.Log("[Haptic] (에디터 / PC) 진동 진단은 안드로이드 실기기에서만 동작합니다.");
         yield return gap;
 #endif
 
