@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d031b56b743378849af9659fd22afca4, type: 3}
-  m_Name: ep_armbreak
+  m_Name: ra_explosion
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
-  id: ep_Armbreak
-  companionName: "\uD30C\uC1C4"
-  icon: {fileID: 21300000, guid: 6007e256ee90b4b0b92980878208f788, type: 3}
-  prefab: {fileID: 3391353107492281548, guid: febf9a0a664c51544bfa7242fe30b3d1, type: 3}
+  id: ra_explosion
+  companionName: "\uD3ED\uBC1C"
+  icon: {fileID: 21300000, guid: 1877011fdc8954440a807dd46b4eaab4, type: 3}
+  prefab: {fileID: 2970979869946304497, guid: 02cdd9dcb568dc04a9a1030a07698622, type: 3}
   detectRange: 5
-  grade: 2
-  ownedSkill: {fileID: 11400000, guid: 922f7b466d17dc64a8996e23c59b5ab9, type: 2}
+  grade: 1
+  ownedSkill: {fileID: 11400000, guid: 7bd7ac94322e7db4aa1409dfbc1f71f8, type: 2}

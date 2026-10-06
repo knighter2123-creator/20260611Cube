@@ -15,10 +15,14 @@ MonoBehaviour:
   normal:
   - {fileID: 11400000, guid: 8e88c7b876364174892884721dcc99eb, type: 2}
   - {fileID: 11400000, guid: 08135a98310f4d64eb3b140159bfcd57, type: 2}
+  - {fileID: 11400000, guid: 9235d4281abba29449e4460d20778819, type: 2}
+  - {fileID: 11400000, guid: 865e4dde08c51cf4c8367385221fb898, type: 2}
   rare:
   - {fileID: 11400000, guid: bdbee6a304c276c46b26c4519c382427, type: 2}
   - {fileID: 11400000, guid: e0e25e71d78192d459f371917a9dd090, type: 2}
   - {fileID: 11400000, guid: 256e4ef793da03649b6f56e401e853ad, type: 2}
+  - {fileID: 11400000, guid: 6e7e76cd9104c0c4487d0110107e32ec, type: 2}
+  - {fileID: 11400000, guid: ca1098075fa9952409c33df37ab6d7e0, type: 2}
   epic:
   - {fileID: 11400000, guid: 6fd0dc250565b5346b85a386a838d0d3, type: 2}
   - {fileID: 11400000, guid: 927361f8eaf08eb47933622aef8d38d7, type: 2}
@@ -28,6 +32,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 21e4aaa8f19ba2b499138c9aa2d8c8be, type: 2}
   - {fileID: 11400000, guid: ad3e818b3e148a94691e48c373c83678, type: 2}
   - {fileID: 11400000, guid: c033e34cdb6f7d64696bf5b0be40211f, type: 2}
+  - {fileID: 11400000, guid: 9fc8c0b98f9279642859c9bbf51d6994, type: 2}
+  - {fileID: 11400000, guid: 11c290b03338de345aebffb978251ca6, type: 2}
   fragmentNormal: 15
   fragmentRare: 15
   fragmentEpic: 10
