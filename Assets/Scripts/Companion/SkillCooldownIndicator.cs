@@ -20,9 +20,8 @@ public class SkillCooldownIndicator : MonoBehaviour
     public int sortingOrder = 100;
 
     [Header("색상")]
-    public Color readyColor  = Color.white;                            // 쿨다운 완료 시 아이콘 색
-    public Color coolColor   = new Color(0.45f, 0.45f, 0.50f, 1f);     // 쿨다운 중 아이콘 색(회색)
-    public Color maskColor   = new Color(0.02f, 0.02f, 0.05f, 0.70f);  // 라디얼 필 색
+    public Color iconColor   = Color.white;                            // 아이콘 색 (흰색 = 스킬 이미지 원본 그대로, 쿨다운 중에도 유지)
+    public Color maskColor   = new Color(0.02f, 0.02f, 0.05f, 0.70f);  // 라디얼 필 색 (아이콘 '뒤'에 그려져 아이콘을 가리지 않음)
     public Color bgColor     = new Color(0.05f, 0.05f, 0.08f, 0.55f);  // 원형 배경
     public Color ringColor   = new Color(1f, 0.85f, 0.35f, 1f);        // 테두리(준비 완료 시 강조)
 
@@ -76,7 +75,7 @@ public class SkillCooldownIndicator : MonoBehaviour
 
         if (icon != null) _icon.sprite = icon;
         _icon.enabled = _icon.sprite != null;
-        _icon.color   = coolColor;
+        _icon.color   = iconColor;
 
         _mask.fillAmount = 1f;
         _ring.color      = new Color(ringColor.r, ringColor.g, ringColor.b, 0.25f);
@@ -137,7 +136,6 @@ public class SkillCooldownIndicator : MonoBehaviour
                 _flashUntil = Time.time + readyFlashTime;
 
                 _mask.fillAmount = 0f;
-                _icon.color      = readyColor;
                 _ring.color      = ringColor;
                 if (_text != null) _text.enabled = false;
             }
@@ -193,10 +191,11 @@ public class SkillCooldownIndicator : MonoBehaviour
 
         Sprite circle = CircleSprite();
 
+        // 그리는 순서 = 생성 순서 : 테두리 → 배경 → 라디얼 필 → 아이콘 → 숫자
+        //   라디얼 필을 아이콘보다 먼저 만들어 아이콘 '뒤'에 깔립니다.
+        //   그래서 쿨다운 진행은 아이콘 둘레(배경 88 > 아이콘 70)에서 보이고, 스킬 이미지는 원본 그대로 보입니다.
         _ring = CreateImage("Ring", _root, circle, new Color(ringColor.r, ringColor.g, ringColor.b, 0.25f), 100f);
         _bg   = CreateImage("BG",   _root, circle, bgColor,   88f);
-        _icon = CreateImage("Icon", _root, null,   coolColor, 70f);
-        _icon.enabled = false;
 
         _mask = CreateImage("Mask", _root, circle, maskColor, 88f);
         _mask.type          = Image.Type.Filled;
@@ -204,6 +203,9 @@ public class SkillCooldownIndicator : MonoBehaviour
         _mask.fillOrigin    = (int)Image.Origin360.Top;
         _mask.fillClockwise = false;
         _mask.fillAmount    = 0f;
+
+        _icon = CreateImage("Icon", _root, null,   iconColor, 70f);
+        _icon.enabled = false;
 
         if (showRemainText) _text = CreateText("Remain", _root);
 

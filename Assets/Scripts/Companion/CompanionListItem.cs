@@ -69,7 +69,8 @@ public class CompanionListItem : MonoBehaviour
         {
             nameText.text  = data.companionName;
             // ★ 등급 색은 도감과 같은 규칙(CompanionGradeStyle)을 씁니다. 색을 바꿀 땐 그 파일 한 곳만 고치면 됩니다.
-            nameText.color = CompanionGradeStyle.GetColor(data.grade);
+            //   목록 아이템은 흰 카드 위에 그려지므로 밝은 배경용 색을 씁니다 (일반 = 흰색이면 안 보임).
+            nameText.color = CompanionGradeStyle.GetColorOnLight(data.grade);
         }
 
         CompanionFragment fragment = CompanionFragment.Instance;

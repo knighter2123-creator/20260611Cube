@@ -34,6 +34,23 @@ public static class CompanionGradeStyle
         };
     }
 
+    /// <summary>
+    /// 밝은 배경(동료 목록의 흰 카드) 위에 쓸 등급 색.
+    /// GetColor 는 어두운 배경 기준이라 일반(흰색)이 흰 카드 위에서 보이지 않습니다.
+    /// 같은 계열의 색을 유지하되 흰 배경에서 읽히도록 어둡게 맞췄습니다.
+    /// </summary>
+    public static Color GetColorOnLight(CompanionGrade grade)
+    {
+        return grade switch
+        {
+            CompanionGrade.Normal    => new Color(0.20f, 0.20f, 0.22f),  // 짙은 회색
+            CompanionGrade.Rare      => new Color(0.12f, 0.42f, 0.90f),  // 파랑
+            CompanionGrade.Epic      => new Color(0.52f, 0.22f, 0.86f),  // 보라
+            CompanionGrade.Legendary => new Color(0.88f, 0.45f, 0.00f),  // 주황
+            _                        => Color.black
+        };
+    }
+
     /// <summary>TMP 리치 텍스트용 "등급 이름에 색 입히기" — &lt;color=#RRGGBB&gt;전설&lt;/color&gt;</summary>
     public static string GetColoredName(CompanionGrade grade)
         => $"<color=#{ColorUtility.ToHtmlStringRGB(GetColor(grade))}>{GetName(grade)}</color>";

@@ -40,13 +40,14 @@ public class DebugCheats : MonoBehaviour
     // 릴리즈 빌드에서는 아래 필드를 읽는 코드가 전부 빠지므로
     // "값을 넣어놓고 안 쓴다(CS0414)" 경고가 납니다. 의도된 상황이라 그 경고만 끕니다.
 #pragma warning disable 0414
-    [Header("골드")]
-    [Tooltip("누르면 소액 추가. Shift 를 누른 채 누르면 대량 추가.")]
+    [Header("골드 · 보석")]
+    [Tooltip("누르면 골드와 보석을 같은 수량만큼 소액 추가. Shift 를 누른 채 누르면 대량 추가.")]
     [SerializeField] private Key goldKey      = Key.G;
 
-    [Tooltip("누르면 골드를 0으로. '골드 부족' 상태(빨간 비용 / 버튼 비활성) 테스트용.")]
+    [Tooltip("누르면 골드와 보석을 0으로. '재화 부족' 상태(빨간 비용 / 버튼 비활성) 테스트용.")]
     [SerializeField] private Key clearGoldKey = Key.H;
 
+    // 골드와 보석에 같은 수량을 씁니다 (필드 이름은 인스펙터 값 유지를 위해 그대로)
     [SerializeField] private int smallGoldAmount = 10_000;        // 1만
     [SerializeField] private int largeGoldAmount = 100_000_000;   // 1억
 #pragma warning restore 0414
@@ -102,8 +103,8 @@ public class DebugCheats : MonoBehaviour
     void Start()
     {
         // 어떤 키가 있는지 까먹지 않게 시작할 때 한 번 알려줍니다.
-        Debug.Log($"[치트] 활성 — {goldKey}: 골드 +{smallGoldAmount:N0}  |  " +
-                  $"Shift+{goldKey}: +{largeGoldAmount:N0}  |  {clearGoldKey}: 골드 0");
+        Debug.Log($"[치트] 활성 — {goldKey}: 골드·보석 +{smallGoldAmount:N0}  |  " +
+                  $"Shift+{goldKey}: +{largeGoldAmount:N0}  |  {clearGoldKey}: 골드·보석 0");
     }
 
     void Update()
@@ -120,11 +121,14 @@ public class DebugCheats : MonoBehaviour
         {
             // Shift 는 '누르고 있는가'를 봐야 하므로 여기는 isPressed 가 맞습니다.
             bool large = kb.shiftKey.isPressed;
-            AddGold(large ? largeGoldAmount : smallGoldAmount);
+            AddGoldAndGem(large ? largeGoldAmount : smallGoldAmount);
         }
 
         if (WasPressed(kb, clearGoldKey))
+        {
             ClearGold();
+            ClearGem();
+        }
     }
 
     /// <summary>
@@ -141,6 +145,36 @@ public class DebugCheats : MonoBehaviour
     // ══════════════════════════════════════════════════════════════
     //  치트 본체
     // ══════════════════════════════════════════════════════════════
+
+    /// <summary>골드와 보석을 같은 수량만큼 추가합니다.</summary>
+    private void AddGoldAndGem(int amount)
+    {
+        AddGold(amount);
+        AddGem(amount);
+    }
+
+    /// <summary>
+    /// 보석을 안전하게 추가합니다. (AddGold 와 같은 방식)
+    /// </summary>
+    private void AddGem(int amount)
+    {
+        CurrencyManager cm = GetReadyCurrency();
+        if (cm == null) return;
+
+        int room = int.MaxValue - cm.Gem;
+        int add  = Mathf.Min(amount, room);
+
+        if (add <= 0)
+        {
+            Debug.Log($"[치트] 보석이 이미 최대치입니다 ({cm.Gem:N0}).");
+            return;
+        }
+
+        // 공개 API 경유 — OnGemChanged 가 나가야 HUD 가 갱신됩니다.
+        cm.AddGem(add);
+
+        Debug.Log($"[치트] 보석 +{add:N0} → 현재 {cm.Gem:N0}");
+    }
 
     /// <summary>
     /// 골드를 안전하게 추가합니다.
@@ -195,6 +229,26 @@ public class DebugCheats : MonoBehaviour
     }
 
     /// <summary>
+    /// 보석을 0으로 만듭니다. (ClearGold 와 같은 방식 — 가진 만큼 써서 이벤트가 정상적으로 나가게)
+    /// </summary>
+    private void ClearGem()
+    {
+        CurrencyManager cm = GetReadyCurrency();
+        if (cm == null) return;
+
+        int before = cm.Gem;
+        if (before <= 0)
+        {
+            Debug.Log("[치트] 보석이 이미 0입니다.");
+            return;
+        }
+
+        cm.SpendGem(before);
+
+        Debug.Log($"[치트] 보석 0으로 (기존 {before:N0})");
+    }
+
+    /// <summary>
     /// 치트를 써도 되는 상태의 CurrencyManager 를 돌려줍니다. 아니면 null.
     ///
     /// ═══ ★ 왜 EnsureLoaded() 를 먼저 부르는가 (중요) ═══════════════════
@@ -242,14 +296,14 @@ public class DebugCheats : MonoBehaviour
     // 기대대로 들어오지 않을 수 있습니다. 이 컴포넌트를 우클릭하면 같은 치트를 쓸 수 있습니다.
     // (Play 중에만 동작합니다)
 
-    [ContextMenu("치트: 골드 추가 (소액)")]
-    private void MenuAddSmall()  { if (Application.isPlaying) AddGold(smallGoldAmount); }
+    [ContextMenu("치트: 골드·보석 추가 (소액)")]
+    private void MenuAddSmall()  { if (Application.isPlaying) AddGoldAndGem(smallGoldAmount); }
 
-    [ContextMenu("치트: 골드 추가 (대량)")]
-    private void MenuAddLarge()  { if (Application.isPlaying) AddGold(largeGoldAmount); }
+    [ContextMenu("치트: 골드·보석 추가 (대량)")]
+    private void MenuAddLarge()  { if (Application.isPlaying) AddGoldAndGem(largeGoldAmount); }
 
-    [ContextMenu("치트: 골드 0으로")]
-    private void MenuClearGold() { if (Application.isPlaying) ClearGold(); }
+    [ContextMenu("치트: 골드·보석 0으로")]
+    private void MenuClearGold() { if (Application.isPlaying) { ClearGold(); ClearGem(); } }
 
 #endif
 }
