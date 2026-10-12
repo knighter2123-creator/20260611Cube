@@ -105,8 +105,42 @@ public class CompanionListItem : MonoBehaviour
         if (actionButtons == null) return;
 
         bool next = !actionButtons.activeSelf;
+        if (next) BringActionButtonsToFront();
         actionButtons.SetActive(next);
         if (next) RefreshActionButtons();
+    }
+
+    // ★ 그리드에서는 뒤에 있는 형제(오른쪽·아래 아이템)가 나중에 그려져서 버튼을 덮습니다.
+    //   아이템 순서를 바꾸면 그리드 배치가 바뀌므로, 버튼 묶음에만 정렬을 덮어쓰는 Canvas 를 붙여 맨 위로 올립니다.
+    //   클릭도 받아야 하므로 GraphicRaycaster 를 같이 붙입니다. (한 번만 만들고 재사용)
+    private void BringActionButtonsToFront()
+    {
+        Canvas canvas = actionButtons.GetComponent<Canvas>();
+        if (canvas == null)
+        {
+            canvas = actionButtons.AddComponent<Canvas>();
+            actionButtons.AddComponent<GraphicRaycaster>();
+        }
+
+        // 기준은 '실제로 정렬 값을 가진' 캔버스 = 정렬을 덮어쓴 가장 가까운 캔버스, 없으면 루트 캔버스.
+        //   중첩 캔버스의 sortingOrder 는 실제로 쓰이지 않는 값(보통 0)이라, 그걸 기준으로 하면
+        //   루트 순서가 더 클 때 버튼이 패널 전체 뒤로 가 버립니다.
+        Canvas basis = FindSortingCanvas(transform.parent);
+        canvas.overrideSorting = true;
+        if (basis != null) canvas.sortingLayerID = basis.sortingLayerID;
+        canvas.sortingOrder = (basis != null ? basis.sortingOrder : 0) + 1;
+    }
+
+    private static Canvas FindSortingCanvas(Transform from)
+    {
+        Canvas found = null;
+        for (Transform t = from; t != null; t = t.parent)
+        {
+            if (!t.TryGetComponent(out Canvas c) || !c.enabled) continue;
+            found = c;
+            if (c.overrideSorting || c.isRootCanvas) break;
+        }
+        return found;
     }
 
     private void OnPlaceClicked()

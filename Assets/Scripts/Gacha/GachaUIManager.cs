@@ -22,6 +22,15 @@ public class GachaUIManager : MonoBehaviour
     [SerializeField] private TMP_Text draw10CostText;
     [SerializeField] private TMP_Text draw100CostText;
 
+    [Header("결과 화면 — 다시 뽑기 (선택)")]
+    [Tooltip("결과 화면에서 바로 1/10/100회를 다시 뽑는 버튼. 결제 규칙·비용은 위 뽑기 버튼과 같습니다.")]
+    [SerializeField] private Button   resultDraw1Button;
+    [SerializeField] private Button   resultDraw10Button;
+    [SerializeField] private Button   resultDraw100Button;
+    [SerializeField] private TMP_Text resultDraw1CostText;
+    [SerializeField] private TMP_Text resultDraw10CostText;
+    [SerializeField] private TMP_Text resultDraw100CostText;
+
     [Header("이동 버튼")]
     [SerializeField] private Button closeResultButton;
 
@@ -57,9 +66,14 @@ public class GachaUIManager : MonoBehaviour
         ValidateEffectLayer();
         contentRect = resultContent as RectTransform;
 
-        draw1Button.onClick.AddListener(()   => OnDraw(GachaSystem.Instance.DrawOne()));
-        draw10Button.onClick.AddListener(()  => OnDraw(GachaSystem.Instance.DrawTen()));
-        draw100Button.onClick.AddListener(() => OnDraw(GachaSystem.Instance.DrawHundred()));
+        draw1Button.onClick.AddListener(()   => TryDraw(1));
+        draw10Button.onClick.AddListener(()  => TryDraw(10));
+        draw100Button.onClick.AddListener(() => TryDraw(100));
+
+        // 결과 화면의 다시 뽑기 — 같은 진입점을 씁니다.
+        if (resultDraw1Button   != null) resultDraw1Button.onClick.AddListener(()   => TryDraw(1));
+        if (resultDraw10Button  != null) resultDraw10Button.onClick.AddListener(()  => TryDraw(10));
+        if (resultDraw100Button != null) resultDraw100Button.onClick.AddListener(() => TryDraw(100));
 
         closeResultButton.onClick.AddListener(() => ShowGachaPanel());
 
@@ -87,6 +101,9 @@ public class GachaUIManager : MonoBehaviour
         SetCostText(draw1CostText,   1);
         SetCostText(draw10CostText,  10);
         SetCostText(draw100CostText, 100);
+        SetCostText(resultDraw1CostText,   1);
+        SetCostText(resultDraw10CostText,  10);
+        SetCostText(resultDraw100CostText, 100);
     }
 
     private static void SetCostText(TMP_Text label, int count)
@@ -135,6 +152,7 @@ public class GachaUIManager : MonoBehaviour
     {
         // 연출 도중 닫으면 코루틴 정리
         if (revealing != null) { StopCoroutine(revealing); revealing = null; }
+        SetRedrawInteractable(true);
 
         ClearResults();
         ClearEffects();
@@ -149,6 +167,26 @@ public class GachaUIManager : MonoBehaviour
         resultPanel.SetActive(true);
     }
 
+    /// <summary>
+    /// count 회 뽑기. 뽑기 화면 버튼과 결과 화면의 다시 뽑기 버튼이 함께 씁니다.
+    /// ★ 연출 중인지를 '결제 전에' 확인합니다. 예전처럼 Draw 를 먼저 부르고 OnDraw 에서 막으면
+    ///   재화는 빠지고 결과는 버려집니다 (결과 화면에서 연출 중에 다시 뽑기를 누르는 경우).
+    /// </summary>
+    private void TryDraw(int count)
+    {
+        if (revealing != null) return;
+
+        GachaSystem gacha = GachaSystem.Instance;
+        if (gacha == null) return;
+
+        OnDraw(count switch
+        {
+            1   => gacha.DrawOne(),
+            10  => gacha.DrawTen(),
+            _   => gacha.DrawHundred()
+        });
+    }
+
     private void OnDraw(List<GachaSystem.GachaResult> results)
     {
         if (results == null || results.Count == 0) return;   // 보석 부족 등
@@ -158,7 +196,49 @@ public class GachaUIManager : MonoBehaviour
         ClearEffects();
 
         ShowResultPanel();
-        revealing = StartCoroutine(RevealRoutine(results));
+        SetRedrawInteractable(false);
+        revealing = StartCoroutine(RevealRoutine(GroupResults(results)));
+    }
+
+    private void SetRedrawInteractable(bool on)
+    {
+        if (resultDraw1Button   != null) resultDraw1Button.interactable   = on;
+        if (resultDraw10Button  != null) resultDraw10Button.interactable  = on;
+        if (resultDraw100Button != null) resultDraw100Button.interactable = on;
+    }
+
+    /// <summary>결과 한 칸 = 동료 한 종류. 같은 동료는 묶고 몇 번 나왔는지 셉니다.</summary>
+    private struct GroupedResult
+    {
+        public GachaSystem.GachaResult first;   // 표시용 (아이콘·이름·등급)
+        public int  count;
+        public bool hasNew;                     // 묶음 안에 신규 획득이 있었나
+    }
+
+    /// <summary>처음 나온 순서를 유지하면서 id 로 묶습니다.</summary>
+    private static List<GroupedResult> GroupResults(List<GachaSystem.GachaResult> results)
+    {
+        List<GroupedResult> groups = new List<GroupedResult>();
+        Dictionary<string, int> indexById = new Dictionary<string, int>();
+
+        foreach (GachaSystem.GachaResult r in results)
+        {
+            if (r.data == null) continue;
+
+            if (indexById.TryGetValue(r.data.id, out int i))
+            {
+                GroupedResult g = groups[i];
+                g.count++;
+                g.hasNew |= !r.isDuplicate;
+                groups[i] = g;
+            }
+            else
+            {
+                indexById[r.data.id] = groups.Count;
+                groups.Add(new GroupedResult { first = r, count = 1, hasNew = !r.isDuplicate });
+            }
+        }
+        return groups;
     }
 
     /// <summary>
@@ -185,20 +265,22 @@ public class GachaUIManager : MonoBehaviour
     }
 
     // ✅ 아이템을 하나씩 순서대로 공개
-    private IEnumerator RevealRoutine(List<GachaSystem.GachaResult> results)
+    private IEnumerator RevealRoutine(List<GroupedResult> results)
     {
         // 개수가 많으면 간격을 줄여 전체 시간이 maxTotalRevealTime을 넘지 않게
         float delay = perItemDelay;
         if (results.Count * delay > maxTotalRevealTime)
             delay = maxTotalRevealTime / results.Count;
 
-        foreach (GachaSystem.GachaResult result in results)
+        foreach (GroupedResult group in results)
         {
+            GachaSystem.GachaResult result = group.first;
+
             GameObject item = Instantiate(resultItemPrefab, resultContent);
             GachaResultItem ui = item.GetComponent<GachaResultItem>();
             if (ui == null) continue;
 
-            ui.Setup(result);
+            ui.Setup(result, group.count, group.hasNew);
             ui.PlayAppear();
 
             // ★ 방금 생성한 아이템은 아직 레이아웃이 계산되지 않아 position이 (0,0)이거나
@@ -217,6 +299,7 @@ public class GachaUIManager : MonoBehaviour
         }
 
         revealing = null;
+        SetRedrawInteractable(true);
     }
 
     private void SpawnEffect(Transform itemTransform)

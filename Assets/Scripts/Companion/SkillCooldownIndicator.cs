@@ -13,7 +13,9 @@ public class SkillCooldownIndicator : MonoBehaviour
 {
     [Header("배치")]
     [Tooltip("동료 기준 표시 위치 오프셋")]
-    public Vector3 offset = new Vector3(0f, 1.1f, 0f);
+    // ★ 배치 칸이 1유닛이라 1.1 이면 바로 위 칸 동료의 중심에 겹쳐 그 동료의 인디케이터처럼 보였습니다.
+    //   0.6 = 동료 머리(0.5) 바로 위.
+    public Vector3 offset = new Vector3(0f, 0.6f, 0f);
     [Tooltip("월드 기준 아이콘 지름(유닛)")]
     public float worldSize = 0.55f;
     [Tooltip("스프라이트 위에 그려지도록 하는 정렬 순서")]

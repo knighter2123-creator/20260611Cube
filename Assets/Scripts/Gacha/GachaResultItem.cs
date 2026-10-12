@@ -8,6 +8,8 @@ public class GachaResultItem : MonoBehaviour
     [SerializeField] private Image           iconImage;
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private TextMeshProUGUI resultText;
+    [Tooltip("아이콘 우하단 '뽑힌 횟수' (x3). 2회 이상일 때만 보입니다.")]
+    [SerializeField] private TextMeshProUGUI countText;
 
     [Header("등장 연출")]
     [SerializeField] private float appearDuration = 0.25f;
@@ -21,7 +23,15 @@ public class GachaResultItem : MonoBehaviour
     // ✅ 매니저가 등급 기반 화면 흔들림을 판단하도록 노출
     public CompanionGrade Grade { get; private set; }
 
-    public void Setup(GachaSystem.GachaResult result)
+    public void Setup(GachaSystem.GachaResult result) => Setup(result, 1, !result.isDuplicate);
+
+    /// <summary>
+    /// 같은 동료를 묶어서 한 칸에 표시합니다.
+    ///   count  = 이번 뽑기에서 이 동료가 나온 횟수 (2 이상이면 아이콘 우하단에 "x{count}")
+    ///   hasNew = 그중 한 번이라도 신규 획득이었는가
+    /// ★ 묶었을 때는 조각 합계를 보여 주지 않습니다 — 횟수만 알려 줍니다.
+    /// </summary>
+    public void Setup(GachaSystem.GachaResult result, int count, bool hasNew)
     {
         Grade = result.data.grade;
 
@@ -31,15 +41,22 @@ public class GachaResultItem : MonoBehaviour
         nameText.text  = result.data.companionName;
         nameText.color = GetGradeColor(result.data.grade);
 
-        if (result.isDuplicate)
-        {
-            resultText.text  = $"조각 +{result.fragmentGain}";
-            resultText.color = Color.gray;
-        }
-        else
+        if (hasNew)
         {
             resultText.text  = "신규 획득!";
             resultText.color = Color.yellow;
+        }
+        else
+        {
+            resultText.text  = count > 1 ? "조각 획득" : $"조각 +{result.fragmentGain}";
+            resultText.color = Color.gray;
+        }
+
+        if (countText != null)
+        {
+            bool show = count > 1;
+            countText.gameObject.SetActive(show);
+            if (show) countText.text = $"x{count}";
         }
 
         // ✅ 등장 전까지 숨김 (1프레임 풀사이즈 깜빡임 방지)
