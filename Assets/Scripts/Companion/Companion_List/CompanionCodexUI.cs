@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using System.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Pool;
 
 /// <summary>
 /// 동료 도감 탭. (신규)
@@ -139,6 +139,12 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         BuildOwnedIds();
         BuildEntries();
 
+        // ★ 누가 칸을 지웠으면(파괴됨) 목록에서 먼저 뺍니다.
+        //   그대로 두면 아래 while 이 '죽은 칸' 도 개수로 세서 새 칸을 안 만들고,
+        //   채우기 루프는 그 칸을 건너뛰어 해당 순번의 동료가 도감에서 빠집니다.
+        //   (== null 은 유니티식 검사라 파괴된 칸도 걸러 냅니다)
+        spawnedItems.RemoveAll(item => item == null);
+
         // ── 칸이 모자라면 그만큼만 새로 만든다 ──
         // ★ CompanionListUI 는 매번 전부 Destroy → Instantiate 합니다.
         //   도감은 동료 수가 계속 늘어나는 화면이라 처음부터 재사용 방식으로 만듭니다.
@@ -165,7 +171,6 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         for (int i = 0; i < spawnedItems.Count; i++)
         {
             CompanionCodexItem item = spawnedItems[i];
-            if (item == null) continue;   // 누가 칸을 지웠을 때 대비 (정상 흐름에선 없음)
 
             if (i < entries.Count)
             {
@@ -215,13 +220,25 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         //   목록에는 넣어 주되, 에셋 쪽을 고칠 수 있게 경고는 id 당 한 번만 남깁니다.
         AddOwnedButUnlisted();
 
-        // ④ 정렬 — 등급 높은 순.
-        // ★ LINQ 의 OrderBy 는 '안정 정렬' 입니다. 같은 등급끼리는 에셋에 넣은 순서가 유지됩니다.
-        //   List.Sort 는 안정 정렬이 아니라서 같은 등급의 순서가 열 때마다 바뀔 수 있습니다.
-        //   ToList() 가 새 리스트를 만들긴 하지만, 탭을 열 때 한 번이라 성능 영향은 무시할 수준입니다.
-        List<CompanionData> sorted = entries.OrderByDescending(d => d.grade).ToList();
-        entries.Clear();
-        entries.AddRange(sorted);
+        // ④ 정렬 — 등급 높은 순, 같은 등급끼리는 넣은 순서 유지 (안정 정렬).
+        // ★ List.Sort 는 안정 정렬이 아니라서 같은 등급의 순서가 열 때마다 바뀔 수 있습니다.
+        //   예전에는 LINQ(OrderByDescending + ToList)로 했는데, 탭을 열 때마다 새 리스트와 정렬용 배열이 생겼습니다.
+        //   등급이 4개뿐이라 '높은 등급부터 한 번씩 훑어 담기' 로 충분합니다.
+        //   임시 리스트는 UnityEngine.Pool.ListPool 에서 빌려 쓰고 돌려줍니다 (할당 없음).
+        using (ListPool<CompanionData>.Get(out List<CompanionData> sorted))
+        {
+            for (CompanionGrade g = CompanionGrade.Legendary; g >= CompanionGrade.Normal; g--)
+                foreach (CompanionData d in entries)
+                    if (d.grade == g) sorted.Add(d);
+
+            // 위 4등급 밖의 값(새 등급 추가 등)도 빠지지 않게 마지막에 붙입니다.
+            if (sorted.Count != entries.Count)
+                foreach (CompanionData d in entries)
+                    if (d.grade > CompanionGrade.Legendary || d.grade < CompanionGrade.Normal) sorted.Add(d);
+
+            entries.Clear();
+            entries.AddRange(sorted);
+        }
     }
 
     private void TryAddEntry(CompanionData d)

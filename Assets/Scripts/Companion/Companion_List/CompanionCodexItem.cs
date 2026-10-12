@@ -70,6 +70,13 @@ public class CompanionCodexItem : MonoBehaviour
     /// <summary>이 칸에 동료 하나를 표시합니다. (재사용할 때마다 호출)</summary>
     public void Bind(CompanionData companion, bool isOwned)
     {
+        // 지금은 도감이 null 을 걸러서 넘기지만, 다른 곳에서 불러도 칸이 NullReferenceException 으로 멈추지 않게.
+        if (companion == null)
+        {
+            Debug.LogWarning("[CompanionCodexItem] Bind 에 null 동료가 들어왔습니다.", this);
+            return;
+        }
+
         data  = companion;
         owned = isOwned;
 

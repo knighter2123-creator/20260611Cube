@@ -84,4 +84,26 @@ public class WorldEnemySet : ScriptableObject
 
         return null;   // 예외 규칙 없음 = 기본값 사용
     }
+
+#if UNITY_EDITOR
+    // 같은 스테이지 규칙이 둘이면 GetOverride 는 앞쪽만 씁니다. 뒤쪽을 고쳐도 반영이 안 돼 헷갈리므로 알려 줍니다.
+    private void OnValidate()
+    {
+        if (overrides == null) return;
+
+        for (int i = 0; i < overrides.Length; i++)
+        {
+            if (overrides[i] == null) continue;
+            for (int j = 0; j < i; j++)
+            {
+                if (overrides[j] != null && overrides[j].stage == overrides[i].stage)
+                {
+                    Debug.LogWarning($"[WorldEnemySet] '{name}' 에 {overrides[i].stage} 스테이지 규칙이 둘 이상입니다. " +
+                                     $"앞쪽(Element {j})만 적용됩니다.", this);
+                    break;
+                }
+            }
+        }
+    }
+#endif
 }

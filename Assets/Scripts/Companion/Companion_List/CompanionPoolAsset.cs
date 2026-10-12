@@ -82,8 +82,9 @@ public class CompanionPoolAsset : ScriptableObject
     /// 모든 등급의 동료를 차례대로 돌려줍니다. 도감이 씁니다.
     ///
     /// ★ yield return 은 '리스트를 새로 만들지 않고' 하나씩 꺼내 주는 문법입니다.
-    ///   네 리스트를 합친 새 List 를 만들면 호출할 때마다 메모리를 할당하지만,
+    ///   네 리스트를 합친 새 List 를 만들면 원소 수만큼 메모리를 할당하지만,
     ///   이 방식은 foreach 가 요청할 때마다 다음 원소를 건네주기만 합니다.
+    ///   (호출마다 작은 열거자 객체 하나는 생깁니다 — 도감을 열 때 한 번이라 무시할 수준)
     /// </summary>
     public IEnumerable<CompanionData> All()
     {
@@ -111,6 +112,22 @@ public class CompanionPoolAsset : ScriptableObject
         CheckDuplicateSkill(rare,      CompanionGrade.Rare);
         CheckDuplicateSkill(epic,      CompanionGrade.Epic);
         CheckDuplicateSkill(legendary, CompanionGrade.Legendary);
+
+        CheckDuplicateEntry();
+    }
+
+    // 같은 동료를 두 번 넣으면 가챠에서 그 동료만 확률이 두 배가 됩니다 (가챠는 칸 단위로 뽑음).
+    // 리스트 칸을 복제(Ctrl+D)하다 생기기 쉬운 실수라 알려 줍니다.
+    private void CheckDuplicateEntry()
+    {
+        var seen = new HashSet<CompanionData>();
+        foreach (var d in All())
+        {
+            if (d == null) continue;
+            if (!seen.Add(d))
+                Debug.LogWarning($"[CompanionPool] '{d.companionName}' 이(가) 풀에 두 번 이상 들어 있습니다. " +
+                                 "가챠에서 이 동료만 더 자주 나옵니다.", this);
+        }
     }
 
     // 한 등급에 같은 스킬 동료가 둘이면 진화 대상이 모호해집니다 (FindEvolution 은 앞쪽만 씀).

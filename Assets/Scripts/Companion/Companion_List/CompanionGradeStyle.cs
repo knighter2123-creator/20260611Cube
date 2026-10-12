@@ -52,6 +52,18 @@ public static class CompanionGradeStyle
     }
 
     /// <summary>TMP 리치 텍스트용 "등급 이름에 색 입히기" — &lt;color=#RRGGBB&gt;전설&lt;/color&gt;</summary>
+    /// <remarks>
+    /// ★ 결과가 등급마다 항상 같으므로 처음 한 번만 만들고 재사용합니다.
+    ///   (예전에는 부를 때마다 색 → 16진수 변환 + 문자열 조립으로 새 문자열이 생겼습니다)
+    /// </remarks>
     public static string GetColoredName(CompanionGrade grade)
-        => $"<color=#{ColorUtility.ToHtmlStringRGB(GetColor(grade))}>{GetName(grade)}</color>";
+    {
+        if (ColoredNames.TryGetValue(grade, out string cached)) return cached;
+
+        string s = $"<color=#{ColorUtility.ToHtmlStringRGB(GetColor(grade))}>{GetName(grade)}</color>";
+        ColoredNames[grade] = s;
+        return s;
+    }
+
+    private static readonly System.Collections.Generic.Dictionary<CompanionGrade, string> ColoredNames = new();
 }

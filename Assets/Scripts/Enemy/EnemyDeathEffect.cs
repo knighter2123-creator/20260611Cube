@@ -231,11 +231,22 @@ public class EnemyDeathEffect : MonoBehaviour
         }
     }
 
-    // 연출 도중 강제로 비활성화되면(스테이지 초기화 등) 머티리얼을 복구하고 콜백을 흘려보냅니다.
-    // Enemy.ReturnToPool 쪽에 이중 반환 가드가 있어 안전합니다.
+    // 연출 도중 강제로 비활성화되면(씬 전환 등) 머티리얼만 복구하고 콜백은 버립니다.
+    //
+    // ★ 예전에는 여기서 Finish() 로 콜백(Enemy.ReturnToPool)까지 불렀습니다.
+    //   그러면 '꺼지는 중' 인 오브젝트에 ObjectPoolManager.Return 이 SetActive / SetParent 를 하게 되는데,
+    //   유니티는 활성화·비활성화 처리 도중의 계층 변경을 막고 에러를 냅니다
+    //   ("Cannot change GameObject hierarchy while activating or deactivating the parent").
+    //   씬 전환 때 죽는 중이던 적이 있으면 이 에러가 찍혔습니다.
+    //
+    //   사망 연출 중인 적은 이미 Enemy.Active 에서 빠져 있어 스테이지 정리가 건드리지 않으므로,
+    //   여기로 오는 경우는 사실상 씬 언로드(곧 파괴됨)뿐입니다. 풀로 돌려보낼 필요가 없습니다.
     private void OnDisable()
     {
         if (!IsPlaying && !swapped) return;
-        Finish();
+
+        IsPlaying = false;
+        pending   = null;
+        Restore();
     }
 }

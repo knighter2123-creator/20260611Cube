@@ -228,6 +228,12 @@ public class Bullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
+        // ★ 한 발이 한 적만 맞히게 합니다.
+        //   적 두 마리가 겹쳐 있으면 같은 물리 스텝에 OnTriggerEnter2D 가 연달아 불립니다.
+        //   첫 적에서 풀로 반환(비활성화)해도 그 스텝에 이미 잡힌 접촉은 계속 전달될 수 있어서,
+        //   이 가드가 없으면 총알 한 발이 겹친 적 모두에게 피해를 줍니다(의도치 않은 관통).
+        if (isReturned) return;
+
         if (!other.TryGetComponent(out Enemy target)) return;
         if (target.isDead) return;
 

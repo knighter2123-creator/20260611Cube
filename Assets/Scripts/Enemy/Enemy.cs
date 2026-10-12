@@ -130,11 +130,12 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         currentHealth = Mathf.Max(currentHealth - finalDamage, 0f);
         RefreshHpBar();
 
-        DamageTextPool.Instance?.ShowDamage(
-            transform.position,
-            Mathf.RoundToInt(finalDamage),
-            isCritical
-        );
+        // ★ ?. 대신 != null — DamageTextPool 은 씬 오브젝트이고 OnDestroy 에서 Instance 를 비우지 않습니다.
+        //   씬이 바뀌어 파괴된 뒤에도 Instance 에 '파괴된 객체' 가 남는데, ?. 는 그걸 null 로 보지 않아
+        //   ShowDamage 안에서 MissingReferenceException 이 납니다. (유니티식 == null 은 파괴됨도 걸러냄)
+        DamageTextPool damageText = DamageTextPool.Instance;
+        if (damageText != null)
+            damageText.ShowDamage(transform.position, Mathf.RoundToInt(finalDamage), isCritical);
 
         if (currentHealth <= 0)
             Die();
@@ -222,7 +223,11 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         hpBarController = null;
     }
 
-    private void RefreshHpBar() => hpBarController?.UpdateHp(currentHealth, maxHealth);
+    // HP 바는 적과 별개 오브젝트(HpBar 루트 아래)라 따로 파괴될 수 있어 유니티식 null 검사를 씁니다.
+    private void RefreshHpBar()
+    {
+        if (hpBarController != null) hpBarController.UpdateHp(currentHealth, maxHealth);
+    }
 
     private void SetCollidersEnabled(bool enabled)
     {

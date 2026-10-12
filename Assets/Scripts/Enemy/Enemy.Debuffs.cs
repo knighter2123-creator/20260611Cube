@@ -23,6 +23,7 @@ public partial class Enemy
     private Color          _originalColor;
 
     private static readonly Color SlowColor = new Color(0.3f, 0.6f, 1f);
+    private const float MinDotInterval = 0.05f;   // 독 피해 간격 하한 (초)
 
     /// <summary>Enemy.Awake에서 1회 호출 — 컴포넌트 캐싱 및 원본 색 보관</summary>
     private void CacheDebuffRefs()
@@ -92,6 +93,10 @@ public partial class Enemy
 
     private IEnumerator DotRoutine(float dotDamage, float dotInterval, float duration)
     {
+        // ★ 간격이 0 이하(스킬 에셋 입력 실수)면 elapsed 가 늘지 않아 매 프레임 피해를 '끝없이' 줍니다.
+        //   하한을 둬서 지속시간 안에 반드시 끝나게 합니다.
+        dotInterval = Mathf.Max(dotInterval, MinDotInterval);
+
         var   wait    = new WaitForSeconds(dotInterval);
         float elapsed = 0f;
 
