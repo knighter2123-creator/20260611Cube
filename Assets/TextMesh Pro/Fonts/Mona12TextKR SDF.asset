@@ -4457,6 +4457,36 @@ MonoBehaviour:
     m_Scale: 1
     m_AtlasIndex: 0
     m_ClassDefinitionType: 0
+  - m_Index: 28384
+    m_Metrics:
+      m_Width: 14.671875
+      m_Height: 14.65625
+      m_HorizontalBearingX: 0
+      m_HorizontalBearingY: 13.328125
+      m_HorizontalAdvance: 16
+    m_GlyphRect:
+      m_X: 17
+      m_Y: 617
+      m_Width: 15
+      m_Height: 16
+    m_Scale: 1
+    m_AtlasIndex: 0
+    m_ClassDefinitionType: 0
+  - m_Index: 31909
+    m_Metrics:
+      m_Width: 14.671875
+      m_Height: 14.65625
+      m_HorizontalBearingX: 0
+      m_HorizontalBearingY: 13.328125
+      m_HorizontalAdvance: 16
+    m_GlyphRect:
+      m_X: 17
+      m_Y: 634
+      m_Width: 15
+      m_Height: 16
+    m_Scale: 1
+    m_AtlasIndex: 0
+    m_ClassDefinitionType: 0
   m_CharacterTable:
   - m_ElementType: 1
     m_Unicode: 32
@@ -5617,6 +5647,14 @@ MonoBehaviour:
   - m_ElementType: 1
     m_Unicode: 49457
     m_GlyphIndex: 29689
+    m_Scale: 1
+  - m_ElementType: 1
+    m_Unicode: 48152
+    m_GlyphIndex: 28384
+    m_Scale: 1
+  - m_ElementType: 1
+    m_Unicode: 51677
+    m_GlyphIndex: 31909
     m_Scale: 1
   m_AtlasTextures:
   - {fileID: -3410448999634607474}
@@ -6781,6 +6819,14 @@ MonoBehaviour:
     m_Y: 599
     m_Width: 15
     m_Height: 17
+  - m_X: 16
+    m_Y: 616
+    m_Width: 16
+    m_Height: 17
+  - m_X: 16
+    m_Y: 633
+    m_Width: 16
+    m_Height: 17
   m_FreeGlyphRects:
   - m_X: 11
     m_Y: 31
@@ -7078,10 +7124,6 @@ MonoBehaviour:
     m_Y: 507
     m_Width: 1
     m_Height: 13
-  - m_X: 31
-    m_Y: 518
-    m_Width: 4064
-    m_Height: 3577
   - m_X: 39
     m_Y: 501
     m_Width: 4056
@@ -7334,10 +7376,18 @@ MonoBehaviour:
     m_Y: 665
     m_Width: 4080
     m_Height: 2
-  - m_X: 16
-    m_Y: 616
-    m_Width: 4079
-    m_Height: 34
+  - m_X: 31
+    m_Y: 518
+    m_Width: 4064
+    m_Height: 98
+  - m_X: 32
+    m_Y: 518
+    m_Width: 4063
+    m_Height: 3577
+  - m_X: 31
+    m_Y: 650
+    m_Width: 4064
+    m_Height: 3445
   m_FontFeatureTable:
     m_MultipleSubstitutionRecords: []
     m_LigatureSubstitutionRecords: []
