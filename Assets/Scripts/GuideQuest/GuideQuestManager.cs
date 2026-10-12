@@ -128,6 +128,13 @@ public partial class GuideQuestManager : MonoBehaviour
         AddProgress(count);
     }
 
+    /// <summary>
+    /// chapter-stage 를 클리어한 적이 있는가 (클리어한 최고 스테이지 기준).
+    /// 실패로 진행 위치가 한 단계 내려가도 기록은 유지되므로, 콘텐츠 개방 조건에 씁니다.
+    /// </summary>
+    public bool HasClearedStage(int chapter, int stage)
+        => highestChapter > chapter || (highestChapter == chapter && highestStage >= stage);
+
     /// <summary>스테이지 클리어 시 호출 (StageManager)</summary>
     public void ReportStageClear(int chapter, int stage)
     {

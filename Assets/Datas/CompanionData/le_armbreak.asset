@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: le_armbreak
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   id: le_armbreak
-  companionName: "\uD30C\uC1C4"
+  companionName: "\uC131\uAE30\uC0AC \uBC29\uD328"
   icon: {fileID: 21300000, guid: 93b24a9c34e5343cfa78e20fb833609a, type: 3}
   prefab: {fileID: 3391353107492281548, guid: 6d189d5237dff94418ffecce46d13865, type: 3}
   detectRange: 5

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: nm_explosion
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   id: nm_explosion
-  companionName: "\uD3ED\uBC1C"
+  companionName: "\uB098\uBB34 \uC9C0\uD321\uC774"
   icon: {fileID: 21300000, guid: 02ff976d39577774bb44b83610e61dec, type: 3}
   prefab: {fileID: 1645179444967808548, guid: 601c964f440887540ab2b3a478644c39, type: 3}
   detectRange: 5

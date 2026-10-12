@@ -13,6 +13,7 @@ using UnityEngine.UI;
 ///   - 소탕 — 클리어한 난이도는 던전에 들어가지 않고 바로 보상 (횟수 1회 차감)
 ///   - 입장 횟수 추가 — 확인 팝업 후 재화 차감 (던전마다 하루 최대 extraEntryCosts 길이만큼, 비용은 점점 증가)
 ///   - 입장 → 확인 팝업("현재 동료 배치로 시작할까요?") → 던전 씬 (횟수는 클리어 시에만 차감)
+///   - 개방 조건 — unlockWorld-unlockStage(기본 2-1) 클리어 전에는 입장/소탕/횟수 추가를 막고 lockedNoticeText 를 띄움
 ///
 /// 텍스트/버튼은 enterButton 과 confirmPopup 외에는 전부 선택입니다. 비우면 그 항목만 건너뜁니다.
 /// 던전이 1개뿐이면 선택 버튼은 비워 두어도 됩니다.
@@ -62,6 +63,13 @@ public class DailyDungeonEntry : MonoBehaviour
     [SerializeField] private Button          sweepButton;
     [SerializeField] private TextMeshProUGUI sweepButtonLabel;
 
+    [Header("개방 조건")]
+    [Tooltip("이 스테이지를 클리어해야 던전이 열립니다 (월드-스테이지)")]
+    [SerializeField] private int unlockWorld = 2;
+    [SerializeField] private int unlockStage = 1;
+    [Tooltip("잠겨 있을 때만 보이는 안내 문구 (선택). 입장 버튼 위에 둡니다.")]
+    [SerializeField] private TextMeshProUGUI lockedNoticeText;
+
     [Header("입장 횟수 추가 (선택)")]
     [SerializeField] private Button          buyEntryButton;
     [SerializeField] private TextMeshProUGUI buyEntryLabel;     // "횟수 +1 (보석 300)"
@@ -74,6 +82,8 @@ public class DailyDungeonEntry : MonoBehaviour
     [SerializeField] private string labelBuyMax   = "추가 횟수 소진";
     [SerializeField] private string labelSweep         = "소탕";
     [SerializeField] private string labelSweepLocked   = "클리어 후 소탕";
+    [Tooltip("잠겨 있을 때 안내 문구. {0} = 개방 월드, {1} = 개방 스테이지")]
+    [SerializeField] private string labelLocked = "스테이지 {0}-{1} 클리어 이후 개방됩니다.";
     [Tooltip("선택 버튼 아래 남은 횟수 문구. {0} = 남은 횟수, {1} = 하루 횟수")]
     [SerializeField] private string labelTabRemain = "{0}/{1}";
 
@@ -256,13 +266,20 @@ public class DailyDungeonEntry : MonoBehaviour
         int level     = CurrentLevel();
         int maxLevel  = DailyDungeonProgress.MaxUnlockedLevel(dungeon);
         int remaining = DailyDungeonProgress.RemainingEntries(dungeon);
-        bool canEnter = remaining > 0;
+        bool unlocked = IsUnlocked();
+        bool canEnter = unlocked && remaining > 0;
+
+        if (lockedNoticeText != null)
+        {
+            SetText(lockedNoticeText, string.Format(labelLocked, unlockWorld, unlockStage));
+            if (lockedNoticeText.gameObject.activeSelf == unlocked) lockedNoticeText.gameObject.SetActive(!unlocked);
+        }
 
         SetText(nameText,   dungeon.displayName);
         SetText(remainText, RemainSummary(dungeon));
         SetText(levelText,  $"난이도 {level}");
         SetText(rewardText, $"클리어 보상 : {dungeon.DescribeReward(level)}");
-        SetText(enterButtonLabel, canEnter ? labelEnter : labelNoEntry);
+        SetText(enterButtonLabel, !unlocked || remaining > 0 ? labelEnter : labelNoEntry);
 
         if (prevLevelButton != null) prevLevelButton.interactable = level > 1;
         if (nextLevelButton != null) nextLevelButton.interactable = level < maxLevel;
@@ -272,7 +289,23 @@ public class DailyDungeonEntry : MonoBehaviour
         SetText(sweepButtonLabel, sweepLevel > 0 ? $"{labelSweep} Lv.{sweepLevel}" : labelSweepLocked);
         if (sweepButton != null) sweepButton.interactable = sweepLevel > 0 && canEnter;
 
-        RefreshBuyEntry(dungeon);
+        RefreshBuyEntry(dungeon, unlocked);
+    }
+
+    // ── 개방 조건 ──────────────────────────────────
+
+    /// <summary>unlockWorld-unlockStage 를 클리어했는가.</summary>
+    private bool IsUnlocked()
+    {
+        // 클리어한 최고 스테이지 기록 (세이브됨 — 실패로 진행 위치가 내려가도 유지)
+        GuideQuestManager gq = GuideQuestManager.Instance;
+        if (gq != null && gq.HasClearedStage(unlockWorld, unlockStage)) return true;
+
+        // 기록이 없을 때 대비 (기록 도입 전 세이브 등) — 지금 위치가 개방 스테이지보다 뒤라면 클리어한 것
+        StageManager sm = StageManager.Instance;
+        if (sm == null) return false;
+        return sm.CurrentWorld > unlockWorld ||
+               (sm.CurrentWorld == unlockWorld && sm.CurrentStage > unlockStage);
     }
 
     // ── 소탕 ───────────────────────────────────────
@@ -291,7 +324,7 @@ public class DailyDungeonEntry : MonoBehaviour
         if (dungeon == null) return;
 
         int level = SweepLevel(dungeon, CurrentLevel());
-        if (!DailyDungeonProgress.CanSweep(dungeon, level))
+        if (!IsUnlocked() || !DailyDungeonProgress.CanSweep(dungeon, level))
         {
             Refresh();
             return;
@@ -320,7 +353,7 @@ public class DailyDungeonEntry : MonoBehaviour
                 $"소탕할 수 없습니다.\n(입장 횟수 또는 클리어 기록을 확인하세요)\n\n{RemainSummary(dungeon)}");
     }
 
-    private void RefreshBuyEntry(DailyDungeonData dungeon)
+    private void RefreshBuyEntry(DailyDungeonData dungeon, bool unlocked)
     {
         int cost = DailyDungeonProgress.NextPurchaseCost(dungeon);
         bool canBuy = cost >= 0;
@@ -330,9 +363,9 @@ public class DailyDungeonEntry : MonoBehaviour
                             DailyDungeonProgress.PurchasedToday(dungeon), dungeon.MaxExtraEntries)
             : labelBuyMax);
 
-        // 재화가 부족해도 버튼은 켜 둡니다 — 누르면 부족 알림을 띄웁니다 (OnBuyEntryClicked). 끄는 건 하루 최대 횟수를 다 썼을 때만.
+        // 재화가 부족해도 버튼은 켜 둡니다 — 누르면 부족 알림을 띄웁니다 (OnBuyEntryClicked). 끄는 건 하루 최대 횟수를 다 썼거나 잠겨 있을 때만.
         if (buyEntryButton != null)
-            buyEntryButton.interactable = canBuy;
+            buyEntryButton.interactable = canBuy && unlocked;
     }
 
     // ── 횟수 추가 ──────────────────────────────────
@@ -344,7 +377,7 @@ public class DailyDungeonEntry : MonoBehaviour
         if (dungeon == null) return;
 
         int cost = DailyDungeonProgress.NextPurchaseCost(dungeon);
-        if (cost < 0)
+        if (cost < 0 || !IsUnlocked())
         {
             Refresh();
             return;
@@ -408,7 +441,7 @@ public class DailyDungeonEntry : MonoBehaviour
         DailyDungeonData dungeon = Selected;
         if (dungeon == null) return;
 
-        if (DailyDungeonProgress.RemainingEntries(dungeon) <= 0)
+        if (!IsUnlocked() || DailyDungeonProgress.RemainingEntries(dungeon) <= 0)
         {
             Refresh();
             return;
@@ -440,7 +473,8 @@ public class DailyDungeonEntry : MonoBehaviour
     {
         // 팝업이 떠 있는 사이 상태가 바뀌었을 수 있으니 확인을 누른 시점에 다시 판정합니다.
         // 횟수는 여기서 차감하지 않습니다 — 클리어했을 때만 DailyDungeonManager 가 차감합니다.
-        if (!DailyDungeonProgress.IsLevelUnlocked(dungeon, level) ||
+        if (!IsUnlocked() ||
+            !DailyDungeonProgress.IsLevelUnlocked(dungeon, level) ||
             DailyDungeonProgress.RemainingEntries(dungeon) <= 0)
         {
             Debug.Log($"[일일 던전] 입장 거부 — {dungeon.id} Lv.{level}");

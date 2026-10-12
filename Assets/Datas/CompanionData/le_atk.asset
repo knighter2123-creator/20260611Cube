@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: le_atk
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   id: le_atk
-  companionName: "\uC804\uC124 \uACF5\uACA9"
+  companionName: "\uC21C\uAE08 \uB3C4\uAC80"
   icon: {fileID: 21300000, guid: 90e99a7fde056a4418b9fe16084adb5c, type: 3}
   prefab: {fileID: 3391353107492281548, guid: 00f9fe8474bc47644ac179b9207cdbbc, type: 3}
   detectRange: 5

@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: nm_atk
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   id: nm_atk
-  companionName: "\uACF5\uACA9"
-  icon: {fileID: 21300000, guid: 95052c6b62fb3de4695beaa99f842ac2, type: 3}
+  companionName: "\uBAA9\uAC80"
+  icon: {fileID: 21300000, guid: 2ddf0348701148a4d8a7c6a0f7f146b3, type: 3}
   prefab: {fileID: 5725842826671454127, guid: 829ae7959aec9a6439995d5ccd3a6c10, type: 3}
   detectRange: 5
   grade: 0

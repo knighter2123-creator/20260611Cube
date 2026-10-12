@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: ra_stun
   m_EditorClassIdentifier: Assembly-CSharp::CompanionData
   id: ra_stun
-  companionName: "\uB808\uC5B4 \uC2A4\uD134"
-  icon: {fileID: 21300000, guid: 7b8e0222a006d824e930445c7d435ac3, type: 3}
-  prefab: {fileID: 5725842826671454127, guid: e21dab67891cefe49ac4a818319c83ff, type: 3}
+  companionName: "\uC740 \uB9DD\uCE58"
+  icon: {fileID: 21300000, guid: 79c0aa3aecde44b08e1d81c0c79b21ce, type: 3}
+  prefab: {fileID: 5725842826671454127, guid: 6d5f0fc73c3b4b21ab5b903ff080a669, type: 3}
   detectRange: 4
   grade: 1
   ownedSkill: {fileID: 11400000, guid: fc2927c3b2f65c9448aa8e6a36e68126, type: 2}
