@@ -68,6 +68,6 @@ public partial class GuideQuestManager
             isLoading = false;   // 예외가 나도 반드시 해제
         }
 
-        Debug.Log($"[GuideQuest] 복원 완료 — {currentStep + 1}단계 / 진행 {progress}");
+        GameLog.Info($"[GuideQuest] 복원 완료 — {currentStep + 1}단계 / 진행 {progress}");
     }
 }

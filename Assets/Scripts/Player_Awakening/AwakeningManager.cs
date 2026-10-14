@@ -172,7 +172,7 @@ public class AwakeningManager : MonoBehaviour
     public void ReportEvolveCleared(string stageId)
     {
         if (verboseLog)
-            Debug.Log($"[각성] 클리어 보고 수신 — {stageId ?? "(id 없음)"}");
+            GameLog.Info($"[각성] 클리어 보고 수신 — {stageId ?? "(id 없음)"}");
 
         Refresh();
     }
@@ -233,7 +233,7 @@ public class AwakeningManager : MonoBehaviour
         if (!changed) return;
 
         if (verboseLog)
-            Debug.Log($"[각성] 갱신 — {Level}단계 / 발사체 {ProjectilesPerVolley}발 " +
+            GameLog.Info($"[각성] 갱신 — {Level}단계 / 발사체 {ProjectilesPerVolley}발 " +
                       $"× 연사 {VolleysPerAttack}회 = 공격당 {ProjectilesPerVolley * VolleysPerAttack}발");
 
         OnChanged?.Invoke();

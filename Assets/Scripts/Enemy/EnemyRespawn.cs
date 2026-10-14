@@ -98,7 +98,7 @@ public class EnemyRespawn : MonoBehaviour
         if (respawnCoroutine != null) StopCoroutine(respawnCoroutine);
         respawnCoroutine = StartCoroutine(RespawnLoop());
 
-        Debug.Log($"[EnemyRespawn] {world}-{stage} 시작 — 프리팹: {currentEnemyPrefab?.name} " +
+        GameLog.Info($"[EnemyRespawn] {world}-{stage} 시작 — 프리팹: {currentEnemyPrefab?.name} " +
                   $"/ 스탯 x{statMultiplier:F3} / 속도 x{currentSpeedMult:F2} / 주기 {currentDelay:F2}s " +
                   $"/ 동시 생성 {SpawnCount}마리");
     }
@@ -162,7 +162,7 @@ public class EnemyRespawn : MonoBehaviour
 
         // 보스는 항상 정확히 waypoint 위치에서 등장 (오프셋 없음)
         Spawn(currentBossPrefab, Vector2.zero);
-        Debug.Log("[EnemyRespawn] 보스 소환!");
+        GameLog.Info("[EnemyRespawn] 보스 소환!");
     }
 
     /// <summary>

@@ -40,7 +40,7 @@ public partial class MissionManager : MonoBehaviour
         var mm = GetMasterMission(type);
         if (mm != null) masterClaimedMap[mm.id] = false;
 
-        Debug.Log($"[MissionManager] {type} 미션 초기화 완료");
+        GameLog.Info($"[MissionManager] {type} 미션 초기화 완료");
     }
 
     // 가장 최근의 오전 6시 (그 전이면 어제 6시). 일일 던전 초기화도 이 계산을 공유합니다.

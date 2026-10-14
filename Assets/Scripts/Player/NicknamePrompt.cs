@@ -223,7 +223,7 @@ public class NicknamePrompt : MonoBehaviour
         if (!ShouldPrompt()) yield break;
 
         MarkPromptShown();
-        Debug.Log($"[NicknamePrompt] {lastWorld}-{lastStage} 도달, 이름 없음 → 닉네임 설정 팝업 (자동 팝업은 이번 1회)");
+        GameLog.Info($"[NicknamePrompt] {lastWorld}-{lastStage} 도달, 이름 없음 → 닉네임 설정 팝업 (자동 팝업은 이번 1회)");
         panel.Open();
     }
 }

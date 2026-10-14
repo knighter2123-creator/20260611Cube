@@ -171,7 +171,7 @@ public partial class AugmentManager : MonoBehaviour
         // 화면에 보이는 장수와 실제로 뽑은 장수가 다르면 UI 쪽 문제입니다.
         // 이 로그가 있으면 "코드가 몇 장을 준 건지"를 즉시 구분할 수 있습니다.
         if (logEnabled)
-            Debug.Log($"[Augment] 카드 {picks.Count}장 표시 (요청 {cardCount}장) — {currentWorld}-{currentStage}");
+            GameLog.Info($"[Augment] 카드 {picks.Count}장 표시 (요청 {cardCount}장) — {currentWorld}-{currentStage}");
 
         ui.Show(picks, OnCardChosen);
     }
@@ -194,7 +194,7 @@ public partial class AugmentManager : MonoBehaviour
         }
 
         if (logEnabled)
-            Debug.Log($"[Augment] 선택: {card.DisplayName} / 공격력 x{attackMultiplier:0.##}, " +
+            GameLog.Info($"[Augment] 선택: {card.DisplayName} / 공격력 x{attackMultiplier:0.##}, " +
                       $"치명타 +{critDamageBonus * 100f:0.#}%p");
     }
 

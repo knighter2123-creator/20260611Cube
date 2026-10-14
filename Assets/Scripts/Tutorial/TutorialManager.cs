@@ -148,7 +148,7 @@ public partial class TutorialManager : MonoBehaviour
         fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;     // 가로 폭은 인스펙터 값 유지 (자동 줄바꿈 기준)
         fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;     // 세로는 줄 수에 맞춤
 
-        Debug.Log("[Tutorial] Message Box 가 텍스트라서 ContentSizeFitter(세로 Preferred)를 자동으로 붙였습니다. " +
+        GameLog.Info("[Tutorial] Message Box 가 텍스트라서 ContentSizeFitter(세로 Preferred)를 자동으로 붙였습니다. " +
                   "에디터에서 직접 붙여 두면 이 로그는 사라집니다.", messageBox);
     }
 
@@ -220,7 +220,7 @@ public partial class TutorialManager : MonoBehaviour
     public void Skip()
     {
         if (!running) return;
-        Debug.Log($"[Tutorial] 스킵 ({index + 1}/{steps.Count} 단계에서)");
+        GameLog.Info($"[Tutorial] 스킵 ({index + 1}/{steps.Count} 단계에서)");
         Finish();
     }
 

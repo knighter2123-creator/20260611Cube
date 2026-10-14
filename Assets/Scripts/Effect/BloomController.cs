@@ -242,7 +242,7 @@ public class BloomController : MonoBehaviour
         userScale = Mathf.Clamp01(PlayerPrefs.GetFloat(PrefsIntensityKey, def));
 
         if (logSettingChanges)
-            Debug.Log($"[Bloom] 설정 로드 — 토글 {userEnabled}, 강도 {userScale:0.00}, " +
+            GameLog.Info($"[Bloom] 설정 로드 — 토글 {userEnabled}, 강도 {userScale:0.00}, " +
                       $"기본값 {def:0.00}, ready {ready}", this);
     }
 
@@ -405,7 +405,7 @@ public class BloomController : MonoBehaviour
                 if (ready)
                 {
                     resolveFailLogged = false;
-                    Debug.Log("[Bloom] Volume 을 뒤늦게 찾았습니다. 정상 동작합니다.", this);
+                    GameLog.Info("[Bloom] Volume 을 뒤늦게 찾았습니다. 정상 동작합니다.", this);
                     ApplyImmediate(alwaysOn ? TargetIntensity : 0f);
                 }
             }
@@ -442,7 +442,7 @@ public class BloomController : MonoBehaviour
     {
         if (!logSettingChanges) return;
 
-        Debug.Log($"[Bloom] {what} — 토글 {userEnabled}, 강도 {userScale:0.00}, " +
+        GameLog.Info($"[Bloom] {what} — 토글 {userEnabled}, 강도 {userScale:0.00}, " +
                   $"UserEnabled {UserEnabled}, 적용 Intensity {TargetIntensity:0.00}, " +
                   $"ready {ready}" +
                   (ready ? "" : "  ← Volume 을 못 잡아 화면에는 반영되지 않습니다"), this);

@@ -327,12 +327,12 @@ public class EvolveStageEntry : MonoBehaviour, ITabPage
         EntryState state = Evaluate(out EvolveStageData target);
         if (state != EntryState.Unlocked)
         {
-            Debug.Log($"[진화 입장] 입장 거부 — 상태 {state} / 내 레벨 Lv.{PlayerLevel}");
+            GameLog.Info($"[진화 입장] 입장 거부 — 상태 {state} / 내 레벨 Lv.{PlayerLevel}");
             RefreshLockState(force: true);
             return;
         }
 
-        Debug.Log($"[진화 입장] 입장 — {target.displayName} (id: {target.id}, " +
+        GameLog.Info($"[진화 입장] 입장 — {target.displayName} (id: {target.id}, " +
                   $"요구 Lv.{target.requiredLevel} / 내 레벨 Lv.{PlayerLevel})");
 
         // ★ 씬을 넘기기 전에 창을 닫습니다.

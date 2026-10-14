@@ -200,12 +200,12 @@ public class AuthManager : MonoBehaviour
 
             // 자동 로그인: 전에 로그인했다면 앱을 다시 켜도 CurrentUser 가 채워져 있다.
             if (IsSignedIn)
-                Debug.Log($"[Auth] 이전 로그인 복원. UID: {Uid}");
+                GameLog.Info($"[Auth] 이전 로그인 복원. UID: {Uid}");
             else
-                Debug.Log("[Auth] Firebase 준비 완료 (로그인 안 됨)");
+                GameLog.Info("[Auth] Firebase 준비 완료 (로그인 안 됨)");
 
             if (!IsGoogleSignInSupported)
-                Debug.Log($"[Auth] 이 플랫폼({Application.platform})에서는 구글 로그인 버튼이 비활성화됩니다.");
+                GameLog.Info($"[Auth] 이 플랫폼({Application.platform})에서는 구글 로그인 버튼이 비활성화됩니다.");
 
             Notify();
         });
@@ -281,7 +281,7 @@ public class AuthManager : MonoBehaviour
 
         if (task.IsCanceled)
         {
-            Debug.Log("[Auth] 사용자가 구글 로그인을 취소했습니다.");
+            GameLog.Info("[Auth] 사용자가 구글 로그인을 취소했습니다.");
             SetSigningIn(false);
             return;
         }
@@ -322,7 +322,7 @@ public class AuthManager : MonoBehaviour
             if (e is GoogleSignIn.SignInException signInError)
             {
                 if (signInError.Status == GoogleSignInStatusCode.Canceled)
-                    Debug.Log("[Auth] 사용자가 구글 로그인을 취소했습니다.");
+                    GameLog.Info("[Auth] 사용자가 구글 로그인을 취소했습니다.");
                 else
                     Debug.LogError($"[Auth] 구글 로그인 실패: {signInError.Status} / {signInError.Message}");
             }
@@ -358,7 +358,7 @@ public class AuthManager : MonoBehaviour
 
             // 반환 타입(FirebaseUser / AuthResult)이 SDK 버전마다 달라서 결과 대신 CurrentUser 를 읽는다.
             if (IsSignedIn)
-                Debug.Log($"[Auth] 로그인 완료. UID: {Uid}, 이름: {DisplayName}");
+                GameLog.Info($"[Auth] 로그인 완료. UID: {Uid}, 이름: {DisplayName}");
             else
                 Debug.LogError("[Auth] 로그인은 끝났는데 CurrentUser 가 없습니다.");
 
@@ -473,7 +473,7 @@ public class AuthManager : MonoBehaviour
         }
 
         if (IsSignedIn)
-            Debug.Log($"[Auth] 이메일 {actionName} 완료. UID: {Uid}");
+            GameLog.Info($"[Auth] 이메일 {actionName} 완료. UID: {Uid}");
         else
             Debug.LogError($"[Auth] 이메일 {actionName}은(는) 끝났는데 CurrentUser 가 없습니다.");
 
@@ -559,7 +559,7 @@ public class AuthManager : MonoBehaviour
             }
         }
 
-        Debug.Log("[Auth] 로그아웃");
+        GameLog.Info("[Auth] 로그아웃");
         LastError = null;   // 로그아웃하면 이전 실패 문구도 지움
         SetSigningIn(false);   // Notify → 로그인 화면 UI 들이 '로그인 전' 상태로 돌아감
     }

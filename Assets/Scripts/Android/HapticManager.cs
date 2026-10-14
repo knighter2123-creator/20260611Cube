@@ -179,7 +179,7 @@ public partial class HapticManager : MonoBehaviour
 
             InitVibrationAttributes();
 
-            Debug.Log($"[Haptic] 초기화 완료 - API {apiLevel}, 진동 지원 {IsSupported}, " +
+            GameLog.Info($"[Haptic] 초기화 완료 - API {apiLevel}, 진동 지원 {IsSupported}, " +
                       $"권한 {hasPermission}, 세기 제어 {hasAmplitudeControl}, " +
                       $"용도 표시 {touchAttributes != null}");
         }
@@ -201,7 +201,7 @@ public partial class HapticManager : MonoBehaviour
         // ★ 에디터에서도 초기화 사실을 남긴다.
         //   이 줄이 없으면 "HapticManager 가 씬에 있긴 한가?"를 에디터에서 확인할 방법이 없다.
         //   실기기 분기에는 초기화 로그가 있는데 에디터 분기에만 없어서 생긴 사각지대였다.
-        Debug.Log($"[Haptic] (에디터) 초기화 — 실제 진동은 불가, UI 상 지원 {IsSupported}", this);
+        GameLog.Info($"[Haptic] (에디터) 초기화 — 실제 진동은 불가, UI 상 지원 {IsSupported}", this);
 #else
         // iOS / PC — 진동 없음.
         IsSupported = false;
@@ -306,7 +306,7 @@ public partial class HapticManager : MonoBehaviour
             }
 
             if (logBlockedCalls)
-                Debug.Log($"[Haptic] 진동 실행 — {durationMs}ms / 세기 {amp}");
+                GameLog.Info($"[Haptic] 진동 실행 — {durationMs}ms / 세기 {amp}");
         }
         catch (System.Exception e)
         {
@@ -314,7 +314,7 @@ public partial class HapticManager : MonoBehaviour
         }
 #elif UNITY_EDITOR
         // 에디터에서는 진동 대신 로그만. (PC 빌드에는 들어가지 않습니다)
-        Debug.Log($"[Haptic] (에디터) 진동 {durationMs}ms / 세기 {amplitude}");
+        GameLog.Info($"[Haptic] (에디터) 진동 {durationMs}ms / 세기 {amplitude}");
 #endif
     }
 
@@ -374,7 +374,7 @@ public partial class HapticManager : MonoBehaviour
             Debug.LogWarning($"[Haptic] 패턴 진동 실패: {e.Message}");
         }
 #else
-        Debug.Log($"[Haptic] (에디터) 패턴 진동 {timingsMs.Length}단계");
+        GameLog.Info($"[Haptic] (에디터) 패턴 진동 {timingsMs.Length}단계");
 #endif
     }
 

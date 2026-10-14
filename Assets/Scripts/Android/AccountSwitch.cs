@@ -71,7 +71,7 @@ public static class AccountSwitch
         string current = SaveManager.ActiveAccountId;
         if (target == current) return StartResult.Proceed;   // ① 같은 계정
 
-        Debug.Log($"[AccountSwitch] 계정 변경 감지: {Label(current)} → {Label(target)}");
+        GameLog.Info($"[AccountSwitch] 계정 변경 감지: {Label(current)} → {Label(target)}");
 
         // 지금 계정의 진행을 먼저 파일에 확정 (로그인 화면으로 돌아온 경우 마지막 플레이분)
         // 게임 씬에 들어간 적이 없으면 Save() 가 알아서 무시합니다 (매니저 ApplyFrom 전 — '게임 시작 전 저장 차단')
@@ -84,7 +84,7 @@ public static class AccountSwitch
             {
                 AugmentManager.MoveSavesBetweenAccounts(current, target);
                 SaveManager.SetActiveAccount(target);
-                Debug.Log("[AccountSwitch] 게스트 진행을 이 계정으로 옮겼습니다 (재시작 없음 — 메모리와 파일 내용이 같음).");
+                GameLog.Info("[AccountSwitch] 게스트 진행을 이 계정으로 옮겼습니다 (재시작 없음 — 메모리와 파일 내용이 같음).");
                 return StartResult.Proceed;
             }
 

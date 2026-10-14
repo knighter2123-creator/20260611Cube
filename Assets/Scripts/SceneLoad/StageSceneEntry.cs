@@ -14,7 +14,9 @@ public class StageSceneEntry : MonoBehaviour
         // ★ 최초 1회만 시각 세팅 (이미 값이 있으면 아무것도 안 함 → 경과 누적 유지)
         IdleRewardManager.Instance?.EnsureInitialized();
 
-        // 쌓인 보상이 있으면 팝업이 열리고, 없으면 내부에서 스스로 닫힘
-        idlePopup?.Open();
+        // 쌓인 보상이 있으면 팝업이 열리고, 없으면 열지 않음
+        // 이전: idlePopup?.Open() — 수동 열기용 Open()을 불러 받을 게 없어도 매번 빈 팝업이 떴다.
+        //       또 ?.는 유니티 오브젝트의 "가짜 null"(인스펙터 미연결)을 걸러내지 못해 != null로 바꿨다.
+        if (idlePopup != null) idlePopup.OpenOnAppStart();
     }
 }

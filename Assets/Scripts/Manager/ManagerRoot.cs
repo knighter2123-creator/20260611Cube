@@ -26,7 +26,7 @@ public class ManagerRoot : MonoBehaviour
         if (Instance != null && Instance != this)
         {
             if (logLifecycle)
-                Debug.Log($"[ManagerRoot] 중복 루트 제거 — 씬 '{gameObject.scene.name}' 의 '{name}'. " +
+                GameLog.Info($"[ManagerRoot] 중복 루트 제거 — 씬 '{gameObject.scene.name}' 의 '{name}'. " +
                           $"기존 루트를 유지합니다.", this);
 
             // ★★ 여기가 이번 수정의 핵심이다 ★★
@@ -61,7 +61,7 @@ public class ManagerRoot : MonoBehaviour
         DontDestroyOnLoad(gameObject);   // 부모째로 유지 → 자식 매니저 전부 유지
 
         if (logLifecycle)
-            Debug.Log($"[ManagerRoot] 루트 등록 — id={GetInstanceID()}, " +
+            GameLog.Info($"[ManagerRoot] 루트 등록 — id={GetInstanceID()}, " +
                       $"자식 {transform.childCount}개, 씬 '{gameObject.scene.name}'", this);
     }
 

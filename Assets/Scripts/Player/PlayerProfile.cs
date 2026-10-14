@@ -120,7 +120,7 @@ public static class PlayerProfile
 
         RegisterSave();
 
-        Debug.Log($"[PlayerProfile] 이름 등록 완료: {cleaned}");
+        GameLog.Info($"[PlayerProfile] 이름 등록 완료: {cleaned}");
         OnNameRegistered?.Invoke(cleaned);
         return true;
     }
@@ -186,7 +186,7 @@ public static class PlayerProfile
         data.playerName = cleaned;
         SaveManager.Instance.Save();   // 위 설명대로 TryRegister 의 Persist() 가 아니라 전체 Save() 사용
 
-        Debug.Log($"[PlayerProfile] 이름 변경 완료: {cleaned} (보석 -{CHANGE_NAME_GEM_COST})");
+        GameLog.Info($"[PlayerProfile] 이름 변경 완료: {cleaned} (보석 -{CHANGE_NAME_GEM_COST})");
         OnNameChanged?.Invoke(cleaned);
         return true;
     }
@@ -246,7 +246,7 @@ public static class PlayerProfile
         if (sm.HasSave())
             sm.WriteCurrentToDisk();   // 기존 유저: 디스크 내용 + 이름만 바뀐 상태로 기록
         else
-            Debug.Log("[PlayerProfile] 첫 실행 — 이름은 첫 저장 때 함께 기록됩니다.");
+            GameLog.Info("[PlayerProfile] 첫 실행 — 이름은 첫 저장 때 함께 기록됩니다.");
     }
 
     // ───────── 예전 PlayerPrefs 이름 이관 (1회성) ─────────
@@ -268,7 +268,7 @@ public static class PlayerProfile
         {
             Data.playerName = cleaned;
             Persist();
-            Debug.Log($"[PlayerProfile] 예전 이름 이관: {cleaned}");
+            GameLog.Info($"[PlayerProfile] 예전 이름 이관: {cleaned}");
 
             // 세이브 파일이 없으면 Persist() 가 파일에 쓰지 않았으므로 이름은 아직 메모리(Current)에만 있습니다.
             // 이때 키를 지웠는데 첫 저장 전에 앱이 꺼지면 옛 이름이 영영 사라집니다.
@@ -278,7 +278,7 @@ public static class PlayerProfile
         }
         else
         {
-            Debug.Log($"[PlayerProfile] 예전 이름 이관 안 함 (값: '{legacy}', 이미 이름 있음={HasName})");
+            GameLog.Info($"[PlayerProfile] 예전 이름 이관 안 함 (값: '{legacy}', 이미 이름 있음={HasName})");
         }
 
         PlayerPrefs.DeleteKey(LEGACY_PREFS_KEY);

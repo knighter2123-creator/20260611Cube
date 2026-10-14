@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -5,19 +6,6 @@ using TMPro;
 /// <summary>
 /// 오프라인 보상 팝업. 경과 시간 + 골드/exp 미리보기를 표시하고,
 /// 수령 / 2배 수령 / 닫기를 처리한다.
-///
-/// ★ 이번 수정 (CS0414 경고 해결)
-///   ① statusText 를 추가하고 claimableMessage / fullMessage 를 실제로 사용
-///      → "값을 넣기만 하고 읽는 곳이 없다"는 경고가 사라지고, 기능도 완성됩니다
-///   ② 누적 상한에 도달했는지 판정 → 상한이면 fullMessage 표시
-///   ③ Awake 의 버튼 등록에 null 검사 추가 (아래 설명 참고)
-///
-/// ⚠️ 파일 이름 확인 (여전히 남아 있는 문제)
-///   클래스 이름은 IdleRewardPopup 인데 파일 이름이 IdleRewardPopUp.cs 입니다(대문자 U).
-///   윈도우는 파일 이름 대소문자를 구분하지 않아서 지금은 동작하지만,
-///   맥/리눅스 빌드 머신이나 일부 유니티 버전에서는 컴포넌트를 못 찾습니다.
-///   고치실 때는 **반드시 유니티 Project 창에서 이름을 바꾸세요.**
-///   탐색기에서 바꾸면 .meta 파일이 따라오지 않아 씬의 연결이 끊어집니다.
 /// </summary>
 public class IdleRewardPopup : MonoBehaviour
 {
@@ -30,7 +18,7 @@ public class IdleRewardPopup : MonoBehaviour
     [SerializeField] private TMP_Text expText;         // "+6,200"
 
     [Tooltip("상태 문구를 띄울 텍스트. 비워두면 문구를 표시하지 않습니다")]
-    [SerializeField] private TMP_Text statusText;      // "오프라인 보상 최대" ★ 신규
+    [SerializeField] private TMP_Text statusText;      // "오프라인 보상 최대"
 
     [Header("버튼")]
     [SerializeField] private Button claimButton;       // 보상 수령
@@ -48,12 +36,7 @@ public class IdleRewardPopup : MonoBehaviour
 
     void Awake()
     {
-        // ★ null 검사를 넣은 이유
-        //   아래 RefreshClaimButtons() 는 claimButton 이 null 일 수 있다고 보고 검사하는데,
-        //   여기서는 무방비로 .onClick 을 불렀습니다. 같은 파일 안에서 같은 필드에 대한
-        //   가정이 두 가지면 반드시 한쪽이 틀립니다.
-        //   실제로 인스펙터 연결을 하나 빠뜨리면 Awake 에서 NullReferenceException 이 터지고,
-        //   그 순간 이 컴포넌트의 나머지 초기화가 통째로 중단됩니다.
+        // 인스펙터 연결을 빠뜨려도 Awake가 중간에 죽지 않게 null 검사
         if (claimButton   != null) claimButton.onClick.AddListener(OnClaim);
         if (claim2xButton != null) claim2xButton.onClick.AddListener(OnClaim2x);
         if (closeButton   != null) closeButton.onClick.AddListener(Close);
@@ -65,106 +48,65 @@ public class IdleRewardPopup : MonoBehaviour
     //  열기
     // ──────────────────────────────────────────────
 
-    /// <summary>
-    /// 사용자가 버튼을 눌러 여는 경우. 받을 게 없어도 팝업은 열립니다.
-    ///
-    /// 버튼 OnClick에는 이 함수를 연결하세요.
-    /// </summary>
+    /// <summary>사용자가 버튼을 눌러 여는 경우. 받을 게 없어도 팝업은 열린다.</summary>
     public void Open() => Open(isAutoOpen: false);
 
-    /// <summary>
-    /// 앱 시작 시 자동으로 여는 경우. 받을 게 없으면 조용히 닫습니다.
-    /// </summary>
+    /// <summary>앱 시작 시 자동으로 여는 경우. 받을 게 없으면 열지 않는다.</summary>
     public void OpenOnAppStart() => Open(isAutoOpen: true);
 
-    /// <summary>
-    /// ─── bool 매개변수 대신 이름 있는 함수 두 개를 둔 이유 (학습 포인트) ────
-    /// 호출부에서 Open(true) 라고 적혀 있으면, 나중에 읽을 때
-    /// "true가 뭐였지?" 하고 이 파일을 다시 열어봐야 합니다.
-    /// OpenOnAppStart() 라고 적혀 있으면 그럴 필요가 없죠.
-    ///
-    /// 실제 로직은 private 함수 하나에 모아두고, 겉으로 드러나는 입구만
-    /// 의미 있는 이름으로 두 개 만드는 방식입니다. 코드 중복 없이 읽기만 좋아집니다.
-    /// ────────────────────────────────────────────────────────────────
-    /// </summary>
     private void Open(bool isAutoOpen)
     {
-        if (IdleRewardManager.Instance == null)
+        var manager = IdleRewardManager.Instance;
+        if (manager == null)
         {
             Debug.LogWarning("[IdlePopup] IdleRewardManager가 없습니다.");
             return;
         }
 
-        var (gold, exp, sec) = IdleRewardManager.Instance.Preview();
-        IdleRewardState state = IdleRewardStatus.Evaluate(gold, exp, sec);
-        bool canClaim = IdleRewardStatus.CanClaim(state);
+        // 이전: Preview() 튜플을 받아 여기서 다시 상태를 판정했다. 이제 판정된 결과를 받기만 한다.
+        IdleRewardPreview preview = manager.Preview();
 
-        Debug.Log($"[IdlePopup] Open({(isAutoOpen ? "자동" : "수동")}) | " +
-                  $"경과 {sec:F0}초, 골드 {gold}, exp {exp}, 상태 {state}");
+        GameLog.Info($"[IdlePopup] Open({(isAutoOpen ? "자동" : "수동")}) | " +
+                  $"경과 {preview.Seconds:F0}초, 골드 {preview.Gold:F0}, exp {preview.Exp:F0}, 상태 {preview.State}");
 
-        // 자동 열기인데 받을 게 없으면 조용히 닫는다 (앱 켤 때마다 빈 팝업이 뜨면 성가심)
-        if (isAutoOpen && !canClaim)
+        // 자동 열기인데 받을 게 없으면 열지 않는다 (앱 켤 때마다 빈 팝업이 뜨면 성가심)
+        if (isAutoOpen && !preview.CanClaim)
         {
             Close();
             return;
         }
 
-        // ── 표시 채우기 ──
-        SetText(elapsedText, canClaim ? FormatElapsed(sec) : emptyElapsedMessage);
+        // 이전: ① 받을 게 없을 때도 쌓인 금액(+37 등)을 보여줘 "아직 모인 보상이 없어요"와 어긋났고,
+        //       ② 자르기 전 double 값을 보여줘 고스테이지에서 실제 지급액(int 상한)보다 큰 숫자가 떴다.
+        int gold = preview.CanClaim ? IdleRewardManager.ToIntClamped(preview.Gold) : 0;
+        int exp  = preview.CanClaim ? IdleRewardManager.ToIntClamped(preview.Exp)  : 0;
+
+        SetText(elapsedText, preview.CanClaim ? FormatElapsed(preview.Seconds) : emptyElapsedMessage);
         SetText(goldText, $"+{gold:N0}");
         SetText(expText,  $"+{exp:N0}");
 
-        RefreshStatusText(canClaim, sec);   // ★ 신규
-        RefreshClaimButtons(canClaim);
+        RefreshStatusText(preview.State);
+        RefreshClaimButtons(preview.CanClaim);
 
         if (root != null) root.SetActive(true);
     }
 
-    // ──────────────────────────────────────────────
-    //  ★ 상태 문구 — claimableMessage / fullMessage 를 쓰는 곳
-    // ──────────────────────────────────────────────
-
-    /// <summary>
-    /// 상단 상태 문구를 갱신합니다.
-    ///
-    /// ─── 왜 이 문구가 필요한가 (학습 포인트) ─────────────────────────
-    /// IdleRewardManager.GetElapsedSeconds() 는 경과 시간을 최대 누적 시간으로
-    /// **잘라서** 돌려줍니다.
-    ///
-    ///     return Math.Min(seconds, MaxAccrualSeconds);
-    ///
-    /// 그래서 3일을 비워도 팝업에는 "24시간 동안 자리를 비웠어요" 라고 뜹니다.
-    /// 값 자체는 맞습니다 — 실제로 정산되는 시간이 24시간이니까요.
-    /// 하지만 플레이어 입장에서는 "내가 3일을 비웠는데 왜 24시간이지?" 가 됩니다.
-    ///
-    /// "최대" 라고 한 줄 알려주면 오해가 사라지고, 동시에
-    /// **더 자주 접속할 이유**가 생깁니다. 방치형에서 상한은 숨기는 게 아니라
-    /// 보여줘야 하는 정보예요.
-    ///
-    /// ─── 판정을 왜 매니저에게 물어보는가 ────────────────────────────
-    /// 여기에 24를 직접 적어두면, 인스펙터에서 maxAccrualHours 를 12로 바꿨을 때
-    /// UI 는 여전히 24를 기준으로 판단합니다. 에러도 로그도 안 나는 종류의 버그죠.
-    /// IdleRewardManager 가 MaxAccrualSeconds 프로퍼티를 열어둔 게 정확히 이 용도입니다.
-    /// ──────────────────────────────────────────────────────────────
-    /// </summary>
-    private void RefreshStatusText(bool canClaim, double seconds)
+    private void RefreshStatusText(IdleRewardState state)
     {
-        if (statusText == null) return;   // 안 쓰기로 했으면 비워두면 됩니다
+        if (statusText == null) return;   // 안 쓰기로 했으면 비워두면 된다
 
-        if (!canClaim)
+        switch (state)
         {
-            // 받을 게 없을 때는 elapsedText 가 이미 안내 문구를 띄우고 있으므로
-            // 같은 말을 두 번 하지 않습니다.
-            statusText.text = string.Empty;
-            return;
+            case IdleRewardState.NotEnough:
+                statusText.text = string.Empty;   // elapsedText가 이미 안내 중이라 비운다
+                break;
+            case IdleRewardState.Claimable:
+                statusText.text = claimableMessage;
+                break;
+            case IdleRewardState.Full:
+                statusText.text = fullMessage;
+                break;
         }
-
-        double max = IdleRewardManager.Instance.MaxAccrualSeconds;
-
-        // double 비교라 == 대신 여유를 둡니다. 시각 계산에서 소수점 오차가 남을 수 있어요.
-        bool isFull = seconds >= max - 1.0;
-
-        statusText.text = isFull ? fullMessage : claimableMessage;
     }
 
     // ──────────────────────────────────────────────
@@ -173,38 +115,37 @@ public class IdleRewardPopup : MonoBehaviour
 
     private void OnClaim()
     {
-        // 버튼이 비활성이면 눌릴 수 없지만, 다른 코드가 직접 호출할 수도 있으므로
-        // 실제 지급 직전에 한 번 더 확인합니다.
-        // (UI 상태만 믿지 않는다 — 서버가 없는 로컬 게임에서도 지켜두면 좋은 습관입니다)
-        if (!IdleRewardStatus.CanClaim(IdleRewardStatus.EvaluateNow())) return;
+        // 이전: IdleRewardStatus.EvaluateNow()로 검사 — 그 함수는 정리하며 없앴다.
+        //       Claim() 안에서도 같은 검사를 하지만, 받을 게 없으면 팝업을 닫지 않기 위해 여기서도 본다.
+        var manager = IdleRewardManager.Instance;
+        if (manager == null || !manager.Preview().CanClaim) return;
 
-        IdleRewardManager.Instance.Claim(1f);
+        manager.Claim(1f);
         Close();
     }
 
     private void OnClaim2x()
     {
-        if (!IdleRewardStatus.CanClaim(IdleRewardStatus.EvaluateNow())) return;
+        // 젬을 쓰기 전에 받을 게 있는지 먼저 확인 (없는데 젬만 빠지면 안 됨)
+        var manager = IdleRewardManager.Instance;
+        if (manager == null || !manager.Preview().CanClaim) return;
 
-        // 젬 차감 성공 시에만 2배 지급
-        if (!CurrencyManager.Instance.SpendGem(claim2xGemCost))
+        // 이전: CurrencyManager.Instance.SpendGem(...) — 같은 파일의 RefreshClaimButtons는 ?.로 null을
+        //       대비하는데 여기만 무방비라, 매니저가 없으면 NullReferenceException이 났다.
+        var currency = CurrencyManager.Instance;
+        if (currency == null || !currency.SpendGem(claim2xGemCost))
         {
-            Debug.Log("[IdlePopup] 보석이 부족해 2배 수령 불가");
-
-            // 보상은 여전히 받을 수 있으므로 canClaim 은 true 그대로 넘깁니다.
-            // 젬이 모자란 건 함수 안에서 따로 검사해 2배 버튼만 비활성화됩니다.
-            RefreshClaimButtons(true);
-            return;                      // 팝업은 닫지 않음 (다시 시도 or 일반 수령 가능)
+            GameLog.Info("[IdlePopup] 보석이 부족해 2배 수령 불가");
+            RefreshClaimButtons(true);   // 일반 수령은 여전히 가능, 2배 버튼만 비활성화
+            return;                      // 팝업은 닫지 않음
         }
 
-        IdleRewardManager.Instance.Claim(2f);
+        manager.Claim(2f);
         Close();
     }
 
     /// <summary>
-    /// 수령 버튼들의 활성 상태를 갱신합니다.
-    ///
-    /// 두 버튼의 조건이 다릅니다:
+    /// 수령 버튼 활성 상태 갱신.
     ///   일반 수령 : 받을 보상이 있는가
     ///   2배 수령  : 받을 보상이 있는가 AND 젬이 충분한가
     /// </summary>
@@ -226,20 +167,18 @@ public class IdleRewardPopup : MonoBehaviour
     }
 
     // 초 → "N시간 M분" / "M분" 문자열
-    private string FormatElapsed(double seconds)
+    // 이전: double → float → int 로 두 번 변환해 직접 나눴다. TimeSpan이 시/분 계산을 대신한다.
+    private static string FormatElapsed(double seconds)
     {
-        int total = Mathf.FloorToInt((float)seconds);
-        int h = total / 3600;
-        int m = (total % 3600) / 60;
+        TimeSpan t = TimeSpan.FromSeconds(seconds);
+        int h = (int)t.TotalHours;
+        int m = t.Minutes;
 
         if (h > 0) return $"{h}시간 {m}분 동안 자리를 비웠어요";
         return $"{m}분 동안 자리를 비웠어요";
     }
 
-    /// <summary>
-    /// 인스펙터 칸을 비워둘 수 있게 하는 작은 도우미.
-    /// 같은 null 검사를 여러 곳에 반복해 적는 대신 한 곳에 모읍니다.
-    /// </summary>
+    // 인스펙터 칸을 비워둘 수 있게 하는 도우미 (null 검사를 한 곳에 모음)
     private static void SetText(TMP_Text label, string value)
     {
         if (label != null) label.text = value;

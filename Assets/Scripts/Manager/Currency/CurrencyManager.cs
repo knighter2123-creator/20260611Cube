@@ -32,7 +32,7 @@ public partial class CurrencyManager : MonoBehaviour
             //   기존 것도 파괴되어 Instance 가 null 로 남습니다.
             //   그 상태를 잡아내려고 아래 로그를 답니다.
             if (logLifecycle)
-                Debug.Log($"[Currency] 중복 → 자기 제거. id={GetInstanceID()}, " +
+                GameLog.Info($"[Currency] 중복 → 자기 제거. id={GetInstanceID()}, " +
                           $"기존 id={Instance.GetInstanceID()}, 씬={gameObject.scene.name}", this);
 
             Destroy(gameObject);
@@ -42,7 +42,7 @@ public partial class CurrencyManager : MonoBehaviour
         Instance = this;
 
         if (logLifecycle)
-            Debug.Log($"[Currency] Instance 등록. id={GetInstanceID()}, 씬={gameObject.scene.name}", this);
+            GameLog.Info($"[Currency] Instance 등록. id={GetInstanceID()}, 씬={gameObject.scene.name}", this);
     }
 
     void OnDestroy()
@@ -89,7 +89,7 @@ public partial class CurrencyManager : MonoBehaviour
         ApplyFrom(SaveManager.Instance.Current);
 
         if (logLifecycle)
-            Debug.Log($"[Currency] 복원 완료 — Gold {gold} / Gem {gem}. id={GetInstanceID()}", this);
+            GameLog.Info($"[Currency] 복원 완료 — Gold {gold} / Gem {gem}. id={GetInstanceID()}", this);
     }
 
     // ── 골드 ──
@@ -160,19 +160,19 @@ public partial class CurrencyManager : MonoBehaviour
         gem = next > int.MaxValue ? int.MaxValue : (int)next;
 
         OnGemChanged?.Invoke(gem);
-        Debug.Log($"[CurrencyManager] 보석 +{amount} | 현재: {gem}");
+        GameLog.Info($"[CurrencyManager] 보석 +{amount} | 현재: {gem}");
     }
 
     public bool SpendGem(int amount)
     {
         if (amount <= 0 || gem < amount)
         {
-            Debug.Log("[CurrencyManager] 보석이 부족합니다.");
+            GameLog.Info("[CurrencyManager] 보석이 부족합니다.");
             return false;
         }
         gem -= amount;
         OnGemChanged?.Invoke(gem);
-        Debug.Log($"[CurrencyManager] 보석 -{amount} | 현재: {gem}");
+        GameLog.Info($"[CurrencyManager] 보석 -{amount} | 현재: {gem}");
         return true;
     }
 

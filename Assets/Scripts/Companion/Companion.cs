@@ -30,7 +30,7 @@ public class Companion : MonoBehaviour
         if (data.ownedSkill == null)
             Debug.LogWarning($"[Companion] {data.companionName}에 스킬이 없습니다.");
         else
-            Debug.Log($"[Companion] {data.companionName} 초기화 — 스킬: {data.ownedSkill.skillName}");
+            GameLog.Info($"[Companion] {data.companionName} 초기화 — 스킬: {data.ownedSkill.skillName}");
     }
 
     void Update()
@@ -64,14 +64,14 @@ public class Companion : MonoBehaviour
         isPlaced           = true;
         skillTimer         = 0f;
         gameObject.SetActive(true);
-        Debug.Log($"[Companion] {CompanionName} 배치 @ {position}");
+        GameLog.Info($"[Companion] {CompanionName} 배치 @ {position}");
     }
 
     public void Retrieve()
     {
         isPlaced = false;
         gameObject.SetActive(false);
-        Debug.Log($"[Companion] {CompanionName} 회수");
+        GameLog.Info($"[Companion] {CompanionName} 회수");
     }
 
     // ──────────────────────────────────────────────

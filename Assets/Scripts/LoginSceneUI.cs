@@ -73,7 +73,7 @@ public class LoginSceneUI : MonoBehaviour
 
     private void OnClickStart()
     {
-        if (logInteractions) Debug.Log("[LoginUI] 게임 시작");
+        if (logInteractions) GameLog.Info("[LoginUI] 게임 시작");
 
         // ★ 인스펙터 참조가 아니라 Instance를 통해 부르는 것이 핵심입니다.
         //   Instance는 항상 살아 있는 SceneLoader를 가리킵니다.

@@ -51,7 +51,7 @@ public class SceneLoader : MonoBehaviour
             //   해결책은 버튼을 인스펙터가 아니라 코드에서 Instance 경유로 연결하는 것입니다.
             //   → LoginSceneUI.cs 참고
             if (logDuplicate)
-                Debug.Log($"[SceneLoader] 중복 인스턴스 제거 — 씬 '{gameObject.scene.name}' 의 '{name}'. " +
+                GameLog.Info($"[SceneLoader] 중복 인스턴스 제거 — 씬 '{gameObject.scene.name}' 의 '{name}'. " +
                           "이 씬의 버튼이 인스펙터로 이 오브젝트를 참조하고 있다면 그 연결은 이제 끊깁니다.", this);
 
             Destroy(gameObject);

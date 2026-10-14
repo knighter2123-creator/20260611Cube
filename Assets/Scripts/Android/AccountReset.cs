@@ -106,7 +106,7 @@ public class AccountReset : MonoBehaviour
         PlayerProfile.DeleteLegacyPrefsForReset(); // 예전 방식 이름 — 안 지우면 LoginScene 에서 옛 이름이 이관돼 되살아남
         PlayerPrefs.Save();                        // PlayerPrefs 는 Save() 전까지 메모리에만 있음 → 바로 앱이 꺼져도 안전하게
 
-        Debug.Log("[AccountReset] 진행 데이터 삭제 완료. RestartFromLogin() 으로 매니저를 새로 만듭니다.");
+        GameLog.Info("[AccountReset] 진행 데이터 삭제 완료. RestartFromLogin() 으로 매니저를 새로 만듭니다.");
         return true;
     }
 
@@ -266,7 +266,7 @@ public class AccountReset : MonoBehaviour
         var ops = new List<AsyncOperation>();
         foreach (Scene s in toUnload)
         {
-            Debug.Log($"[AccountReset] 씬 언로드: {s.name}");
+            GameLog.Info($"[AccountReset] 씬 언로드: {s.name}");
             AsyncOperation op = SceneManager.UnloadSceneAsync(s);
             if (op != null) ops.Add(op);
         }
@@ -321,7 +321,7 @@ public class AccountReset : MonoBehaviour
         pendingLoginScene = null;
         pendingReason = null;
 
-        Debug.Log($"[AccountReset] {reason} 완료 — 매니저를 새로 만들고 LoginScene 에 도착했습니다. (계정: {SaveManager.ActiveAccountLabel})");
+        GameLog.Info($"[AccountReset] {reason} 완료 — 매니저를 새로 만들고 LoginScene 에 도착했습니다. (계정: {SaveManager.ActiveAccountLabel})");
         Destroy(gameObject);   // 할 일을 다 했으니 자기 자신도 정리
     }
 
@@ -360,13 +360,13 @@ public class AccountReset : MonoBehaviour
 
             if (!HasGameScript(root, gameAssembly))
             {
-                Debug.Log($"[AccountReset] 유지 (엔진/플러그인 오브젝트): {root.name}");
+                GameLog.Info($"[AccountReset] 유지 (엔진/플러그인 오브젝트): {root.name}");
                 continue;
             }
 
             // ★ ManagerRoot 가 파괴되면 "살아 있던 루트가 파괴되었습니다" 경고가 뜹니다.
             //   평소엔 이상 신호지만, 지금은 의도한 동작입니다.
-            Debug.Log($"[AccountReset] 파괴: {root.name}", root);
+            GameLog.Info($"[AccountReset] 파괴: {root.name}", root);
             Destroy(root);
         }
     }

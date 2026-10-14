@@ -129,7 +129,7 @@ public static class DailyDungeonProgress
         if (dungeon == null || Data == null) return false;
         if (!CanSweep(dungeon, level))
         {
-            Debug.Log($"[DailyDungeon] 소탕 불가 — {dungeon.id} Lv.{level} " +
+            GameLog.Info($"[DailyDungeon] 소탕 불가 — {dungeon.id} Lv.{level} " +
                       $"(최고 클리어 {HighestCleared(dungeon)}, 남은 횟수 {RemainingEntries(dungeon)})");
             return false;
         }
@@ -142,7 +142,7 @@ public static class DailyDungeonProgress
         }
 
         CompleteClear(dungeon, level);
-        Debug.Log($"[DailyDungeon] 소탕 — {dungeon.displayName} Lv.{level} : {dungeon.DescribeReward(level)} " +
+        GameLog.Info($"[DailyDungeon] 소탕 — {dungeon.displayName} Lv.{level} : {dungeon.DescribeReward(level)} " +
                   $"(남은 횟수 {RemainingEntries(dungeon)}/{TotalEntries(dungeon)})");
         return true;
     }
@@ -158,21 +158,21 @@ public static class DailyDungeonProgress
         int cost = NextPurchaseCost(dungeon);
         if (cost < 0)
         {
-            Debug.Log($"[DailyDungeon] 횟수 추가 불가 — 오늘 최대({dungeon.MaxExtraEntries}회)까지 추가함 ({dungeon.id})");
+            GameLog.Info($"[DailyDungeon] 횟수 추가 불가 — 오늘 최대({dungeon.MaxExtraEntries}회)까지 추가함 ({dungeon.id})");
             return false;
         }
 
         CurrencyManager cm = CurrencyManager.Instance;
         if (cost > 0 && (cm == null || !cm.TrySpendCurrency(dungeon.extraEntryCostType, cost)))
         {
-            Debug.Log($"[DailyDungeon] 횟수 추가 실패 — {dungeon.DescribeCost(cost)} 부족 ({dungeon.id})");
+            GameLog.Info($"[DailyDungeon] 횟수 추가 실패 — {dungeon.DescribeCost(cost)} 부족 ({dungeon.id})");
             return false;
         }
 
         GetRecord(dungeon, create: true).purchasedToday++;
         SaveManager.Instance?.Save();
 
-        Debug.Log($"[DailyDungeon] 입장 횟수 추가 — {dungeon.id} ({dungeon.DescribeCost(cost)}, " +
+        GameLog.Info($"[DailyDungeon] 입장 횟수 추가 — {dungeon.id} ({dungeon.DescribeCost(cost)}, " +
                   $"오늘 {PurchasedToday(dungeon)}/{dungeon.MaxExtraEntries}회)");
         OnChanged?.Invoke();
         return true;
@@ -220,7 +220,7 @@ public static class DailyDungeonProgress
             if (r != null) { r.usedToday = 0; r.purchasedToday = 0; }
 
         dd.lastResetTicks = periodStart;
-        Debug.Log("[DailyDungeon] 일일 입장 횟수 초기화");
+        GameLog.Info("[DailyDungeon] 일일 입장 횟수 초기화");
         OnChanged?.Invoke();
     }
 }

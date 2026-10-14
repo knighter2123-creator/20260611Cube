@@ -117,7 +117,7 @@ public class DailyDungeonManager : MonoBehaviour
         DailyDungeonBoss boss = Instantiate(prefab, spawnPos, Quaternion.identity);
         boss.InitForDungeon(ActiveData, ActiveLevel);   // ★ 반드시 호출 — 난이도 스탯 적용
 
-        Debug.Log($"[DailyDungeonManager] 보스 스폰 — {prefab.name} / " +
+        GameLog.Info($"[DailyDungeonManager] 보스 스폰 — {prefab.name} / " +
                   $"{(ActiveData != null ? ActiveData.id : "(데이터 없음)")} Lv.{ActiveLevel}");
 
         TargetMove move = boss.GetComponent<TargetMove>();
@@ -138,7 +138,7 @@ public class DailyDungeonManager : MonoBehaviour
         string reward = GrantReward();
 
         OnStageClear?.Invoke();
-        Debug.Log($"[DailyDungeonManager] 클리어 — {reward}");
+        GameLog.Info($"[DailyDungeonManager] 클리어 — {reward}");
 
         StartCoroutine(ReturnAfterDelay($"클리어!\n{reward}"));
     }
@@ -149,7 +149,7 @@ public class DailyDungeonManager : MonoBehaviour
         stageOver = true;
 
         OnStageFail?.Invoke();
-        Debug.Log("[DailyDungeonManager] 시간 초과 실패 — 보상 없이 복귀");
+        GameLog.Info("[DailyDungeonManager] 시간 초과 실패 — 보상 없이 복귀");
 
         StartCoroutine(ReturnAfterDelay("시간 초과"));
     }

@@ -138,7 +138,7 @@ public class MissionPopup : MonoBehaviour
 
         int claimed = mgr.ClaimAll(currentTab);
         // ClaimAll 내부에서 OnMissionUpdated 발행 → 항목/버튼 자동 갱신
-        if (claimed == 0) Debug.Log("[MissionPopup] 수령 가능한 미션 없음");
+        if (claimed == 0) GameLog.Info("[MissionPopup] 수령 가능한 미션 없음");
     }
     
     private void RefreshTabHighlight()

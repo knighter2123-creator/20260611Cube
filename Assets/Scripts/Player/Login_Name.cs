@@ -44,7 +44,7 @@ public class Login_Name : MonoBehaviour
         // 이 씬의 SceneLoader 도 Awake 에서 Instance 등록을 끝낸 뒤입니다.
         if (AccountSwitch.ConsumeAutoStartAfterReload())
         {
-            Debug.Log("[Login_Name] 계정 전환 재시작 완료 — 게임을 이어서 시작합니다.");
+            GameLog.Info("[Login_Name] 계정 전환 재시작 완료 — 게임을 이어서 시작합니다.");
             StartGame();
         }
     }

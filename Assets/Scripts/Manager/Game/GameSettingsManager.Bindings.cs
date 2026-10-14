@@ -35,7 +35,7 @@ public partial class GameSettingManager
         // ★ 이 줄이 콘솔에 안 찍히면, 설정 패널이 Open() 을 거치지 않고 열린 것입니다.
         //   (버튼의 인스펙터 On Click 에 SetActive(true) 가 직접 걸려 있다든지)
         //   그 경우 바인딩 코드를 어느 파일로 옮겨도 똑같이 안 됩니다.
-        Debug.Log("[Setting] BindAll 시작");
+        GameLog.Info("[Setting] BindAll 시작");
 
         BindBloom();
         BindFlash();
@@ -108,7 +108,7 @@ public partial class GameSettingManager
         //   유저 설정을 무시하는 게 아니라, 조작 수단이 없어진 죽은 값을 정리하는 것이다.
         if (!bloom.UserEnabled && bloom.UserIntensity01 > 0.001f)
         {
-            Debug.Log("[Setting] 블룸 토글이 없는 구성이라 userEnabled 를 되살립니다.", this);
+            GameLog.Info("[Setting] 블룸 토글이 없는 구성이라 userEnabled 를 되살립니다.", this);
             bloom.SetUserEnabled(true);
         }
 
@@ -157,7 +157,7 @@ public partial class GameSettingManager
         flashToggle.interactable = true;
         effect.BindFlashToggle(flashToggle);
 
-        Debug.Log($"[Setting] 화면 번쩍임 토글 바인딩 — 표시 {effect.FlashEnabled}", flashToggle);
+        GameLog.Info($"[Setting] 화면 번쩍임 토글 바인딩 — 표시 {effect.FlashEnabled}", flashToggle);
     }
 
     // ───────────────────────── 진동 ─────────────────────────

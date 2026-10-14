@@ -61,7 +61,7 @@ public class CompanionListUI : MonoBehaviour, ITabPage
         IReadOnlyList<CompanionData> owned = cm != null ? cm.GetOwnedCompanionData() : null;
         if (owned == null || owned.Count == 0)
         {
-            Debug.Log("[CompanionListUI] 보유 동료 없음");
+            GameLog.Info("[CompanionListUI] 보유 동료 없음");
             return;
         }
 

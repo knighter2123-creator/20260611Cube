@@ -114,7 +114,7 @@ public class SaveManager : MonoBehaviour
         activeAccountLoaded = true;
         PlayerPrefs.SetString(ACTIVE_ACCOUNT_PREF_KEY, activeAccountId);
         PlayerPrefs.Save();   // 바로 앱이 꺼져도 다음 실행에 맞는 파일을 읽도록 즉시 기록
-        Debug.Log($"[SaveManager] 사용 계정 변경 → {ActiveAccountLabel} ({PathFor(activeAccountId)})");
+        GameLog.Info($"[SaveManager] 사용 계정 변경 → {ActiveAccountLabel} ({PathFor(activeAccountId)})");
     }
 
     /// <summary>
@@ -199,7 +199,7 @@ public class SaveManager : MonoBehaviour
     public static void LockForReset()
     {
         IsSaveLocked = true;
-        Debug.Log("[SaveManager] 저장 잠금 — 매니저 재시작(계정 삭제/전환) 시작");
+        GameLog.Info("[SaveManager] 저장 잠금 — 매니저 재시작(계정 삭제/전환) 시작");
     }
 
     /// <summary>
@@ -210,7 +210,7 @@ public class SaveManager : MonoBehaviour
     {
         if (!IsSaveLocked) return;
         IsSaveLocked = false;
-        Debug.Log("[SaveManager] 저장 잠금 해제");
+        GameLog.Info("[SaveManager] 저장 잠금 해제");
     }
 
     /// <summary>
@@ -241,7 +241,7 @@ public class SaveManager : MonoBehaviour
         if (Instance != null)
             Instance.Current = new SaveData();
 
-        Debug.Log($"[SaveManager] 세이브 파일 삭제 완료: {SavePath}");
+        GameLog.Info($"[SaveManager] 세이브 파일 삭제 완료: {SavePath}");
         return true;
     }
 
@@ -280,7 +280,7 @@ public class SaveManager : MonoBehaviour
         if (IsPreGameScene(scene.name)) return;     // 로그인/로딩 — 아직 게임 시작 전
 
         IsGameplayStarted = true;
-        Debug.Log($"[SaveManager] 게임 씬 진입('{scene.name}') — 이제부터 Save() 허용");
+        GameLog.Info($"[SaveManager] 게임 씬 진입('{scene.name}') — 이제부터 Save() 허용");
     }
 
     /// <summary>
@@ -333,7 +333,7 @@ public class SaveManager : MonoBehaviour
         if (IsSaveLocked)
         {
             IsSaveLocked = false;
-            Debug.Log("[SaveManager] 새 SaveManager 생성 — 계정 초기화 완료, 저장 잠금 해제");
+            GameLog.Info("[SaveManager] 새 SaveManager 생성 — 계정 초기화 완료, 저장 잠금 해제");
         }
 
         Load();
@@ -379,7 +379,7 @@ public class SaveManager : MonoBehaviour
         //   초기화 도중 파괴되는 매니저들의 CaptureTo 를 건드리지 않아도 됩니다.
         if (IsSaveLocked)
         {
-            Debug.Log("[SaveManager] 저장 잠금 중 — Save() 무시");
+            GameLog.Info("[SaveManager] 저장 잠금 중 — Save() 무시");
             return;
         }
 
@@ -388,7 +388,7 @@ public class SaveManager : MonoBehaviour
         //   그래서 여기서 건너뛰어도 잃는 데이터가 없다.
         if (!IsGameplayStarted)
         {
-            Debug.Log("[SaveManager] 게임 시작 전(매니저 ApplyFrom 전) — Save() 무시");
+            GameLog.Info("[SaveManager] 게임 시작 전(매니저 ApplyFrom 전) — Save() 무시");
             return;
         }
 
@@ -427,14 +427,14 @@ public class SaveManager : MonoBehaviour
         //   이 한 줄이 모든 파일 쓰기를 덮습니다. 쓰기를 한 곳에 모아 둔 덕분입니다.
         if (IsSaveLocked)
         {
-            Debug.Log("[SaveManager] 저장 잠금 중 — 파일 쓰기 무시");
+            GameLog.Info("[SaveManager] 저장 잠금 중 — 파일 쓰기 무시");
             return;
         }
 
         try
         {
             File.WriteAllText(SavePath, JsonUtility.ToJson(data, true));
-            Debug.Log($"[SaveManager] 저장 완료: {SavePath}");
+            GameLog.Info($"[SaveManager] 저장 완료: {SavePath}");
         }
         catch (System.Exception e)
         {
@@ -451,7 +451,7 @@ public class SaveManager : MonoBehaviour
         if (!HasSave())
         {
             Current = new SaveData();   // 첫 실행 — 기본값
-            Debug.Log($"[SaveManager] 세이브 없음 — 새 데이터로 시작 (계정: {ActiveAccountLabel})");   // ★ [계정별 세이브]
+            GameLog.Info($"[SaveManager] 세이브 없음 — 새 데이터로 시작 (계정: {ActiveAccountLabel})");   // ★ [계정별 세이브]
             return;
         }
 
@@ -483,7 +483,7 @@ public class SaveManager : MonoBehaviour
             if (!json.Contains("\"tutorialDone\""))
                 Current.tutorialDone = true;
 
-            Debug.Log($"[SaveManager] 불러오기 완료 (계정: {ActiveAccountLabel})");   // ★ [계정별 세이브] 어느 계정 파일인지
+            GameLog.Info($"[SaveManager] 불러오기 완료 (계정: {ActiveAccountLabel})");   // ★ [계정별 세이브] 어느 계정 파일인지
         }
         catch (System.Exception e)
         {

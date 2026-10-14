@@ -259,7 +259,7 @@ public partial class GameSettingManager : MonoBehaviour
         if (!logInteractions) return;
 
         GameObject go = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
-        Debug.Log($"[Setting] {action} — 클릭된 오브젝트: {(go != null ? go.name : "(키보드 또는 코드 호출)")}", go);
+        GameLog.Info($"[Setting] {action} — 클릭된 오브젝트: {(go != null ? go.name : "(키보드 또는 코드 호출)")}", go);
     }
 
     // ─────────────────────────────────────────────

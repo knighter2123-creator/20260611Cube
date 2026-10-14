@@ -39,7 +39,7 @@ public partial class LevelUpEffect
         useScreenFlash = PlayerPrefs.GetInt(PrefsFlashKey, useScreenFlash ? 1 : 0) == 1;
 
         if (logBinding)
-            Debug.Log($"[LevelUpEffect] 화면 번쩍임 설정 로드 — {useScreenFlash}", this);
+            GameLog.Info($"[LevelUpEffect] 화면 번쩍임 설정 로드 — {useScreenFlash}", this);
     }
 
     /// <summary>화면 번쩍임 on/off. 즉시 저장된다.</summary>
@@ -60,7 +60,7 @@ public partial class LevelUpEffect
         RefreshFlashToggle();
 
         if (logBinding)
-            Debug.Log($"[LevelUpEffect] 화면 번쩍임 — {on}", this);
+            GameLog.Info($"[LevelUpEffect] 화면 번쩍임 — {on}", this);
     }
 
     // ───────────────────────── UI 바인딩 ─────────────────────────

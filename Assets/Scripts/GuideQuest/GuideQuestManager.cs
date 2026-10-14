@@ -189,7 +189,7 @@ public partial class GuideQuestManager : MonoBehaviour
         }
 
         pendingEvolveClears = Mathf.Min(pendingEvolveClears + count, MaxPendingEvolveClears);
-        Debug.Log($"[GuideQuest] 각성 클리어를 적립했습니다 (대기 {pendingEvolveClears}회). " +
+        GameLog.Info($"[GuideQuest] 각성 클리어를 적립했습니다 (대기 {pendingEvolveClears}회). " +
                   $"현재 퀘스트: {(Current != null ? Current.type.ToString() : "없음")}");
     }
 
@@ -211,7 +211,7 @@ public partial class GuideQuestManager : MonoBehaviour
 
         if (IsComplete)
         {
-            Debug.Log($"[GuideQuest] {Current.Title} 조건 충족: {Current.Description} (수령 대기)");
+            GameLog.Info($"[GuideQuest] {Current.Title} 조건 충족: {Current.Description} (수령 대기)");
             RequestSave();   // ★ 자동 지급 제거 — 완료 상태만 저장, 지급은 버튼(Claim)에서
         }
     }
@@ -228,7 +228,7 @@ public partial class GuideQuestManager : MonoBehaviour
         CurrencyManager.Instance?.AddCurrency(type, amount);
         OnRewardClaimed?.Invoke(type, amount);
 
-        Debug.Log($"[GuideQuest] {Current.Title} 보상 {Current.RewardTypeName} {amount} 지급");
+        GameLog.Info($"[GuideQuest] {Current.Title} 보상 {Current.RewardTypeName} {amount} 지급");
 
         // 다음 단계로
         currentStep++;
@@ -267,7 +267,7 @@ public partial class GuideQuestManager : MonoBehaviour
                 {
                     int use = pendingEvolveClears;
                     pendingEvolveClears = 0;
-                    Debug.Log($"[GuideQuest] 적립해둔 각성 클리어 {use}회를 반영합니다.");
+                    GameLog.Info($"[GuideQuest] 적립해둔 각성 클리어 {use}회를 반영합니다.");
                     AddProgress(use);
                 }
                 break;

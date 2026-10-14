@@ -480,7 +480,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 
         if (successCount == 0)
         {
-            Debug.Log($"[UpgradeUI] {type} 강화 실패 (Currency 부족 또는 최대 레벨)");
+            GameLog.Info($"[UpgradeUI] {type} 강화 실패 (Currency 부족 또는 최대 레벨)");
             RefreshAllImmediate();   // 실패해도 비용/보유량 표시는 최신으로
             return;
         }
@@ -538,7 +538,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         Open();   // 내부에서 RefreshAllImmediate 수행
 
         if (rowIndex.ContainsKey(type))
-            Debug.Log($"[UpgradeUI] 가이드 퀘스트 포커스 → {GuideQuest.StatName(type)}");
+            GameLog.Info($"[UpgradeUI] 가이드 퀘스트 포커스 → {GuideQuest.StatName(type)}");
         else
             Debug.LogWarning($"[UpgradeUI] statRows 에 {type} 행이 없어 포커스할 수 없습니다.", this);
 

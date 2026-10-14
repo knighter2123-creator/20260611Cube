@@ -70,14 +70,14 @@ public class QuitConfirmController : MonoBehaviour
     private void OpenQuitPanel()
     {
         quitPanel.SetActive(true);
-        Debug.Log("[QuitConfirm] 종료 확인 패널 열림");
+        GameLog.Info("[QuitConfirm] 종료 확인 패널 열림");
     }
 
     /// <summary>"아니오" 버튼 OnClick에 연결.</summary>
     public void CloseQuitPanel()
     {
         quitPanel.SetActive(false);
-        Debug.Log("[QuitConfirm] 종료 취소");
+        GameLog.Info("[QuitConfirm] 종료 취소");
     }
 
     /// <summary>"예" 버튼 OnClick에 연결.</summary>
@@ -86,7 +86,7 @@ public class QuitConfirmController : MonoBehaviour
         if (isQuitting) return;   // 연타 방지
         isQuitting = true;
 
-        Debug.Log("[QuitConfirm] 게임 종료");
+        GameLog.Info("[QuitConfirm] 게임 종료");
 
 #if UNITY_EDITOR
         // 에디터에서는 Application.Quit()이 아무 일도 하지 않는다.

@@ -49,7 +49,7 @@ public class GameSpeedManager : MonoBehaviour
     private void ApplySpeed()
     {
         Time.timeScale = speedSteps[_currentIndex];
-        Debug.Log($"[GameSpeed] {speedSteps[_currentIndex]}x 배속 적용");
+        GameLog.Info($"[GameSpeed] {speedSteps[_currentIndex]}x 배속 적용");
     }
 
     void OnDestroy()

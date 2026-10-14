@@ -394,7 +394,7 @@ public class CompanionPlacementController : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Placement] {pendingData.companionName} → {cell} 배치");
+        GameLog.Info($"[Placement] {pendingData.companionName} → {cell} 배치");
 
         // ★ [추가] 배치는 유저가 직접 한 '의미 있는 변경'이라 바로 저장합니다.
         //   예전에는 배치만으로는 저장이 일어나지 않아, 다른 이유로 저장되기 전에 앱이 종료되면

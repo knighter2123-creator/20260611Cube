@@ -45,12 +45,14 @@ public partial class StageManager : MonoBehaviour
     [Header("스테이지 설정")]
     [SerializeField] private int   killGoal       = 20;
     [SerializeField] private float timeLimit      = 184f;
-    [SerializeField] private float statMultiplier = 1.5f;
+
+    // 이전: [SerializeField] statMultiplier — 인스펙터 값(1.3)을 다른 클래스가 읽을 수 없어
+    //       IdleRewardManager가 1.5로 복사해 쓰다 어긋났다. 이제 StageFormula에서 읽는다.
 
     public event Action OnStageClear;
     public event Action OnStageFail;
 
-    public float StatMultiplier => statMultiplier;
+    public float StatMultiplier => StageFormula.StatMultiplier;
 
     // 진화 스테이지 입장 버튼이 현재 위치를 읽을 수 있게 공개
     public int CurrentWorld => currentWorld;
@@ -63,7 +65,6 @@ public partial class StageManager : MonoBehaviour
 
     private int   currentWorld     = 1;
     private int   currentStage     = 1;
-    private int   maxStagePerWorld = 10;
     private float currentStatMult  = 1f;
     public float CurrentStatMult => currentStatMult;
 
@@ -80,8 +81,7 @@ public partial class StageManager : MonoBehaviour
         {
             currentWorld    = EvolveStageContext.ReturnWorld;
             currentStage    = EvolveStageContext.ReturnStage;
-            currentStatMult = Mathf.Pow(statMultiplier,
-                (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
+            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
             EvolveStageContext.ClearReturn();
             NextStage();          // ← 내부에서 ResetStage를 부르므로 프리팹도 함께 결정됨
             return;
@@ -92,8 +92,7 @@ public partial class StageManager : MonoBehaviour
         {
             currentWorld    = DailyDungeonContext.ReturnWorld;
             currentStage    = DailyDungeonContext.ReturnStage;
-            currentStatMult = Mathf.Pow(statMultiplier,
-                (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
+            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
             DailyDungeonContext.ClearReturn();
             NextStage();
             return;
@@ -191,7 +190,7 @@ public partial class StageManager : MonoBehaviour
     {
         stageOver = true;
         OnStageClear?.Invoke();
-        Debug.Log($"[StageManager] {currentWorld}-{currentStage} 클리어!");
+        GameLog.Info($"[StageManager] {currentWorld}-{currentStage} 클리어!");
 
         // ※ 아래 세 줄은 반드시 currentStage++ 이전에!
         GuideQuestManager.Instance?.ReportStageClear(currentWorld, currentStage);
@@ -217,15 +216,17 @@ public partial class StageManager : MonoBehaviour
 
         currentStage++;
 
-        if (currentStage > maxStagePerWorld)
+        if (currentStage > StageFormula.MaxStagePerWorld)
         {
             currentStage = 1;
             currentWorld++;
-            Debug.Log($"[StageManager] 월드 변경 → {currentWorld}-{currentStage}");
+            GameLog.Info($"[StageManager] 월드 변경 → {currentWorld}-{currentStage}");
         }
 
-        currentStatMult *= statMultiplier;
-        Debug.Log($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
+        // 이전: currentStatMult *= statMultiplier — 곱셈을 누적하면 float 오차가 쌓여
+        //       같은 스테이지라도 세이브 로드(공식으로 재계산) 때와 값이 미세하게 달라졌다.
+        currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
+        GameLog.Info($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
 
         SaveManager.Instance?.Save();
         StartCoroutine(NextStageDelayed());
@@ -240,14 +241,14 @@ public partial class StageManager : MonoBehaviour
         // X-N 실패 → 한 단계 되돌아감
         if (currentStage == 1)
         {
-            currentStatMult = Mathf.Pow(statMultiplier, (currentWorld - 1) * maxStagePerWorld);
-            Debug.Log($"[StageManager] {currentWorld}-1 실패 → {currentWorld}-1 재시작 / 스탯 배율: {currentStatMult:F4}");
+            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
+            GameLog.Info($"[StageManager] {currentWorld}-1 실패 → {currentWorld}-1 재시작 / 스탯 배율: {currentStatMult:F4}");
         }
         else
         {
             currentStage--;
-            currentStatMult /= statMultiplier;
-            Debug.Log($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
+            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);   // 이전: /= 누적 (위와 같은 이유)
+            GameLog.Info($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
         }
 
         ShowStageFailNotice();

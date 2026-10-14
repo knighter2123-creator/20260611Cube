@@ -55,7 +55,7 @@ public partial class LevelUpManager
 
         NotifyRestored();   // 복원은 레벨업이 아니므로 OnLevelUp 이 아니라 전용 이벤트
 
-        Debug.Log($"[LevelUp] ApplyFrom 완료 | Lv.{stat.Level}, dmg={stat.baseDamage}, " +
+        GameLog.Info($"[LevelUp] ApplyFrom 완료 | Lv.{stat.Level}, dmg={stat.baseDamage}, " +
                   $"lvD={stat.UpgradeLevelDamage}, lvAS={stat.UpgradeLevelAttackSpd} → " +
                   $"{stat.AttackSpd:0.0}ms | id={GetInstanceID()}");
     }

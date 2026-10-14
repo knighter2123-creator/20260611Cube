@@ -78,7 +78,7 @@ public partial class GameManager
         }
 
         // 여기까지 왔다 = 이 씬에는 Escape로 할 일이 없다. 그냥 무시.
-        Debug.Log("[Escape] 처리할 핸들러 없음");
+        GameLog.Info("[Escape] 처리할 핸들러 없음");
     }
 
     /// <summary>

@@ -175,7 +175,7 @@ public partial class AugmentManager
         foreach (string key in usedSaveKeys)
             if (!string.IsNullOrEmpty(key)) PlayerPrefs.DeleteKey(KeyFor(key, account));
 
-        Debug.Log($"[Augment] 계정 삭제 — 증강 저장 삭제 (계정 {SaveManager.ActiveAccountLabel}, 키 {usedSaveKeys.Count + 1}개 확인)");
+        GameLog.Info($"[Augment] 계정 삭제 — 증강 저장 삭제 (계정 {SaveManager.ActiveAccountLabel}, 키 {usedSaveKeys.Count + 1}개 확인)");
     }
 
     /// <summary>
@@ -203,7 +203,7 @@ public partial class AugmentManager
         }
 
         PlayerPrefs.Save();   // 세이브 파일 이동과 짝이 맞게 즉시 기록
-        Debug.Log($"[Augment] 증강 저장 이동: {moved}개 키");
+        GameLog.Info($"[Augment] 증강 저장 이동: {moved}개 키");
     }
 
     /// <summary>저장 데이터를 통째로 지웁니다. 개발 중 초기화용.</summary>
@@ -212,6 +212,6 @@ public partial class AugmentManager
     {
         PlayerPrefs.DeleteKey(CurrentKey);   // 지금 계정만
         PlayerPrefs.Save();
-        Debug.Log("[Augment] 저장 데이터를 삭제했습니다.");
+        GameLog.Info("[Augment] 저장 데이터를 삭제했습니다.");
     }
 }

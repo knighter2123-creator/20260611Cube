@@ -120,7 +120,7 @@ public partial class EvolveStageManager : MonoBehaviour
         boss.InitForEvolveStage();
 
         string tierId = ActiveData != null ? ActiveData.id : "(티어 데이터 없음)";
-        Debug.Log($"[EvolveStageManager] 보스 스폰 — {prefab.name} / 티어: {tierId}");
+        GameLog.Info($"[EvolveStageManager] 보스 스폰 — {prefab.name} / 티어: {tierId}");
 
         // ── 일반 스테이지 보스와 동일하게 이동 경로 전달 ──
         TargetMove move = boss.GetComponent<TargetMove>();
@@ -166,7 +166,7 @@ public partial class EvolveStageManager : MonoBehaviour
                              "LoginScene의 Managers 루트에 추가했는지 확인하세요.");
 
         OnStageClear?.Invoke();
-        Debug.Log("[EvolveStageManager] 진화 스테이지 클리어 → 원래 스테이지로 복귀");
+        GameLog.Info("[EvolveStageManager] 진화 스테이지 클리어 → 원래 스테이지로 복귀");
 
         ReturnToStage();
     }

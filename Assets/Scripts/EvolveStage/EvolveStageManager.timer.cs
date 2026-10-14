@@ -41,7 +41,7 @@ public partial class EvolveStageManager
         stageOver = true;
 
         OnStageFail?.Invoke();
-        Debug.Log("[EvolveStageManager] 시간 초과 실패 — 보상 없이 원래 스테이지로 복귀");
+        GameLog.Info("[EvolveStageManager] 시간 초과 실패 — 보상 없이 원래 스테이지로 복귀");
 
         ReturnToStage();
     }

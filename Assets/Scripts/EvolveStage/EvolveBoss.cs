@@ -126,14 +126,14 @@ public class EvolveBoss : Enemy
 
         if (SaveManager.Instance != null && SaveManager.Instance.IsEvolveRewardClaimed(id))
         {
-            Debug.Log($"[EvolveBoss] 이미 보상 지급된 티어({id}) — 버프 미지급");
+            GameLog.Info($"[EvolveBoss] 이미 보상 지급된 티어({id}) — 버프 미지급");
             return;
         }
 
         PlayerBuffManager.Instance?.AddPermanentDamageBuff(buff);   // 내부에서 Save() 호출
         SaveManager.Instance?.MarkEvolveRewardClaimed(id);          // 플래그 기록 + Save()
 
-        Debug.Log($"[EvolveBoss] 영구 대미지 버프 +{buff * 100f}% 지급 ({id})");
+        GameLog.Info($"[EvolveBoss] 영구 대미지 버프 +{buff * 100f}% 지급 ({id})");
     }
 
     /// <summary>훅 ② — 일반 StageManager가 아니라 EvolveStageManager로 보고</summary>

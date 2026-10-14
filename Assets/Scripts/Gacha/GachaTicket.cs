@@ -55,7 +55,7 @@ public static class GachaTicket
         long next = (long)data.gachaTicket + amount;   // CurrencyManager.AddGold 와 같은 포화 덧셈
         data.gachaTicket = next > int.MaxValue ? int.MaxValue : (int)next;
 
-        Debug.Log($"[GachaTicket] 소환권 +{amount} | 현재: {data.gachaTicket}");
+        GameLog.Info($"[GachaTicket] 소환권 +{amount} | 현재: {data.gachaTicket}");
         OnChanged?.Invoke(data.gachaTicket);
     }
 
@@ -67,7 +67,7 @@ public static class GachaTicket
 
         data.gachaTicket -= amount;
 
-        Debug.Log($"[GachaTicket] 소환권 -{amount} | 현재: {data.gachaTicket}");
+        GameLog.Info($"[GachaTicket] 소환권 -{amount} | 현재: {data.gachaTicket}");
         OnChanged?.Invoke(data.gachaTicket);
         return true;
     }

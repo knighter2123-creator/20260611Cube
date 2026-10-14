@@ -19,7 +19,6 @@ public partial class StageManager
     {
         currentWorld    = d.currentWorld;
         currentStage    = d.currentStage;
-        currentStatMult = Mathf.Pow(statMultiplier,
-            (currentWorld - 1) * maxStagePerWorld + (currentStage - 1));
+        currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
     }
 }

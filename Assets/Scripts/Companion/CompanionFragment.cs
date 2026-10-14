@@ -62,7 +62,7 @@ public class CompanionFragment : MonoBehaviour
 
         int next = GetFragment(data) + amount;
         SetFragment(data.id, next);
-        Debug.Log($"[Fragment] {data.companionName}({data.id}) 조각 +{amount} → 현재 {next}개");
+        GameLog.Info($"[Fragment] {data.companionName}({data.id}) 조각 +{amount} → 현재 {next}개");
     }
 
     public int GetFragment(CompanionData data)
@@ -121,7 +121,7 @@ public class CompanionFragment : MonoBehaviour
 
         SaveManager.Instance?.Save();
 
-        Debug.Log($"[Fragment] {data.companionName}({data.id}) 성급 상승 → {nextStar}성 " +
+        GameLog.Info($"[Fragment] {data.companionName}({data.id}) 성급 상승 → {nextStar}성 " +
                   $"(조각 -{CompanionStar.FRAGMENTS_PER_STAR}, 남은 조각 {GetFragment(data)})");
         return true;
     }
@@ -176,7 +176,7 @@ public class CompanionFragment : MonoBehaviour
 
         SaveManager.Instance?.Save();
 
-        Debug.Log(alreadyOwned
+        GameLog.Info(alreadyOwned
             ? $"[Fragment] {data.companionName} 진화 → 이미 보유한 {target.companionName} 조각 +{gained}"
             : $"[Fragment] {data.companionName} 진화 → {target.companionName} 1성 획득");
         return true;

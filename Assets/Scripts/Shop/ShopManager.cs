@@ -59,13 +59,13 @@ public class ShopManager : MonoBehaviour
         SaveManager.Instance?.Save();
 
         OnPurchaseSuccess?.Invoke(product);
-        Debug.Log($"[ShopManager] 구매 완료: {product.DisplayName}");
+        GameLog.Info($"[ShopManager] 구매 완료: {product.DisplayName}");
         return true;
     }
 
     private bool Fail(ShopProductData product, string reason)
     {
-        Debug.Log($"[ShopManager] 구매 실패: {reason}");
+        GameLog.Info($"[ShopManager] 구매 실패: {reason}");
         OnPurchaseFailed?.Invoke(product, reason);
         return false;
     }

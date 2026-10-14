@@ -401,7 +401,7 @@ public class DailyDungeonEntry : MonoBehaviour
         // 팝업이 떠 있는 사이 다른 곳에서 추가/초기화돼 비용이 바뀌었으면, 확인한 금액과 다르므로 진행하지 않습니다.
         if (DailyDungeonProgress.NextPurchaseCost(dungeon) != confirmedCost)
         {
-            Debug.Log($"[일일 던전] 횟수 추가 취소 — 비용이 바뀜 ({dungeon.id})");
+            GameLog.Info($"[일일 던전] 횟수 추가 취소 — 비용이 바뀜 ({dungeon.id})");
             Refresh();
             return;
         }
@@ -430,7 +430,7 @@ public class DailyDungeonEntry : MonoBehaviour
     private void Notify(string title, string message)
     {
         if (confirmPopup != null) confirmPopup.ShowMessage(title, message);
-        else Debug.Log($"[일일 던전] {title} — {message}");
+        else GameLog.Info($"[일일 던전] {title} — {message}");
     }
 
     // ── 입장 ───────────────────────────────────────
@@ -477,12 +477,12 @@ public class DailyDungeonEntry : MonoBehaviour
             !DailyDungeonProgress.IsLevelUnlocked(dungeon, level) ||
             DailyDungeonProgress.RemainingEntries(dungeon) <= 0)
         {
-            Debug.Log($"[일일 던전] 입장 거부 — {dungeon.id} Lv.{level}");
+            GameLog.Info($"[일일 던전] 입장 거부 — {dungeon.id} Lv.{level}");
             Refresh();
             return;
         }
 
-        Debug.Log($"[일일 던전] 입장 — {dungeon.displayName} Lv.{level} ({RemainSummary(dungeon)})");
+        GameLog.Info($"[일일 던전] 입장 — {dungeon.displayName} Lv.{level} ({RemainSummary(dungeon)})");
 
         lastSelectedId = dungeon.id;   // 돌아왔을 때 이 던전이 선택돼 있도록
 

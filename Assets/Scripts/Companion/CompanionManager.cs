@@ -116,7 +116,7 @@ public class CompanionManager : MonoBehaviour
         // 이미 이 세이브대로 복원돼 오브젝트가 살아있으면 다시 비우지 않는다 (중복 ApplyFrom 방지)
         if (ownedCompanions.Count > 0)
         {
-            Debug.Log("[CompanionManager] 이미 복원됨 — ApplyFrom 건너뜀");
+            GameLog.Info("[CompanionManager] 이미 복원됨 — ApplyFrom 건너뜀");
             return;
         }
 
@@ -142,7 +142,7 @@ public class CompanionManager : MonoBehaviour
                 placementByIndex[p.ownedIndex] = new Vector3Int(p.cellX, p.cellY, p.cellZ);
         }
 
-        Debug.Log($"[CompanionManager] 세이브 복원 — 동료 {ownedCompanionData.Count}명 / 배치 {placementByIndex.Count}개");
+        GameLog.Info($"[CompanionManager] 세이브 복원 — 동료 {ownedCompanionData.Count}명 / 배치 {placementByIndex.Count}개");
     }
 
     // ──────────────────────────────────────────────
@@ -155,13 +155,13 @@ public class CompanionManager : MonoBehaviour
         // 이미 보유(복원 포함)한 동료면 신규 획득 아님 → 조각 처리로 넘김
         if (IsOwned(data.id))
         {
-            Debug.Log($"[CompanionManager] {data.companionName}은(는) 이미 보유 중 — 신규 획득 아님");
+            GameLog.Info($"[CompanionManager] {data.companionName}은(는) 이미 보유 중 — 신규 획득 아님");
             return false;
         }
 
         // ✅ 보유(도감) 등록은 슬롯 제한과 무관하게 항상 수행 (중복 판정의 기준)
         ownedCompanionData.Add(data);
-        Debug.Log($"[CompanionManager] {data.companionName} 신규 보유 등록");
+        GameLog.Info($"[CompanionManager] {data.companionName} 신규 보유 등록");
 
         // ★ [수정] 오브젝트는 '항상' 만듭니다. (최대 6 제한은 PlaceCompanion 이 '배치 수' 기준으로 검사)
         //   예전에는 오브젝트 수가 6이면 새 동료는 데이터만 보유했습니다.
@@ -218,7 +218,7 @@ public class CompanionManager : MonoBehaviour
             if (next != null && cell.HasValue) PlaceCompanion(next, cell.Value);
         }
 
-        Debug.Log($"[CompanionManager] {from.companionName} → {to.companionName} 교체 (자리 {index})");
+        GameLog.Info($"[CompanionManager] {from.companionName} → {to.companionName} 교체 (자리 {index})");
         return true;
     }
 
@@ -257,7 +257,7 @@ public class CompanionManager : MonoBehaviour
             foreach (var kv in shifted) placementByIndex[kv.Key] = kv.Value;
         }
 
-        Debug.Log($"[CompanionManager] {data.companionName} 보유 목록에서 제거 (자리 {index})");
+        GameLog.Info($"[CompanionManager] {data.companionName} 보유 목록에서 제거 (자리 {index})");
         return true;
     }
 
@@ -307,7 +307,7 @@ public class CompanionManager : MonoBehaviour
             int idx = ownedCompanions.IndexOf(kv.Value);
             if (idx >= 0) placementByIndex[idx] = kv.Key;
         }
-        Debug.Log($"[CompanionManager] 배치 스냅샷 — {placementByIndex.Count}개");
+        GameLog.Info($"[CompanionManager] 배치 스냅샷 — {placementByIndex.Count}개");
     }
 
     /// <summary>
@@ -317,7 +317,7 @@ public class CompanionManager : MonoBehaviour
     /// </summary>
     public void RestoreIntoScene(Tilemap tilemap)
     {
-        Debug.Log($"[CompanionManager] RestoreIntoScene — 데이터 {ownedCompanionData.Count}명, 오브젝트 {ownedCompanions.Count}개");
+        GameLog.Info($"[CompanionManager] RestoreIntoScene — 데이터 {ownedCompanionData.Count}명, 오브젝트 {ownedCompanions.Count}개");
 
         BindPlaceableTilemap(tilemap);
 
@@ -375,12 +375,12 @@ public class CompanionManager : MonoBehaviour
         }
         if (!placeableTilemap.HasTile(cell))
         {
-            Debug.Log("[CompanionManager] 배치 가능 구역이 아닙니다.");
+            GameLog.Info("[CompanionManager] 배치 가능 구역이 아닙니다.");
             return false;
         }
         if (occupied.ContainsKey(cell))
         {
-            Debug.Log($"[CompanionManager] {cell} 셀에 이미 동료가 있습니다.");
+            GameLog.Info($"[CompanionManager] {cell} 셀에 이미 동료가 있습니다.");
             return false;
         }
 
@@ -389,7 +389,7 @@ public class CompanionManager : MonoBehaviour
         //   이미 배치된 동료를 다른 칸으로 '옮기는' 경우는 수가 늘지 않으므로 통과.
         if (!companion.IsPlaced && occupied.Count >= maxCompanions)
         {
-            Debug.Log($"[CompanionManager] 최대 배치 수({maxCompanions}) 도달 — 배치하지 않습니다.");
+            GameLog.Info($"[CompanionManager] 최대 배치 수({maxCompanions}) 도달 — 배치하지 않습니다.");
             return false;
         }
 

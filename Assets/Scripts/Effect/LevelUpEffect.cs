@@ -248,7 +248,7 @@ public partial class LevelUpEffect : MonoBehaviour
         lastKnownLevel = newLevel;
 
         if (logBinding)
-            Debug.Log($"[LevelUpEffect] 레벨업 감지 → Lv.{newLevel} 연출 재생", this);
+            GameLog.Info($"[LevelUpEffect] 레벨업 감지 → Lv.{newLevel} 연출 재생", this);
 
 // ★ 추가 — ?. 로 조용히 넘기지 않는다. 없으면 없다고 말하게 한다.
         if (HapticManager.Instance != null)
