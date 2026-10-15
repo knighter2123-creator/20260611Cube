@@ -100,6 +100,12 @@ public class SaveData
 
     // ── 기타 ──
     public string playerName = "";
+    public string anonymousName = "";      // 이름을 정하기 전 표시 이름 ("익명1234"). 처음 필요할 때 한 번 만들어짐 (PlayerProfile)
+    public long   nameUpdatedAt = 0;       // 이름을 마지막으로 정한 시각 (UTC unix ms) — 서버 이름과 어느 쪽이 최신인지 비교 (ProfileSync)
+
+    // ── 랭킹 (StageRecord) ──
+    public int  bestClearedProgress = 0;   // 최고 클리어 스테이지 (누적 개수, 1-1 클리어 = 1). 0 = 아직 없음
+    public long bestClearedAt       = 0;   // 그 기록을 처음 세운 시각 (UTC unix ms) — 같은 스테이지끼리 먼저 깬 사람이 위
     public long lastExitTime = 0;
     public long lastIdleClaimTime = 0;   // 마지막 정산 시각 (DateTime.ToBinary())
     public MissionSaveData missionData = new MissionSaveData();

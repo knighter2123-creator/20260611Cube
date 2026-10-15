@@ -57,6 +57,39 @@ public static class PlayerProfile
 
     public static bool HasName => !string.IsNullOrEmpty(Name);
 
+    // ───────── 익명 이름 (이름을 정하기 전 표시용) ─────────
+
+    public const string ANONYMOUS_PREFIX = "익명";
+
+    /// <summary>
+    /// 이름을 정하기 전 보여 줄 "익명1234". 처음 읽을 때 한 번 만들어 세이브에 넣고, 이후엔 같은 값을 씁니다.
+    ///
+    /// [왜 playerName 에 바로 넣지 않는가]
+    ///   playerName 이 채워지면 HasName = true 가 되어 '최초 등록(무료)' 흐름(NicknamePrompt / TryRegister)이
+    ///   전부 막히고, 첫 이름 정하기부터 보석을 내야 합니다. 그래서 별도 필드에 두고 "표시용" 으로만 씁니다.
+    ///
+    /// 숫자 4자리 = "익명" + 4 = 6자로 MAX_LENGTH 안에 들어갑니다. 다른 유저와 겹칠 수 있습니다 (표시용이라 허용).
+    /// </summary>
+    public static string AnonymousName
+    {
+        get
+        {
+            SaveData data = Data;
+            if (data == null) return ANONYMOUS_PREFIX;
+
+            if (string.IsNullOrEmpty(data.anonymousName))
+            {
+                data.anonymousName = ANONYMOUS_PREFIX + Random.Range(1000, 10000);
+                Persist();   // 기존 세이브가 있으면 바로 기록, 첫 실행이면 첫 Save() 때 함께 기록 (Persist 주석 참고)
+                GameLog.Info($"[PlayerProfile] 익명 이름 생성: {data.anonymousName}");
+            }
+            return data.anonymousName;
+        }
+    }
+
+    /// <summary>화면·랭킹에 보여 줄 이름. 정한 이름이 없으면 익명 이름.</summary>
+    public static string DisplayName => HasName ? Name : AnonymousName;
+
     /// <summary>쓰기 창구 공통 — 저장 시스템이 준비됐는지 확인합니다.</summary>
     private static bool TryGetData(out SaveData data, out string error)
     {
@@ -116,7 +149,8 @@ public static class PlayerProfile
         if (!Validate(raw, out string cleaned, out error))
             return false;
 
-        data.playerName = cleaned;
+        data.playerName    = cleaned;
+        data.nameUpdatedAt = NowMs();
 
         RegisterSave();
 
@@ -183,13 +217,61 @@ public static class PlayerProfile
             return false;
         }
 
-        data.playerName = cleaned;
+        data.playerName    = cleaned;
+        data.nameUpdatedAt = NowMs();
         SaveManager.Instance.Save();   // 위 설명대로 TryRegister 의 Persist() 가 아니라 전체 Save() 사용
 
         GameLog.Info($"[PlayerProfile] 이름 변경 완료: {cleaned} (보석 -{CHANGE_NAME_GEM_COST})");
         OnNameChanged?.Invoke(cleaned);
         return true;
     }
+
+    // ───────── 서버 이름 적용 (ProfileSync 전용) ─────────
+
+    /// <summary>이름을 마지막으로 정한 시각 (UTC ms). 서버 값과 어느 쪽이 최신인지 비교할 때 씁니다.</summary>
+    public static long NameUpdatedAt => Data?.nameUpdatedAt ?? 0;
+
+    /// <summary>
+    /// 서버(다른 기기)에서 정한 이름을 이 기기에 적용합니다. 보석을 쓰지 않습니다 —
+    /// 개명 비용은 이름을 바꾼 기기에서 이미 냈기 때문입니다.
+    /// 규칙에 안 맞는 값(콘솔에서 직접 고친 경우 등)은 적용하지 않습니다.
+    /// </summary>
+    public static bool ApplyFromServer(string raw, long updatedAt)
+    {
+        if (!TryGetData(out SaveData data, out _)) return false;
+
+        if (!Validate(raw, out string cleaned, out string error))
+        {
+            Debug.LogWarning($"[PlayerProfile] 서버 이름 '{raw}' 이(가) 규칙에 맞지 않아 무시합니다: {error}");
+            return false;
+        }
+
+        bool hadName = HasName;
+        data.playerName    = cleaned;
+        data.nameUpdatedAt = updatedAt;
+
+        RegisterSave();   // 게임 씬 진입 전(LoginScene)에 불릴 수 있으므로 등록과 같은 저장 경로
+
+        GameLog.Info($"[PlayerProfile] 서버 이름 적용: {cleaned}");
+        if (hadName) OnNameChanged?.Invoke(cleaned);
+        else         OnNameRegistered?.Invoke(cleaned);
+        return true;
+    }
+
+    /// <summary>서버에 있는 익명 이름을 이 기기에도 씁니다 (어느 기기에서나 같은 "익명1234").</summary>
+    public static void ApplyAnonymousFromServer(string anonymousName)
+    {
+        SaveData data = Data;
+        if (data == null || string.IsNullOrEmpty(anonymousName) || data.anonymousName == anonymousName) return;
+
+        data.anonymousName = anonymousName;
+        RegisterSave();
+
+        // 이름이 없는 유저에게는 익명 이름이 곧 표시 이름 → 네임플레이트 갱신
+        if (!HasName) OnNameChanged?.Invoke(anonymousName);
+    }
+
+    private static long NowMs() => System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     // ───────── 파일 기록 ─────────
 

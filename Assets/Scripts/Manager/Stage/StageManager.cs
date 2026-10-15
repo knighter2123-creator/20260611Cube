@@ -214,6 +214,9 @@ public partial class StageManager : MonoBehaviour
         // ────────────────────────────────────────────────────────────────
         AugmentManager.Instance?.OnStageCleared(currentWorld, currentStage);
 
+        // ★ 랭킹 — 최고 클리어 기록 갱신 (마찬가지로 currentStage++ 이전, 아래 Save() 에 함께 기록됨)
+        StageRecord.ReportClear(currentWorld, currentStage);
+
         currentStage++;
 
         if (currentStage > StageFormula.MaxStagePerWorld)

@@ -11,9 +11,6 @@ using UnityEngine.EventSystems;   // 클릭/터치 감지(IPointerClickHandler)
 /// </summary>
 public class PlayerName : MonoBehaviour, IPointerClickHandler
 {
-    // 이름이 없을 때 보여줄 값 (이제는 "특정 스테이지 전 신규 유저" 의 정상 상태)
-    private const string DefaultName = "플레이어";
-
     [Header("닉네임 표시")]
     [SerializeField] private TMP_Text nickNameText;   // "유저 : OOO" 텍스트
 
@@ -53,7 +50,8 @@ public class PlayerName : MonoBehaviour, IPointerClickHandler
         if (nickNameText == null) return;
 
         // 변수 이름을 name 으로 하면 MonoBehaviour 의 name(오브젝트 이름)과 헷갈리므로 다른 이름 사용
-        string displayName = PlayerProfile.HasName ? PlayerProfile.Name : DefaultName;
+        // 이름이 없으면(특정 스테이지 전 신규 유저의 정상 상태) "익명1234" 같은 익명 이름
+        string displayName = PlayerProfile.DisplayName;
         try
         {
             nickNameText.text = string.Format(format, displayName);

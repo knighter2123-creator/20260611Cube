@@ -13,6 +13,7 @@ using UnityEngine.UI;
 ///   [계정 삭제] ──→ 확인 팝업 표시
 ///                     ├─ [취소] / 뒤로가기 → 팝업만 닫힘 (설정 패널은 그대로)
 ///                     └─ [삭제]
+///                          ├─ ServerAccountData        서버 랭킹·닉네임 삭제. 실패 → 팝업에 안내, 아무것도 안 바뀜
 ///                          ├─ AccountReset.TryWipe()   실패 → 팝업에 안내, 아무것도 안 바뀜
 ///                          ├─ 패널 정리 (리스너 해제, 진동 취소, 블룸 요청 비우기)
 ///                          └─ AccountReset.RestartFromLogin() → LoginScene (첫 실행 상태)
@@ -39,6 +40,9 @@ public partial class GameSettingManager
     [SerializeField] private TMP_Text deleteStatusText;
 
     private bool accountResetReady;
+
+    // 서버 기록(랭킹·닉네임) 삭제를 기다리는 중 — 이 동안 팝업을 닫거나 다시 누를 수 없음
+    private bool serverDeleteInProgress;
 
     /// <summary>확인 팝업이 떠 있는가. OnEscape 가 "팝업만 닫기" 를 판단할 때 쓴다.</summary>
     private bool IsDeleteConfirmOpen => deleteConfirmPopup != null && deleteConfirmPopup.activeSelf;
@@ -107,7 +111,7 @@ public partial class GameSettingManager
     /// <summary>팝업만 닫는다. 설정 패널은 그대로 둔다. (Close() 와 OnEscape 에서도 부름)</summary>
     private void HideDeleteConfirm()
     {
-        if (AccountReset.IsRunning) return;   // 삭제가 시작된 뒤에는 팝업을 유지 ('삭제 중...' 표시)
+        if (AccountReset.IsRunning || serverDeleteInProgress) return;   // 삭제가 시작된 뒤에는 팝업을 유지 ('삭제 중...' 표시)
         if (deleteConfirmPopup != null) deleteConfirmPopup.SetActive(false);
     }
 
@@ -117,7 +121,7 @@ public partial class GameSettingManager
 
     private void OnClickConfirmDelete()
     {
-        if (AccountReset.IsRunning) return;
+        if (AccountReset.IsRunning || serverDeleteInProgress) return;
 
         LogWhoClicked("계정 삭제 실행");
 
@@ -125,9 +129,35 @@ public partial class GameSettingManager
         SetDeleteButtonsInteractable(false);
         SetDeleteStatus("삭제 중...");
 
+        // ⓪ 서버 기록(랭킹 + 닉네임) 삭제 — 네트워크라 실패할 수 있으므로 로컬보다 먼저.
+        //   실패하면 로컬도 지우지 않습니다 (서버 기록만 남은 계정이 생기지 않게). 게스트 세이브면 바로 성공.
+        serverDeleteInProgress = true;
+        ServerAccountData.DeleteForCurrentAccount((ok, serverError) =>
+        {
+            if (this == null) return;   // 기다리는 사이 씬이 바뀜
+            serverDeleteInProgress = false;
+
+            if (!ok)
+            {
+                SetDeleteStatus(serverError);
+                SetDeleteButtonsInteractable(true);
+                return;
+            }
+
+            WipeLocalAndRestart();
+        });
+    }
+
+    /// <summary>서버 기록 삭제가 끝난 뒤 — 로컬 진행 데이터를 지우고 LoginScene 부터 다시 시작.</summary>
+    private void WipeLocalAndRestart()
+    {
         // ① 지우기 — 실패할 수 있는 일을 먼저. 실패하면 게임은 아무 일 없던 것처럼 계속된다.
         if (!AccountReset.TryWipe(LOGIN_SCENE, out string error))
         {
+            // 서버 기록은 이미 지워졌는데 로컬은 그대로 → 계속 플레이하므로 서버에 다시 올림
+            RankingManager.Instance?.RequestUpload();
+            ProfileSync.Instance?.RequestPush();
+
             SetDeleteStatus(error);
             SetDeleteButtonsInteractable(true);
             return;
