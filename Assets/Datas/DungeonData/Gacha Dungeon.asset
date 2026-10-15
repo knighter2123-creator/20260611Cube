@@ -16,13 +16,25 @@ MonoBehaviour:
   displayName: "\uC18C\uD658\uAD8C \uB358\uC804"
   dailyEntries: 3
   maxLevel: 10
+  extraEntryCostType: 1
+  extraEntryCosts: 2c010000f4010000bc020000e8030000dc050000
   rewardType: 3
   baseReward: 1
   rewardPerLevel: 1
+  rule: 1
+  timeLimit: 60
   bossPrefab: {fileID: -2826533066840684818, guid: 0308cdca773578c46bb5604cd22adc17,
     type: 3}
-  timeLimit: 60
   hpMultiplier: 1.5
   hpGrowthPerLevel: 1.2
   defenceMultiplier: 2
   defenceGrowthPerLevel: 1.2
+  defenseEnemyPrefab: {fileID: 6701534727113030509, guid: e79a6d0c6351e1b429681e6a60ef9366,
+    type: 3}
+  maxBreaches: 3
+  spawnInterval: 2
+  spawnIntervalGrowthPerLevel: 1
+  minSpawnInterval: 0.1
+  enemiesPerSpawn: 1
+  enemyHpMultiplier: 0.5
+  enemyDefenceMultiplier: 0.5
