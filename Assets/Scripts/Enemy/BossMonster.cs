@@ -71,7 +71,7 @@ public class BossMonster : Enemy
         GachaTicket.Add(rewardGachaTicket);
 
         LevelUpManager.Instance?.AddExp(
-            Mathf.RoundToInt(baseRewardExp * bossExpMultiplier * statMult));
+            (long)System.Math.Round(baseRewardExp * bossExpMultiplier * expMult));
     }
 
     /// <summary>훅 ② — 보스는 킬 카운트가 아니라 "스테이지 클리어"를 보고</summary>

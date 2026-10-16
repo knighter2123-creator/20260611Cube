@@ -85,9 +85,19 @@ public class IdleRewardManager : MonoBehaviour
     // ──────────────────────────────────────────────
     private (double gold, double exp) GetBaseRatePerMinute()
     {
-        float mult = GetCurrentStatMult();
-        return (rewardGoldPerKill * mult * killsPerMinute,
-                rewardExpPerKill  * mult * killsPerMinute);
+        float  mult    = GetCurrentStatMult();
+        double expMult = GetCurrentExpMult();   // 경험치는 체력 배율이 아니라 경험치 전용 배율 (Enemy 와 동일)
+        return (rewardGoldPerKill * mult    * killsPerMinute,
+                rewardExpPerKill  * expMult * killsPerMinute);
+    }
+
+    // 현재 스테이지의 경험치 배율 — 스탯 배율과 같은 이유로 세이브 기준.
+    private double GetCurrentExpMult()
+    {
+        var data = SaveManager.Instance?.Current;
+        if (data == null) return 1.0;
+
+        return StageFormula.ExpMult(data.currentWorld, data.currentStage);
     }
 
     // 현재 스테이지 배율 — 세이브의 월드/스테이지로 계산한다.

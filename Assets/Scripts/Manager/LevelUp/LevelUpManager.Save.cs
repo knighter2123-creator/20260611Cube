@@ -33,11 +33,21 @@ public partial class LevelUpManager
     {
         if (!IsReady || d == null) return;
 
-        stat.Level      = d.level > 0 ? d.level : 1;
-        stat.Experience = d.experience;
+        stat.Level = d.level > 0 ? d.level : 1;
 
-        // maxExperience가 오염(0)됐을 때 고정값으로 두면 레벨과 어긋나므로 레벨에 맞게 재계산합니다.
-        stat.MaxExperience = d.maxExperience > 0 ? d.maxExperience : CalculateMaxExp(stat.Level);
+        // 필요 경험치는 저장값(사본)을 믿지 않고 레벨(원본)에서 다시 계산합니다 (치명타·공격 주기와 같은 원칙).
+        // 공식을 바꿔도 기존 세이브에 옛 값이 남지 않습니다.
+        stat.MaxExperience = CalculateMaxExp(stat.Level);
+
+        // 옛 공식으로 저장된 세이브는 경험치 '진행률'을 유지해 새 기준으로 옮깁니다.
+        // (그대로 두면 새 필요량을 넘어서 다음 처치 때 레벨이 한꺼번에 오를 수 있음)
+        long savedExp = System.Math.Max(0L, d.experience);
+        if (d.maxExperience > 0 && d.maxExperience != stat.MaxExperience)
+        {
+            double ratio = System.Math.Min(1.0, (double)savedExp / d.maxExperience);
+            savedExp = (long)(ratio * stat.MaxExperience);
+        }
+        stat.Experience = System.Math.Min(savedExp, stat.MaxExperience - 1);
 
         stat.UpgradeLevelDamage     = d.upgradeDamage;
         stat.UpgradeLevelAttackSpd  = d.upgradeAttackSpd;

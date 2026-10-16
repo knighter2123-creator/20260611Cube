@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -42,7 +43,8 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     [Tooltip("사망 시 녹색으로 물들며 사라지는 연출을 사용합니다")]
     [SerializeField] private bool useDeathEffect = true;
 
-    protected float statMult = 1f;   // 스폰 시 받은 누적 배율
+    protected float statMult = 1f;   // 스폰 시 받은 누적 배율 (체력·골드용)
+    protected double expMult = 1.0;  // 스폰 시 스테이지 기준 경험치 배율 (체력 배율과 분리)
 
     // 풀 재사용 대비 원본 기준값 (프리팹 인스펙터 값을 Awake에서 1회 보관)
     protected float baseMaxHealth;
@@ -92,6 +94,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         deathEffect?.ResetState();
         ResetDebuffs();
         ApplyStatMultiplier(mult);
+        expMult = StageFormula.CurrentExpMult();
 
         OnResetForSpawn();
     }
@@ -180,7 +183,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     protected virtual void GrantRewards()
     {
         CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(rewardGold * statMult));
-        LevelUpManager.Instance?.AddExp(Mathf.RoundToInt(rewardExp * statMult));
+        LevelUpManager.Instance?.AddExp((long)Math.Round(rewardExp * expMult));
     }
 
     /// <summary>
@@ -217,7 +220,12 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     public void RemoveHpBar()
     {
         if (hpBarObject != null)
-            Destroy(hpBarObject);
+        {
+            // HP 바는 HpBar 루트가 풀링합니다. 루트를 못 찾는 경우(구조 변경 등)에만 파괴.
+            HpBar root = hpBarObject.GetComponentInParent<HpBar>(true);
+            if (root != null) root.Release(hpBarObject);
+            else              Destroy(hpBarObject);
+        }
 
         hpBarObject     = null;
         hpBarController = null;

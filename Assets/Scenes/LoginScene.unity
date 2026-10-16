@@ -4184,7 +4184,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fcf1012bbd82ddb4dbdd97de57ed1698, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AlarmClock
-  intervalSeconds: 30
+  intervalSeconds: 300
   showSeconds: 5
   fadeIn: 0.25
   fadeOut: 0.35
@@ -5604,7 +5604,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ebeeb31c975f1049bbcb9587ac02591, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IdleRewardManager
-  idleRatio: 0.5
+  idleRatio: 0.3
   maxAccrualHours: 24
   rewardGoldPerKill: 10
   rewardExpPerKill: 5

@@ -37,11 +37,14 @@ public abstract class AugmentReward : AugmentCard
         {
             // 현재 스테이지의 스탯 배율(적 체력/보상에 곱해지는 값)을 그대로 재활용합니다.
             // 이러면 밸런스 곡선을 따로 관리하지 않아도 자동으로 따라옵니다.
-            v *= AugmentBridge.GetStageMultiplier() * stageScale;
+            v *= StageMultiplier() * stageScale;
         }
 
         return v;
     }
+
+    /// <summary>지급량에 곱할 스테이지 배율. 기본은 적 스탯 배율, 경험치 카드는 경험치 전용 배율로 덮어씁니다.</summary>
+    protected virtual double StageMultiplier() => AugmentBridge.GetStageMultiplier();
 
     public override void Apply(AugmentManager manager, bool isRestore)
     {
