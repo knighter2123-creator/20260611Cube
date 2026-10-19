@@ -29,6 +29,15 @@ public class ShopTabController : MonoBehaviour
     }
 
     [SerializeField] private List<Tab> tabs = new();
+
+    // ★ 기본 탭은 '번호' 가 아니라 'id' 로 정합니다.
+    //   번호는 탭을 추가 · 삭제 · 순서 변경할 때마다 가리키는 탭이 바뀝니다.
+    //   실제로 탭이 2개(0~1)로 줄었는데 defaultIndex 가 2 로 남아, 아래 Clamp 때문에 뽑기가 아닌 골드 탭이 열렸습니다.
+    //   id 는 순서와 무관하게 같은 탭을 가리킵니다.
+    [Tooltip("상점을 열었을 때 처음 보일 탭의 id (tabs 의 id 와 철자까지 같아야 함). 비우거나 못 찾으면 Default Index 를 씁니다.")]
+    [SerializeField] private string defaultTabId = "Gacha_UI";
+
+    [Tooltip("Default Tab Id 가 비어 있거나 찾지 못했을 때만 쓰는 예비 번호")]
     [Min(0)] [SerializeField] private int defaultIndex = 0;
 
     /// <summary>지금 선택된 탭 번호. 아직 선택 전이면 -1.</summary>
@@ -45,9 +54,27 @@ public class ShopTabController : MonoBehaviour
 
         if (tabs.Count == 0) return;
 
+        Select(ResolveDefaultIndex());
+    }
+
+    /// <summary>처음 열 탭 번호. id 우선, 못 찾으면 예비 번호(범위 밖이면 경고 후 범위 안으로).</summary>
+    private int ResolveDefaultIndex()
+    {
+        if (!string.IsNullOrEmpty(defaultTabId))
+        {
+            int byId = tabs.FindIndex(t => t.id == defaultTabId);
+            if (byId >= 0) return byId;
+
+            Debug.LogWarning($"[ShopTabController] 기본 탭 id '{defaultTabId}' 를 찾지 못해 Default Index({defaultIndex}) 를 씁니다. " +
+                             "tabs 의 id 철자를 확인하세요.", this);
+        }
+
         // 인스펙터에서 탭을 지운 뒤 defaultIndex 가 범위를 벗어나면 모든 패널이 꺼진 빈 화면이 됩니다.
-        // 범위 안으로 당겨서 최소한 첫/마지막 탭은 보이게 합니다.
-        Select(Mathf.Clamp(defaultIndex, 0, tabs.Count - 1));
+        // 범위 안으로 당겨서 최소한 첫/마지막 탭은 보이게 하되, 조용히 넘어가지 않고 알립니다.
+        if (defaultIndex >= tabs.Count)
+            Debug.LogWarning($"[ShopTabController] Default Index({defaultIndex}) 가 탭 수({tabs.Count})를 넘어 마지막 탭을 엽니다.", this);
+
+        return Mathf.Clamp(defaultIndex, 0, tabs.Count - 1);
     }
 
     public void Select(int index)
