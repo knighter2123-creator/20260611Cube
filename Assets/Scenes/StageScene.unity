@@ -7300,7 +7300,7 @@ MonoBehaviour:
   fontSize: 32
   anchoredPosition: {x: 24, y: -260}
   tapToToggleDetail: 1
-  showWhenEmpty: 1
+  showWhenEmpty: 0
   inactiveColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
 --- !u!4 &267939178
 Transform:
