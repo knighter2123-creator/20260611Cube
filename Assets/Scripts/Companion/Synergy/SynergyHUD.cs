@@ -41,6 +41,7 @@ public class SynergyHUD : MonoBehaviour
     private CompanionManager             bound;           // 실제로 구독한 대상 (CurrencyHUD 와 같은 이유)
     private CompanionPlacementController boundPlacement;
     private Button                       toggleButton;
+    private bool                         labelBuiltByMe;  // 자동 생성한 텍스트인가 (그렇다면 파괴도 내 책임)
     private bool                         detailed;
     private bool                         reportedMissing;
 
@@ -74,6 +75,11 @@ public class SynergyHUD : MonoBehaviour
     private void OnDestroy()
     {
         if (toggleButton != null) toggleButton.onClick.RemoveListener(ToggleDetail);
+
+        // ★ 자동 생성한 텍스트는 HUD 와 운명을 같이합니다.
+        //   텍스트는 Canvas 아래에 있어서, Canvas 가 HUD 보다 오래 살면(다른 씬 · DontDestroyOnLoad)
+        //   HUD 가 사라진 뒤에도 화면에 남습니다. 연결(Label)해 준 텍스트는 남의 것이라 건드리지 않습니다.
+        if (labelBuiltByMe && label != null) Destroy(label.gameObject);
     }
 
     // ══════════════════════════════════════════════
@@ -218,7 +224,11 @@ public class SynergyHUD : MonoBehaviour
 
     private void EnsureLabel()
     {
-        if (label == null) label = BuildLabel();
+        if (label == null)
+        {
+            label          = BuildLabel();
+            labelBuiltByMe = label != null;
+        }
         if (label == null) return;
 
         label.richText = true;
@@ -238,10 +248,10 @@ public class SynergyHUD : MonoBehaviour
 
     private TMP_Text BuildLabel()
     {
-        Canvas canvas = targetCanvas != null ? targetCanvas : FindAnyObjectByType<Canvas>();
+        Canvas canvas = targetCanvas != null ? targetCanvas : FindCanvasInMyScene();
         if (canvas == null)
         {
-            Debug.LogWarning("[SynergyHUD] Canvas 를 찾지 못해 HUD 를 만들지 않았습니다. Label 이나 Target Canvas 를 연결하세요.", this);
+            Debug.LogWarning("[SynergyHUD] 이 씬에서 Canvas 를 찾지 못해 HUD 를 만들지 않았습니다. Label 이나 Target Canvas 를 연결하세요.", this);
             return null;
         }
 
@@ -271,5 +281,30 @@ public class SynergyHUD : MonoBehaviour
         fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
 
         return text;
+    }
+
+    /// <summary>
+    /// 이 HUD 와 '같은 씬' 에 있는 화면용 루트 Canvas.
+    ///
+    /// ★ FindAnyObjectByType&lt;Canvas&gt;() 를 쓰면 안 되는 이유
+    ///   SceneLoader 처럼 DontDestroyOnLoad 로 살아남는 오브젝트의 Canvas 가 잡힐 수 있습니다.
+    ///   거기에 텍스트를 만들면 씬을 옮겨도(Stage → Shop) 텍스트가 따라오고,
+    ///   돌아올 때마다 하나씩 더 생겨 겹칩니다.
+    ///   gameObject.scene 으로 걸러서 '이 씬의 UI' 에만 붙입니다.
+    /// </summary>
+    private Canvas FindCanvasInMyScene()
+    {
+        Canvas fallback = null;
+
+        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (c == null || !c.isRootCanvas || c.gameObject.scene != gameObject.scene) continue;
+
+            // 월드 공간 Canvas(머리 위 체력바 등)보다 화면 Canvas 를 우선합니다.
+            if (c.renderMode != RenderMode.WorldSpace) return c;
+            if (fallback == null) fallback = c;
+        }
+
+        return fallback;
     }
 }

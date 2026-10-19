@@ -371,9 +371,17 @@ public class DailyDungeonManager : MonoBehaviour
         SceneLoader.Instance?.ReturnFromDailyDungeon();
     }
 
+    // 마지막으로 표시한 '초' — StageManager.UpdateTimerUI 와 같은 이유로 초가 바뀔 때만 갱신합니다.
+    private int lastTimerSecond = int.MinValue;
+
     private void UpdateTimerUI()
     {
         if (timerText == null) return;
+
+        int total = Mathf.FloorToInt(timeLeft);
+        if (total == lastTimerSecond) return;
+        lastTimerSecond = total;
+
         int m = Mathf.FloorToInt(timeLeft / 60f);
         int s = Mathf.FloorToInt(timeLeft % 60f);
         timerText.text  = $"{m}:{s:D2}";

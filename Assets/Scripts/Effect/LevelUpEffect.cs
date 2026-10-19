@@ -154,6 +154,15 @@ public partial class LevelUpEffect : MonoBehaviour
         LoadFlashSetting();
     }
 
+    /// <summary>
+    /// ★ [프레임 드랍 수정] 연출 오브젝트를 씬 시작 때 미리 만들어 둡니다.
+    ///   EnsureBuilt 는 텍스처 5장을 픽셀 단위로 계산(링 256×256 등 약 10만 픽셀)하고
+    ///   Shader.Find · 머티리얼 20여 개 · TMP 라벨까지 만듭니다. 예전에는 '첫 레벨업 순간' 에 이걸 해서
+    ///   전투 도중 한 번 크게 멈칫했습니다. 씬 로딩 직후로 옮기면 로딩 화면 뒤에 묻힙니다.
+    ///   (EnsureBuilt 는 한 번만 돌므로 Play 에서 다시 불려도 비용이 없습니다)
+    /// </summary>
+    private void Start() => EnsureBuilt();
+
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;

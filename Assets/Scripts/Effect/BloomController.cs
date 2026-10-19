@@ -434,8 +434,21 @@ public class BloomController : MonoBehaviour
         bloom.active = on;
         bloom.intensity.value = current;
 
+        // ★ [프레임 드랍 수정] 포스트 프로세싱 on/off 는 '연출마다' 가 아니라 '유저 설정' 을 따릅니다.
+        //
+        //   예전에는 블룸이 켜지고 꺼질 때마다(= 레벨업 연출마다 두 번) renderPostProcessing 을 뒤집었습니다.
+        //   URP 는 이 값이 바뀌면 포스트 프로세싱용 렌더 타깃을 새로 할당하고 렌더 경로를 다시 구성하므로,
+        //   그 프레임이 눈에 띄게 멈칫합니다. 방치형이라 레벨업이 잦아 '주기적으로 끊기는' 증상이 됐습니다.
+        //
+        //   이제 블룸이 꺼진 동안에는 bloom.active = false 로 블룸 패스만 건너뛰고(위 줄),
+        //   카메라의 포스트 프로세싱은 유저가 설정에서 블룸을 끈 경우에만 내립니다.
+        //   값이 실제로 바뀔 때만 대입해 매 프레임 같은 값을 다시 쓰지도 않습니다.
         if (togglePostProcessing && cameraData != null)
-            cameraData.renderPostProcessing = on;
+        {
+            bool wantPost = UserEnabled;   // 설정에서 블룸을 끄면(토글 off 또는 강도 0) 패스 자체를 끔
+            if (cameraData.renderPostProcessing != wantPost)
+                cameraData.renderPostProcessing = wantPost;
+        }
     }
 
     private void LogState(string what)

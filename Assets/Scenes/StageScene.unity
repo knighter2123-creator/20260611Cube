@@ -7295,9 +7295,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyHUD
   label: {fileID: 0}
-  targetCanvas: {fileID: 0}
+  targetCanvas: {fileID: 280316193}
   font: {fileID: 11400000, guid: 6b35cf9cacfc87e489df92e967a31f5f, type: 2}
-  fontSize: 26
+  fontSize: 32
   anchoredPosition: {x: 24, y: -260}
   tapToToggleDetail: 1
   showWhenEmpty: 1
