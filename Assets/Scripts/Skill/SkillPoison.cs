@@ -33,10 +33,13 @@ public class SkillPoison : ActiveSkill
         var (finalDamage, isCritical) = CalcDamage(caster);
 
         // 독 피해도 즉발 피해와 같은 공식 — '플레이어 공격력 + 독 피해' 에 같은 치명타 판정을 적용합니다.
-        float finalDot = WithPlayerAttack(caster, GetDotDamage(g), isCritical);
+        // ★ [시너지] WithPlayerAttack 안에서 스킬 피해 보너스가 이미 곱해졌고, 여기서 독 피해 보너스를 한 번 더 곱합니다.
+        //   (두 보너스는 서로 다른 시너지라 둘 다 받는 게 맞습니다 — 같은 보너스를 두 번 곱하는 것과는 다릅니다)
+        float finalDot = WithSynergyScale(WithPlayerAttack(caster, GetDotDamage(g), isCritical), SynergyStat.DotDamage);
+        float duration = WithSynergyScale(GetDotDuration(g), SynergyStat.DebuffDuration);
 
         target.TakeDamage(finalDamage, isCritical);
-        target.ApplyDot(finalDot, GetDotInterval(g), GetDotDuration(g));
+        target.ApplyDot(finalDot, GetDotInterval(g), duration);
     }
 
     // 효과 요약 — 위 Execute 의 독 피해 공식(플레이어 공격력 + dotDamage)과 같은 말로 적습니다.

@@ -133,6 +133,11 @@ public partial class AugmentManager
             for (int i = 0; i < n; i++)
             {
                 if (string.IsNullOrEmpty(data.ids[i])) continue;
+
+                // ★ 0 이하 스택은 버립니다. 깨진 파일에서 음수가 들어오면
+                //   StackOf 가 음수를 돌려줘 maxStack 판정이 어긋나고, 다음 Save 때 그 값이 계속 남습니다.
+                if (data.counts[i] <= 0) continue;
+
                 permanentStacks[data.ids[i]] = data.counts[i];
             }
         }

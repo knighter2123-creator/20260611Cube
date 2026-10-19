@@ -8,6 +8,7 @@ using UnityEngine;
 ///   기본값(const)  +  강화 기여분  =  baseDamage       ← 세이브에 저장되는 값
 ///                                 × 증강 배율        ← 이번 판 한정 (AugmentManager)
 ///                                 × 각성 영구 버프    ← PlayerBuffManager (세이브는 따로)
+///                                 × 동료 시너지       ← CompanionManager.Synergy (저장 안 함 — 배치로 매번 계산)
 ///                                 = FinalDamage      ← 실제 대미지
 ///
 /// 원칙
@@ -80,7 +81,7 @@ public class PlayerStat
     /// 최종 공격력(증강 + 각성 영구 버프 포함). 대미지 계산에는 이 값을 쓰세요.
     /// 배율을 곱하는 곳은 여기 한 군데뿐이어야 합니다.
     /// </summary>
-    public float FinalDamage => DamageAfterAugment * PermanentDamageMultiplier;
+    public float FinalDamage => DamageAfterAwaken * SynergyDamageMultiplier;
 
     /// <summary>증강 치명타 대미지가 반영된 최종 치명타 배수.</summary>
     public float FinalCriticalMultiplier => CriticalMultiplier + AugmentCritDamageBonus;
@@ -142,8 +143,26 @@ public class PlayerStat
     public float PermanentDamageMultiplier =>
         PlayerBuffManager.Instance != null ? PlayerBuffManager.Instance.DamageMultiplier : 1f;
 
-    /// <summary>각성 영구 버프로 늘어난 공격력의 절대량.</summary>
-    public float AwakenDamageBonus => FinalDamage - DamageAfterAugment;
+    /// <summary>각성까지 적용한 공격력(시너지 전 중간값). DamageAfterAugment 와 같은 이유로 둡니다.</summary>
+    public float DamageAfterAwaken => DamageAfterAugment * PermanentDamageMultiplier;
+
+    /// <summary>
+    /// 각성 영구 버프로 늘어난 공격력의 절대량.
+    /// ★ 예전 식(FinalDamage − DamageAfterAugment)을 그대로 두면 시너지분까지 각성으로 잡힙니다 → 중간값 기준으로 바꿈.
+    /// </summary>
+    public float AwakenDamageBonus => DamageAfterAwaken - DamageAfterAugment;
+
+    // ── 공격력: ⑤ 동료 시너지 ──
+    /// <summary>
+    /// 동료 시너지 공격력 배율 (1 = 시너지 없음). 매니저가 없으면 1.
+    /// ★ FinalDamage 는 동료 스킬의 '플레이어 공격력 몫' 에도 쓰이므로(ActiveSkill.WithPlayerAttack)
+    ///   이 보너스는 평타와 동료 스킬 양쪽에 자동으로 들어갑니다. 각성 버프와 같은 동작입니다.
+    /// </summary>
+    public float SynergyDamageMultiplier
+        => Mathf.Max(0f, 1f + CompanionManager.SynergyValue(SynergyStat.PlayerDamage));
+
+    /// <summary>시너지로 늘어난 공격력의 절대량.</summary>
+    public float SynergyDamageBonus => FinalDamage - DamageAfterAwaken;
 
     // ── 치명타 대미지(배수) ──
     public float UpgradeCritDamageBonus => Mathf.Max(0f, CriticalMultiplier - BASE_CRIT_MULT);

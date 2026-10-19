@@ -103,8 +103,39 @@ public abstract class ActiveSkill : ScriptableObject
     /// <summary>이 시전자(등급·성급)의 스킬 피해.</summary>
     public float GetDamage(Companion caster) => GetDamage(GradeOf(caster), StarOf(caster));
 
-    /// <summary>이 시전자(등급·성급)의 재사용 대기.</summary>
-    public float GetCooldown(Companion caster) => GetCooldown(GradeOf(caster), StarOf(caster));
+    /// <summary>
+    /// 이 시전자(등급·성급)의 재사용 대기 — ★ 시너지(재사용 대기 감소)까지 반영한 '실제' 값.
+    /// Companion.Update 와 쿨다운 인디케이터가 둘 다 이 함수를 써서 게이지와 실제 발사가 어긋나지 않습니다.
+    /// (도감은 배치와 무관한 기본값을 보여줘야 하므로 위의 GetCooldown(grade, star) 를 씁니다)
+    /// </summary>
+    public float GetCooldown(Companion caster)
+        => Mathf.Max(GetCooldown(GradeOf(caster), StarOf(caster)) * SynergyCooldownFactor, MIN_COOLDOWN);
+
+    // ══════════════════════════════════════════════
+    //  [시너지] 보정 — CompanionManager.Synergy.cs 의 결과를 읽기만 합니다
+    // ══════════════════════════════════════════════
+    //
+    // ★ 시너지는 팀 전체 보너스라 '누가 쐈는지' 와 무관하게 같은 값입니다.
+    //   스킬 에셋 값은 여전히 건드리지 않습니다 — 읽어서 곱하기만 합니다.
+
+    /// <summary>재사용 대기 감소 상한. 시너지를 겹쳐 100% 이상이 되면 쿨다운 0 → 매 프레임 발사가 되므로 막습니다.</summary>
+    private const float MAX_COOLDOWN_REDUCTION = 0.9f;
+
+    /// <summary>재사용 대기에 곱할 값 (0.1 감소 → 0.9).</summary>
+    public static float SynergyCooldownFactor
+        => 1f - Mathf.Min(CompanionManager.SynergyValue(SynergyStat.Cooldown), MAX_COOLDOWN_REDUCTION);
+
+    /// <summary>스킬 최종 피해에 곱할 값 (+15% → 1.15). 음수 시너지가 생겨도 0 아래로는 내려가지 않습니다.</summary>
+    public static float SynergyDamageFactor
+        => Mathf.Max(0f, 1f + CompanionManager.SynergyValue(SynergyStat.SkillDamage));
+
+    /// <summary>비율형 보정 — 지속시간 · 독 피해처럼 '곱하는' 값. (value × (1 + 시너지))</summary>
+    protected static float WithSynergyScale(float value, SynergyStat stat)
+        => value * Mathf.Max(0f, 1f + CompanionManager.SynergyValue(stat));
+
+    /// <summary>%p 가산 보정 — 둔화율 · 방어력 감소율처럼 원래 0~1 비율인 값. 결과도 0~1 로 자릅니다.</summary>
+    protected static float WithSynergyRate(float rate01, SynergyStat stat)
+        => Mathf.Clamp01(rate01 + CompanionManager.SynergyValue(stat));
 
     // ══════════════════════════════════════════════
     //  [도감] 효과 요약
@@ -175,13 +206,17 @@ public abstract class ActiveSkill : ScriptableObject
     /// 곱해지고, 스킬 자체 피해(extra)는 등급별 고정값 그대로입니다.
     ///
     /// Player 가 없으면(씬 전환 중 등) Stat 이 null 이라 extra 만 돌려줍니다 (NullReferenceException 방지).
+    ///
+    /// ★ [시너지] 스킬 피해 보너스는 여기서 '최종 값 전체' 에 곱합니다.
+    ///   스킬 자체 피해(extra)에만 곱하면 플레이어 공격력이 큰 후반에는 +40% 가 거의 티가 나지 않습니다.
+    ///   즉발 피해(CalcDamage)와 독 피해(SkillPoison)가 모두 이 함수를 지나므로 둘 다 같은 보너스를 받습니다.
     /// </summary>
     protected static float WithPlayerAttack(Companion caster, float extra, bool isCritical)
     {
         PlayerStat stat = StatOf(caster);
-        if (stat == null) return extra;
+        if (stat == null) return extra * SynergyDamageFactor;
 
-        float value = stat.FinalDamage + extra;
+        float value = (stat.FinalDamage + extra) * SynergyDamageFactor;
         return isCritical ? value * stat.FinalCriticalMultiplier : value;
     }
 

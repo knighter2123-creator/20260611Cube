@@ -23,7 +23,8 @@ public class SkillStun : ActiveSkill
     {
         if (target == null || target.isDead) return;
 
-        float duration = GetStunDuration(GradeOf(caster));
+        // ★ [시너지] 디버프 지속시간 — 아래 회색 연출도 이 값을 쓰므로 스턴과 같이 풀립니다.
+        float duration = WithSynergyScale(GetStunDuration(GradeOf(caster)), SynergyStat.DebuffDuration);
 
         var (finalDamage, isCritical) = CalcDamage(caster);
         target.TakeDamage(finalDamage, isCritical);

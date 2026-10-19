@@ -37,7 +37,11 @@ public static class AugmentBridge
     {
         // Enemy.GrantRewards() 가 쓰는 경로와 똑같이 맞췄습니다.
         // LevelUpManager 안에서 레벨업 연출(LevelUpEffect)까지 처리될 겁니다.
-        LevelUpManager.Instance?.AddExp(ToSafeInt(amount));
+        //
+        // '?.' 대신 '!= null' 을 쓰는 이유: LevelUpManager 는 MonoBehaviour 입니다.
+        // '?.' 는 C# 의 진짜 null 만 걸러서, 유니티가 파괴한 오브젝트(가짜 null)는 그대로 통과시킵니다.
+        var lm = LevelUpManager.Instance;
+        if (lm != null) lm.AddExp(ToSafeInt(amount));
     }
 
     // ─────────────────────────────────────────────────────────
@@ -50,8 +54,9 @@ public static class AugmentBridge
     /// </summary>
     public static double GetStageMultiplier()
     {
-        if (StageManager.Instance == null) return 1.0;
-        return StageManager.Instance.CurrentStatMult;
+        var sm = StageManager.Instance;   // 한 번만 읽어 두면 검사와 사용 사이에 값이 달라질 일이 없습니다
+        if (sm == null) return 1.0;
+        return sm.CurrentStatMult;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -81,7 +86,11 @@ public static class AugmentBridge
     /// </summary>
     private static int ClampToHeadroom(double amount, int current)
     {
-        if (amount <= 0d) return 0;
+        // ★ 버그 수정: NaN(숫자 아님) 방어.
+        //   스테이지 배율이 double 범위를 넘어 Infinity 가 된 상태에서 stageScale = 0 이면
+        //   Infinity × 0 = NaN 이 됩니다. NaN 은 어떤 비교(<=, >=)도 false 라서 아래 검사를 전부 빠져나가고,
+        //   (int)NaN 은 int.MinValue(약 -21억)가 되어 AddGold 에 들어가면 골드가 0 이 됩니다.
+        if (double.IsNaN(amount) || amount <= 0d) return 0;
 
         int headroom = int.MaxValue - Mathf.Max(0, current);
         if (headroom <= 0) return 0;
@@ -92,7 +101,7 @@ public static class AugmentBridge
     /// <summary>보유량을 알 수 없는 경우(경험치)의 단순 안전 변환.</summary>
     private static int ToSafeInt(double v)
     {
-        if (v <= 0d) return 0;
+        if (double.IsNaN(v) || v <= 0d) return 0;   // NaN 이유는 ClampToHeadroom 참고
         if (v >= int.MaxValue) return int.MaxValue;
         return (int)v;
     }

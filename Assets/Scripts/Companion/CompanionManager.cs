@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
-public class CompanionManager : MonoBehaviour
+// ★ partial — 시너지 계산 · 조회는 CompanionManager.Synergy.cs 에 있습니다.
+public partial class CompanionManager : MonoBehaviour
 {
     public static CompanionManager Instance;
 
@@ -143,6 +144,9 @@ public class CompanionManager : MonoBehaviour
         }
 
         GameLog.Info($"[CompanionManager] 세이브 복원 — 동료 {ownedCompanionData.Count}명 / 배치 {placementByIndex.Count}개");
+
+        // ★ 시너지 — 위에서 occupied 를 비웠으므로 결과도 비웁니다 (실제 배치는 RestoreIntoScene 에서 다시 계산)
+        RecalculateSynergy();
     }
 
     // ──────────────────────────────────────────────
@@ -209,16 +213,19 @@ public class CompanionManager : MonoBehaviour
             Companion old = ownedCompanions[index];
             Vector3Int? cell = CellOf(old);
 
-            RetrieveCompanion(old);
+            RetrieveInternal(old);
             if (old != null) Destroy(old.gameObject);
 
             Companion next = SpawnCompanionObject(to);
             ownedCompanions[index] = next;
 
-            if (next != null && cell.HasValue) PlaceCompanion(next, cell.Value);
+            if (next != null && cell.HasValue) PlaceInternal(next, cell.Value);
         }
 
         GameLog.Info($"[CompanionManager] {from.companionName} → {to.companionName} 교체 (자리 {index})");
+
+        // ★ 시너지 — 진화로 계열이 바뀔 수 있습니다. 회수·배치를 다 끝낸 뒤 한 번만 계산합니다.
+        RecalculateSynergy();
         return true;
     }
 
@@ -233,7 +240,7 @@ public class CompanionManager : MonoBehaviour
         if (index < ownedCompanions.Count)
         {
             Companion obj = ownedCompanions[index];
-            RetrieveCompanion(obj);
+            RetrieveInternal(obj);
             if (obj != null) Destroy(obj.gameObject);
             ownedCompanions.RemoveAt(index);
         }
@@ -258,6 +265,9 @@ public class CompanionManager : MonoBehaviour
         }
 
         GameLog.Info($"[CompanionManager] {data.companionName} 보유 목록에서 제거 (자리 {index})");
+
+        // ★ 시너지 — 배치돼 있던 동료였다면 인원 수가 줄었습니다.
+        RecalculateSynergy();
         return true;
     }
 
@@ -352,16 +362,37 @@ public class CompanionManager : MonoBehaviour
 
             Companion companion = ownedCompanions[idx];
             if (companion != null)
-                PlaceCompanion(companion, cell);
+                PlaceInternal(companion, cell);
         }
 
         restoredIntoScene = true;
+
+        // ★ 시너지 — 동료마다 계산하지 않고, 전부 재배치한 뒤 한 번만 계산합니다.
+        RecalculateSynergy();
     }
 
     // ──────────────────────────────────────────────
     //  배치 / 회수 (셀 좌표 기반)
     // ──────────────────────────────────────────────
+    // ★ 시너지 — 공개 메서드(PlaceCompanion / RetrieveCompanion)는 '바뀌었으면 재계산' 까지 합니다.
+    //   내부 메서드(PlaceInternal / RetrieveInternal)는 재계산 없이 배치만 바꿉니다.
+    //   여러 동료를 한꺼번에 옮기는 곳(RestoreIntoScene · ReplaceCompanion)은 내부 메서드를 쓰고
+    //   끝에서 한 번만 계산합니다. (PlaceCompanion 안의 회수까지 재계산하면 한 번 배치에 두 번 계산 · 두 번 알림)
     public bool PlaceCompanion(Companion companion, Vector3Int cell)
+    {
+        if (!PlaceInternal(companion, cell)) return false;
+
+        RecalculateSynergy();
+        return true;
+    }
+
+    public void RetrieveCompanion(Companion companion)
+    {
+        if (RetrieveInternal(companion))
+            RecalculateSynergy();
+    }
+
+    private bool PlaceInternal(Companion companion, Vector3Int cell)
     {
         if (placeableTilemap == null)
         {
@@ -393,22 +424,23 @@ public class CompanionManager : MonoBehaviour
             return false;
         }
 
-        RetrieveCompanion(companion);                 // 다른 셀에 있던 동료면 먼저 회수
+        RetrieveInternal(companion);                  // 다른 셀에 있던 동료면 먼저 회수
         occupied[cell] = companion;
         companion.Place(placeableTilemap.GetCellCenterWorld(cell)); // 셀 중앙으로 스냅
         return true;
     }
 
-    public void RetrieveCompanion(Companion companion)
+    /// <summary>배치돼 있던 동료를 회수합니다. 실제로 회수했으면 true (배치돼 있지 않았으면 false).</summary>
+    private bool RetrieveInternal(Companion companion)
     {
-        if (companion == null) return;
+        if (companion == null) return false;
 
         Vector3Int? found = CellOf(companion);
-        if (found.HasValue)
-        {
-            occupied.Remove(found.Value);
-            companion.Retrieve();
-        }
+        if (!found.HasValue) return false;
+
+        occupied.Remove(found.Value);
+        companion.Retrieve();
+        return true;
     }
 
     // ──────────────────────────────────────────────

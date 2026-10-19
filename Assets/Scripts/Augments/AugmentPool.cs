@@ -43,6 +43,14 @@ public class AugmentPool : ScriptableObject
     /// <param name="world">현재 월드. 등급 상승 보정에 사용</param>
     public List<AugmentCard> Draw(int count, System.Func<AugmentCard, int> stackOf, int world)
     {
+        // [작동 순서] 0) 입력 방어 → 1) 후보 추리기 → 2) 장수 결정 → 3) 가중치 추첨 반복
+
+        // 0) 입력 방어
+        //    new List<T>(음수) 는 ArgumentOutOfRangeException 을 던지므로 먼저 거릅니다.
+        //    stackOf 를 안 넘기면 "모든 카드 0 스택" 으로 간주합니다 (영구 카드 확인에서 NullReference 방지).
+        if (count <= 0) return new List<AugmentCard>();
+        stackOf ??= _ => 0;   // ??= : 왼쪽이 null 일 때만 오른쪽을 대입 (System.Func 는 유니티 오브젝트가 아니라 안전)
+
         var result = new List<AugmentCard>(count);
 
         // 1) 후보 추리기 — 최대 스택에 도달한 영구 카드는 제외
@@ -91,11 +99,16 @@ public class AugmentPool : ScriptableObject
 
         // 3) 가중치 추첨을 pick 번 반복.
         //    한 번 뽑은 카드는 후보에서 빼서 같은 카드가 두 장 뜨는 걸 막습니다.
-        float total = 0f;
-        for (int i = 0; i < weights.Count; i++) total += weights[i];
-
         for (int n = 0; n < pick; n++)
         {
+            // 총합을 매번 새로 더합니다.
+            // 예전에는 처음에 한 번 더한 뒤 뽑을 때마다 빼 나갔는데(total -= w),
+            // float 뺄셈은 오차가 쌓여서 남은 실제 합과 조금씩 어긋납니다.
+            // 후보가 몇십 장이라 다시 더해도 비용은 무시할 만하고, 결과는 항상 정확합니다.
+            // ("누적하지 않고 매번 다시 계산" — AugmentManager.RecalculatePermanent 와 같은 원칙)
+            float total = 0f;
+            for (int i = 0; i < weights.Count; i++) total += weights[i];
+
             if (total <= 0f) break;
 
             // [가중치 추첨의 원리]
@@ -112,8 +125,7 @@ public class AugmentPool : ScriptableObject
             }
 
             result.Add(candidates[chosen]);
-            total -= weights[chosen];   // 뽑힌 후보의 무게만큼 총합에서 뺍니다 (다시 더하지 않음)
-            candidates.RemoveAt(chosen);
+            candidates.RemoveAt(chosen);   // 두 리스트는 같은 인덱스끼리 짝이라 반드시 함께 지웁니다
             weights.RemoveAt(chosen);
         }
 

@@ -118,15 +118,29 @@ public partial class AugmentSelectUI : MonoBehaviour
     /// <summary>카드 목록을 보여주고, 선택되면 콜백을 부릅니다.</summary>
     public void Show(List<AugmentCard> cards, Action<AugmentCard> callback)
     {
-        if (isOpen) return;                            // 중복 오픈 방지
+        // [작동 순서]
+        //   ① 중복/빈 목록 거르기 → ② 화면 만들기 → ③ "열림" 확정 → ④ 일시정지 → ⑤ 연출·타이머 시작
+        //   카드 선택 → OnClickCard → PlayPickAndClose(Anim.cs) → Close → 콜백(AugmentManager.OnCardChosen)
+
+        if (isOpen)
+        {
+            // 조용히 무시하면 "카드가 왜 안 뜨지?" 를 추적하기 어려워 로그를 남깁니다.
+            Debug.LogWarning("[AugmentSelectUI] 이미 창이 열려 있어 새 요청을 무시합니다.", this);
+            return;
+        }
         if (cards == null || cards.Count == 0) return;
+
+        // ★ 버그 수정: 예전에는 isOpen = true 를 화면을 만들기 '전에' 했습니다.
+        //   만드는 도중 예외가 나면(예: 카드 설명문 형식 오류) isOpen 이 true 로 남아
+        //   위의 중복 방지에 영원히 걸려 창이 다시는 안 열렸습니다.
+        //   실패할 수 있는 일(화면 만들기)을 먼저 하고, 성공한 뒤에 상태를 바꿉니다.
+        //   (ShopManager.TryPurchase 의 "검증 먼저, 상태 변경은 나중" 과 같은 원칙)
+        EnsureBuilt();      // → Build.cs
+        BuildCards(cards);  // → Build.cs
 
         onChosen = callback;
         picked   = false;
         isOpen   = true;
-
-        EnsureBuilt();      // → Build.cs
-        BuildCards(cards);  // → Build.cs
 
         canvas.gameObject.SetActive(true);
 

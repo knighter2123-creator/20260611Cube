@@ -19,3 +19,4 @@ MonoBehaviour:
   detectRange: 5
   grade: 3
   ownedSkill: {fileID: 11400000, guid: ee382893c8b57f043b83fb935cbbf3ab, type: 2}
+  synergyTag: 3

@@ -201,14 +201,19 @@ public class CompanionDetailPanel : MonoBehaviour
         if (statsText != null)
         {
             sb.Clear();
+            // ★ 시너지 계열 — 계열 판정은 SynergyTags.Of 한 곳에서 (전투 계산과 같은 함수)
+            sb.Append("계열        <b>").Append(SynergyTags.GetColoredName(SynergyTags.Of(data))).Append("</b>\n");
             sb.Append("탐지 범위   <b>").Append(data.detectRange.ToString("0.#")).Append("</b>");
 
             if (skill != null)
             {
                 // 에셋의 원래 숫자가 아니라 '이 동료 등급·성급의' 값을 보여줍니다.
                 // 전투(Companion / CalcDamage)와 같은 함수를 부르므로 화면 수치와 실제 동작이 어긋나지 않습니다.
+                float cooldown = skill.GetCooldown(data.grade, star);
                 sb.Append('\n').Append("스킬 피해   <b>플레이어 공격력 + ").Append(skill.GetDamage(data.grade, star).ToString("0.#")).Append("</b>");
-                sb.Append('\n').Append("재사용 대기 <b>").Append(skill.GetCooldown(data.grade, star).ToString("0.#")).Append("초</b>");
+                sb.Append('\n').Append("재사용 대기 <b>").Append(cooldown.ToString("0.#")).Append("초</b>");
+
+                AppendSynergyNote(data, owned, cooldown);
             }
             statsText.text = sb.ToString();
         }
@@ -290,6 +295,34 @@ public class CompanionDetailPanel : MonoBehaviour
 
         if (evolveButtonLabel != null && evolveTarget != null)
             evolveButtonLabel.text = $"진화 → {CompanionGradeStyle.GetColoredName(evolveTarget.grade)} {evolveTarget.companionName}";
+    }
+
+    /// <summary>
+    /// ★ 시너지 — 이 동료가 지금 맵에 배치돼 있고 시너지가 켜져 있으면, 시너지 반영 수치를 한 줄 덧붙입니다.
+    ///   위의 기본 수치는 그대로 둡니다 (도감은 '이 동료 자체' 의 값을 보여주는 곳이라).
+    ///   쿨다운은 전투와 같은 상수(ActiveSkill.SynergyCooldownFactor · MIN_COOLDOWN)로 계산해 실제와 어긋나지 않게 합니다.
+    /// </summary>
+    private void AppendSynergyNote(CompanionData data, bool owned, float baseCooldown)
+    {
+        CompanionManager cm = CompanionManager.Instance;
+        if (!owned || cm == null || !cm.IsPlaced(data.id)) return;
+
+        float damageBonus = ActiveSkill.SynergyDamageFactor - 1f;
+        float cdFactor    = ActiveSkill.SynergyCooldownFactor;
+        bool  hasDamage   = !Mathf.Approximately(damageBonus, 0f);
+        bool  hasCooldown = !Mathf.Approximately(cdFactor, 1f);
+        if (!hasDamage && !hasCooldown) return;
+
+        sb.Append("\n<color=#8CFF8C>시너지 적용 중: ");
+        if (hasDamage)
+            sb.Append(SynergyStatText.Describe(SynergyStat.SkillDamage, damageBonus));
+        if (hasCooldown)
+        {
+            if (hasDamage) sb.Append(", ");
+            float cd = Mathf.Max(baseCooldown * cdFactor, ActiveSkill.MIN_COOLDOWN);
+            sb.Append("재사용 대기 ").Append(cd.ToString("0.#")).Append('초');
+        }
+        sb.Append("</color>");
     }
 
     private static void SetActive(Component c, bool on)

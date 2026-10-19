@@ -21,9 +21,13 @@ public class SkillSlow : ActiveSkill
 
         CompanionGrade g = GradeOf(caster);
 
+        // ★ [시너지] 둔화율은 %p 가산(0~1 로 자름), 지속시간은 비율 — 도감 요약은 시너지 전 기본값 그대로입니다.
+        float rate     = WithSynergyRate(GetSlowRate(g), SynergyStat.SlowRate);
+        float duration = WithSynergyScale(GetSlowDuration(g), SynergyStat.DebuffDuration);
+
         var (finalDamage, isCritical) = CalcDamage(caster);
         target.TakeDamage(finalDamage, isCritical);
-        target.ApplySlow(GetSlowRate(g), GetSlowDuration(g));
+        target.ApplySlow(rate, duration);
     }
 
     // 효과 요약

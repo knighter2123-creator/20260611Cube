@@ -73,7 +73,22 @@ public abstract class AugmentCard : ScriptableObject
     public virtual string GetDescription()
     {
         // string.Format 은 {0} 이 없으면 그냥 원문을 돌려주므로 안전합니다.
-        return string.Format(description, GetValueText());
+        //
+        // ★ 버그 수정: 하지만 {1} 처럼 없는 번호를 쓰거나 '{' 하나만 적으면 FormatException 이 납니다.
+        //   이 함수는 카드 UI 를 만드는 도중(AugmentSelectUI.Show → BuildCards)에 불리기 때문에,
+        //   예외가 나면 창이 '열린 상태'로 굳어 그 뒤로 증강 창이 다시는 안 열렸습니다.
+        //   설명문은 기획자가 인스펙터에 쓰는 "코드 밖 입력" 이라 여기서 실패를 받아냅니다.
+        //   (try-catch 를 쓰는 기준 — AugmentManager.Save.cs Load 의 학습 포인트 참고)
+        try
+        {
+            return string.Format(description ?? string.Empty, GetValueText());
+        }
+        catch (System.FormatException)
+        {
+            Debug.LogWarning($"[AugmentCard] '{name}' 설명문의 중괄호 형식이 잘못됐습니다. " +
+                             "수치 자리는 {0} 만 쓸 수 있고, 중괄호 글자 자체는 {{ }} 로 적으세요.", this);
+            return description;   // 수치 없이 원문이라도 보여 줍니다
+        }
     }
 
     /// <summary>설명문의 {0} 자리에 들어갈 문자열. 자식이 각자 형식을 정합니다.</summary>

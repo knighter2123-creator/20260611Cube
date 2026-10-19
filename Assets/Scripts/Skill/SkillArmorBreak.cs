@@ -28,9 +28,10 @@ public class SkillArmorBreak : ActiveSkill
         if (target == null || target.isDead) return;
 
         // 등급은 한 번만 구해서 아래에서 같이 씁니다 (피해·효과가 서로 다른 등급으로 계산되는 실수 방지)
+        // ★ [시너지] 감소율은 %p 가산(0~1 로 자름), 지속시간은 비율. 아래 부착 이펙트도 같은 duration 을 씁니다.
         CompanionGrade g        = GradeOf(caster);
-        float          rate     = GetArmorBreakRate(g);
-        float          duration = GetArmorBreakDuration(g);
+        float          rate     = WithSynergyRate(GetArmorBreakRate(g), SynergyStat.ArmorBreakRate);
+        float          duration = WithSynergyScale(GetArmorBreakDuration(g), SynergyStat.DebuffDuration);
 
         var (finalDamage, isCritical) = CalcDamage(caster);
         target.TakeDamage(finalDamage, isCritical);

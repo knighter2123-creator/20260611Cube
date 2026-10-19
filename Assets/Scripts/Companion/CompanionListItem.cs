@@ -67,7 +67,13 @@ public class CompanionListItem : MonoBehaviour
 
         if (nameText != null)
         {
-            nameText.text  = data.companionName;
+            // ★ 시너지 계열 배지 — "순금 도검 [딜러]". 배지만 계열 색, 이름은 아래 등급 색.
+            //   (TMP 리치 텍스트의 <color> 는 nameText.color 보다 우선하므로 둘이 섞이지 않습니다)
+            SynergyTag tag = SynergyTags.Of(data);
+            nameText.richText = true;
+            nameText.text     = tag == SynergyTag.None
+                ? data.companionName
+                : $"{data.companionName} <size=75%>[{SynergyTags.GetColoredName(tag)}]</size>";
             // ★ 등급 색은 도감과 같은 규칙(CompanionGradeStyle)을 씁니다. 색을 바꿀 땐 그 파일 한 곳만 고치면 됩니다.
             //   목록 아이템은 흰 카드 위에 그려지므로 밝은 배경용 색을 씁니다 (일반 = 흰색이면 안 보임).
             nameText.color = CompanionGradeStyle.GetColorOnLight(data.grade);

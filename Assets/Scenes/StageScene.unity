@@ -7265,6 +7265,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 265530654}
   m_CullTransparentMesh: 1
+--- !u!1 &267939176
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 267939178}
+  - component: {fileID: 267939177}
+  m_Layer: 0
+  m_Name: Synergy Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &267939177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 267939176}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 740604d96db0def40b09b02cf450b053, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyHUD
+  label: {fileID: 0}
+  targetCanvas: {fileID: 0}
+  font: {fileID: 11400000, guid: 6b35cf9cacfc87e489df92e967a31f5f, type: 2}
+  fontSize: 26
+  anchoredPosition: {x: 24, y: -260}
+  tapToToggleDetail: 1
+  showWhenEmpty: 1
+  inactiveColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+--- !u!4 &267939178
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 267939176}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &274566911
 GameObject:
   m_ObjectHideFlags: 0
@@ -23729,6 +23781,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HpBar
   _monsterHPbar: {fileID: 2302188127071317768, guid: d18deb2f7e87915488a88563448648dc,
     type: 3}
+  prewarmCount: 12
 --- !u!114 &911579668
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -34422,6 +34475,7 @@ MonoBehaviour:
     detailColor: {r: 0.65, g: 0.68, b: 0.75, a: 1}
     augmentColor: {r: 1, g: 0.82, b: 0.35, a: 1}
     awakenColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+    synergyColor: {r: 0.55, g: 1, b: 0.55, a: 1}
   animate: 0
   animateDuration: 0.14
 --- !u!224 &1436195911
@@ -47730,3 +47784,4 @@ SceneRoots:
   - {fileID: 1091533606}
   - {fileID: 713698387}
   - {fileID: 238973151}
+  - {fileID: 267939178}

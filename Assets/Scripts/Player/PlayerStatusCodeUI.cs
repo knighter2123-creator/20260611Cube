@@ -86,8 +86,9 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     //   이 프로젝트의 매니저들은 씬 왕복 중 파괴 후 재생성되는 경우가 있어서,
     //   bool 로 관리하면 옛 인스턴스를 붙잡은 채 새 매니저의 이벤트를 영영 못 받습니다.
     //   CurrencyHUD 가 'Instance 가 아니라 bound 를 쓰는 이유' 로 적어둔 것과 같은 이야기입니다.
-    private LevelUpManager boundLm;
-    private AugmentManager boundAm;
+    private LevelUpManager   boundLm;
+    private AugmentManager   boundAm;
+    private CompanionManager boundCm;   // ★ 시너지 — 동료를 배치/회수하면 공격력(시너지 배율)이 바뀝니다
 
     /// <summary>패널이 열려 있는가.</summary>
     public bool IsOpen => isOpen;
@@ -207,6 +208,13 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
             UnbindAugment();
             BindAugment(am);
         }
+
+        var cm = CompanionManager.Instance;
+        if (cm != boundCm)
+        {
+            UnbindCompanion();
+            BindCompanion(cm);
+        }
     }
 
     /// <summary>
@@ -219,6 +227,7 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     {
         UnbindLevelUp();
         UnbindAugment();
+        UnbindCompanion();
     }
 
     // 구독(+=) 과 해제(-=) 목록을 한 쌍의 함수에만 둡니다.
@@ -259,11 +268,24 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
         boundAm = null;
     }
 
+    private void BindCompanion(CompanionManager cm)
+    {
+        boundCm = cm;
+        if (boundCm != null) boundCm.OnSynergyChanged += HandleSynergyChanged;
+    }
+
+    private void UnbindCompanion()
+    {
+        if (boundCm != null) boundCm.OnSynergyChanged -= HandleSynergyChanged;
+        boundCm = null;
+    }
+
     // 이벤트마다 시그니처가 달라서 얇은 래퍼를 하나씩 둡니다.
     // 람다(_ => Refresh())로 걸면 짧지만, 람다는 -= 로 해제할 수 없어 구독이 영원히 남습니다.
     private void HandleLevelChanged(int _)                     => RefreshIfOpen();
     private void HandleExpChanged(long _)                      => RefreshIfOpen();
     private void HandleStatUpgraded(LevelUpManager.StatType _) => RefreshIfOpen();
+    private void HandleSynergyChanged(SynergyResult _)         => RefreshIfOpen();
 
     private void RefreshIfOpen()
     {

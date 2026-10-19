@@ -82,7 +82,33 @@ public partial class AugmentManager : MonoBehaviour
 
     // ─────────────────────────────────────────────────────────
     //  라이프사이클
+    //
+    //  [작동 순서 — 한 판의 흐름]
+    //   Awake      : 싱글턴 등록 → UI 찾기 → 저장된 스택 Load → 영구 배율 계산
+    //   Update     : 임시 버프 만료 검사 (Buffs.cs)
+    //   스테이지 클리어 (StageManager → OnStageCleared)
+    //              : '이번 스테이지 동안' 버프 정리 → 트리거 스테이지면 openDelay 뒤 Open
+    //   Open       : 풀에서 카드 추첨 → UI.Show (게임 일시정지)
+    //   카드 선택   : UI 가 창을 닫고 timeScale 복구 → OnCardChosen → card.Apply
+    //              → 영구 카드면 배율 재계산 + Save
     // ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// ─── 도메인 리로드를 끈 에디터 대비 (학습 포인트) ─────────────────────────
+    /// Project Settings → Editor → Enter Play Mode Options 에서 "Reload Domain" 을 끄면
+    /// 플레이를 다시 시작해도 static 변수가 지난 플레이 값을 그대로 들고 있습니다.
+    /// Instance 는 OnDestroy 에서 지우지만, 플레이 중 에러로 OnDestroy 가 안 불린 경우까지 대비해
+    /// 플레이 시작 시 가장 먼저 도는 SubsystemRegistration 에서 비웁니다.
+    /// (GachaTicket.ResetStatics 와 같은 방식. 도메인 리로드가 켜져 있으면 영향 없음)
+    /// ───────────────────────────────────────────────────────────────────────
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        Instance = null;
+        usedSaveKeys.Clear();   // → Save.cs. "이번 실행에서 쓰인 키" 라는 뜻에 맞게 플레이마다 새로 시작
+    }
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -149,6 +175,14 @@ public partial class AugmentManager : MonoBehaviour
     {
         // WaitForSecondsRealtime 을 쓰는 이유:
         // 다른 연출이 timeScale 을 건드리고 있어도 대기 시간이 늘어지지 않게 하기 위해서입니다.
+        //
+        // ─── 왜 Unity 6 의 Awaitable 이 아니라 코루틴인가 (학습 포인트) ────────────
+        // Awaitable.WaitForSecondsAsync 는 scaled 시간(timeScale 영향)으로만 기다립니다.
+        // 여기서는 'unscaled' 대기가 필요한데, 코루틴의 WaitForSecondsRealtime 이 정확히 그 일을 합니다.
+        // 또 코루틴은 이 오브젝트가 파괴되면 자동으로 멈춰서, 파괴된 매니저가 Open 을 부를 걱정이 없습니다.
+        // 새 기능이 항상 정답은 아닙니다 — 씬 이동처럼 "끝날 때까지 기다리기" 는 Awaitable(ShopSceneLoader),
+        // 이렇게 "실시간으로 몇 초" 는 코루틴이 더 단순합니다.
+        // ───────────────────────────────────────────────────────────────────────
         yield return new WaitForSecondsRealtime(delay);
         Open();
     }

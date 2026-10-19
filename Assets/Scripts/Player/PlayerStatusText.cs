@@ -77,6 +77,10 @@ public static class PlayerStatusText
         // 같은 색으로 칠하면 플레이어가 "이 수치가 계속 남는 건가?"를 구분할 수 없습니다.
         [Tooltip("각성(영구) 기여분을 강조할 색")]
         public Color awakenColor = new Color(0.55f, 0.85f, 1f);
+
+        // 시너지는 '동료 배치에 따라' 켜졌다 꺼지는 값이라 증강 · 각성과 또 다른 색을 씁니다.
+        [Tooltip("동료 시너지 기여분을 강조할 색")]
+        public Color synergyColor = new Color(0.55f, 1f, 0.55f);
     }
 
     // 호출부가 Style 을 넘기지 않아도 동작하게 기본값을 하나 들고 있습니다.
@@ -126,6 +130,11 @@ public static class PlayerStatusText
         d += Sep(Colored(st, st.awakenColor,
             $"각성 {MULTIPLY}{s.PermanentDamageMultiplier:0.00} ({NumberFormat.Signed(s.AwakenDamageBonus)})",
             !Mathf.Approximately(s.PermanentDamageMultiplier, 1f)));
+
+        // ★ 동료 시너지 (조화 등). 각성과 같은 이유로 x1.00 이면 기본적으로 숨깁니다.
+        d += Sep(Colored(st, st.synergyColor,
+            $"시너지 {MULTIPLY}{s.SynergyDamageMultiplier:0.00} ({NumberFormat.Signed(s.SynergyDamageBonus)})",
+            !Mathf.Approximately(s.SynergyDamageMultiplier, 1f)));
 
         return d;
     }
