@@ -106,13 +106,18 @@ public partial class TutorialManager : MonoBehaviour
 
         overlayRoot.gameObject.SetActive(false);
 
+        OnClickListener();
+
+        if (autoShowOnFirstLogin && TutorialProgress.ShouldAutoShow)
+            StartCoroutine(BeginNextFrame());
+    }
+
+    private void OnClickListener()
+    {
         nextArea.onClick.RemoveAllListeners();
         skipButton.onClick.RemoveAllListeners();
         nextArea.onClick.AddListener(OnNextClicked);
         skipButton.onClick.AddListener(Skip);
-
-        if (autoShowOnFirstLogin && TutorialProgress.ShouldAutoShow)
-            StartCoroutine(BeginNextFrame());
     }
 
     /// <summary>
@@ -152,10 +157,8 @@ public partial class TutorialManager : MonoBehaviour
                   "에디터에서 직접 붙여 두면 이 로그는 사라집니다.", messageBox);
     }
 
-    private bool ValidateReferences()
+    private bool ValidateReferences(bool ok = true)
     {
-        bool ok = true;
-
         if (overlayRoot == null) { Debug.LogError("[Tutorial] overlayRoot 미할당", this); ok = false; }
         if (messageBox  == null) { Debug.LogError("[Tutorial] messageBox 미할당", this);  ok = false; }
         if (messageText == null) { Debug.LogError("[Tutorial] messageText 미할당", this); ok = false; }
@@ -364,21 +367,21 @@ public partial class TutorialManager : MonoBehaviour
             new TutorialStep { label = "1. 플레이어 타워", targetType = TutorialTargetType.World,
                 message = "이 타워는 플레이어, 당신입니다." },
             new TutorialStep { label = "2. 공격", targetType = TutorialTargetType.PlayerRange, padding = 0f,
-                message = "타워는 사거리 안에 들어온 몬스터를\n자동으로 공격합니다." },
+                message = "타워는 사거리 안에 들어온 몬스터를 자동으로 공격합니다." },
             new TutorialStep { label = "3. 몬스터 생성", targetType = TutorialTargetType.World,
-                message = "몬스터는 이곳에서 생성되어\n타워를 향해 다가옵니다." },
+                message = "몬스터는 이곳에서 생성되어 타워를 향해 다가옵니다." },
             new TutorialStep { label = "4. 스테이지 / 타이머", targetType = TutorialTargetType.UI,
                 message = "현재 스테이지와 남은 시간입니다.\n제한 시간 안에 몬스터를 처치하세요." },
             new TutorialStep { label = "5. 메뉴 - 탭 창", targetType = TutorialTargetType.UI,
-                message = "이 버튼으로 강화 / 스탯 / 각성 / 동료 / 도감\n창을 열 수 있습니다." },
+                message = "이 버튼으로 강화 / 스탯 / 각성 / 동료 / 도감 창을 열 수 있습니다." },
             new TutorialStep { label = "6. 메뉴 - 미션", targetType = TutorialTargetType.UI,
-                message = "가이드 미션과 일일 미션을 완료하고\n보상을 받으세요." },
+                message = "가이드 미션과 일일 미션을 완료하고 보상을 받으세요." },
             new TutorialStep { label = "7. 메뉴 - 상점", targetType = TutorialTargetType.UI,
                 message = "상점에서 다양한 상품을 구매할 수 있습니다." },
             new TutorialStep { label = "8. 메뉴 - 배속", targetType = TutorialTargetType.UI,
                 message = "게임 속도를 바꿀 수 있습니다." },
             new TutorialStep { label = "9. 메뉴 - 설정", targetType = TutorialTargetType.UI,
-                message = "설정에서 효과와 진동을 조절하고,\n이 튜토리얼을 다시 볼 수 있습니다." },
+                message = "설정에서 효과와 진동을 조절하고, 이 튜토리얼을 다시 볼 수 있습니다." },
             new TutorialStep { label = "10. 마무리", targetType = TutorialTargetType.None,
                 message = "준비가 끝났습니다!\n몬스터를 물리치고 더 높은 스테이지에 도전하세요." },
         };

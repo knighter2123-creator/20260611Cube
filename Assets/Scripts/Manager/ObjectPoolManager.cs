@@ -273,16 +273,5 @@ public class ObjectPoolManager : MonoBehaviour
 
         prewarming.Remove(prefab);
     }
-
-    /// <summary>
-    /// 씬을 다시 로드하기 전 등에 호출해 풀 기록을 비웁니다. (선택)
-    ///
-    /// instanceToPrefab은 인스턴스가 파괴돼도 항목이 남기 때문에,
-    /// 씬 전환이 잦으면 딕셔너리가 계속 커집니다.
-    /// </summary>
-    public void ClearAllPools()
-    {
-        prefabPools.Clear();
-        instanceToPrefab.Clear();
-    }
+    
 }
