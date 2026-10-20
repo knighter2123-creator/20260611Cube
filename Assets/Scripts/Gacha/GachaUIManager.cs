@@ -117,7 +117,7 @@ public class GachaUIManager : MonoBehaviour
         }
 
         int gemCost = GachaSystem.Instance != null ? GachaSystem.Instance.GemCostFor(count) : -1;
-        label.text = gemCost >= 0 ? $"보석 {KoreanNumberFormatter.Format(gemCost)}" : string.Empty;
+        label.text = gemCost >= 0 ? $"보석 {NumberFormat.Short(gemCost)}" : string.Empty;
     }
 
     /// <summary>

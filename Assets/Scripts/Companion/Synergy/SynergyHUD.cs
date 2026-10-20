@@ -10,8 +10,10 @@ using UnityEngine.UI;
 ///   [자세히]  탭하면 단계별 효과까지 펼칩니다. 다시 탭하면 접힙니다.
 ///
 /// [붙이는 곳] StageScene 의 항상 켜져 있는 오브젝트 (예: 다른 HUD 옆).
-///   · Label 을 연결하면 그 텍스트에 씁니다.
-///   · 비워 두면 Canvas 왼쪽 위에 텍스트를 직접 만듭니다 (Font 에 한글 폰트를 꼭 연결하세요).
+///   · Label 에 Canvas 아래의 TextMeshPro - Text(UI) 를 연결합니다.
+///     폰트 · 크기 · 위치 · 정렬은 그 텍스트의 인스펙터에서 정합니다.
+///   · ★ Label 에 ContentSizeFitter(Preferred Size) 를 붙여 두세요.
+///     큰 고정 영역을 두면 빈 부분까지 탭을 먹어서 그 아래 맵 칸에 배치가 안 되는 것처럼 보입니다.
 ///
 /// ★ 배치 중에는 탭을 받지 않습니다.
 ///   CompanionPlacementController 는 "탭 좌표에 UI 가 있으면 무시" 하므로,
@@ -19,17 +21,14 @@ using UnityEngine.UI;
 /// </summary>
 public class SynergyHUD : MonoBehaviour
 {
-    [Header("표시 텍스트 (비워 두면 자동 생성)")]
+    [Header("표시 텍스트")]
+    [Tooltip("★ 한글이 들어 있는 폰트를 쓰는 TMP 텍스트. 기본 폰트면 한글이 □ 로 보일 수 있습니다")]
     [SerializeField] private TMP_Text label;
 
-    [Header("자동 생성 설정 (Label 이 비어 있을 때만)")]
-    [Tooltip("비워 두면 씬의 Canvas 를 찾습니다")]
-    [SerializeField] private Canvas        targetCanvas;
-    [Tooltip("★ 한글이 들어 있는 TMP 폰트. 비워 두면 TMP 기본 폰트라 한글이 □ 로 보일 수 있습니다")]
-    [SerializeField] private TMP_FontAsset font;
-    [SerializeField] private float         fontSize = 26f;
-    [Tooltip("Canvas 왼쪽 위 기준 위치 (x 오른쪽 +, y 아래 -)")]
-    [SerializeField] private Vector2       anchoredPosition = new Vector2(24f, -260f);
+    [Header("외곽선 (밝은 맵 위에서도 읽히도록)")]
+    [Tooltip("0 이면 손대지 않습니다 — 머티리얼 프리셋으로 외곽선을 관리할 때 0 으로 두세요")]
+    [SerializeField, Range(0f, 1f)] private float outlineWidth = 0.2f;
+    [SerializeField] private Color32 outlineColor = new Color32(0, 0, 0, 200);
 
     [Header("동작")]
     [Tooltip("탭해서 단계별 효과를 펼치고 접습니다")]
@@ -41,7 +40,6 @@ public class SynergyHUD : MonoBehaviour
     private CompanionManager             bound;           // 실제로 구독한 대상 (CurrencyHUD 와 같은 이유)
     private CompanionPlacementController boundPlacement;
     private Button                       toggleButton;
-    private bool                         labelBuiltByMe;  // 자동 생성한 텍스트인가 (그렇다면 파괴도 내 책임)
     private bool                         detailed;
     private bool                         reportedMissing;
 
@@ -75,11 +73,6 @@ public class SynergyHUD : MonoBehaviour
     private void OnDestroy()
     {
         if (toggleButton != null) toggleButton.onClick.RemoveListener(ToggleDetail);
-
-        // ★ 자동 생성한 텍스트는 HUD 와 운명을 같이합니다.
-        //   텍스트는 Canvas 아래에 있어서, Canvas 가 HUD 보다 오래 살면(다른 씬 · DontDestroyOnLoad)
-        //   HUD 가 사라진 뒤에도 화면에 남습니다. 연결(Label)해 준 텍스트는 남의 것이라 건드리지 않습니다.
-        if (labelBuiltByMe && label != null) Destroy(label.gameObject);
     }
 
     // ══════════════════════════════════════════════
@@ -219,19 +212,24 @@ public class SynergyHUD : MonoBehaviour
         => $"<color=#{ColorUtility.ToHtmlStringRGB(c)}>{text}</color>";
 
     // ══════════════════════════════════════════════
-    //  텍스트 준비 (연결 or 자동 생성)
+    //  텍스트 준비
     // ══════════════════════════════════════════════
 
     private void EnsureLabel()
     {
         if (label == null)
         {
-            label          = BuildLabel();
-            labelBuiltByMe = label != null;
+            Debug.LogWarning("[SynergyHUD] Label 이 비어 있어 시너지를 표시하지 않습니다. Canvas 아래의 TMP 텍스트를 연결하세요.", this);
+            return;
         }
-        if (label == null) return;
 
-        label.richText = true;
+        label.richText = true;   // 색 · 굵기 · 크기를 태그로 넣기 때문에 꺼져 있으면 태그가 그대로 보입니다
+
+        if (outlineWidth > 0f)
+        {
+            label.outlineWidth = outlineWidth;
+            label.outlineColor = outlineColor;
+        }
 
         if (tapToToggleDetail && toggleButton == null)
         {
@@ -244,67 +242,5 @@ public class SynergyHUD : MonoBehaviour
         }
 
         SetRaycastable(boundPlacement == null || !boundPlacement.IsPlacing);
-    }
-
-    private TMP_Text BuildLabel()
-    {
-        Canvas canvas = targetCanvas != null ? targetCanvas : FindCanvasInMyScene();
-        if (canvas == null)
-        {
-            Debug.LogWarning("[SynergyHUD] 이 씬에서 Canvas 를 찾지 못해 HUD 를 만들지 않았습니다. Label 이나 Target Canvas 를 연결하세요.", this);
-            return null;
-        }
-
-        // 중첩 캔버스를 잡았을 수 있으므로 루트 캔버스 아래에 만듭니다 (꺼진 패널 안에 생기는 사고 방지).
-        Transform parent = canvas.rootCanvas != null ? canvas.rootCanvas.transform : canvas.transform;
-
-        var go = new GameObject("SynergyHUD_Label", typeof(RectTransform));
-        go.transform.SetParent(parent, false);
-
-        var rt = (RectTransform)go.transform;
-        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);   // 왼쪽 위
-        rt.anchoredPosition = anchoredPosition;
-
-        var text = go.AddComponent<TextMeshProUGUI>();
-        if (font != null) text.font = font;
-        text.fontSize           = fontSize;
-        text.alignment          = TextAlignmentOptions.TopLeft;
-        text.textWrappingMode   = TextWrappingModes.NoWrap;
-        text.color              = Color.white;
-        text.outlineWidth       = 0.2f;              // 밝은 맵 위에서도 읽히도록 외곽선
-        text.outlineColor       = new Color32(0, 0, 0, 200);
-
-        // ★ 글자 크기에 맞춰 영역을 줄입니다. 큰 고정 영역을 두면 빈 부분까지 탭을 먹어서
-        //   그 아래 맵 칸에 배치가 안 되는 것처럼 보입니다.
-        var fitter = go.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
-
-        return text;
-    }
-
-    /// <summary>
-    /// 이 HUD 와 '같은 씬' 에 있는 화면용 루트 Canvas.
-    ///
-    /// ★ FindAnyObjectByType&lt;Canvas&gt;() 를 쓰면 안 되는 이유
-    ///   SceneLoader 처럼 DontDestroyOnLoad 로 살아남는 오브젝트의 Canvas 가 잡힐 수 있습니다.
-    ///   거기에 텍스트를 만들면 씬을 옮겨도(Stage → Shop) 텍스트가 따라오고,
-    ///   돌아올 때마다 하나씩 더 생겨 겹칩니다.
-    ///   gameObject.scene 으로 걸러서 '이 씬의 UI' 에만 붙입니다.
-    /// </summary>
-    private Canvas FindCanvasInMyScene()
-    {
-        Canvas fallback = null;
-
-        foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
-        {
-            if (c == null || !c.isRootCanvas || c.gameObject.scene != gameObject.scene) continue;
-
-            // 월드 공간 Canvas(머리 위 체력바 등)보다 화면 Canvas 를 우선합니다.
-            if (c.renderMode != RenderMode.WorldSpace) return c;
-            if (fallback == null) fallback = c;
-        }
-
-        return fallback;
     }
 }

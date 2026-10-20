@@ -5,26 +5,16 @@ using TMPro;
 /// <summary>
 /// 스테이지 진행(킬 카운트 / 제한 시간 / 클리어·실패 / 월드-스테이지 번호) 담당.
 ///
-/// ★ 이번 수정 — "킬 카운트(스테이지 카운트) 도달 시 잡몹 즉시 전체 삭제 후 보스 등장"
-///   기존에는 killGoal에 도달하면 새 잡몹 스폰만 멈추고(EnemyRespawn.bossSpawned),
-///   그 순간 이미 화면에 남아 걸어다니던 잡몹은 자연히 죽거나 끝까지 도달할 때까지
-///   그대로 남아 있었습니다. 이제는 그 잡몹들을 "죽이지 않고" 즉시 전부 풀로 반환한 뒤
-///   보스를 등장시킵니다. "★ 킬카운트" 를 검색하세요.
+/// 흐름
+///   Start  : 시작 위치 결정 (진화·던전 복귀 → 세이브 → 1-1) 후 스폰 시작
+///   진행   : 잡몹 killGoal 마리 처치 → 남은 잡몹을 즉시 치우고(ClearAllActiveEnemies) 보스 등장
+///   종료   : 보스 처치 = 클리어(다음 스테이지), 시간 초과 = 실패(한 단계 후퇴)
+///            → 알림이 끝나면 NextStage() 로 다음 판 시작
 ///
-///   원래 NextStage()(스테이지 전환 시 잔여 적 정리)에 있던 로직을
-///   ClearAllActiveEnemies()로 뽑아내 ReportEnemyKill()에서도 재사용했습니다
-///   (같은 코드를 두 곳에 복사하면 한쪽만 고치는 실수가 나기 쉽다는 게
-///    바로 아래 NotifyRespawner()의 주석에도 이미 적혀 있던 원칙입니다).
-///
-///   ★ 검토 후 추가 수정 — ClearAllActiveEnemies()에서 e.isDead = true 를 세팅합니다.
-///   Die()를 거치지 않고 강제로 풀에 반환하면 isDead가 false로 남는데, 그 상태에서
-///   "한 프레임 늦게 도착한" TakeDamage() 호출이 같은 적을 다시 죽여 보상/카운트가
-///   중복되거나 풀에 이중 반환될 수 있어서입니다. 자세한 이유는 해당 메서드 내부
-///   주석 참고.
-///
-/// 나머지 코드는 원본 그대로입니다.
-/// (이 클래스는 partial 이므로, ShowBossNotice / ApplyFrom 등은
-///  다른 파일에 있는 나머지 절반에 그대로 남아 있습니다 — 건드릴 필요 없습니다.)
+/// 나머지 절반은 partial 파일에 있습니다.
+///   StageManager.UI.cs     — 킬/타이머/스테이지 텍스트
+///   StageManager.notice.cs — 알림 패널, NextStageDelayed
+///   StageManager.Save.cs   — CaptureTo / ApplyFrom
 ///
 /// ─── partial class가 뭔가요? (학습 포인트) ────────────────────────────
 /// 하나의 클래스를 여러 파일에 나눠 쓰는 문법입니다. 컴파일할 때 합쳐져서
@@ -76,62 +66,71 @@ public partial class StageManager : MonoBehaviour
 
     void Start()
     {
-        // 1) 진화 스테이지에서 복귀
-        if (EvolveStageContext.HasReturn)
+        // 시작 위치는 우선순위대로 ① 진화 스테이지·일일 던전 복귀 → ② 세이브 → ③ 처음(1-1)
+        if (TryRestoreReturnPoint() || TryRestoreSave())
         {
-            currentWorld    = EvolveStageContext.ReturnWorld;
-            currentStage    = EvolveStageContext.ReturnStage;
-            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
-            EvolveStageContext.ClearReturn();
             NextStage();          // ← 내부에서 ResetStage를 부르므로 프리팹도 함께 결정됨
             return;
         }
 
-        // 1-2) 일일 던전에서 복귀 (진화 스테이지와 같은 방식)
-        if (DailyDungeonContext.HasReturn)
-        {
-            currentWorld    = DailyDungeonContext.ReturnWorld;
-            currentStage    = DailyDungeonContext.ReturnStage;
-            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
-            DailyDungeonContext.ClearReturn();
-            NextStage();
-            return;
-        }
-
-        // 2) 세이브된 진행도 복원  ← 이게 없으면 항상 1-1에서 시작
-        if (SaveManager.Instance != null && SaveManager.Instance.HasSave())
-        {
-            ApplyFrom(SaveManager.Instance.Current);
-            NextStage();          // ← 여기도 마찬가지
-            return;
-        }
-
-        // 3) 세이브 없음 — 처음부터
+        // ③ 세이브 없음 — 처음부터
         InitStage();
 
-        //   기존에는 InitStage()만 부르고 끝냈습니다. 예전 EnemyRespawn은
-        //   Start()에서 스스로 스폰 루프를 돌렸기 때문에 그래도 적이 나왔죠.
-        //   이제는 "어느 월드의 어느 프리팹을 쓸지"를 StageManager가 알려줘야
-        //   스폰이 시작되므로, 신규 시작 경로에서도 반드시 호출해야 합니다.
+        //   EnemyRespawn은 "어느 월드의 어느 프리팹을 쓸지"를 StageManager가 알려줘야
+        //   스폰을 시작하므로, 신규 시작 경로에서도 반드시 호출해야 합니다.
         //   (이걸 빠뜨리면 1-1에서 적이 한 마리도 안 나옵니다)
         NotifyRespawner();
+    }
+
+    /// <summary>진화 스테이지 / 일일 던전에서 돌아왔다면 원래 위치로 되돌립니다.</summary>
+    private bool TryRestoreReturnPoint()
+    {
+        if (EvolveStageContext.HasReturn)
+        {
+            SetPosition(EvolveStageContext.ReturnWorld, EvolveStageContext.ReturnStage);
+            EvolveStageContext.ClearReturn();
+            return true;
+        }
+
+        if (DailyDungeonContext.HasReturn)
+        {
+            SetPosition(DailyDungeonContext.ReturnWorld, DailyDungeonContext.ReturnStage);
+            DailyDungeonContext.ClearReturn();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>세이브된 진행도 복원. ← 이게 없으면 항상 1-1에서 시작</summary>
+    private bool TryRestoreSave()
+    {
+        if (SaveManager.Instance == null || !SaveManager.Instance.HasSave()) return false;
+
+        ApplyFrom(SaveManager.Instance.Current);
+        return true;
+    }
+
+    /// <summary>
+    /// 위치를 바꾸고 스탯 배율을 공식으로 다시 계산합니다.
+    /// (곱셈을 누적하면 float 오차가 쌓여 세이브 로드 때와 값이 미세하게 달라지므로 항상 재계산)
+    /// </summary>
+    private void SetPosition(int world, int stage)
+    {
+        currentWorld    = world;
+        currentStage    = stage;
+        currentStatMult = StageFormula.StatMult(world, stage);
     }
 
     void Update()
     {
         if (stageOver) return;
 
-        timeLeft -= Time.deltaTime;
+        timeLeft = Mathf.Max(0f, timeLeft - Time.deltaTime);
+        UpdateTimerUI();
 
         if (timeLeft <= 0f)
-        {
-            timeLeft = 0f;
-            UpdateTimerUI();
             StageFail();
-            return;
-        }
-
-        UpdateTimerUI();
     }
 
     // ── 외부 호출 ──────────────────────────────────
@@ -217,18 +216,16 @@ public partial class StageManager : MonoBehaviour
         // ★ 랭킹 — 최고 클리어 기록 갱신 (마찬가지로 currentStage++ 이전, 아래 Save() 에 함께 기록됨)
         StageRecord.ReportClear(currentWorld, currentStage);
 
-        currentStage++;
-
-        if (currentStage > StageFormula.MaxStagePerWorld)
+        if (currentStage < StageFormula.MaxStagePerWorld)
         {
-            currentStage = 1;
-            currentWorld++;
+            SetPosition(currentWorld, currentStage + 1);
+        }
+        else
+        {
+            SetPosition(currentWorld + 1, 1);
             GameLog.Info($"[StageManager] 월드 변경 → {currentWorld}-{currentStage}");
         }
 
-        // 이전: currentStatMult *= statMultiplier — 곱셈을 누적하면 float 오차가 쌓여
-        //       같은 스테이지라도 세이브 로드(공식으로 재계산) 때와 값이 미세하게 달라졌다.
-        currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
         GameLog.Info($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
 
         SaveManager.Instance?.Save();
@@ -242,17 +239,8 @@ public partial class StageManager : MonoBehaviour
 
         // X-1 실패 → 현재 월드 1스테이지 그대로 재시작
         // X-N 실패 → 한 단계 되돌아감
-        if (currentStage == 1)
-        {
-            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
-            GameLog.Info($"[StageManager] {currentWorld}-1 실패 → {currentWorld}-1 재시작 / 스탯 배율: {currentStatMult:F4}");
-        }
-        else
-        {
-            currentStage--;
-            currentStatMult = StageFormula.StatMult(currentWorld, currentStage);   // 이전: /= 누적 (위와 같은 이유)
-            GameLog.Info($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
-        }
+        SetPosition(currentWorld, Mathf.Max(1, currentStage - 1));
+        GameLog.Info($"[StageManager] 실패 → {currentWorld}-{currentStage} 재시작 / 스탯 배율: {currentStatMult:F4}");
 
         ShowStageFailNotice();
         StartCoroutine(NextStageDelayed());

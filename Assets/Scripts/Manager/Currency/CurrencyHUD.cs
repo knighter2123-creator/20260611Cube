@@ -81,17 +81,14 @@ public class CurrencyHUD : MonoBehaviour
         bound = null;
     }
 
-    // ★ 표기 규칙을 이 파일에 두지 않고 KoreanNumberFormatter 에 맡깁니다.
+    // ★ 표기 규칙을 이 파일에 두지 않고 NumberFormat 에 맡깁니다.
     //
-    //   [왜 자체 Format 함수를 없앴나]
-    //   원래 여기에 1000 단위 K/M/G/T 변환이 있었습니다. 그런데 강화 비용은
-    //   KoreanNumberFormatter 로 "73만 2800" 처럼 나오다 보니, 한 화면에
-    //   "보유 1.4M / 비용 73만 2800" 이 동시에 떴습니다.
-    //   자릿수 체계가 둘이면 유저가 살 수 있는지를 암산해야 합니다.
+    //   [왜 자체 Format 함수를 두지 않나]
+    //   보유 골드와 강화 비용이 서로 다른 자릿수 체계로 나오면
+    //   ("보유 1.4M / 비용 73만 2800") 유저가 살 수 있는지를 암산해야 합니다.
     //
     //   같은 개념의 규칙이 두 곳에 각각 적혀 있으면 반드시 어긋납니다.
-    //   나중에 "억부터는 소수점 한 자리" 같은 걸 넣고 싶어지면
-    //   KoreanNumberFormatter 한 곳만 고치면 골드·젬·강화 비용이 동시에 따라옵니다.
-    private void UpdateGold(int value) { if (goldText != null) goldText.text = KoreanNumberFormatter.Format(value); }
-    private void UpdateGem(int value)  { if (gemText  != null) gemText.text  = KoreanNumberFormatter.Format(value); }
+    //   NumberFormat 한 곳만 고치면 골드·젬·강화 비용이 동시에 따라옵니다.
+    private void UpdateGold(int value) { if (goldText != null) goldText.text = NumberFormat.Short(value); }
+    private void UpdateGem(int value)  { if (gemText  != null) gemText.text  = NumberFormat.Short(value); }
 }

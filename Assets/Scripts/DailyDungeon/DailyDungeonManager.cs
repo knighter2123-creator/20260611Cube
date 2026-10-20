@@ -80,6 +80,9 @@ public class DailyDungeonManager : MonoBehaviour
     private float timeLeft;
     private bool  stageOver;
 
+    // 마지막으로 표시한 '초' — StageManager.UpdateTimerUI 와 같은 이유로 초가 바뀔 때만 갱신합니다.
+    private int lastTimerSecond = int.MinValue;
+
     private HpBar hpBarRoot;   // 매 스폰마다 씬을 뒤지지 않도록 캐싱
 
     private bool HasPath => spawnWaypoints != null && spawnWaypoints.Length > 0;
@@ -95,11 +98,17 @@ public class DailyDungeonManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    void Start()
+    void fromEntry()
     {
         bool fromEntry = DailyDungeonContext.SelectedData != null;
         ActiveData  = fromEntry ? DailyDungeonContext.SelectedData  : fallbackData;
         ActiveLevel = fromEntry ? DailyDungeonContext.SelectedLevel : fallbackLevel;
+    }
+
+    void Start()
+    {
+        fromEntry();
+        
         if (ActiveData != null) ActiveLevel = ActiveData.ClampLevel(ActiveLevel);
 
         if (stageText != null && ActiveData != null)
@@ -124,18 +133,16 @@ public class DailyDungeonManager : MonoBehaviour
     {
         if (stageOver) return;
 
-        timeLeft -= Time.deltaTime;
+        timeLeft = Mathf.Max(0f, timeLeft - Time.deltaTime);
+        UpdateTimerUI();
+
         if (timeLeft <= 0f)
         {
-            timeLeft = 0f;
-            UpdateTimerUI();
-
             // 시간이 다 되면: 보스 규칙은 실패, 디펜스 규칙은 끝까지 막아 낸 것이므로 클리어
             if (Rule == DailyDungeonRule.Defense) StageClear();
             else                                  StageFail("시간 초과");
             return;
         }
-        UpdateTimerUI();
 
         if (Rule == DailyDungeonRule.Defense)
             CheckBreaches();
@@ -371,8 +378,7 @@ public class DailyDungeonManager : MonoBehaviour
         SceneLoader.Instance?.ReturnFromDailyDungeon();
     }
 
-    // 마지막으로 표시한 '초' — StageManager.UpdateTimerUI 와 같은 이유로 초가 바뀔 때만 갱신합니다.
-    private int lastTimerSecond = int.MinValue;
+    // ── UI ─────────────────────────────────────────
 
     private void UpdateTimerUI()
     {

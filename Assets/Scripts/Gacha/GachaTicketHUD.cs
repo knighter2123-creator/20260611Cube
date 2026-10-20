@@ -37,7 +37,7 @@ public class GachaTicketHUD : MonoBehaviour
         if (countText == null) return;
 
         // 골드·보석과 같은 표기 규칙 (CurrencyHUD 참고)
-        string number = KoreanNumberFormatter.Format(count);
+        string number = NumberFormat.Short(count);
         try
         {
             countText.text = string.Format(format, number);

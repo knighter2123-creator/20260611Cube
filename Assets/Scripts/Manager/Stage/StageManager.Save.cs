@@ -17,8 +17,6 @@ public partial class StageManager
     /// </summary>
     public void ApplyFrom(SaveData d)
     {
-        currentWorld    = d.currentWorld;
-        currentStage    = d.currentStage;
-        currentStatMult = StageFormula.StatMult(currentWorld, currentStage);
+        SetPosition(d.currentWorld, d.currentStage);
     }
 }

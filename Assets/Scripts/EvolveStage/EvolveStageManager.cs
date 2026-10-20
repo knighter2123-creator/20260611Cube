@@ -118,10 +118,7 @@ public partial class EvolveStageManager : MonoBehaviour
         //   일반 스테이지 배율(statMult)은 여기서도 적용하지 않습니다 —
         //   진화 스테이지는 티어 데이터만으로 난이도가 결정되는 별개의 축이니까요.
         boss.InitForEvolveStage();
-
-        string tierId = ActiveData != null ? ActiveData.id : "(티어 데이터 없음)";
-        GameLog.Info($"[EvolveStageManager] 보스 스폰 — {prefab.name} / 티어: {tierId}");
-
+        
         // ── 일반 스테이지 보스와 동일하게 이동 경로 전달 ──
         TargetMove move = boss.GetComponent<TargetMove>();
         if (move != null && hasPath)

@@ -5,8 +5,8 @@ public partial class StageManager
 {
     private void UpdateKillUI()
     {
-        if (killCountText != null)
-            killCountText.text = $"처치  {killCount} / {killGoal}";
+        // 적을 잡을 때마다 불리므로 문자열을 만들지 않는 SetNumbers 를 씁니다 (TmpTextExtensions 참고)
+        killCountText.SetNumbers("처치  {0} / {1}", killCount, killGoal);
     }
 
     // 마지막으로 표시한 '초'. 같은 초면 문자열을 다시 만들지 않습니다.

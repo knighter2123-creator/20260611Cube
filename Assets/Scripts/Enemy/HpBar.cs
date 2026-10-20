@@ -22,12 +22,11 @@ public class HpBar : MonoBehaviour
     readonly List<RectTransform> activeBarRects    = new List<RectTransform>();   // 매 프레임 GetComponent 방지
     readonly Stack<GameObject>   freeBars          = new Stack<GameObject>();
 
-    Camera        mainCamera;
+    [SerializeField] Camera        mainCamera;
     RectTransform canvasRect;
 
     void Start()
     {
-        mainCamera = Camera.main;
         canvasRect = GetComponent<RectTransform>();
 
         for (int i = freeBars.Count; i < prewarmCount; i++)

@@ -46,6 +46,9 @@ public class ObjectPoolManager : MonoBehaviour
         InitPool();
     }
 
+    // 꺼지면 예열 코루틴이 중간에 멈춥니다. 표시를 남겨 두면 그 프리팹은 다시 예열되지 않으므로 비웁니다.
+    void OnDisable() => prewarming.Clear();
+
     // ──────────────────────────────────────────────
     //  풀 초기화
     // ──────────────────────────────────────────────
@@ -224,6 +227,51 @@ public class ObjectPoolManager : MonoBehaviour
             instanceToPrefab[obj] = prefab;
             queue.Enqueue(obj);
         }
+    }
+
+    // 지금 나눠서 예열 중인 프리팹 (같은 프리팹을 두 코루틴이 동시에 채우지 않게)
+    private readonly HashSet<GameObject> prewarming = new HashSet<GameObject>();
+
+    /// <summary>
+    /// Prewarm 과 같지만, 한 프레임에 perFrame 개씩 나눠서 만듭니다.
+    ///
+    /// ★ [프레임 드랍 수정] 스테이지가 바뀌어 적 프리팹이 달라지면 Prewarm 이 그 자리에서 12개를
+    ///   한꺼번에 Instantiate 했습니다. 전투 중 스테이지 전환 순간마다 한 프레임이 크게 멈칫합니다.
+    ///   첫 스폰까지는 몇 초 여유가 있으므로 여러 프레임에 나눠 만들면 끊김이 사라집니다.
+    ///   (그사이 풀이 비면 GetInactive 가 알아서 하나 만들어 주므로 스폰이 막히지는 않습니다)
+    /// </summary>
+    public void PrewarmOverFrames(GameObject prefab, int count, int perFrame = 2)
+    {
+        if (prefab == null || count <= 0) return;
+        if (prewarming.Contains(prefab)) return;
+
+        if (!prefabPools.TryGetValue(prefab, out var queue))
+            prefabPools[prefab] = queue = new Queue<GameObject>();
+
+        int need = count - queue.Count;   // 시작 시점의 부족분만 (스폰으로 큐가 줄어도 더 만들지 않음)
+        if (need <= 0) return;
+
+        StartCoroutine(PrewarmRoutine(prefab, queue, need, Mathf.Max(1, perFrame)));
+    }
+
+    private System.Collections.IEnumerator PrewarmRoutine(GameObject prefab, Queue<GameObject> queue, int need, int perFrame)
+    {
+        prewarming.Add(prefab);
+
+        int made = 0;
+        while (made < need)
+        {
+            for (int i = 0; i < perFrame && made < need; i++, made++)
+            {
+                GameObject obj = Instantiate(prefab);
+                obj.SetActive(false);
+                instanceToPrefab[obj] = prefab;
+                queue.Enqueue(obj);
+            }
+            yield return null;
+        }
+
+        prewarming.Remove(prefab);
     }
 
     /// <summary>

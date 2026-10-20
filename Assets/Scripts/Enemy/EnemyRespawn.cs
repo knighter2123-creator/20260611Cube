@@ -13,10 +13,10 @@ using UnityEngine;
 /// </summary>
 public class EnemyRespawn : MonoBehaviour
 {
-    public static EnemyRespawn Instance;
+    public static EnemyRespawn Instance { get; private set; }
 
     [Header("이 프리팹이 따라갈 이동 경로")]
-    public Transform[] spawnWaypoints;
+    [SerializeField] private Transform[] spawnWaypoints;
 
     [Header("월드별 적 세트")]
     [Tooltip("배열 순서가 곧 월드 번호입니다. index 0 = 월드 1, index 1 = 월드 2 ...")]
@@ -141,7 +141,14 @@ public class EnemyRespawn : MonoBehaviour
         }
 
         // 프리팹이 바뀌었을 수 있으므로 매 스테이지 예열 (부족분만 채우므로 여러 번 불러도 안전)
-        ObjectPoolManager.Instance?.Prewarm(currentEnemyPrefab, prewarmCount);
+        // ★ [프레임 드랍 수정] 한 프레임에 몰아 만들지 않고 나눠서 만듭니다 (ObjectPoolManager.PrewarmOverFrames 참고).
+        //   보스도 1마리 미리 만들어 둡니다 — 없으면 보스가 등장하는 순간 Instantiate 하느라 멈칫합니다.
+        ObjectPoolManager pool = ObjectPoolManager.Instance;
+        if (pool != null)
+        {
+            pool.PrewarmOverFrames(currentEnemyPrefab, prewarmCount);
+            pool.PrewarmOverFrames(currentBossPrefab, 1);
+        }
     }
 
     // ── 스폰 ───────────────────────────────────────

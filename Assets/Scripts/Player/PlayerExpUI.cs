@@ -72,11 +72,9 @@ public class PlayerExpUI : MonoBehaviour
         long currentExp = bound.CurrentExp;
         long maxExp     = bound.MaxExp;
 
-        if (levelText != null)
-            levelText.text = $"Lv. {bound.CurrentLevel}";
-
-        if (expText != null)
-            expText.text = $"{currentExp} / {maxExp}";
+        // 경험치는 적을 잡을 때마다 바뀌므로 문자열을 만들지 않는 SetNumber(s) 를 씁니다 (TmpTextExtensions 참고)
+        levelText.SetNumber("Lv. {0}", bound.CurrentLevel);
+        expText.SetNumbers("{0} / {1}", currentExp, maxExp);
 
         if (expSlider != null)
             expSlider.value = maxExp > 0 ? (float)currentExp / maxExp : 0f;

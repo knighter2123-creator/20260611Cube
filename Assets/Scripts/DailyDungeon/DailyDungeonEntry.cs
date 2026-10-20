@@ -353,6 +353,8 @@ public class DailyDungeonEntry : MonoBehaviour
                 $"소탕할 수 없습니다.\n(입장 횟수 또는 클리어 기록을 확인하세요)\n\n{RemainSummary(dungeon)}");
     }
 
+    // ── 횟수 추가 ──────────────────────────────────
+
     private void RefreshBuyEntry(DailyDungeonData dungeon, bool unlocked)
     {
         int cost = DailyDungeonProgress.NextPurchaseCost(dungeon);
@@ -367,8 +369,6 @@ public class DailyDungeonEntry : MonoBehaviour
         if (buyEntryButton != null)
             buyEntryButton.interactable = canBuy && unlocked;
     }
-
-    // ── 횟수 추가 ──────────────────────────────────
 
     private void OnBuyEntryClicked()
     {
@@ -408,29 +408,6 @@ public class DailyDungeonEntry : MonoBehaviour
 
         DailyDungeonProgress.TryPurchaseEntry(dungeon);
         Refresh();
-    }
-
-    private static void SetText(TextMeshProUGUI label, string msg)
-    {
-        if (label != null && label.text != msg) label.text = msg;
-    }
-
-    /// <summary>"남은 횟수 2/5"</summary>
-    private static string RemainSummary(DailyDungeonData dungeon)
-        => $"남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)}";
-
-    /// <summary>확인 팝업을 띄우고 확인 시 action 실행. 팝업이 연결돼 있지 않으면 바로 실행합니다.</summary>
-    private void AskThen(string title, string message, Action action)
-    {
-        if (confirmPopup == null) { action(); return; }
-        confirmPopup.Show(title, message, action);
-    }
-
-    /// <summary>알림 팝업 (확인 버튼만). 팝업이 연결돼 있지 않으면 콘솔에만 남깁니다.</summary>
-    private void Notify(string title, string message)
-    {
-        if (confirmPopup != null) confirmPopup.ShowMessage(title, message);
-        else GameLog.Info($"[일일 던전] {title} — {message}");
     }
 
     // ── 입장 ───────────────────────────────────────
@@ -498,5 +475,30 @@ public class DailyDungeonEntry : MonoBehaviour
         if (SaveManager.Instance != null) SaveManager.Instance.Save();
 
         SceneLoader.Instance?.GoToDailyDungeon();
+    }
+
+    // ── 도우미 ─────────────────────────────────────
+
+    private static void SetText(TextMeshProUGUI label, string msg)
+    {
+        if (label != null && label.text != msg) label.text = msg;
+    }
+
+    /// <summary>"남은 횟수 2/5"</summary>
+    private static string RemainSummary(DailyDungeonData dungeon)
+        => $"남은 횟수 {DailyDungeonProgress.RemainingEntries(dungeon)}/{DailyDungeonProgress.TotalEntries(dungeon)}";
+
+    /// <summary>확인 팝업을 띄우고 확인 시 action 실행. 팝업이 연결돼 있지 않으면 바로 실행합니다.</summary>
+    private void AskThen(string title, string message, Action action)
+    {
+        if (confirmPopup == null) { action(); return; }
+        confirmPopup.Show(title, message, action);
+    }
+
+    /// <summary>알림 팝업 (확인 버튼만). 팝업이 연결돼 있지 않으면 콘솔에만 남깁니다.</summary>
+    private void Notify(string title, string message)
+    {
+        if (confirmPopup != null) confirmPopup.ShowMessage(title, message);
+        else GameLog.Info($"[일일 던전] {title} — {message}");
     }
 }

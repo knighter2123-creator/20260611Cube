@@ -226,12 +226,27 @@ public abstract class ActiveSkill : ScriptableObject
     {
         if (effectPrefab == null) return;
 
-        GameObject fx = Instantiate(effectPrefab, position, Quaternion.identity);
+        // ★ [프레임 드랍 수정] 시전마다 Instantiate/Destroy 하지 않고 풀에서 꺼내 씁니다 (PooledEffect 참고).
+        ObjectPoolManager pool = ObjectPoolManager.Instance;
+        if (pool == null)
+        {
+            GameObject once = Instantiate(effectPrefab, position, Quaternion.identity);
+            SetEffectSorting(once);
+            Destroy(once, effectDuration);
+            return;
+        }
 
-        SpriteRenderer sr = fx.GetComponent<SpriteRenderer>();
-        if (sr != null) sr.sortingOrder = 10;
+        GameObject fx = pool.GetInactive(effectPrefab, position, Quaternion.identity);
+        if (fx == null) return;
 
-        Destroy(fx, effectDuration);
+        SetEffectSorting(fx);
+        fx.SetActive(true);
+        PooledEffect.ReturnAfter(fx, effectDuration);
+    }
+
+    private static void SetEffectSorting(GameObject fx)
+    {
+        if (fx.TryGetComponent(out SpriteRenderer sr)) sr.sortingOrder = 10;
     }
 
     // ══════════════════════════════════════════════

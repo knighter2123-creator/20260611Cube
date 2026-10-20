@@ -75,7 +75,7 @@ public class GuideQuestHUD : MonoBehaviour
 
     private void HandleProgressChanged(long cur, long req)
     {
-        if (progressText != null) progressText.text = $"{cur} / {req}";
+        progressText.SetNumbers("{0} / {1}", cur, req);   // 처치 퀘스트면 적을 잡을 때마다 불림 → 할당 없는 SetNumbers
         if (fillBar != null) fillBar.fillAmount = req > 0 ? (float)cur / req : 0f;
 
         bool done = cur >= req;

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using TMPro;
 
@@ -92,8 +93,9 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     [SerializeField] private Color costAffordableColor   = Color.white;
     [SerializeField] private Color costUnaffordableColor = new Color(1f, 0.35f, 0.35f);
 
-    [Tooltip("비용을 '73만 2800' 처럼 한국식 만/억 단위로 표시합니다")]
-    [SerializeField] private bool useKoreanNumberFormat = true;
+    [Tooltip("비용을 '45.6M' 처럼 K/M/B/T 단위로 줄여 표시합니다. 끄면 '45,600,000' 처럼 전부 표시")]
+    [FormerlySerializedAs("useKoreanNumberFormat")]
+    [SerializeField] private bool useShortNumberFormat = true;
 
     [Tooltip("스탯 수치를 '현재 → 강화 후' 로 표시합니다. (선택한 배수만큼 강화했을 때)\n" +
              "글자가 칸을 넘치면 끄세요 — 그러면 예전처럼 현재 값만 보입니다.")]
@@ -115,8 +117,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     private LevelUpManager    boundLm;
     private CurrencyManager   boundCurrency;
     private GuideQuestManager boundGuide;
-
-    private LevelUpManager lm;   // 편의용 캐시 (= boundLm)
 
     // 골드 캐시
     private int  cachedGold;
@@ -292,7 +292,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
             if (boundLm != null) boundLm.OnStatUpgraded -= HandleStatUpgraded;
 
             boundLm = currentLm;
-            lm      = currentLm;
 
             if (boundLm != null)
             {
@@ -343,7 +342,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         boundLm       = null;
         boundCurrency = null;
         boundGuide    = null;
-        lm            = null;
     }
 
     /// <summary>
@@ -472,11 +470,11 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     /// <summary>강화 버튼 클릭 — 배수는 공용 selectedMultiplier 를 사용</summary>
     private void OnClickUpgrade(LevelUpManager.StatType type)
     {
-        if (lm == null) { TryBindAll(); }
-        if (lm == null) return;
+        if (boundLm == null) TryBindAll();
+        if (boundLm == null) return;
 
         int times = Mathf.Max(1, selectedMultiplier);
-        int successCount = lm.TryUpgradeMultiple(type, times);
+        int successCount = boundLm.TryUpgradeMultiple(type, times);
 
         if (successCount == 0)
         {
@@ -600,9 +598,10 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         if (row.statValueText != null)
             row.statValueText.text = GetStatValueString(type);
 
-        // ★ lm 은 있는데 PlayerStat 이 아직 주입되지 않은 구간이 존재합니다.
+        // ★ LevelUpManager 는 있는데 PlayerStat 이 아직 주입되지 않은 구간이 존재합니다.
         //   그때 GetUpgradeCost 는 0을 돌려주므로, 검사하지 않으면
         //   "0 / 5,000, 비용 : 0" 이라는 거짓 정보를 띄우고 버튼도 눌리게 됩니다.
+        LevelUpManager lm = boundLm;
         if (lm == null || !lm.IsReady)
         {
             if (row.upgradeLevelText != null) row.upgradeLevelText.text = "-";
@@ -654,8 +653,8 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 
         if (row.costText != null)
         {
-            string costStr = useKoreanNumberFormat
-                ? KoreanNumberFormatter.Format(totalCost)
+            string costStr = useShortNumberFormat
+                ? NumberFormat.Short(totalCost)
                 : totalCost.ToString("N0");
 
             // 상한 때문에 배수보다 적게 사게 되는 경우엔 몇 번인지 같이 보여줍니다

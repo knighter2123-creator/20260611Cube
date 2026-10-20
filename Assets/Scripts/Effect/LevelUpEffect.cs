@@ -21,6 +21,11 @@ public partial class LevelUpEffect : MonoBehaviour
     private const string AdditiveShader = "Custom/2D/SpriteAdditiveHDR";
     private const float  PPU = 100f;      // 절차 생성 스프라이트의 Pixels Per Unit
 
+    // 절차 생성 텍스처 크기(픽셀)
+    private const int BeamW = 64, BeamH = 256, RingS = 256, GlowS = 128, SparkS = 32, FlashS = 8;
+
+    private static readonly int ShaderColorId = Shader.PropertyToID("_Color");
+
     // ─────────────────────────────────────────────
     [Header("대상")]
     [Tooltip("연출이 재생될 위치. 비우면 이 오브젝트 자신을 사용")]
@@ -142,6 +147,16 @@ public partial class LevelUpEffect : MonoBehaviour
 
     private float DeltaTime => useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
 
+    // LevelUpManager 자동 연결 상태
+    private LevelUpManager boundManager;
+    private int   lastKnownLevel = -1;
+    private float suppressUntil;
+
+    /// <summary>지금이 '시작 직후 억제 구간'인가</summary>
+    private bool IsSuppressed => Time.unscaledTime < suppressUntil;
+
+    // ─────────────────────────────────────────────
+    // 생명주기
     // ─────────────────────────────────────────────
     private void Awake()
     {
@@ -154,6 +169,13 @@ public partial class LevelUpEffect : MonoBehaviour
         LoadFlashSetting();
     }
 
+    private void OnEnable()
+    {
+        // 씬이 새로 로드될 때마다 억제 구간을 다시 잡습니다
+        suppressUntil = Time.unscaledTime + Mathf.Max(0f, suppressAfterLoadSeconds);
+        TryBind();
+    }
+
     /// <summary>
     /// ★ [프레임 드랍 수정] 연출 오브젝트를 씬 시작 때 미리 만들어 둡니다.
     ///   EnsureBuilt 는 텍스처 5장을 픽셀 단위로 계산(링 256×256 등 약 10만 픽셀)하고
@@ -162,6 +184,19 @@ public partial class LevelUpEffect : MonoBehaviour
     ///   (EnsureBuilt 는 한 번만 돌므로 Play 에서 다시 불려도 비용이 없습니다)
     /// </summary>
     private void Start() => EnsureBuilt();
+
+    private void Update()
+    {
+        // LevelUpManager 가 나중에 만들어지는 구조여도 붙을 때까지 재시도
+        if (autoBindLevelUpManager && boundManager == null) TryBind();
+
+        // ★ 억제 구간 동안은 연출 없이 현재 레벨만 계속 따라갑니다.
+        //   세이브 로드가 언제 끝나든(스탯이 나중에 주입돼도) 기준값이 복원된 레벨로 맞춰집니다.
+        if (boundManager != null && IsSuppressed)
+            lastKnownLevel = boundManager.CurrentLevel;
+    }
+
+    private void OnDisable() => Unbind();
 
     private void OnDestroy()
     {
@@ -177,33 +212,6 @@ public partial class LevelUpEffect : MonoBehaviour
     // ─────────────────────────────────────────────
     // LevelUpManager 자동 연결
     // ─────────────────────────────────────────────
-    private LevelUpManager boundManager;
-    private int   lastKnownLevel = -1;
-    private float suppressUntil;
-
-    /// <summary>지금이 '시작 직후 억제 구간'인가</summary>
-    private bool IsSuppressed => Time.unscaledTime < suppressUntil;
-
-    private void OnEnable()
-    {
-        // 씬이 새로 로드될 때마다 억제 구간을 다시 잡습니다
-        suppressUntil = Time.unscaledTime + Mathf.Max(0f, suppressAfterLoadSeconds);
-        TryBind();
-    }
-
-    private void OnDisable() => Unbind();
-
-    private void Update()
-    {
-        // LevelUpManager 가 나중에 만들어지는 구조여도 붙을 때까지 재시도
-        if (autoBindLevelUpManager && boundManager == null) TryBind();
-
-        // ★ 억제 구간 동안은 연출 없이 현재 레벨만 계속 따라갑니다.
-        //   세이브 로드가 언제 끝나든(스탯이 나중에 주입돼도) 기준값이 복원된 레벨로 맞춰집니다.
-        if (boundManager != null && IsSuppressed)
-            lastKnownLevel = boundManager.CurrentLevel;
-    }
-
     private void TryBind()
     {
         if (!autoBindLevelUpManager) return;
@@ -213,7 +221,6 @@ public partial class LevelUpEffect : MonoBehaviour
         boundManager = LevelUpManager.Instance;
         boundManager.OnLevelUp += HandleLevelUp;
         lastKnownLevel = boundManager.CurrentLevel;
-
     }
 
     /// <summary>
@@ -227,7 +234,6 @@ public partial class LevelUpEffect : MonoBehaviour
 
         lastKnownLevel = boundManager.CurrentLevel;
         suppressUntil  = 0f;   // 기준이 확정됐으므로 억제 해제
-
     }
 
     private void Unbind()
@@ -243,7 +249,6 @@ public partial class LevelUpEffect : MonoBehaviour
         if (IsSuppressed)
         {
             lastKnownLevel = Mathf.Max(lastKnownLevel, newLevel);
-
             return;
         }
 
@@ -259,7 +264,7 @@ public partial class LevelUpEffect : MonoBehaviour
         if (logBinding)
             GameLog.Info($"[LevelUpEffect] 레벨업 감지 → Lv.{newLevel} 연출 재생", this);
 
-// ★ 추가 — ?. 로 조용히 넘기지 않는다. 없으면 없다고 말하게 한다.
+        // ?. 로 조용히 넘기지 않는다. 없으면 없다고 말하게 한다.
         if (HapticManager.Instance != null)
             HapticManager.Instance.LevelUp();
         else
@@ -635,8 +640,6 @@ public partial class LevelUpEffect : MonoBehaviour
         ft.localScale = new Vector3(w / (FlashS / PPU), h / (FlashS / PPU), 1f);
     }
 
-    private static readonly int ShaderColorId = Shader.PropertyToID("_Color");
-
     private static float EaseOutCubic(float x) => 1f - Mathf.Pow(1f - x, 3f);
     private static float EaseOutQuint(float x) => 1f - Mathf.Pow(1f - x, 5f);
     private static float EaseOutBack(float x)
@@ -650,8 +653,6 @@ public partial class LevelUpEffect : MonoBehaviour
     // ─────────────────────────────────────────────
     // 오브젝트 생성 (최초 1회)
     // ─────────────────────────────────────────────
-    private const int BeamW = 64, BeamH = 256, RingS = 256, GlowS = 128, SparkS = 32, FlashS = 8;
-
     private void EnsureBuilt()
     {
         if (built) return;
