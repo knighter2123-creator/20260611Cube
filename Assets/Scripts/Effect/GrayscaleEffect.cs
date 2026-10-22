@@ -48,6 +48,12 @@ public class GrayscaleEffect : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 머티리얼을 미리 읽어 둡니다. 처음 쓸 때 Resources.Load 하면 첫 스턴 순간 멈칫하므로
+    /// 전투 전에 부릅니다 (ObjectPoolManager.Start). 이미 읽었으면 아무것도 하지 않습니다.
+    /// </summary>
+    public static void Preload() => _ = GrayMaterial;
+
     // ─────────────────────────────────────────────
     // 정적 진입점
     // ─────────────────────────────────────────────

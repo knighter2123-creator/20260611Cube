@@ -50,6 +50,12 @@ public class EnemyDeathEffect : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 머티리얼을 미리 읽어 둡니다. 처음 쓸 때 Resources.Load 하면 첫 적이 죽는 순간 멈칫하므로
+    /// 전투 전에 부릅니다 (ObjectPoolManager.Start). 이미 읽었으면 아무것도 하지 않습니다.
+    /// </summary>
+    public static void Preload() => _ = DeathMaterial;
+
     // ─────────────────────────────────────────────
     [Header("색")]
     [Tooltip("사망 시 더해질 색. Intensity 를 1 이상으로 올리면 블룸에도 반응합니다")]

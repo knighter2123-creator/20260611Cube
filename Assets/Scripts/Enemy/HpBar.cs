@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,6 +18,9 @@ public class HpBar : MonoBehaviour
     [Tooltip("시작할 때 미리 만들어 둘 HP 바 개수. 동시에 살아 있는 적 수에 맞추면 첫 스폰 렉도 사라집니다.")]
     [SerializeField] int prewarmCount = 12;
 
+    [Tooltip("한 프레임에 미리 만들 개수. UI 라 만들 때마다 Canvas 재구성이 따라오므로 한 번에 몰지 않습니다.")]
+    [SerializeField] int prewarmPerFrame = 3;
+
     readonly List<Transform>     monsterTransforms = new List<Transform>();
     readonly List<GameObject>    activeBars        = new List<GameObject>();
     readonly List<RectTransform> activeBarRects    = new List<RectTransform>();   // 매 프레임 GetComponent 방지
@@ -25,12 +29,20 @@ public class HpBar : MonoBehaviour
     [SerializeField] Camera        mainCamera;
     RectTransform canvasRect;
 
-    void Start()
+    // ★ [프레임 드랍 수정] 예전에는 씬이 켜지는 프레임에 12개를 한꺼번에 만들었습니다.
+    //   총알·데미지 텍스트 예열과 같은 프레임에 겹쳐 시작 직후 크게 멈칫했으므로 프레임마다 나눠 만듭니다.
+    //   그사이 적이 나오면 RegisterEnemy 가 부족분을 하나씩 만들어 줍니다.
+    IEnumerator Start()
     {
         canvasRect = GetComponent<RectTransform>();
 
-        for (int i = freeBars.Count; i < prewarmCount; i++)
-            freeBars.Push(CreateBar());
+        int perFrame = Mathf.Max(1, prewarmPerFrame);
+        while (freeBars.Count + activeBars.Count < prewarmCount)
+        {
+            yield return null;
+            for (int i = 0; i < perFrame && freeBars.Count + activeBars.Count < prewarmCount; i++)
+                freeBars.Push(CreateBar());
+        }
     }
 
     GameObject CreateBar()

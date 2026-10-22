@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -29,6 +30,13 @@ public class ObjectPoolManager : MonoBehaviour
     [Tooltip("각성으로 한 번에 여러 발이 나가면 순간 소비량이 늘어납니다. 60 권장.")]
     [SerializeField] private int initialPoolSize = 60;
 
+    [Tooltip("한 프레임에 미리 만들 총알 수 (시작 직후 프레임 드랍 방지)")]
+    [SerializeField] private int bulletsPerFrame = 6;
+
+    [Header("시작 예열")]
+    [Tooltip("배치된 동료의 스킬 이펙트를 프리팹마다 몇 개 미리 만들지. 0 이면 예열하지 않음.")]
+    [SerializeField] private int skillEffectPrewarm = 2;
+
     private Queue<GameObject> pool = new Queue<GameObject>();
 
     // ──────────────────────────────────────────────
@@ -42,24 +50,65 @@ public class ObjectPoolManager : MonoBehaviour
             return;
         }
         Instance = this;
-
-        InitPool();
     }
 
     // 꺼지면 예열 코루틴이 중간에 멈춥니다. 표시를 남겨 두면 그 프리팹은 다시 예열되지 않으므로 비웁니다.
     void OnDisable() => prewarming.Clear();
 
     // ──────────────────────────────────────────────
-    //  풀 초기화
+    //  시작 예열
     // ──────────────────────────────────────────────
-    private void InitPool()
+
+    /// <summary>
+    /// ★ [프레임 드랍 수정] "처음 한 번" 비용을 전투가 시작되기 전에, 여러 프레임에 나눠 치릅니다.
+    ///
+    ///   ① 총알 60개 — 예전에는 Awake 에서 한 프레임에 전부 만들었습니다. 같은 프레임에
+    ///      데미지 텍스트·HP 바 예열까지 겹쳐 씬이 켜지는 순간 크게 멈칫했습니다.
+    ///      그사이 총알이 부족하면 GetBulletInactive 가 하나씩 만들어 주므로 발사가 막히지 않습니다.
+    ///   ② 배치된 동료의 스킬 이펙트 — 풀에서 꺼내 쓰지만 미리 만들어 두지 않아서
+    ///      동료마다 첫 스킬을 쓰는 순간 Instantiate + 첫 렌더링 비용이 한꺼번에 들었습니다.
+    ///   ③ 사망·흑백 연출 머티리얼 — 처음 쓸 때 Resources.Load 로 동기 로드해서 첫 적이 죽는 순간 멈칫했습니다.
+    ///
+    ///   첫 프레임을 건너뛰는 이유: 씬이 켜지는 프레임에는 모든 Awake/Start 가 몰려 있고,
+    ///   동료 배치 복원 같은 다른 오브젝트의 Start 도 끝난 뒤에 봐야 '배치된 동료' 를 정확히 셀 수 있습니다.
+    /// </summary>
+    private IEnumerator Start()
     {
-        for (int i = 0; i < initialPoolSize; i++)
+        yield return null;
+
+        EnemyDeathEffect.Preload();
+        GrayscaleEffect.Preload();
+        PrewarmPlacedSkillEffects();
+
+        int perFrame = Mathf.Max(1, bulletsPerFrame);
+        int made = 0;
+        while (made < initialPoolSize)
         {
-            GameObject obj = CreateBullet();
-            pool.Enqueue(obj);
+            for (int i = 0; i < perFrame && made < initialPoolSize; i++, made++)
+                pool.Enqueue(CreateBullet());
+            yield return null;
         }
     }
+
+    /// <summary>지금 배치된 동료들의 스킬 이펙트를 프리팹마다 skillEffectPrewarm 개씩 나눠서 만듭니다.</summary>
+    private void PrewarmPlacedSkillEffects()
+    {
+        CompanionManager companions = CompanionManager.Instance;
+        if (companions == null || skillEffectPrewarm <= 0) return;
+
+        foreach (Companion c in companions.GetOwnedCompanions())
+        {
+            if (c == null || !c.IsPlaced) continue;
+
+            ActiveSkill skill = c.OwnedSkill;
+            if (skill != null && skill.effectPrefab != null)
+                PrewarmOverFrames(skill.effectPrefab, skillEffectPrewarm, 1);   // 같은 프리팹이 겹치면 PrewarmOverFrames 가 거름
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  총알 풀
+    // ──────────────────────────────────────────────
 
     private GameObject CreateBullet()
     {
@@ -254,13 +303,16 @@ public class ObjectPoolManager : MonoBehaviour
         StartCoroutine(PrewarmRoutine(prefab, queue, need, Mathf.Max(1, perFrame)));
     }
 
-    private System.Collections.IEnumerator PrewarmRoutine(GameObject prefab, Queue<GameObject> queue, int need, int perFrame)
+    private IEnumerator PrewarmRoutine(GameObject prefab, Queue<GameObject> queue, int need, int perFrame)
     {
         prewarming.Add(prefab);
 
+        // 먼저 한 프레임 쉰 뒤 만듭니다. StartCoroutine 은 첫 yield 까지 그 자리에서 바로 실행되므로,
+        // 만들고 나서 쉬면 첫 묶음이 부른 쪽 프레임(스테이지 전환·씬 시작)에 그대로 얹힙니다.
         int made = 0;
         while (made < need)
         {
+            yield return null;
             for (int i = 0; i < perFrame && made < need; i++, made++)
             {
                 GameObject obj = Instantiate(prefab);
@@ -268,7 +320,6 @@ public class ObjectPoolManager : MonoBehaviour
                 instanceToPrefab[obj] = prefab;
                 queue.Enqueue(obj);
             }
-            yield return null;
         }
 
         prewarming.Remove(prefab);
