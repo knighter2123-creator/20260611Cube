@@ -73,7 +73,7 @@ public class ChatPanel : MonoBehaviour
     [SerializeField] private RectTransform previewBar;
     [SerializeField] private TextMeshProUGUI previewText;
 
-    [Tooltip("OpenChatButton 위쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
+    [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
 
     // 줄 색 (TMP 리치 텍스트)
@@ -156,12 +156,12 @@ public class ChatPanel : MonoBehaviour
             noticeText.gameObject.SetActive(false);
     }
 
-    /// <summary>미리보기를 이 UI(보통 OpenChatButton) 위쪽에 붙입니다.</summary>
+    /// <summary>미리보기를 이 UI(보통 OpenChatButton) 오른쪽에 붙입니다.</summary>
     public void AttachPreviewTo(RectTransform target) => previewFollow = target;
 
     /// <summary>
-    /// 미리보기를 보이거나 숨기고, 붙은 버튼 위쪽으로 옮깁니다 (아래쪽 버튼 줄과 겹치지 않게). 버튼은 다른 캔버스(Safe Panel 등)에 있으므로
-    /// 버튼의 왼쪽 위 모서리 → 화면 좌표 → 미리보기 캔버스 좌표로 바꿉니다. 레이아웃이 끝난 뒤라 LateUpdate.
+    /// 미리보기를 보이거나 숨기고, 붙은 버튼 오른쪽으로 옮깁니다. 버튼은 다른 캔버스(Safe Panel 등)에 있으므로
+    /// 버튼의 오른쪽 변 가운데 → 화면 좌표 → 미리보기 캔버스 좌표로 바꿉니다. 레이아웃이 끝난 뒤라 LateUpdate.
     /// </summary>
     private void LateUpdate()
     {
@@ -174,14 +174,14 @@ public class ChatPanel : MonoBehaviour
             ? null : targetCanvas.worldCamera;
 
         previewFollow.GetWorldCorners(corners);   // 0 왼쪽 아래, 1 왼쪽 위, 2 오른쪽 위, 3 오른쪽 아래
-        Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, corners[1]);
+        Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, (corners[2] + corners[3]) * 0.5f);   // 오른쪽 변 가운데
 
         var canvasRt = (RectTransform)previewBar.parent;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, screen, null, out Vector2 local)) return;
 
         previewBar.anchorMin = previewBar.anchorMax = new Vector2(0.5f, 0.5f);
-        previewBar.pivot            = new Vector2(0f, 0f);
-        previewBar.anchoredPosition = local + new Vector2(0f, previewGap);
+        previewBar.pivot            = new Vector2(0f, 0.5f);
+        previewBar.anchoredPosition = local + new Vector2(previewGap, 0f);
 
         // 화면 오른쪽 밖으로 나가지 않게 폭을 줄임
         float room = canvasRt.rect.width * 0.5f - previewBar.anchoredPosition.x - previewGap;
