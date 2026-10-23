@@ -5,7 +5,8 @@ using Firebase.Firestore;
 using UnityEngine;
 
 /// <summary>
-/// 계정 삭제 시 서버(Firestore)에 있는 이 계정의 데이터 — 랭킹(rankings/{UID}) + 닉네임(profiles/{UID}) — 를 지웁니다.
+/// 계정 삭제 시 서버(Firestore)에 있는 이 계정의 데이터 — 랭킹(rankings/{UID}) + 닉네임(profiles/{UID})
+/// + 클라우드 세이브(saves/{UID}) — 를 지웁니다.
 ///
 /// [호출 순서]  GameSettingManager.AccountReset 의 [삭제] →  ① 여기(서버)  →  ② AccountReset.TryWipe(로컬)
 ///   서버 삭제는 네트워크 때문에 실패할 수 있습니다. "실패할 수 있는 일을 먼저" 라는 AccountReset 의 원칙대로
@@ -58,11 +59,20 @@ public static class ServerAccountData
             return;
         }
 
+        // 클라우드 세이브를 올리는 중이면 기다림 — 삭제 뒤에 그 트랜잭션이 끝나면 지운 세이브가 되살아남
+        //   (IsDeleting 은 "새로" 올리는 것만 막고, 이미 시작한 올리기는 막지 못함)
+        if (CloudSave.Instance != null && CloudSave.Instance.IsUploading)
+        {
+            onDone?.Invoke(false, "데이터를 저장하는 중입니다. 잠시 후 다시 시도해 주세요.");
+            return;
+        }
+
         IsDeleting = true;
 
         FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
         DocumentReference ranking = db.Collection(RankingManager.COLLECTION).Document(owner);
         DocumentReference profile = db.Collection(ProfileSync.COLLECTION).Document(owner);
+        DocumentReference save    = db.Collection(CloudSave.COLLECTION).Document(owner);   // 클라우드 세이브도 함께 — 남으면 다음 로그인 때 되살아남
 
         try
         {
@@ -78,10 +88,11 @@ public static class ServerAccountData
                     return;
                 }
 
-                // ② 두 문서를 한 번에 삭제 (배치 — 둘 다 지워지거나 둘 다 안 지워짐)
+                // ② 세 문서를 한 번에 삭제 (배치 — 모두 지워지거나 하나도 안 지워짐)
                 WriteBatch batch = db.StartBatch();
                 batch.Delete(ranking);
                 batch.Delete(profile);
+                batch.Delete(save);
                 Task commit = batch.CommitAsync();
 
                 Task.WhenAny(commit, Task.Delay(TimeSpan.FromSeconds(TIMEOUT_SECONDS)))
@@ -101,7 +112,7 @@ public static class ServerAccountData
                             return;
                         }
 
-                        GameLog.Info($"[ServerAccountData] 서버 기록 삭제 완료 (랭킹 + 닉네임): {SaveManager.ActiveAccountLabel}");
+                        GameLog.Info($"[ServerAccountData] 서버 기록 삭제 완료 (랭킹 + 닉네임 + 클라우드 세이브): {SaveManager.ActiveAccountLabel}");
                         Finish(onDone, true, null);
                     });
             });

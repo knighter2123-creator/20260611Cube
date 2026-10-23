@@ -27,12 +27,13 @@ using UnityEngine.UI;
 ///         Notice                       ← 보내기 실패 문구
 ///         Input (TMP_InputField) / Send (Button)
 ///   ChatPreviewCanvas (Canvas 100)
-///     Preview (Button)                 ← previewBar. 창이 닫혀 있을 때 마지막 메시지 한 줄
+///     Preview (Image)                  ← previewBar. 창이 닫혀 있을 때 마지막 메시지 한 줄
 ///       Text
 ///   버튼 클릭·입력 제출은 Awake 에서 코드로 연결합니다 (씬의 OnClick 칸은 비워 둠).
 ///
-/// [미리보기]  창이 닫혀 있는 동안 마지막 메시지 한 줄을 띄웁니다. 누르면 창이 열립니다.
-///   OpenChatButton 이 이 패널을 연결하고 있으면 그 버튼 오른쪽에 붙어 따라다닙니다 (버튼이 꺼지면 함께 숨음).
+/// [미리보기]  창이 닫혀 있는 동안 마지막 메시지 한 줄을 띄웁니다. 보여 주기만 하고 터치는 아래 UI 로 통과시킵니다
+///   (미리보기 캔버스가 위에 있어 오프라인 보상·스탯 강화 버튼을 가리지 않게). 창은 OpenChatButton 으로만 엽니다.
+///   OpenChatButton 이 이 패널을 연결하고 있으면 그 버튼 위쪽에 붙어 따라다닙니다 (버튼이 꺼지면 함께 숨음).
 ///   버튼이 없으면 씬에 배치한 위치 그대로입니다. 미리보기 폭은 씬에서 정한 폭이 최대입니다.
 ///
 /// [데이터]  ChatManager.Messages 를 그리기만 합니다. ChatManager.Changed 를 받아 미리보기와(열려 있으면) 창을 다시 그립니다.
@@ -68,11 +69,11 @@ public class ChatPanel : MonoBehaviour
     [SerializeField] private int prewarmPerFrame = 3;
 
     [Header("미리보기 (창을 닫았을 때 한 줄)")]
-    [Tooltip("미리보기 줄 (Button 포함). 별도 캔버스에 둡니다 — panel 안에 두면 창을 닫을 때 함께 꺼짐.")]
+    [Tooltip("미리보기 줄. 별도 캔버스에 둡니다 — panel 안에 두면 창을 닫을 때 함께 꺼짐.")]
     [SerializeField] private RectTransform previewBar;
     [SerializeField] private TextMeshProUGUI previewText;
 
-    [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
+    [Tooltip("OpenChatButton 위쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
 
     // 줄 색 (TMP 리치 텍스트)
@@ -103,7 +104,10 @@ public class ChatPanel : MonoBehaviour
         dimButton.onClick.AddListener(Close);
         closeButton.onClick.AddListener(Close);
         sendButton.onClick.AddListener(Submit);
-        previewBar.GetComponent<Button>().onClick.AddListener(Open);
+
+        // 미리보기는 터치를 받지 않음 — 씬에서 Raycast Target 을 켜 두어도 아래 버튼이 눌리게 코드에서 끔
+        foreach (Graphic g in previewBar.GetComponentsInChildren<Graphic>(true))
+            g.raycastTarget = false;
 
         // 글자 수 제한은 ChatManager 상수를 따름 (씬 값과 어긋나지 않게 코드에서 덮어씀)
         input.characterLimit = ChatManager.MAX_LENGTH;
@@ -152,12 +156,12 @@ public class ChatPanel : MonoBehaviour
             noticeText.gameObject.SetActive(false);
     }
 
-    /// <summary>미리보기를 이 UI(보통 OpenChatButton) 오른쪽에 붙입니다.</summary>
+    /// <summary>미리보기를 이 UI(보통 OpenChatButton) 위쪽에 붙입니다.</summary>
     public void AttachPreviewTo(RectTransform target) => previewFollow = target;
 
     /// <summary>
-    /// 미리보기를 보이거나 숨기고, 붙은 버튼 오른쪽으로 옮깁니다. 버튼은 다른 캔버스(Safe Panel 등)에 있으므로
-    /// 버튼의 오른쪽 가운데 → 화면 좌표 → 미리보기 캔버스 좌표로 바꿉니다. 레이아웃이 끝난 뒤라 LateUpdate.
+    /// 미리보기를 보이거나 숨기고, 붙은 버튼 위쪽으로 옮깁니다 (아래쪽 버튼 줄과 겹치지 않게). 버튼은 다른 캔버스(Safe Panel 등)에 있으므로
+    /// 버튼의 왼쪽 위 모서리 → 화면 좌표 → 미리보기 캔버스 좌표로 바꿉니다. 레이아웃이 끝난 뒤라 LateUpdate.
     /// </summary>
     private void LateUpdate()
     {
@@ -170,14 +174,14 @@ public class ChatPanel : MonoBehaviour
             ? null : targetCanvas.worldCamera;
 
         previewFollow.GetWorldCorners(corners);   // 0 왼쪽 아래, 1 왼쪽 위, 2 오른쪽 위, 3 오른쪽 아래
-        Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, (corners[2] + corners[3]) * 0.5f);
+        Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, corners[1]);
 
         var canvasRt = (RectTransform)previewBar.parent;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, screen, null, out Vector2 local)) return;
 
         previewBar.anchorMin = previewBar.anchorMax = new Vector2(0.5f, 0.5f);
-        previewBar.pivot            = new Vector2(0f, 0.5f);
-        previewBar.anchoredPosition = local + new Vector2(previewGap, 0f);
+        previewBar.pivot            = new Vector2(0f, 0f);
+        previewBar.anchoredPosition = local + new Vector2(0f, previewGap);
 
         // 화면 오른쪽 밖으로 나가지 않게 폭을 줄임
         float room = canvasRt.rect.width * 0.5f - previewBar.anchoredPosition.x - previewGap;

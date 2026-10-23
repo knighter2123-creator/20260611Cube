@@ -91,7 +91,7 @@ public class AccountReset : MonoBehaviour
         // ① 저장 잠금 — 반드시 삭제보다 먼저. 순서가 바뀌면 지운 직후 끼어든 Save() 가 파일을 되살립니다.
         if (!TryLockForRestart(loginSceneName, "계정 삭제", out error)) return false;
 
-        // ② 세이브 파일 삭제
+        // ② 세이브 파일 삭제 — 에디터의 '세이브 삭제' 와 같은 경로라 랭킹 초기화 표시도 함께 남습니다 (SaveManager.TryDeleteSaveFile)
         if (!SaveManager.TryDeleteSaveFile(out string fileError))
         {
             // 파일이 그대로 남아 있으므로 게임을 그대로 계속하면 됩니다. 잠금만 풀어 줍니다.
@@ -122,6 +122,19 @@ public class AccountReset : MonoBehaviour
     /// </summary>
     public static bool TryBeginAccountSwitch(string loginSceneName, out string error)
         => TryLockForRestart(loginSceneName, "계정 전환", out error);
+
+    /// <summary>
+    /// 클라우드 세이브 적용용 1단계 — TryBeginAccountSwitch 와 같지만 로그 이름만 다릅니다.
+    /// 잠근 뒤 받은 세이브를 파일로 쓰고 RestartFromLogin() 을 부릅니다. 쓰기가 실패하면 CancelBegin() 으로 되돌립니다.
+    /// </summary>
+    public static bool TryBeginCloudRestore(string loginSceneName, out string error)
+        => TryLockForRestart(loginSceneName, "클라우드 세이브 적용", out error);
+
+    /// <summary>TryBeginAccountSwitch / TryBeginCloudRestore 뒤, RestartFromLogin() 전에 실패했을 때 되돌립니다.</summary>
+    public static void CancelBegin()
+    {
+        if (IsRunning) CancelRestart();
+    }
 
     /// <summary>
     /// 재시작 공통 준비 — 진행 중 검사 → 씬 확인 → 저장 잠금 → 대기 상태 기록.

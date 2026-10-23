@@ -8,6 +8,9 @@ using UnityEngine.UI;
 ///
 ///   [간단히]  딜러 3/4   제어 1/2 ...        (켜진 시너지는 계열 색, 꺼진 건 회색)
 ///   [자세히]  탭하면 단계별 효과까지 펼칩니다. 다시 탭하면 접힙니다.
+///             다음 단계 목표도 보이도록 모든 단계를 표시합니다(적용 중인 단계만 밝게).
+///             StageScene 에서는 Safe Panel 안 오른쪽 위에 오른쪽 정렬로 둡니다 — Safe Panel 이 카메라 구멍을 피해 주므로
+///             화면이 어느 쪽으로 돌아가도 가려지지 않습니다.
 ///
 /// [붙이는 곳] StageScene 의 항상 켜져 있는 오브젝트 (예: 다른 HUD 옆).
 ///   · Label 에 Canvas 아래의 TextMeshPro - Text(UI) 를 연결합니다.
@@ -18,6 +21,9 @@ using UnityEngine.UI;
 /// ★ 배치 중에는 탭을 받지 않습니다.
 ///   CompanionPlacementController 는 "탭 좌표에 UI 가 있으면 무시" 하므로,
 ///   이 HUD 가 탭을 받는 상태로 남아 있으면 HUD 아래 칸에는 동료를 놓을 수 없습니다.
+///
+/// ★ TabWindow(Player Total 등)가 열려 있는 동안에도 탭을 받지 않습니다.
+///   이 HUD 가 창 위에 그려지는 자리라, 창 안의 버튼을 눌러도 시너지 설명이 대신 펼쳐지기 때문입니다.
 /// </summary>
 public class SynergyHUD : MonoBehaviour
 {
@@ -41,6 +47,7 @@ public class SynergyHUD : MonoBehaviour
     private CompanionPlacementController boundPlacement;
     private Button                       toggleButton;
     private bool                         detailed;
+    private bool                         placing;          // 동료 배치 중인가
     private bool                         reportedMissing;
 
     private readonly StringBuilder sb = new StringBuilder(256);
@@ -53,6 +60,8 @@ public class SynergyHUD : MonoBehaviour
     {
         TryBind();
         TryBindPlacement();   // 껐다 켰을 때 OnDisable 에서 푼 구독을 되살립니다
+        TabWindow.AnyOpenChanged += UpdateRaycastable;
+        UpdateRaycastable();
     }
 
     // OnEnable 은 매니저 Awake 보다 먼저 돌 수 있어 Start 에서 한 번 더 시도합니다 (CurrencyHUD 와 같은 패턴).
@@ -68,6 +77,7 @@ public class SynergyHUD : MonoBehaviour
     {
         Unbind();
         UnbindPlacement();
+        TabWindow.AnyOpenChanged -= UpdateRaycastable;
     }
 
     private void OnDestroy()
@@ -115,7 +125,8 @@ public class SynergyHUD : MonoBehaviour
 
         boundPlacement.OnPlacementBegan += HandlePlacementBegan;
         boundPlacement.OnPlacementEnded += HandlePlacementEnded;
-        SetRaycastable(!boundPlacement.IsPlacing);
+        placing = boundPlacement.IsPlacing;
+        UpdateRaycastable();
     }
 
     private void UnbindPlacement()
@@ -124,15 +135,17 @@ public class SynergyHUD : MonoBehaviour
         boundPlacement.OnPlacementBegan -= HandlePlacementBegan;
         boundPlacement.OnPlacementEnded -= HandlePlacementEnded;
         boundPlacement = null;
+        placing = false;
     }
 
     private void HandleSynergyChanged(SynergyResult _) => Refresh();
-    private void HandlePlacementBegan() => SetRaycastable(false);
-    private void HandlePlacementEnded() => SetRaycastable(true);
+    private void HandlePlacementBegan() { placing = true;  UpdateRaycastable(); }
+    private void HandlePlacementEnded() { placing = false; UpdateRaycastable(); }
 
-    private void SetRaycastable(bool on)
+    /// <summary>배치 중이거나 TabWindow 가 열려 있으면 탭을 받지 않습니다 (클래스 주석 참고).</summary>
+    private void UpdateRaycastable()
     {
-        if (label != null) label.raycastTarget = on && tapToToggleDetail;
+        if (label != null) label.raycastTarget = tapToToggleDetail && !placing && !TabWindow.AnyOpen;
     }
 
     // ══════════════════════════════════════════════
@@ -194,7 +207,7 @@ public class SynergyHUD : MonoBehaviour
 
             sb.Append("<size=80%>");
             sb.Append(current ? "<color=#FFFFFF>" : $"<color=#{ColorUtility.ToHtmlStringRGB(inactiveColor)}>");
-            sb.Append("   ").Append(t.requiredCount).Append("명: ");
+            sb.Append(t.requiredCount).Append("명: ");
 
             if (t.effects != null)
             {
@@ -241,6 +254,6 @@ public class SynergyHUD : MonoBehaviour
             toggleButton.onClick.AddListener(ToggleDetail);
         }
 
-        SetRaycastable(boundPlacement == null || !boundPlacement.IsPlacing);
+        UpdateRaycastable();
     }
 }

@@ -109,6 +109,12 @@ public static class AccountSwitch
     }
 
     /// <summary>
+    /// 재시작 뒤 새 LoginScene 에서 게임을 자동으로 이어서 시작하게 합니다.
+    /// 계정 전환이 아닌 재시작(클라우드 세이브를 받은 뒤 — CloudSave)도 같은 자동 시작을 쓰려고 공개합니다.
+    /// </summary>
+    public static void RequestAutoStartAfterReload() => autoStartAfterReload = true;
+
+    /// <summary>
     /// 새 LoginScene 의 Login_Name.Start 가 부릅니다. true 면 바로 StartGame() 을 이어서 부르면 됩니다.
     /// (유저는 이미 '시작' 을 눌렀으므로 한 번 더 누르게 하지 않음)
     /// </summary>

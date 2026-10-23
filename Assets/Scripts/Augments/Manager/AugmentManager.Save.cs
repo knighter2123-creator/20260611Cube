@@ -211,6 +211,28 @@ public partial class AugmentManager
         GameLog.Info($"[Augment] 증강 저장 이동: {moved}개 키");
     }
 
+    // ─────────────────────────────────────────────────────────
+    //  클라우드 세이브 (CloudSave)
+    // ─────────────────────────────────────────────────────────
+    //   증강은 save.json 밖(PlayerPrefs)에 있어서 클라우드 문서에 따로 실어 보냅니다.
+    //   씬의 saveKey 는 모두 기본 키(AUGMENT_SAVE_V1)라 기본 키만 다룹니다.
+
+    /// <summary>이 계정의 증강 저장 문자열. 없으면 "".</summary>
+    public static string ExportForCloud(string accountId)
+        => PlayerPrefs.GetString(KeyFor(DEFAULT_SAVE_KEY, accountId), string.Empty);
+
+    /// <summary>
+    /// 클라우드에서 받은 증강 저장으로 이 계정의 저장을 바꿉니다. 빈 문자열이면 지웁니다.
+    /// 살아 있는 인스턴스의 메모리는 건드리지 않습니다 — 받은 뒤 매니저를 새로 만들어 Load() 가 다시 읽게 합니다 (CloudSave).
+    /// </summary>
+    public static void ImportFromCloud(string accountId, string json)
+    {
+        string key = KeyFor(DEFAULT_SAVE_KEY, accountId);
+        if (string.IsNullOrEmpty(json)) PlayerPrefs.DeleteKey(key);
+        else                            PlayerPrefs.SetString(key, json);
+        PlayerPrefs.Save();
+    }
+
     /// <summary>저장 데이터를 통째로 지웁니다. 개발 중 초기화용.</summary>
     [ContextMenu("테스트: 저장 데이터 삭제")]
     private void DeleteSave()

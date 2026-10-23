@@ -52,6 +52,11 @@ public class DailyDungeonSaveData
 public class SaveData
 {
     public int saveVersion = 1;
+
+    // ── 클라우드 세이브 (CloudSave) ──
+    // 시각 값이지만 "버전 번호" 로만 씁니다 — 기기마다 시계가 달라서 크기 비교는 하지 않고 같은지만 봅니다.
+    public long savedAt       = 0;   // 이 데이터를 마지막으로 파일에 쓴 시각 (UTC ms). SaveManager.WriteToDisk 가 매번 갱신
+    public long cloudSyncedAt = 0;   // 클라우드와 마지막으로 맞췄을 때 클라우드에 있던 savedAt (0 = 맞춘 적 없음)
     public bool nicknamePromptShown;   // 닉네임 자동 팝업을 이미 띄웠는가 (기본 false)
     
     // ── 레벨 / 경험치 ──

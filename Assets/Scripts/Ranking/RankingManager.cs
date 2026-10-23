@@ -29,6 +29,12 @@ using UnityEngine;
 ///   - 앱 시작 직후 1회
 ///   조건: Firebase 준비 + 로그인 + 게임 씬 진입(세이브 적용 후) + 깬 스테이지가 1개 이상
 ///
+/// [세이브 삭제 후 랭킹 초기화]  세이브를 지운 계정(SaveManager.IsRankingResetPending — 에디터 '세이브 삭제', 설정 '계정 삭제')이
+///   아직 1-1(깬 스테이지 0개)이면, 업로드보다 먼저 서버의 내 랭킹 문서를 지웁니다.
+///   업로드는 "서버 기록이 더 높으면 유지" 라서, 지우지 않으면 예전 기록이 그대로 남기 때문입니다.
+///   새 기기·재설치처럼 세이브 파일이 없을 뿐인 경우는 표시가 없으므로 서버 기록을 지킵니다.
+///   지우기 전에 1-1 을 넘겼으면 초기화하지 않고 표시만 내립니다.
+///
 /// ⚠ 기록은 클라이언트가 올리는 값을 그대로 믿습니다. 보안 규칙은 "남의 문서는 못 쓴다" 까지만 막습니다.
 /// </summary>
 public class RankingManager : MonoBehaviour
@@ -57,6 +63,7 @@ public class RankingManager : MonoBehaviour
     // ── 업로드 상태 ──
     private bool  dirty = true;   // 앱 시작 직후 1회 동기화
     private bool  uploading;
+    private bool  resetting;      // 세이브 삭제 후 서버 랭킹을 지우는 중 — 끝날 때까지 업로드하지 않음
     private float nextTryTime;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -102,10 +109,72 @@ public class RankingManager : MonoBehaviour
 
     private void Update()
     {
-        if (!dirty || uploading || Time.unscaledTime < nextTryTime) return;
+        if (uploading || resetting || Time.unscaledTime < nextTryTime) return;
+        if (TryResetAfterSaveDelete()) return;   // 초기화가 먼저 — 그 전에 올리면 서버의 예전 기록이 유지됨
+
+        if (!dirty) return;
         if (!CanUpload(out string uid)) return;
 
         Upload(uid);
+    }
+
+    /// <summary>
+    /// 세이브를 지운 계정이 아직 1-1 이면 서버의 내 랭킹 문서를 지웁니다 (클래스 주석 [세이브 삭제 후 랭킹 초기화]).
+    /// 지우기 시작했으면 true.
+    /// </summary>
+    private bool TryResetAfterSaveDelete()
+    {
+        // 업로드와 같은 조건 — 지금 세이브의 주인으로 로그인 + 게임 씬 진입(세이브 적용 후)
+        if (!ProfileSync.TryGetAccount(out string uid)) return false;
+        if (!SaveManager.IsRankingResetPending(uid)) return false;
+        if (!SaveManager.Instance.IsGameplayStarted) return false;
+
+        // ★ 클라우드 확인이 먼저 — 이 표시는 CloudSave 에게 "세이브 삭제로 새로 시작했다(클라우드를 덮어써라)" 는 뜻이기도 합니다.
+        //   오프라인으로 시작해 클라우드 확인 전에 여기서 표시를 지우면, 다음 실행 때 CloudSave 가 빈 세이브로 보고
+        //   클라우드의 옛 진행을 자동으로 되살립니다 (랭킹만 지워진 채).
+        if (CloudSave.Instance != null && !CloudSave.Instance.IsCheckedFor(uid)) return false;
+
+        if (StageRecord.HasRecord)
+        {
+            // 지우기 전에 1-1 을 넘김 → 초기화 조건이 아님. 평소처럼 업로드만 합니다.
+            SaveManager.SetRankingResetPending(uid, false);
+            GameLog.Info("[Ranking] 세이브를 지웠지만 이미 1-1 을 넘겨 랭킹 초기화를 건너뜁니다.");
+            return false;
+        }
+
+        resetting = true;
+        try
+        {
+            FirebaseFirestore.DefaultInstance.Collection(COLLECTION).Document(uid).DeleteAsync()
+                .ContinueWithOnMainThread(task =>
+                {
+                    if (this == null) return;   // 기다리는 사이 파괴됨 (계정 삭제 등)
+                    resetting = false;
+
+                    if (task.IsFaulted || task.IsCanceled)
+                    {
+                        Debug.LogWarning($"[Ranking] 새 세이브 랭킹 초기화 실패 — {retryDelay}초 뒤 재시도: {task.Exception}");
+                        nextTryTime = Time.unscaledTime + retryDelay;
+                        return;
+                    }
+
+                    SaveManager.SetRankingResetPending(uid, false);   // 표시는 계정별이라 그사이 계정이 바뀌어도 이 계정 것만 내림
+
+                    // ★ 플레이 중에 에디터 '세이브 삭제' 를 누르면 Current 만 비고 매니저는 옛 진행을 들고 있어서,
+                    //   다음 Save() 때 진행이 파일로 돌아옵니다. 그때 다시 올라가도록 표시해 둡니다.
+                    //   (진짜 1-1 이면 CanUpload 의 HasRecord 검사에서 걸려 아무것도 올리지 않음)
+                    dirty = true;
+                    GameLog.Info("[Ranking] 세이브 삭제 후 1-1 — 서버 랭킹 초기화 완료");
+                });
+        }
+        catch (Exception e)
+        {
+            // 호출하는 순간의 예외 — 콜백이 오지 않으므로 여기서 상태를 풀어 줌 (Upload 와 같은 방어)
+            Debug.LogError($"[Ranking] 랭킹 초기화 호출 실패: {e}");
+            resetting   = false;
+            nextTryTime = Time.unscaledTime + retryDelay;
+        }
+        return true;
     }
 
     private static bool IsFirebaseReady

@@ -40,6 +40,9 @@ using UnityEngine.SceneManagement;   // ★ [게임 시작 전 저장 차단] sc
 ///   10. SavePath 가 ActiveAccountId 에 따라 바뀜 (경로 계산은 여전히 PathFor 한 곳)
 ///   11. SaveFileExists / TryMoveSaveFile / SetActiveAccount — 계정 전환(AccountSwitch)이 쓰는 도구
 ///   어느 계정으로 바꿀지, 게스트 진행을 옮길지는 AccountSwitch.cs 가 결정합니다. 이 파일은 "파일 위치" 만 압니다.
+///
+/// ★ [클라우드 세이브]  CloudSave 를 같은 오브젝트에 붙이고(Awake), 파일을 쓸 때마다 버전(SaveData.savedAt)을 올려 알립니다.
+///   언제 올리고 어느 쪽을 쓸지는 CloudSave.cs 가 정합니다. 이 파일은 MarkCloudSynced / TryWriteDownloadedSave 창구만 줍니다.
 /// </summary>
 public class SaveManager : MonoBehaviour
 {
@@ -100,6 +103,9 @@ public class SaveManager : MonoBehaviour
         }
 
         Load();
+
+        // 클라우드 세이브 — SaveManager 와 수명을 같이 합니다 (계정 삭제·전환 때 함께 파괴되고 새로 만들어짐)
+        if (GetComponent<CloudSave>() == null) gameObject.AddComponent<CloudSave>();
 
         // ★ [게임 시작 전 저장 차단]
         //   구독은 중복 제거 return "아래" 에서 한다 — 곧 죽을 복제본이 구독하면 안 되니까.
@@ -187,8 +193,9 @@ public class SaveManager : MonoBehaviour
         WriteToDisk(Current);
     }
 
-    // 실제 파일 쓰기는 이 함수 한 곳에만 있음 (Save / WriteCurrentToDisk 공용)
-    private void WriteToDisk(SaveData data)
+    // 실제 파일 쓰기는 이 함수 한 곳에만 있음 (Save / WriteCurrentToDisk / MarkCloudSynced 공용)
+    //   contentChanged = false 는 내용은 그대로 두고 클라우드 표시만 적을 때 — savedAt(버전)을 바꾸지 않고 올리지도 않음
+    private void WriteToDisk(SaveData data, bool contentChanged = true)
     {
         // ★ [계정 삭제] 파일 쓰기의 "유일한 출입구" 에서 한 번 더 막습니다.
         //   Save() 를 거치지 않는 WriteCurrentToDisk() 경로(PlayerProfile.Persist)도 여기로 모이므로,
@@ -199,14 +206,80 @@ public class SaveManager : MonoBehaviour
             return;
         }
 
+        // 버전 갱신 — 같은 밀리초에 두 번 저장해도 값이 달라지게 최소 1 씩 올림 (CloudSave 가 "같은 버전인가" 로 비교)
+        if (contentChanged)
+            data.savedAt = System.Math.Max(System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), data.savedAt + 1);
+
         try
         {
-            File.WriteAllText(SavePath, JsonUtility.ToJson(data, true));
+            string json = JsonUtility.ToJson(data, true);
+            File.WriteAllText(SavePath, json);
             GameLog.Info($"[SaveManager] 저장 완료: {SavePath}");
+
+            // 파일에 실제로 쓴 내용 그대로 클라우드에 올리도록 알림 (올릴지·언제 올릴지는 CloudSave 가 정함)
+            if (contentChanged) CloudSave.Instance?.NotifySaved(json, data.savedAt);
         }
         catch (System.Exception e)
         {
             Debug.LogError($"[SaveManager] 저장 실패: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 클라우드와 맞춘 버전(cloudSyncedAt)을 적어 둡니다. 내용·버전(savedAt)은 바꾸지 않습니다. (CloudSave 전용)
+    ///
+    /// 파일에도 바로 적어서, 이 직후 앱이 꺼져도 다음 실행 때 "이미 맞춘 상태" 로 판단되게 합니다.
+    ///   게임 시작 전(LoginScene 의 확인) — Current 가 파일 그대로라 Current 를 씀
+    ///   게임 중 — ★ 파일의 그 값 하나만 고침. 게임 중의 Current 에는 StageRecord·소환권처럼 직접 바꾼 값이 파일보다 앞서 있어서,
+    ///             Current 를 버전 그대로 쓰면 "버전은 클라우드와 같은데 내용은 다른" 파일이 생깁니다.
+    /// 파일이 없으면(새 세이브) 다음 저장 때 Current 와 함께 기록됩니다.
+    /// </summary>
+    public void MarkCloudSynced(long cloudSavedAt)
+    {
+        if (Current == null || Current.cloudSyncedAt == cloudSavedAt) return;
+        Current.cloudSyncedAt = cloudSavedAt;
+        if (IsSaveLocked || !HasSave()) return;
+
+        if (!IsGameplayStarted)
+        {
+            WriteToDisk(Current, contentChanged: false);
+            return;
+        }
+
+        try
+        {
+            string json    = File.ReadAllText(SavePath);
+            string patched = System.Text.RegularExpressions.Regex.Replace(
+                json, "\"cloudSyncedAt\"\\s*:\\s*-?\\d+", $"\"cloudSyncedAt\": {cloudSavedAt}");
+            if (patched != json) File.WriteAllText(SavePath, patched);
+            // 키가 없으면(이 버전에서 한 번도 안 쓴 파일) 그대로 둠 — 게임 중 올리기는 이 버전이 파일을 쓴 뒤에만 일어나므로 보통 있음
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[SaveManager] 클라우드 동기화 표시 기록 실패 (다음 저장 때 함께 기록됨): {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 클라우드에서 받은 세이브를 그 계정의 파일로 씁니다. (CloudSave 전용)
+    /// ⚠ 저장 잠금을 무시합니다 — 호출하는 쪽이 먼저 잠그고(AccountReset.TryBeginAccountSwitch), 이 파일을 쓴 뒤
+    ///   매니저를 새로 만들어(RestartFromLogin) 새 SaveManager 가 이 파일을 읽게 합니다.
+    ///   잠금을 거는 이유는 옛 매니저가 옛 값으로 이 파일을 덮어쓰지 못하게 하려는 것이라, 이 쓰기만은 통과해야 합니다.
+    /// </summary>
+    public static bool TryWriteDownloadedSave(string accountId, string json, out string error)
+    {
+        error = string.Empty;
+        try
+        {
+            File.WriteAllText(PathFor(accountId), json);
+            GameLog.Info($"[SaveManager] 클라우드 세이브를 파일로 기록: {PathFor(accountId)}");
+            return true;
+        }
+        catch (System.Exception e)
+        {
+            error = e.Message;   // 외부 저장소라 try-catch (TryDeleteSaveFile 과 같은 기준)
+            Debug.LogError($"[SaveManager] 클라우드 세이브 기록 실패: {e.Message}");
+            return false;
         }
     }
 
@@ -283,9 +356,29 @@ public class SaveManager : MonoBehaviour
     [ContextMenu("세이브 삭제")]
     public void DeleteSave()
     {
-        if (File.Exists(SavePath)) File.Delete(SavePath);
-        Current = new SaveData();
-        Debug.Log($"[SaveManager] 세이브 삭제됨: {SavePath}");
+        // 설정의 '계정 삭제'(AccountReset.TryWipe)와 같은 세이브 삭제 경로 — 랭킹 초기화 표시도 여기서 함께 남습니다.
+        if (TryDeleteSaveFile(out string error))
+            Debug.Log($"[SaveManager] 세이브 삭제됨: {SavePath}");
+        else
+            Debug.LogError($"[SaveManager] 세이브 삭제 실패: {error}");
+    }
+
+    // ── 세이브 삭제 후 랭킹 초기화 표시 ─────────────────
+    //   세이브 파일과 함께 지워지면 안 되므로 PlayerPrefs 에 계정별로 둡니다.
+    //   새 기기·재설치처럼 "파일이 없을 뿐" 인 경우와 구분하려고, 세이브 삭제(TryDeleteSaveFile)를 거쳤을 때만 켭니다.
+    //   (에디터의 '세이브 삭제' 와 설정의 '계정 삭제' 가 모두 TryDeleteSaveFile 을 지납니다)
+    private const string RANKING_RESET_PREF_KEY = "RANKING_RESET_AFTER_SAVE_DELETE_V1";
+
+    /// <summary>이 계정이 세이브 삭제 후 서버 랭킹 초기화를 기다리는 중인가.</summary>
+    public static bool IsRankingResetPending(string accountId)
+        => PlayerPrefs.GetInt(RANKING_RESET_PREF_KEY + KeySuffixFor(accountId), 0) == 1;
+
+    public static void SetRankingResetPending(string accountId, bool on)
+    {
+        string key = RANKING_RESET_PREF_KEY + KeySuffixFor(accountId);
+        if (on) PlayerPrefs.SetInt(key, 1);
+        else    PlayerPrefs.DeleteKey(key);
+        PlayerPrefs.Save();   // 바로 앱이 꺼져도 표시가 남거나 지워지도록 즉시 기록
     }
 
     // ── 자동 저장 ──────────────────────────────────
@@ -540,6 +633,11 @@ public class SaveManager : MonoBehaviour
         //   (Instance 는 Unity 식 null 검사 — 파괴된 인스턴스도 걸러냅니다)
         if (Instance != null)
             Instance.Current = new SaveData();
+        CloudSave.Instance?.DiscardPending();   // 지우기 전 내용이 클라우드로 올라가지 않게
+
+        // 다시 1-1 부터 시작하면 서버 랭킹도 지움 (RankingManager.TryResetAfterSaveDelete).
+        //   계정 삭제는 서버 랭킹을 먼저 지우지만, 그 삭제가 늦게 반영되거나 사이에 다시 올라간 기록까지 정리하는 안전망입니다.
+        SetRankingResetPending(ActiveAccountId, true);
 
         GameLog.Info($"[SaveManager] 세이브 파일 삭제 완료: {SavePath}");
         return true;

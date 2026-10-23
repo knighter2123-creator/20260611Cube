@@ -153,6 +153,25 @@ public class TabWindow : MonoBehaviour
 
     public bool IsOpen => windowRoot != null && windowRoot.activeSelf;
 
+    // ★ 창 위에 겹쳐 그려지는 HUD(예: SynergyHUD)가 창이 열린 동안 탭을 양보할 수 있게 알립니다.
+    //   창 안의 버튼을 눌렀는데 그 자리에 있던 HUD 가 탭을 가져가는 일을 막습니다.
+    private static readonly System.Collections.Generic.HashSet<TabWindow> openWindows =
+        new System.Collections.Generic.HashSet<TabWindow>();
+
+    /// <summary>열려 있는 TabWindow 가 하나라도 있는가.</summary>
+    public static bool AnyOpen => openWindows.Count > 0;
+
+    /// <summary>AnyOpen 이 바뀔 수 있을 때마다 불립니다.</summary>
+    public static event Action AnyOpenChanged;
+
+    // Enter Play Mode 옵션으로 도메인 리로드를 끈 경우에도 이전 플레이의 값이 남지 않게
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        openWindows.Clear();
+        AnyOpenChanged = null;
+    }
+
     // ══════════════════════════════════════════════
     //  Unity 생명주기
     // ══════════════════════════════════════════════
@@ -230,7 +249,7 @@ public class TabWindow : MonoBehaviour
     {
         // 시작 시 창은 닫아 둡니다.
         if (windowRoot != null) windowRoot.SetActive(false);
-        RefreshOpenButtonIcon();
+        RefreshOpenState();
 
         // 모든 탭 내용도 꺼 둡니다.
         // ★ 이걸 빼먹으면 씬에 켜둔 채 저장한 탭이 창 뒤에 겹쳐 보입니다.
@@ -266,6 +285,9 @@ public class TabWindow : MonoBehaviour
     {
         UnbindManagers();
         UnregisterListeners();
+
+        // 창이 열린 채로 이 컴포넌트가 꺼지거나 파괴되면(씬 전환 등) 열린 창 목록에서 빼 줍니다.
+        if (openWindows.Remove(this)) AnyOpenChanged?.Invoke();
     }
 
     // ══════════════════════════════════════════════
@@ -422,7 +444,7 @@ public class TabWindow : MonoBehaviour
 
         // ★ 창이 안 보이는 동안에는 버튼도 '열기' 모양이어야 합니다.
         //   안 그러면 화면에 창이 없는데 버튼만 '접기(▼)' 로 남아 유저가 혼란스러워집니다.
-        RefreshOpenButtonIcon();
+        RefreshOpenState();
     }
 
     private void HandlePlacementEnded()
@@ -436,7 +458,7 @@ public class TabWindow : MonoBehaviour
         // 배치 결과(배치 ↔ 취소 버튼)가 목록에 반영되도록 현재 탭을 다시 그립니다.
         ShowTab(currentTab, force: true);
 
-        RefreshOpenButtonIcon();
+        RefreshOpenState();
     }
 
     // ══════════════════════════════════════════════
@@ -473,7 +495,7 @@ public class TabWindow : MonoBehaviour
         //   "이벤트 하나를 놓쳐도 거짓 정보가 화면까지 도달하지 못하게" 하는 이중 안전장치입니다.
         ShowTab(currentTab, force: true);
 
-        RefreshOpenButtonIcon();
+        RefreshOpenState();
     }
 
     public void Close()
@@ -510,7 +532,7 @@ public class TabWindow : MonoBehaviour
 
         if (windowRoot != null) windowRoot.SetActive(false);
 
-        RefreshOpenButtonIcon();
+        RefreshOpenState();
     }
 
     public void Toggle()
@@ -614,6 +636,15 @@ public class TabWindow : MonoBehaviour
         // ★ 인스펙터는 인터페이스 타입 필드를 직렬화하지 못합니다.
         //   그래서 MonoBehaviour 로 받아 여기서 캐스팅합니다. 아니면 null 이 돌아올 뿐 터지지 않습니다.
         return tabs[index].page as ITabPage;
+    }
+
+    /// <summary>창을 켜고 끈 직후에 부릅니다 — 진입 버튼 아이콘과 열린 창 목록(AnyOpen)을 함께 맞춥니다.</summary>
+    private void RefreshOpenState()
+    {
+        RefreshOpenButtonIcon();
+
+        bool changed = IsOpen ? openWindows.Add(this) : openWindows.Remove(this);
+        if (changed) AnyOpenChanged?.Invoke();
     }
 
     /// <summary>

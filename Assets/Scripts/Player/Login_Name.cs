@@ -13,6 +13,8 @@ using UnityEngine.UI;
 /// · StartGame() 은 public — 다른 버튼(GoogleLoginButtonUI, EmailLoginUI 등)도 같은 입구로 들어옵니다.
 /// · 씬 이동 직전에 AccountSwitch.PrepareForStart() 로 로그인 계정과 세이브 주인을 맞춥니다.
 ///   계정이 바뀌어 매니저 재시작이 필요하면 여기서 멈추고, 재시작된 LoginScene 에서 자동으로 이어서 시작합니다.
+/// · 그다음 CloudSave.CheckBeforeStart() 로 클라우드 세이브와 맞춥니다 (필요하면 선택 팝업).
+///   클라우드 것을 적용하면 같은 방식으로 재시작 후 자동으로 이어서 시작합니다.
 ///
 /// ★ 시작 버튼의 인스펙터 OnClick 목록은 비워 두세요. 리스너는 코드(Start)에서 등록합니다.
 /// </summary>
@@ -27,6 +29,10 @@ public class Login_Name : MonoBehaviour
     [Tooltip("시작을 눌렀을 때 로그인 상태(Firebase)가 아직 준비 전이면 최대 이만큼 기다립니다(초, 실제 시간).\n" +
              "보통 1초 안에 끝납니다. 넘으면(오프라인 등) 마지막으로 쓰던 계정 데이터로 시작합니다.")]
     [SerializeField] private float authWaitSeconds = 3f;
+
+    [Header("클라우드 세이브")]
+    [Tooltip("클라우드 세이브를 확인할 때 최대 이만큼 기다립니다(초). 넘으면(오프라인 등) 이 기기 데이터로 시작합니다.")]
+    [SerializeField] private float cloudWaitSeconds = 5f;
 
     // 시작 절차에 들어갔는지. 버튼 연타·여러 버튼 동시 입력으로 시작이 두 번 되는 것을 막습니다.
     private bool isLoading;
@@ -92,6 +98,17 @@ public class Login_Name : MonoBehaviour
 
         if (result == AccountSwitch.StartResult.NotReady)
             Debug.LogWarning($"[Login_Name] {authWaitSeconds}초 동안 로그인 상태를 확인하지 못해 마지막 계정({SaveManager.ActiveAccountLabel}) 데이터로 시작합니다.");
+
+        // 클라우드 세이브 확인 — 게스트·오프라인이면 바로 통과. 선택 팝업이 뜨면 고를 때까지 기다림.
+        if (CloudSave.Instance != null)
+        {
+            bool done = false;
+            CloudSave.StartCheck check = CloudSave.StartCheck.Proceed;
+            CloudSave.Instance.CheckBeforeStart(cloudWaitSeconds, r => { check = r; done = true; });
+
+            while (!done && this != null) yield return null;
+            if (check == CloudSave.StartCheck.Rebooting) yield break;   // 클라우드 세이브 적용 재시작 — 새 LoginScene 에서 자동으로 이어서 시작
+        }
 
         LoadMainScene();
     }

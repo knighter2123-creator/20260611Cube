@@ -7,15 +7,43 @@ using UnityEngine.UI;
 /// 스테이지 랭킹 창 — "순위 / 닉네임 / 스테이지" 목록 + 맨 아래 내 순위.
 ///
 /// [붙이는 위치]
-///   StageScene 의 항상 켜진 빈 오브젝트. 창 UI 는 Awake 에서 코드로 만들므로 따로 배치할 것이 없습니다.
-///   여는 버튼에는 OpenRankingButton 을 붙이고 이 컴포넌트를 연결하세요.
+///   StageScene 의 항상 켜진 빈 오브젝트. 여는 버튼에는 OpenRankingButton 을 붙이고 이 컴포넌트를 연결하세요.
+///
+/// [UI]  씬에 있는 오브젝트를 아래 칸에 연결해서 씁니다.
+///   처음 만들거나 모양을 다시 만들 때는 StageScene 을 열고 Tools/UI 굽기/랭킹 창 메뉴를 누르세요 (UIBaker) —
+///   RankingCanvas 를 씬 최상위에 만들고 아래 칸을 모두 채웁니다. 그 뒤 씬을 저장하면 됩니다.
+///   RankingCanvas 를 씬 최상위에 두는 이유: 다른 캔버스(예: Safe Panel) 안에 넣으면 '중첩 캔버스' 가 되어
+///   sortingOrder·CanvasScaler 가 무시되고, 어두운 배경도 Safe Area 만큼만 덮습니다.
+///
+///   RankingCanvas (Canvas 500)
+///     Dim (Button)               ← dimButton. 누르면 닫힘
+///     Window
+///       Title / Close (Button)   ← closeButton
+///       Header (RankingRow)      ← 머리줄
+///       Viewport (ScrollRect)
+///         Content (VerticalLayoutGroup)   ← content
+///           Row (RankingRow, 꺼 둠)         ← rowTemplate. 복제해서 씀
+///         Status                 ← statusText
+///       MyRank / Text            ← myRankText
 ///
 /// [데이터]  RankingManager.FetchTop 으로 받아 와 그리기만 합니다 (값을 들고 있지 않음).
 ///   너무 자주 열고 닫아도 서버 조회가 몰리지 않도록 refreshCooldown 동안은 이전 결과를 다시 씁니다.
 /// </summary>
 public class RankingPanel : MonoBehaviour
 {
-    [Header("UI")]
+    [Header("UI (Tools/UI 굽기/랭킹 창 이 채움)")]
+    [Tooltip("창 전체 (RankingCanvas). 열고 닫을 때 켜고 끕니다.")]
+    [SerializeField] private GameObject root;
+    [SerializeField] private Button dimButton;
+    [SerializeField] private Button closeButton;
+    [Tooltip("목록 줄들이 들어가는 곳 (ScrollRect.content)")]
+    [SerializeField] private RectTransform content;
+    [Tooltip("목록 한 줄의 모양. 꺼 둔 채로 content 아래에 둡니다.")]
+    [SerializeField] private RankingRow rowTemplate;
+    [SerializeField] private TextMeshProUGUI statusText;
+    [SerializeField] private TextMeshProUGUI myRankText;
+
+    [Header("굽기 설정 (UIBaker 가 UI 를 만들 때만 씀)")]
     [Tooltip("한글이 들어 있는 TMP 폰트 (예: BMJUA_ttf SDF). 비우면 TMP 기본 폰트 — 한글이 □ 로 보일 수 있습니다.")]
     [SerializeField] private TMP_FontAsset font;
 
@@ -26,20 +54,17 @@ public class RankingPanel : MonoBehaviour
     [Tooltip("이 시간(초) 안에 다시 열면 서버에 다시 묻지 않고 이전 결과를 보여 줍니다.")]
     [SerializeField] private float refreshCooldown = 30f;
 
-    private static readonly Color DimColor    = new Color(0f, 0f, 0f, 0.6f);
-    private static readonly Color WindowColor = new Color(0.12f, 0.13f, 0.18f, 0.97f);
-    private static readonly Color HeaderColor = new Color(0.22f, 0.24f, 0.32f, 1f);
-    private static readonly Color RowColor    = new Color(1f, 1f, 1f, 0.04f);
-    private static readonly Color MyRowColor  = new Color(1f, 0.85f, 0.2f, 0.25f);
-    private static readonly Color GoldColor   = new Color(1f, 0.85f, 0.2f);
+    public TMP_FontAsset Font         => font;
+    public int           SortingOrder => sortingOrder;
+
+    // 목록을 그릴 때 쓰는 색. UIBaker 도 같은 값으로 구워서 굽는 모양과 그리는 색이 어긋나지 않게 합니다
+    // (창 배경처럼 굽고 나면 바뀌지 않는 색은 UIBaker 에만 있음)
+    public static readonly Color RowColor    = new Color(1f, 1f, 1f, 0.04f);
+    public static readonly Color MyRowColor  = new Color(1f, 0.85f, 0.2f, 0.25f);
+    public static readonly Color GoldColor   = new Color(1f, 0.85f, 0.2f);
 
     // 구분자. 가운뎃점(·)은 BMJUA 폰트에 없어서 □ 로 보이므로 폰트에 있는 '|' 를 씁니다.
     private const string Sep = "  |  ";
-
-    private GameObject      root;
-    private RectTransform   content;
-    private TextMeshProUGUI statusText;
-    private TextMeshProUGUI myRankText;
 
     private readonly List<GameObject> rows = new List<GameObject>();
 
@@ -49,21 +74,30 @@ public class RankingPanel : MonoBehaviour
 
     public bool IsOpen => root != null && root.activeSelf;
 
+    private bool ready;   // 칸이 다 연결돼 있는가 — 비어 있으면 열지 않음 (Awake 에서 한 번 알림)
+
     private void Awake()
     {
-        Build();
-        root.SetActive(false);
-    }
+        ready = root != null && content != null && rowTemplate != null && statusText != null && myRankText != null;
+        if (!ready)
+        {
+            Debug.LogError("[RankingPanel] UI 칸이 비어 있습니다. StageScene 을 열고 Tools/UI 굽기/랭킹 창 메뉴로 만든 뒤 씬을 저장하세요.", this);
+            return;
+        }
 
-    private void OnDestroy()
-    {
-        if (root != null) Destroy(root);   // 캔버스가 내 자식이 아니므로 직접 정리 (Build 주석 참고)
+        // 버튼은 코드에서 연결합니다 (씬의 OnClick 칸은 비워 둠 — ChatPanel 과 같은 규칙)
+        if (dimButton   != null) dimButton.onClick.AddListener(Close);
+        if (closeButton != null) closeButton.onClick.AddListener(Close);
+
+        rowTemplate.gameObject.SetActive(false);
+        root.SetActive(false);
     }
 
     // ───────────────────────────── 열기 / 닫기 ─────────────────────────────
 
     public void Open()
     {
+        if (!ready) return;
         root.SetActive(true);
 
         if (cached != null && Time.unscaledTime - cachedTime < refreshCooldown)
@@ -74,7 +108,10 @@ public class RankingPanel : MonoBehaviour
         Refresh();
     }
 
-    public void Close() => root.SetActive(false);
+    public void Close()
+    {
+        if (root != null) root.SetActive(false);
+    }
 
     private void Refresh()
     {
@@ -119,8 +156,14 @@ public class RankingPanel : MonoBehaviour
 
         string myUid = AuthManager.Instance != null ? AuthManager.Instance.Uid : null;
         foreach (RankingManager.Entry e in list)
-            rows.Add(MakeRow(content, e.Rank.ToString(), e.Nickname, StageRecord.Format(e.Progress),
-                             e.Uid == myUid ? MyRowColor : RowColor, e.Rank <= 3));
+        {
+            RankingRow row = Instantiate(rowTemplate, content);
+            row.gameObject.SetActive(true);
+            row.Set(e.Rank.ToString(), e.Nickname, StageRecord.Format(e.Progress),
+                    e.Uid == myUid ? MyRowColor : RowColor,
+                    e.Rank <= 3 ? GoldColor : Color.white);
+            rows.Add(row.gameObject);
+        }
 
         UpdateMyRank(list);
     }
@@ -165,161 +208,5 @@ public class RankingPanel : MonoBehaviour
     {
         foreach (GameObject row in rows) Destroy(row);
         rows.Clear();
-    }
-
-    // ───────────────────────────── UI 생성 ─────────────────────────────
-
-    private void Build()
-    {
-        // 캔버스 (프로젝트 다른 씬과 같은 1920x1080 기준)
-        // ★ 내 자식으로 두지 않고 씬 최상위에 만듭니다.
-        //   이 컴포넌트가 다른 캔버스(예: Safe Panel) 안에 있으면 자식 캔버스는 '중첩 캔버스' 가 되어
-        //   sortingOrder·CanvasScaler 가 무시되고, 어두운 배경도 Safe Area 만큼만 덮습니다.
-        //   씬 최상위라도 같은 씬 소속이라 씬이 바뀌면 함께 사라지고, 이 컴포넌트가 먼저 파괴되면 OnDestroy 가 지웁니다.
-        root = new GameObject("RankingCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-
-        var canvas = root.GetComponent<Canvas>();
-        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = sortingOrder;
-
-        var scaler = root.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.matchWidthOrHeight  = 0.5f;
-
-        // 어두운 배경 — 뒤 화면 클릭을 막고, 누르면 닫힘
-        RectTransform dim = MakeImage("Dim", root.transform, DimColor, true);
-        Stretch(dim);
-        dim.gameObject.AddComponent<Button>().onClick.AddListener(Close);
-
-        // 창
-        RectTransform window = MakeImage("Window", root.transform, WindowColor, true);
-        window.sizeDelta = new Vector2(1000f, 900f);
-
-        // 제목
-        TextMeshProUGUI title = MakeText("Title", window, "스테이지 랭킹", 52f, TextAlignmentOptions.Center);
-        Place(title.rectTransform, 120f, 120f, -20f, 80f);   // 좌우 여백 = 닫기 버튼 자리
-        title.color = GoldColor;
-
-        // 닫기 버튼
-        RectTransform closeRt = MakeImage("Close", window, HeaderColor, true);
-        closeRt.anchorMin = closeRt.anchorMax = closeRt.pivot = new Vector2(1f, 1f);
-        closeRt.anchoredPosition = new Vector2(-20f, -20f);
-        closeRt.sizeDelta = new Vector2(80f, 80f);
-        closeRt.gameObject.AddComponent<Button>().onClick.AddListener(Close);
-        Stretch(MakeText("X", closeRt, "X", 44f, TextAlignmentOptions.Center).rectTransform);
-
-        // 머리줄
-        GameObject header = MakeRow(window, "순위", "닉네임", "스테이지", HeaderColor, false);
-        Place((RectTransform)header.transform, 40f, 40f, -115f, 70f);
-
-        // 목록 (스크롤)
-        RectTransform viewport = MakeImage("Viewport", window, Color.clear, true);
-        viewport.gameObject.AddComponent<RectMask2D>();
-        viewport.anchorMin = new Vector2(0f, 0f);
-        viewport.anchorMax = new Vector2(1f, 1f);
-        viewport.offsetMin = new Vector2(40f, 120f);
-        viewport.offsetMax = new Vector2(-40f, -195f);
-
-        content = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
-        content.SetParent(viewport, false);
-        content.anchorMin = new Vector2(0f, 1f);
-        content.anchorMax = new Vector2(1f, 1f);
-        content.pivot     = new Vector2(0.5f, 1f);
-        content.sizeDelta = Vector2.zero;
-
-        var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.spacing                = 6f;
-        layout.childControlWidth      = true;
-        layout.childControlHeight     = true;
-        layout.childForceExpandWidth  = true;
-        layout.childForceExpandHeight = false;
-        content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
-        scroll.viewport          = viewport;
-        scroll.content           = content;
-        scroll.horizontal        = false;
-        scroll.movementType      = ScrollRect.MovementType.Clamped;
-        scroll.scrollSensitivity = 40f;
-
-        // 상태 문구 (불러오는 중 / 오류 / 기록 없음)
-        statusText = MakeText("Status", viewport, string.Empty, 36f, TextAlignmentOptions.Center);
-        Stretch(statusText.rectTransform);
-        statusText.color = new Color(1f, 1f, 1f, 0.7f);
-
-        // 내 순위
-        RectTransform myBar = MakeImage("MyRank", window, MyRowColor, false);
-        myBar.anchorMin = new Vector2(0f, 0f);
-        myBar.anchorMax = new Vector2(1f, 0f);
-        myBar.pivot     = new Vector2(0.5f, 0f);
-        myBar.offsetMin = new Vector2(40f, 30f);
-        myBar.offsetMax = new Vector2(-40f, 100f);
-        myRankText = MakeText("Text", myBar, string.Empty, 34f, TextAlignmentOptions.Center);
-        Stretch(myRankText.rectTransform);
-    }
-
-    /// <summary>순위 / 닉네임 / 스테이지 한 줄. 머리줄도 같은 모양을 씁니다.</summary>
-    private GameObject MakeRow(Transform parent, string rank, string nickname, string stage, Color bg, bool highlight)
-    {
-        RectTransform row = MakeImage("Row", parent, bg, false);
-        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 70f;
-
-        Color textColor = highlight ? GoldColor : Color.white;
-        AddCell(row, rank,     0f,    0.18f, TextAlignmentOptions.Center, textColor);
-        AddCell(row, nickname, 0.18f, 0.72f, TextAlignmentOptions.Center, textColor);
-        AddCell(row, stage,    0.72f, 1f,    TextAlignmentOptions.Center, textColor);
-        return row.gameObject;
-    }
-
-    private void AddCell(RectTransform row, string value, float xMin, float xMax, TextAlignmentOptions align, Color color)
-    {
-        TextMeshProUGUI t = MakeText("Cell", row, value, 34f, align);
-        t.rectTransform.anchorMin = new Vector2(xMin, 0f);
-        t.rectTransform.anchorMax = new Vector2(xMax, 1f);
-        t.rectTransform.offsetMin = t.rectTransform.offsetMax = Vector2.zero;
-        t.color = color;
-    }
-
-    private static RectTransform MakeImage(string name, Transform parent, Color color, bool raycast)
-    {
-        var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-        go.transform.SetParent(parent, false);
-        var img = go.GetComponent<Image>();
-        img.color         = color;
-        img.raycastTarget = raycast;
-        return (RectTransform)go.transform;
-    }
-
-    private TextMeshProUGUI MakeText(string name, Transform parent, string value, float size, TextAlignmentOptions align)
-    {
-        var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-        go.transform.SetParent(parent, false);
-        var t = go.GetComponent<TextMeshProUGUI>();
-        if (font != null) t.font = font;
-        t.text               = value;
-        t.fontSize           = size;
-        t.alignment          = align;
-        t.raycastTarget      = false;
-        t.textWrappingMode   = TextWrappingModes.NoWrap;
-        t.overflowMode       = TextOverflowModes.Ellipsis;
-        return t;
-    }
-
-    private static void Stretch(RectTransform rt)
-    {
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.offsetMin = rt.offsetMax = Vector2.zero;
-    }
-
-    /// <summary>창 위쪽에 가로로 꽉 차게 배치 (left/right 여백, 위에서 top 만큼, 높이 height).</summary>
-    private static void Place(RectTransform rt, float left, float right, float top, float height)
-    {
-        rt.anchorMin = new Vector2(0f, 1f);
-        rt.anchorMax = new Vector2(1f, 1f);
-        rt.pivot     = new Vector2(0.5f, 1f);
-        rt.offsetMin = new Vector2(left, top - height);
-        rt.offsetMax = new Vector2(-right, top);
     }
 }
