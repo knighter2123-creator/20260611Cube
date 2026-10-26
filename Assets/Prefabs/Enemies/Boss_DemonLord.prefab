@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &1722518745338239954
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2431723932254382337, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+      propertyPath: m_Name
+      value: Boss_DemonLord
+      objectReference: {fileID: 0}
+    - target: {fileID: 1995881640367027984, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 0b5b9e0ac893478e8f37c628c22e4368, type: 3}
+    - target: {fileID: 1995881640367027984, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+      propertyPath: m_Color.a
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1995881640367027984, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+      propertyPath: m_Size.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1995881640367027984, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+      propertyPath: m_Size.y
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects:
+    - {fileID: 4523025405811909959, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2431723932254382337, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5846036626402728915}
+  m_SourcePrefab: {fileID: 100100000, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+--- !u!1 &3916062001855525587 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2431723932254382337, guid: 9dbaee4187b85b44f810079739c829a8, type: 3}
+  m_PrefabInstance: {fileID: 1722518745338239954}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5846036626402728915
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3916062001855525587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8d09a91b2504d49af5c37756a81591a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyWalkAnimator
+  frames:
+  - {fileID: 21300000, guid: 0b5b9e0ac893478e8f37c628c22e4368, type: 3}
+  - {fileID: 21300002, guid: 0b5b9e0ac893478e8f37c628c22e4368, type: 3}
+  - {fileID: 21300004, guid: 0b5b9e0ac893478e8f37c628c22e4368, type: 3}
+  - {fileID: 21300006, guid: 0b5b9e0ac893478e8f37c628c22e4368, type: 3}
+  framesPerSecond: 6

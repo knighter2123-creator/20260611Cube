@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: World 4 Set
   m_EditorClassIdentifier: Assembly-CSharp::WorldEnemySet
   world: 4
-  normalPrefab: {fileID: 8197083033936464343, guid: c4dd1d77c66f13348ac39e4f612fdae3,
+  normalPrefab: {fileID: 7850769700820258807, guid: 90287be831af4da7a7a66fd3d04c4f2c,
     type: 3}
-  bossPrefab: {fileID: 2431723932254382337, guid: 9dbaee4187b85b44f810079739c829a8,
+  bossPrefab: {fileID: 4159605394133206834, guid: 8ccdc3ded71b4831b7fb480e22384e1d,
     type: 3}
   overrides:
   - stage: 5
-    prefab: {fileID: 8197083033936464343, guid: 7b976779c9cac96458798387ec344462,
+    prefab: {fileID: 7360709432029499909, guid: 66d8eb76f88241fc9249f86c6020f2c8,
       type: 3}
     speedMultiplier: 2.5
     respawnDelayMultiplier: 1

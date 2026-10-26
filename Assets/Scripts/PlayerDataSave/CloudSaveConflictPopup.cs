@@ -113,8 +113,8 @@ public class CloudSaveConflictPopup : MonoBehaviour
         {
             // 첫 번째 누름 — 확인 문구로 바꾸기만 함
             armed = side;
-            localLabel.text = side == 0 ? "정말 이 기기 데이터로?" : LocalButtonText;
-            cloudLabel.text = side == 1 ? "정말 클라우드 데이터로?" : CloudButtonText;
+            localLabel.text = side == 0 ? "기기 데이터로 시작" : LocalButtonText;
+            cloudLabel.text = side == 1 ? "클라우드 데이터로 시작" : CloudButtonText;
             noticeText.text = side == 0
                 ? "<color=#FF8080>클라우드 데이터가 이 기기 데이터로 덮어써집니다.</color> 한 번 더 누르면 확정합니다."
                 : "<color=#FF8080>이 기기 데이터가 클라우드 데이터로 덮어써집니다.</color> 한 번 더 누르면 확정합니다.";

@@ -7619,9 +7619,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IdleRewardManager
   idleRatio: 0.3
-  maxAccrualHours: 24
-  rewardGoldPerKill: 10
-  rewardExpPerKill: 5
+  maxAccrualHours: 8
+  rewardGoldPerKill: 2
+  rewardExpPerKill: 2
   killsPerMinute: 7
 --- !u!4 &2128311914
 Transform:

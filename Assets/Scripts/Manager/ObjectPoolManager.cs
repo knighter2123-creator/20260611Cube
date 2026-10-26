@@ -68,6 +68,8 @@ public class ObjectPoolManager : MonoBehaviour
     ///   ② 배치된 동료의 스킬 이펙트 — 풀에서 꺼내 쓰지만 미리 만들어 두지 않아서
     ///      동료마다 첫 스킬을 쓰는 순간 Instantiate + 첫 렌더링 비용이 한꺼번에 들었습니다.
     ///   ③ 사망·흑백 연출 머티리얼 — 처음 쓸 때 Resources.Load 로 동기 로드해서 첫 적이 죽는 순간 멈칫했습니다.
+    ///      머티리얼만 읽어 두면 셰이더의 GPU 프로그램은 여전히 '처음 그릴 때' 만들어지므로,
+    ///      RenderWarmup 으로 투명하게 한 번 그려서 그 비용까지 미리 치릅니다.
     ///
     ///   첫 프레임을 건너뛰는 이유: 씬이 켜지는 프레임에는 모든 Awake/Start 가 몰려 있고,
     ///   동료 배치 복원 같은 다른 오브젝트의 Start 도 끝난 뒤에 봐야 '배치된 동료' 를 정확히 셀 수 있습니다.
@@ -76,8 +78,7 @@ public class ObjectPoolManager : MonoBehaviour
     {
         yield return null;
 
-        EnemyDeathEffect.Preload();
-        GrayscaleEffect.Preload();
+        StartCoroutine(RenderWarmup.Run(EnemyDeathEffect.Preload(), GrayscaleEffect.Preload()));
         PrewarmPlacedSkillEffects();
 
         int perFrame = Mathf.Max(1, bulletsPerFrame);
