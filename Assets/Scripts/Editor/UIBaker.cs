@@ -10,6 +10,7 @@ using UnityEngine.UI;
 /// 예전에 런타임 코드로 만들던 창을 씬에 실제 오브젝트로 "굽고", 컴포넌트의 인스펙터 칸을 채우는 메뉴.
 ///   Tools/UI 굽기/랭킹 창            — StageScene 을 열고 실행 (RankingPanel)
 ///   Tools/UI 굽기/저장 데이터 선택 팝업 — LoginScene 을 열고 실행 (CloudSaveConflictPopup)
+///   Tools/UI 굽기/채팅 탭·친구 창      — StageScene 을 열고 실행 (ChatPanel 탭·나가기·유저 메뉴 + FriendPanel + 랭킹 옆 친구 버튼)
 /// 실행한 뒤 씬을 저장하세요. 이미 구운 창이 있으면 지우고 새로 만듭니다 (Ctrl+Z 로 되돌릴 수 있음).
 /// 굽고 나면 모양은 씬에서 자유롭게 고쳐도 됩니다 — 다시 굽기 전까지는 고친 모양이 그대로 쓰입니다.
 /// </summary>
@@ -286,6 +287,381 @@ public static class UIBaker
         Builder.Stretch(label.rectTransform);
 
         return new Side { Summary = body, Button = btn, Label = label };
+    }
+
+    // ═════════════════════════════ 채팅 탭 · 유저 메뉴 · 친구 창 ═════════════════════════════
+
+    // 채팅 Window 왼쪽에 사이드바를 넣으면서 Window 를 이만큼 넓히고, 왼쪽에 붙은 기존 UI 를 이만큼 오른쪽으로 밉니다.
+    private const float ChatSidebarLeft  = 30f;
+    private const float ChatSidebarWidth = 260f;
+    private const float ChatSidebarSpace = ChatSidebarLeft + ChatSidebarWidth + 10f;   // = 기존 UI 가 밀리는 거리
+
+    private static readonly Color ChatSidebarColor = new Color(0f, 0f, 0f, 0.25f);
+    private static readonly Color MenuDimColor     = new Color(0f, 0f, 0f, 0.35f);
+    private static readonly Color DangerColor      = new Color(0.75f, 0.28f, 0.28f, 1f);
+
+    [MenuItem("Tools/UI 굽기/채팅 탭·친구 창 (StageScene)")]
+    private static void BakeChatSocial()
+    {
+        ChatPanel chat = FindInOpenScenes<ChatPanel>();
+        if (chat == null)
+        {
+            EditorUtility.DisplayDialog("UI 굽기", "열린 씬에 ChatPanel 이 없습니다. StageScene 을 열고 다시 실행하세요.", "확인");
+            return;
+        }
+
+        var so = new SerializedObject(chat);
+        var scroll  = so.FindProperty("scroll").objectReferenceValue as ScrollRect;
+        var panelGo = so.FindProperty("panel").objectReferenceValue as GameObject;
+        if (scroll == null || panelGo == null || scroll.transform.parent == null)
+        {
+            EditorUtility.DisplayDialog("UI 굽기", "ChatPanel 의 panel·scroll 칸이 비어 있습니다. 채팅 창을 먼저 연결하세요.", "확인");
+            return;
+        }
+
+        var window = (RectTransform)scroll.transform.parent;   // Viewport 의 부모 = 채팅 Window
+        var panel  = (RectTransform)panelGo.transform;
+
+        // 친구 버튼은 랭킹 버튼을 복제해 그 오른쪽에 둠 — 랭킹 버튼이 없으면 시작 전에 멈춤
+        OpenRankingButton rankingButton = FindInOpenScenes<OpenRankingButton>();
+        if (rankingButton == null)
+        {
+            EditorUtility.DisplayDialog("UI 굽기", "열린 씬에 OpenRankingButton 이 없습니다. 친구 버튼을 그 옆에 만들 수 없습니다.", "확인");
+            return;
+        }
+
+        // 예전에 구운 것 — 지우고 새로 (Window 는 이미 넓혀 둔 만큼을 빼고 다시 넓힘)
+        Transform         oldSidebar   = window.Find("Sidebar");
+        Transform         oldLeave     = window.Find("Leave");
+        var               oldMenu      = so.FindProperty("userMenu").objectReferenceValue as GameObject;
+        FriendPanel       friends      = chat.GetComponent<FriendPanel>();
+        GameObject        oldFriends   = friends != null ? new SerializedObject(friends).FindProperty("root").objectReferenceValue as GameObject : null;
+        OpenFriendsButton oldFriendBtn = FindInOpenScenes<OpenFriendsButton>();
+
+        float shifted = 0f;
+        if (oldSidebar != null || oldLeave != null || oldMenu != null || oldFriends != null || oldFriendBtn != null)
+        {
+            if (!EditorUtility.DisplayDialog("UI 굽기", "이미 채팅 탭·친구 창이 있습니다. 지우고 새로 만들까요?", "새로 만들기", "취소")) return;
+            if (oldSidebar != null)
+            {
+                shifted = ((RectTransform)oldSidebar).offsetMax.x + 10f;   // 그때 민 거리 (ChatSidebarSpace 공식과 같음)
+                Undo.DestroyObjectImmediate(oldSidebar.gameObject);
+            }
+            if (oldLeave     != null) Undo.DestroyObjectImmediate(oldLeave.gameObject);
+            if (oldMenu      != null) Undo.DestroyObjectImmediate(oldMenu);
+            if (oldFriends   != null) Undo.DestroyObjectImmediate(oldFriends);
+            if (oldFriendBtn != null) Undo.DestroyObjectImmediate(oldFriendBtn.gameObject);
+        }
+
+        var lineTemplate = so.FindProperty("logLineTemplate").objectReferenceValue as TMP_Text;
+        TMP_FontAsset font = lineTemplate != null && lineTemplate.font != null ? lineTemplate.font : MostUsedFont(chat.gameObject.scene);
+        var b = new Builder(font);
+
+        // ── 사이드바 자리 만들기 — Window 를 넓히고, 왼쪽(또는 가운데)에 붙은 자식을 오른쪽으로 밈 ──
+        float delta = ChatSidebarSpace - shifted;
+        if (!Mathf.Approximately(delta, 0f))
+        {
+            Undo.RecordObject(window, "채팅 탭 굽기");
+            window.sizeDelta += new Vector2(delta, 0f);
+            foreach (RectTransform child in window)
+            {
+                Undo.RecordObject(child, "채팅 탭 굽기");
+                if (Mathf.Approximately(child.anchorMin.x, 0f))
+                {
+                    child.offsetMin += new Vector2(delta, 0f);
+                    if (Mathf.Approximately(child.anchorMax.x, 0f)) child.offsetMax += new Vector2(delta, 0f);
+                }
+                else if (Mathf.Approximately(child.anchorMin.x, 0.5f) && Mathf.Approximately(child.anchorMax.x, 0.5f))
+                    child.anchoredPosition += new Vector2(delta * 0.5f, 0f);   // 가운데 정렬 UI 는 남은 칸의 가운데로
+            }
+        }
+
+        // ── 사이드바 ──
+        RectTransform sidebar = b.Image("Sidebar", window, ChatSidebarColor, true);
+        sidebar.anchorMin = new Vector2(0f, 0f);
+        sidebar.anchorMax = new Vector2(0f, 1f);
+        sidebar.pivot     = new Vector2(0f, 0.5f);
+        sidebar.offsetMin = new Vector2(ChatSidebarLeft, 30f);
+        sidebar.offsetMax = new Vector2(ChatSidebarLeft + ChatSidebarWidth, -30f);
+        sidebar.SetAsFirstSibling();   // 다른 UI 뒤에
+
+        RectTransform tabList = VerticalScroll(b, sidebar, "Tabs", "TabList", 8f, out RectTransform tabsViewport);
+        tabsViewport.offsetMin = new Vector2(10f, 10f);
+        tabsViewport.offsetMax = new Vector2(-10f, -10f);
+
+        RectTransform tabRt = b.Image("Tab", tabList, ChatPanel.TabColor, true);
+        tabRt.gameObject.AddComponent<LayoutElement>().preferredHeight = 80f;
+        Button tabTemplate = tabRt.gameObject.AddComponent<Button>();
+        TextMeshProUGUI tabLabel = b.Text("Label", tabRt, "전체 채팅", 32f, TextAlignmentOptions.MidlineLeft, false);
+        Builder.Stretch(tabLabel.rectTransform);
+        tabLabel.rectTransform.offsetMin = new Vector2(20f, 0f);
+        tabLabel.rectTransform.offsetMax = new Vector2(-12f, 0f);
+        tabRt.gameObject.SetActive(false);
+
+        Undo.RegisterCreatedObjectUndo(sidebar.gameObject, "채팅 탭 굽기");
+
+        // ── 개인 채팅 [나가기] — 오른쪽 위, 닫기 버튼 왼쪽 (개인 탭을 볼 때만 ChatPanel 이 켬) ──
+        Button leaveButton = LabeledButton(b, window, "Leave", "나가기", DangerColor, 32f, out TextMeshProUGUI leaveLabel);
+        var lb = (RectTransform)leaveButton.transform;
+        lb.anchorMin = lb.anchorMax = lb.pivot = new Vector2(1f, 1f);
+        lb.anchoredPosition = new Vector2(-120f, -20f);
+        lb.sizeDelta        = new Vector2(200f, 80f);
+        leaveButton.gameObject.SetActive(false);
+        Undo.RegisterCreatedObjectUndo(leaveButton.gameObject, "채팅 나가기 버튼 굽기");
+
+        // ── 유저 메뉴 (누르기) ──
+        RectTransform menu = Container("UserMenu", panel);
+        RectTransform menuDim = b.Image("Dim", menu, MenuDimColor, true);
+        Builder.Stretch(menuDim);
+        Button menuDimButton = menuDim.gameObject.AddComponent<Button>();
+
+        RectTransform box = b.Image("Box", menu, PopupWindowColor, true);
+        box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
+        box.pivot     = new Vector2(0f, 1f);
+        box.sizeDelta = new Vector2(440f, 410f);
+
+        TextMeshProUGUI menuTitle = b.Text("Title", box, "닉네임", 36f, TextAlignmentOptions.Center, false);
+        Builder.PlaceTop(menuTitle.rectTransform, 20f, 20f, -20f, 60f);
+        menuTitle.color = GoldColor;
+
+        Button menuFriend  = LabeledButton(b, box, "Friend",  "친구 추가",   PopupCloudColor, 34f, out TextMeshProUGUI menuFriendLabel);
+        Button menuMessage = LabeledButton(b, box, "Message", "개인 메시지", PopupLocalColor, 34f, out _);
+        Button menuBlock   = LabeledButton(b, box, "Block",   "채팅 차단",   DangerColor,     34f, out TextMeshProUGUI menuBlockLabel);
+        Builder.PlaceTop((RectTransform)menuFriend.transform,  20f, 20f, -95f,  90f);
+        Builder.PlaceTop((RectTransform)menuMessage.transform, 20f, 20f, -200f, 90f);
+        Builder.PlaceTop((RectTransform)menuBlock.transform,   20f, 20f, -305f, 90f);
+
+        menu.gameObject.SetActive(false);
+        Undo.RegisterCreatedObjectUndo(menu.gameObject, "채팅 유저 메뉴 굽기");
+
+        // ── 친구 창 — 채팅 창(Panel) 밖, ChatCanvas 바로 아래: 채팅을 열지 않아도 랭킹 옆 버튼으로 열림 ──
+        RectTransform friendsRoot = Container("Friends", chat.transform);
+        RectTransform friendsDim = b.Image("Dim", friendsRoot, RankDimColor, true);
+        Builder.Stretch(friendsDim);
+        Button friendsDimButton = friendsDim.gameObject.AddComponent<Button>();
+
+        RectTransform fw = b.Image("Window", friendsRoot, RankWindowColor, true);
+        fw.sizeDelta = new Vector2(1000f, 860f);
+
+        TextMeshProUGUI fTitle = b.Text("Title", fw, "친구", 52f, TextAlignmentOptions.Center, false);
+        Builder.PlaceTop(fTitle.rectTransform, 260f, 260f, -20f, 80f);
+        fTitle.color = GoldColor;
+
+        // 친구 목록 ↔ 차단 목록 전환 (왼쪽 위)
+        Button fBlockList = LabeledButton(b, fw, "BlockList", "차단 목록", RankHeaderColor, 30f, out TextMeshProUGUI fBlockListLabel);
+        var blRt = (RectTransform)fBlockList.transform;
+        blRt.anchorMin = blRt.anchorMax = blRt.pivot = new Vector2(0f, 1f);
+        blRt.anchoredPosition = new Vector2(20f, -20f);
+        blRt.sizeDelta        = new Vector2(220f, 80f);
+
+        RectTransform fClose = b.Image("Close", fw, RankHeaderColor, true);
+        fClose.anchorMin = fClose.anchorMax = fClose.pivot = new Vector2(1f, 1f);
+        fClose.anchoredPosition = new Vector2(-20f, -20f);
+        fClose.sizeDelta = new Vector2(80f, 80f);
+        Button fCloseButton = fClose.gameObject.AddComponent<Button>();
+        Builder.Stretch(b.Text("X", fClose, "X", 44f, TextAlignmentOptions.Center, false).rectTransform);
+
+        RectTransform fContent = VerticalScroll(b, fw, "Viewport", "Content", 6f, out RectTransform fViewport);
+        fViewport.offsetMin = new Vector2(40f, 120f);
+        fViewport.offsetMax = new Vector2(-40f, -120f);
+
+        TextMeshProUGUI header = b.Text("Header", fContent, "받은 친구 요청", 34f, TextAlignmentOptions.BottomLeft, false);
+        header.gameObject.AddComponent<LayoutElement>().preferredHeight = 60f;
+        header.margin = new Vector4(10f, 0f, 0f, 6f);
+        header.gameObject.SetActive(false);
+
+        FriendRow rowTemplate = FriendRowObject(b, fContent);
+        rowTemplate.gameObject.SetActive(false);
+
+        TextMeshProUGUI fStatus = b.Text("Status", fViewport, string.Empty, 36f, TextAlignmentOptions.Center, true);
+        Builder.Stretch(fStatus.rectTransform);
+        fStatus.color = new Color(1f, 1f, 1f, 0.7f);
+
+        TextMeshProUGUI fNotice = b.Text("Notice", fw, "채팅에서 다른 유저의 메시지를 누르면 친구 신청을 할 수 있습니다.",
+                                         28f, TextAlignmentOptions.Center, true);
+        RectTransform nRt = fNotice.rectTransform;
+        nRt.anchorMin = new Vector2(0f, 0f);
+        nRt.anchorMax = new Vector2(1f, 0f);
+        nRt.pivot     = new Vector2(0.5f, 0f);
+        nRt.offsetMin = new Vector2(40f, 30f);
+        nRt.offsetMax = new Vector2(-40f, 100f);
+        fNotice.color = new Color(1f, 1f, 1f, 0.75f);
+
+        friendsRoot.gameObject.SetActive(false);
+        Undo.RegisterCreatedObjectUndo(friendsRoot.gameObject, "친구 창 굽기");
+
+        if (friends == null) friends = Undo.AddComponent<FriendPanel>(chat.gameObject);   // ChatCanvas — 항상 켜져 있음
+        var fso = new SerializedObject(friends);
+        fso.FindProperty("root").objectReferenceValue           = friendsRoot.gameObject;
+        fso.FindProperty("dimButton").objectReferenceValue      = friendsDimButton;
+        fso.FindProperty("closeButton").objectReferenceValue    = fCloseButton;
+        fso.FindProperty("titleText").objectReferenceValue      = fTitle;
+        fso.FindProperty("blockListButton").objectReferenceValue = fBlockList;
+        fso.FindProperty("blockListLabel").objectReferenceValue  = fBlockListLabel;
+        fso.FindProperty("content").objectReferenceValue        = fContent;
+        fso.FindProperty("headerTemplate").objectReferenceValue = header;
+        fso.FindProperty("rowTemplate").objectReferenceValue    = rowTemplate;
+        fso.FindProperty("statusText").objectReferenceValue     = fStatus;
+        fso.FindProperty("noticeText").objectReferenceValue     = fNotice;
+        fso.FindProperty("chatPanel").objectReferenceValue      = chat;
+        fso.ApplyModifiedProperties();
+
+        // ── ChatPanel 칸 채우기 ──
+        Transform titleTr = window.Find("Title");
+        TextMeshProUGUI title = titleTr != null ? titleTr.GetComponent<TextMeshProUGUI>() : null;
+
+        so.Update();
+        so.FindProperty("tabList").objectReferenceValue           = tabList;
+        so.FindProperty("tabTemplate").objectReferenceValue       = tabTemplate;
+        so.FindProperty("leaveButton").objectReferenceValue       = leaveButton;
+        so.FindProperty("leaveLabel").objectReferenceValue        = leaveLabel;
+        so.FindProperty("userMenu").objectReferenceValue          = menu.gameObject;
+        so.FindProperty("userMenuDim").objectReferenceValue       = menuDimButton;
+        so.FindProperty("userMenuBox").objectReferenceValue       = box;
+        so.FindProperty("userMenuTitle").objectReferenceValue     = menuTitle;
+        so.FindProperty("menuFriendButton").objectReferenceValue  = menuFriend;
+        so.FindProperty("menuFriendLabel").objectReferenceValue   = menuFriendLabel;
+        so.FindProperty("menuMessageButton").objectReferenceValue = menuMessage;
+        so.FindProperty("menuBlockButton").objectReferenceValue   = menuBlock;
+        so.FindProperty("menuBlockLabel").objectReferenceValue    = menuBlockLabel;
+        if (title != null) so.FindProperty("titleText").objectReferenceValue = title;
+        so.ApplyModifiedProperties();
+
+        // ── 친구 버튼 — 랭킹 버튼 오른쪽, 그 줄의 버튼 간격 그대로 ──
+        GameObject friendButton = FriendsButtonFrom(rankingButton, friends);
+
+        Finish(chat.gameObject.scene, friendButton, "채팅 탭·유저 메뉴·친구 창·친구 버튼");
+    }
+
+    /// <summary>
+    /// 랭킹 버튼을 복제해 친구 버튼을 만듭니다 (같은 모양·크기). 위치는 랭킹 버튼 + (랭킹 버튼 − 같은 줄 왼쪽 이웃 버튼) 간격.
+    /// 같은 줄에 이웃이 없으면 버튼 폭 + 16.
+    /// </summary>
+    private static GameObject FriendsButtonFrom(OpenRankingButton ranking, FriendPanel friends)
+    {
+        var rankRt = (RectTransform)ranking.transform;
+
+        float spacing = rankRt.rect.width + 16f;
+        float nearest = float.NegativeInfinity;
+        foreach (Transform t in rankRt.parent)
+        {
+            if (t == rankRt || !(t is RectTransform rt)) continue;
+            bool sameRow = rt.anchorMin == rankRt.anchorMin && rt.anchorMax == rankRt.anchorMax
+                        && Mathf.Abs(rt.anchoredPosition.y - rankRt.anchoredPosition.y) < 1f;
+            float x = rt.anchoredPosition.x;
+            if (sameRow && x < rankRt.anchoredPosition.x && x > nearest) nearest = x;
+        }
+        if (!float.IsNegativeInfinity(nearest)) spacing = rankRt.anchoredPosition.x - nearest;
+
+        GameObject go = Object.Instantiate(ranking.gameObject, rankRt.parent);
+        go.name = "Open Friends Button";
+        go.transform.SetSiblingIndex(rankRt.GetSiblingIndex() + 1);
+        ((RectTransform)go.transform).anchoredPosition = rankRt.anchoredPosition + new Vector2(spacing, 0f);
+
+        Object.DestroyImmediate(go.GetComponent<OpenRankingButton>());
+        go.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();   // 씬에서 랭킹을 여는 OnClick 을 달아 뒀어도 따라오지 않게
+
+        TextMeshProUGUI label = go.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null) label.text = "친구";
+
+        var open = go.AddComponent<OpenFriendsButton>();
+        var so = new SerializedObject(open);
+        so.FindProperty("friendPanel").objectReferenceValue = friends;
+        so.FindProperty("label").objectReferenceValue       = label;
+        so.ApplyModifiedPropertiesWithoutUndo();   // 막 만든 오브젝트 — 아래 생성 Undo 에 함께 묶임
+
+        Undo.RegisterCreatedObjectUndo(go, "친구 버튼 굽기");
+        return go;
+    }
+
+    /// <summary>친구 창 한 줄 — 닉네임 + 오른쪽 버튼 두 개</summary>
+    private static FriendRow FriendRowObject(Builder b, Transform parent)
+    {
+        RectTransform row = b.Image("Row", parent, RankingPanel.RowColor, false);
+        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 90f;
+
+        TextMeshProUGUI name = b.Text("Name", row, "닉네임", 34f, TextAlignmentOptions.MidlineLeft, false);
+        name.rectTransform.anchorMin = new Vector2(0f, 0f);
+        name.rectTransform.anchorMax = new Vector2(1f, 1f);
+        name.rectTransform.offsetMin = new Vector2(24f, 0f);
+        name.rectTransform.offsetMax = new Vector2(-420f, 0f);
+
+        Button primary   = LabeledButton(b, row, "Primary",   "수락", PopupCloudColor, 30f, out TextMeshProUGUI primaryLabel);
+        Button secondary = LabeledButton(b, row, "Secondary", "거절", DangerColor,     30f, out TextMeshProUGUI secondaryLabel);
+        PlaceRight((RectTransform)primary.transform,   -210f, 190f);
+        PlaceRight((RectTransform)secondary.transform, -12f,  190f);
+
+        var comp = row.gameObject.AddComponent<FriendRow>();
+        var so = new SerializedObject(comp);
+        so.FindProperty("nameText").objectReferenceValue        = name;
+        so.FindProperty("primaryButton").objectReferenceValue   = primary;
+        so.FindProperty("primaryLabel").objectReferenceValue    = primaryLabel;
+        so.FindProperty("secondaryButton").objectReferenceValue = secondary;
+        so.FindProperty("secondaryLabel").objectReferenceValue  = secondaryLabel;
+        so.ApplyModifiedPropertiesWithoutUndo();   // 막 만든 오브젝트 — 생성 Undo 에 함께 묶임
+        return comp;
+    }
+
+    /// <summary>줄 오른쪽 끝에서 right 만큼 떨어진 곳에 폭 width 버튼 (위아래 10 여백)</summary>
+    private static void PlaceRight(RectTransform rt, float right, float width)
+    {
+        rt.anchorMin = new Vector2(1f, 0f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot     = new Vector2(1f, 0.5f);
+        rt.offsetMin = new Vector2(right - width, 10f);
+        rt.offsetMax = new Vector2(right, -10f);
+    }
+
+    /// <summary>배경 Image + Button + 가운데 글자</summary>
+    private static Button LabeledButton(Builder b, Transform parent, string name, string text, Color color, float size, out TextMeshProUGUI label)
+    {
+        RectTransform rt = b.Image(name, parent, color, true);
+        Button button = rt.gameObject.AddComponent<Button>();
+        label = b.Text("Label", rt, text, size, TextAlignmentOptions.Center, false);
+        Builder.Stretch(label.rectTransform);
+        return button;
+    }
+
+    /// <summary>부모를 꽉 채우는 빈 RectTransform (창 묶음)</summary>
+    private static RectTransform Container(string name, Transform parent)
+    {
+        var rt = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+        rt.gameObject.layer = parent.gameObject.layer;
+        rt.SetParent(parent, false);
+        Builder.Stretch(rt);
+        return rt;
+    }
+
+    /// <summary>세로 스크롤 목록 (Viewport + RectMask2D + VerticalLayoutGroup 콘텐츠). 콘텐츠를 돌려주고, 뷰포트 위치는 호출한 쪽이 정함.</summary>
+    private static RectTransform VerticalScroll(Builder b, Transform parent, string viewportName, string contentName, float spacing,
+                                                out RectTransform viewport)
+    {
+        viewport = b.Image(viewportName, parent, Color.clear, true);
+        viewport.gameObject.AddComponent<RectMask2D>();
+        viewport.anchorMin = Vector2.zero;
+        viewport.anchorMax = Vector2.one;
+
+        RectTransform content = Container(contentName, viewport);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.pivot     = new Vector2(0.5f, 1f);
+        content.sizeDelta = Vector2.zero;
+
+        var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.spacing                = spacing;
+        layout.childControlWidth      = true;
+        layout.childControlHeight     = true;
+        layout.childForceExpandWidth  = true;
+        layout.childForceExpandHeight = false;
+        content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+        scroll.viewport          = viewport;
+        scroll.content           = content;
+        scroll.horizontal        = false;
+        scroll.movementType      = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 40f;
+        return content;
     }
 
     // ═════════════════════════════ 공용 ═════════════════════════════

@@ -13,7 +13,7 @@ using System.Collections.Generic;
 /// </summary>
 public interface IChatService
 {
-    /// <summary>새로 받은 메시지. 처음 연결하면 최근 기록이 한 번에 옵니다. 같은 메시지가 다시 올 수 있습니다 (받는 쪽이 Id 로 거름).</summary>
+    /// <summary>새로 받은 전체 채팅 메시지. 처음 연결하면 최근 기록이 한 번에 옵니다. 같은 메시지가 다시 올 수 있습니다 (받는 쪽이 Id 로 거름).</summary>
     event Action<IReadOnlyList<ChatMessage>> MessagesReceived;
 
     /// <summary>목록에서 빠진 메시지 Id (서버가 거절한 내 메시지, 최근 N개 밖으로 밀려난 메시지).</summary>
@@ -21,6 +21,12 @@ public interface IChatService
 
     /// <summary>연결이 끊겼을 때 (권한 오류 등). 받은 뒤엔 연결이 끊긴 상태입니다.</summary>
     event Action<string> Failed;
+
+    /// <summary>같은 서버·같은 신원으로 쓰는 친구·차단 기능.</summary>
+    IFriendService Friends { get; }
+
+    /// <summary>같은 서버·같은 신원으로 쓰는 1:1 개인 메시지.</summary>
+    IDirectService Direct { get; }
 
     /// <summary>
     /// 이 서버에서 "나" 를 나타내는 ID (보낸 사람 uid, 내 메시지 강조에 씀). 매 프레임 불러도 됩니다.

@@ -53,7 +53,53 @@ public class ObjectPoolManager : MonoBehaviour
     }
 
     // 꺼지면 예열 코루틴이 중간에 멈춥니다. 표시를 남겨 두면 그 프리팹은 다시 예열되지 않으므로 비웁니다.
-    void OnDisable() => prewarming.Clear();
+    void OnDisable()
+    {
+        prewarming.Clear();
+        LogUsage();
+    }
+
+    // ──────────────────────────────────────────────
+    //  사용량 기록 — 예열 개수를 데이터로 정하기 위한 것
+    // ──────────────────────────────────────────────
+    //
+    // 예열 개수는 "동시에 최대 몇 개가 쓰이는가" 에 맞추는 게 정답입니다.
+    //   · 너무 적으면 → 전투 중에 풀이 비어 Instantiate 가 일어나고, 그 프레임이 멈칫합니다 (풀링을 하는 이유 그 자체)
+    //   · 너무 많으면 → 메모리와 시작 시간만 씁니다 (시작 예열은 여러 프레임에 나눠서 하므로 끊김은 없음)
+    // 그래서 짐작으로 줄이지 않고, 실제로 쓴 최대치를 씬이 끝날 때 남깁니다 (GameLog — 상세 로그를 켰을 때만 보임).
+    //   "만든 수 > 최대 동시 사용" 이면 예열을 그만큼 줄여도 되고, "전투 중 생성" 이 0 보다 크면 예열이 모자란 것입니다.
+
+    private sealed class Usage
+    {
+        public string Name;
+        public int    Created;          // 지금까지 만든 수
+        public int    CreatedInBattle;  // 풀이 비어서 꺼내는 순간 만든 수 (= 그 프레임이 멈칫했을 수 있음)
+        public int    Peak;             // 동시에 밖에 나가 있던 최대 수
+    }
+
+    private readonly Dictionary<GameObject, Usage> usage = new Dictionary<GameObject, Usage>();
+    private readonly Usage bulletUsage = new Usage { Name = "총알" };
+
+    private Usage UsageOf(GameObject prefab)
+    {
+        if (!usage.TryGetValue(prefab, out Usage u)) usage[prefab] = u = new Usage { Name = prefab.name };
+        return u;
+    }
+
+    /// <summary>꺼낸 직후 — 만든 수에서 창고에 남은 수를 빼면 지금 밖에 나가 있는 수.</summary>
+    private static void TrackTake(Usage u, int remainingInQueue)
+    {
+        int inUse = u.Created - remainingInQueue;
+        if (inUse > u.Peak) u.Peak = inUse;
+    }
+
+    private void LogUsage()
+    {
+        if (bulletUsage.Created > 0)
+            GameLog.Info($"[ObjectPool] {bulletUsage.Name}: 예열 {initialPoolSize} / 만든 수 {bulletUsage.Created} / 최대 동시 사용 {bulletUsage.Peak} / 전투 중 생성 {bulletUsage.CreatedInBattle}");
+        foreach (Usage u in usage.Values)
+            GameLog.Info($"[ObjectPool] {u.Name}: 만든 수 {u.Created} / 최대 동시 사용 {u.Peak} / 전투 중 생성 {u.CreatedInBattle}");
+    }
 
     // ──────────────────────────────────────────────
     //  시작 예열
@@ -89,7 +135,10 @@ public class ObjectPoolManager : MonoBehaviour
                 pool.Enqueue(CreateBullet());
             yield return null;
         }
+        bulletPrewarmDone = true;
     }
+
+    private bool bulletPrewarmDone;   // 이후에 만드는 총알은 '전투 중 생성' 으로 셉니다
 
     /// <summary>지금 배치된 동료들의 스킬 이펙트를 프리팹마다 skillEffectPrewarm 개씩 나눠서 만듭니다.</summary>
     private void PrewarmPlacedSkillEffects()
@@ -116,6 +165,7 @@ public class ObjectPoolManager : MonoBehaviour
         // 부모 없이 생성 → 월드 좌표계 기준으로 위치가 적용됨
         GameObject obj = Instantiate(bulletPrefab);
         obj.SetActive(false);
+        bulletUsage.Created++;
         return obj;
     }
 
@@ -151,11 +201,16 @@ public class ObjectPoolManager : MonoBehaviour
         while (pool.Count > 0)
         {
             GameObject obj = pool.Dequeue();
-            if (obj != null) return obj;
+            if (obj == null) continue;
+            TrackTake(bulletUsage, pool.Count);
+            return obj;
         }
 
         // 쓸 만한 게 없으면 새로 만든다 (풀은 "최대치"가 아니라 "재활용 창고")
-        return CreateBullet();
+        GameObject created = CreateBullet();
+        if (bulletPrewarmDone) bulletUsage.CreatedInBattle++;
+        TrackTake(bulletUsage, pool.Count);
+        return created;
     }
 
     /// <summary>사용이 끝난 Bullet을 풀에 반환합니다.</summary>
@@ -223,10 +278,10 @@ public class ObjectPoolManager : MonoBehaviour
         if (obj == null)
         {
             // 풀이 비었으면 그때 새로 만든다 (풀은 "최대치"가 아니라 "재활용 창고")
-            obj = Instantiate(prefab);
-            obj.SetActive(false);
-            instanceToPrefab[obj] = prefab;
+            obj = CreatePooled(prefab);
+            UsageOf(prefab).CreatedInBattle++;
         }
+        TrackTake(UsageOf(prefab), queue.Count);
 
         obj.transform.SetParent(null);
         obj.transform.SetPositionAndRotation(position, rotation);
@@ -271,12 +326,17 @@ public class ObjectPoolManager : MonoBehaviour
 
         int need = count - queue.Count;   // ★ 부족분만 계산
         for (int i = 0; i < need; i++)
-        {
-            GameObject obj = Instantiate(prefab);
-            obj.SetActive(false);
-            instanceToPrefab[obj] = prefab;
-            queue.Enqueue(obj);
-        }
+            queue.Enqueue(CreatePooled(prefab));
+    }
+
+    /// <summary>범용 풀의 인스턴스를 만드는 유일한 곳 — 출생 기록(instanceToPrefab)과 사용량 집계를 빠뜨리지 않게.</summary>
+    private GameObject CreatePooled(GameObject prefab)
+    {
+        GameObject obj = Instantiate(prefab);
+        obj.SetActive(false);
+        instanceToPrefab[obj] = prefab;
+        UsageOf(prefab).Created++;
+        return obj;
     }
 
     // 지금 나눠서 예열 중인 프리팹 (같은 프리팹을 두 코루틴이 동시에 채우지 않게)
@@ -315,12 +375,7 @@ public class ObjectPoolManager : MonoBehaviour
         {
             yield return null;
             for (int i = 0; i < perFrame && made < need; i++, made++)
-            {
-                GameObject obj = Instantiate(prefab);
-                obj.SetActive(false);
-                instanceToPrefab[obj] = prefab;
-                queue.Enqueue(obj);
-            }
+                queue.Enqueue(CreatePooled(prefab));
         }
 
         prewarming.Remove(prefab);

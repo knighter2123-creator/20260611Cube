@@ -4,11 +4,14 @@
 //   _Alpha     : 전체 페이드
 //
 // 투명한 배경까지 물드는 걸 막기 위해 더하는 양에 텍스처 알파를 곱합니다.
+//
+// _MainTex_ST(타일링·오프셋)는 두지 않습니다 — 2D SRP Batcher 가 머티리얼 CBUFFER 의 _ST / _TexelSize 를 지원하지 않아
+// 있으면 이 머티리얼을 쓰는 스프라이트의 배칭이 꺼집니다. 스프라이트 텍스처는 SpriteRenderer 가 넣으므로 타일링은 늘 (1,1,0,0).
 Shader "Custom/2D/SpriteAddTexColor"
 {
     Properties
     {
-        [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
+        [PerRendererData][NoScaleOffset] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color     ("Tint", Color) = (1,1,1,1)
         [HDR] _AddColor  ("Add Color", Color) = (0.15, 0.85, 0.30, 1)
         _AddAmount ("Add Amount", Range(0,1)) = 0
@@ -60,7 +63,6 @@ Shader "Custom/2D/SpriteAddTexColor"
             SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_ST;
                 float4 _Color;
                 float4 _AddColor;   // HDR 가능하므로 float
                 float  _AddAmount;
@@ -71,7 +73,7 @@ Shader "Custom/2D/SpriteAddTexColor"
             {
                 Varyings OUT;
                 OUT.positionCS = TransformObjectToHClip(IN.positionOS);
-                OUT.uv         = TRANSFORM_TEX(IN.uv, _MainTex);
+                OUT.uv         = IN.uv;
                 OUT.color      = IN.color;
                 return OUT;
             }

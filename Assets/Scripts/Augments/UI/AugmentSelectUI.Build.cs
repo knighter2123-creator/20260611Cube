@@ -240,19 +240,38 @@ public partial class AugmentSelectUI
         btn.onClick.AddListener(() => OnClickCard(card, cardGo));
     }
 
-    /// <summary>아이콘. 스프라이트가 없으면 등급 색 원으로 대체합니다.</summary>
+    /// <summary>
+    /// 아이콘 — 항상 IconSize × IconSize 정사각형. 스프라이트가 없으면 등급 색 원으로 대체합니다.
+    ///
+    /// ─── 왜 '칸' 안에 한 번 더 넣는가 ─────────────────────────────────────
+    /// 부모 LayoutGroup 은 childForceExpand 로 자식을 줄 방향 반대쪽 끝까지 늘립니다
+    /// (세로 배치면 가로를 카드 폭만큼, 가로 배치면 세로를 카드 높이만큼).
+    /// 아이콘에 직접 LayoutElement 를 주면 그 늘어난 크기를 그대로 받아 납작해집니다.
+    /// 그래서 레이아웃은 '칸(IconSlot)' 만 잡게 하고, 아이콘은 칸 가운데에 고정 크기로 둡니다.
+    ///
+    /// CreateImage 는 스프라이트를 주면 Sliced(9슬라이스)로 만드는데, Sliced 에서는 preserveAspect 가 무시됩니다.
+    /// 아이콘은 늘릴 일이 없으므로 Simple 로 되돌립니다 — 정사각형이 아닌 그림도 비율 그대로 가운데에 맞춰집니다.
+    /// ────────────────────────────────────────────────────────────────────
+    /// </summary>
     private void BuildCardIcon(RectTransform parent, AugmentCard card, Color rarityColor)
     {
+        var slot = AugmentUIFactory.CreateContainer("IconSlot", parent);
+        AugmentUIFactory.SetFixedSize(slot.gameObject, IconSize, IconSize);
+
         bool hasIcon = card.Icon != null;
 
-        var icon = AugmentUIFactory.CreateImage("Icon", parent,
+        var icon = AugmentUIFactory.CreateImage("Icon", slot,
             hasIcon ? card.Icon : AugmentUIFactory.Circle(),
             hasIcon ? Color.white : new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.35f));
 
+        icon.type           = Image.Type.Simple;
         icon.raycastTarget  = false;
         icon.preserveAspect = true;
 
-        AugmentUIFactory.SetFixedSize(icon.gameObject, IconSize, IconSize);
+        RectTransform rt = icon.rectTransform;
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta        = new Vector2(IconSize, IconSize);
     }
 
     /// <summary>

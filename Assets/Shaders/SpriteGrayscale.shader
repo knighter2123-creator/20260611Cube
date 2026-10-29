@@ -1,10 +1,13 @@
 // URP 2D Renderer 용 스프라이트 흑백(Grayscale) 셰이더
 // _GrayAmount : 0 = 원본, 1 = 완전 흑백
+//
+// _MainTex_ST(타일링·오프셋)는 두지 않습니다 — 2D SRP Batcher 가 머티리얼 CBUFFER 의 _ST / _TexelSize 를 지원하지 않아
+// 있으면 이 머티리얼을 쓰는 스프라이트의 배칭이 꺼집니다. 스프라이트 텍스처는 SpriteRenderer 가 넣으므로 타일링은 늘 (1,1,0,0).
 Shader "Custom/2D/SpriteGrayscale"
 {
     Properties
     {
-        [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
+        [PerRendererData][NoScaleOffset] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color      ("Tint", Color) = (1,1,1,1)
         _GrayAmount ("Gray Amount", Range(0,1)) = 1
         _GrayTint   ("Gray Tint", Color) = (0.75, 0.78, 0.85, 1)   // 살짝 푸른 잿빛
@@ -56,7 +59,6 @@ Shader "Custom/2D/SpriteGrayscale"
             SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_ST;
                 half4  _Color;
                 half4  _GrayTint;
                 half   _GrayAmount;
@@ -67,7 +69,7 @@ Shader "Custom/2D/SpriteGrayscale"
             {
                 Varyings OUT;
                 OUT.positionCS = TransformObjectToHClip(IN.positionOS);
-                OUT.uv         = TRANSFORM_TEX(IN.uv, _MainTex);
+                OUT.uv         = IN.uv;
                 OUT.color      = IN.color * _Color;
                 return OUT;
             }

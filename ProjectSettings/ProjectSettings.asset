@@ -838,6 +838,7 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
+    Android: GAME_VERBOSE_LOG
     Standalone: AMPLIFY_SHADER_EDITOR
     WebGL: AMPLIFY_SHADER_EDITOR
   additionalCompilerArguments: {}

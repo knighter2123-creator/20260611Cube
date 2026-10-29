@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 
 /// <summary>
@@ -58,6 +59,14 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
 
     private EnemyDeathEffect deathEffect;
     private bool returnedToPool;      // 이중 반환 방지
+
+    // Profiler 의 CPU Hierarchy 에 이 이름으로 보입니다 (Deep Profile 없이도). 검색창에 "Enemy.Die" 를 치면 됩니다.
+    //   멈춘 프레임에서 이 항목들이 작다면 스크립트가 아니라 렌더링(셰이더 첫 사용 등) 쪽 문제입니다.
+    private static readonly ProfilerMarker DieMarker     = new ProfilerMarker("Enemy.Die");
+    private static readonly ProfilerMarker CleanupMarker = new ProfilerMarker("Enemy.Die.Cleanup");
+    private static readonly ProfilerMarker RewardMarker  = new ProfilerMarker("Enemy.Die.Rewards");
+    private static readonly ProfilerMarker ReportMarker  = new ProfilerMarker("Enemy.Die.ReportKill");
+    private static readonly ProfilerMarker EffectMarker  = new ProfilerMarker("Enemy.Die.Effect");
 
     void Awake()
     {
@@ -154,26 +163,35 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         if (isDead) return;
         isDead = true;
 
-        // 사망 연출 동안 아직 살아있는 것처럼 취급되지 않도록 즉시 목록에서 제외.
-        Active.Remove(this);
+        using (DieMarker.Auto())
+        {
+            using (CleanupMarker.Auto())
+            {
+                // 사망 연출 동안 아직 살아있는 것처럼 취급되지 않도록 즉시 목록에서 제외.
+                Active.Remove(this);
 
-        // 늦게 들어오는 총알 충돌로 중복 처리되는 것 방지
-        SetCollidersEnabled(false);
+                // 늦게 들어오는 총알 충돌로 중복 처리되는 것 방지
+                SetCollidersEnabled(false);
 
-        // 반드시 사망 연출보다 먼저. 회색 머티리얼이 '원본'으로 캐싱되는 걸 막습니다.
-        GrayscaleEffect.Clear(gameObject);
+                // 반드시 사망 연출보다 먼저. 회색 머티리얼이 '원본'으로 캐싱되는 걸 막습니다.
+                GrayscaleEffect.Clear(gameObject);
 
-        StopAllDebuffs();
-        RemoveHpBar();
+                StopAllDebuffs();
+                RemoveHpBar();
+            }
 
-        GrantRewards();
-        ReportKill();
+            using (RewardMarker.Auto()) GrantRewards();
+            using (ReportMarker.Auto()) ReportKill();
 
-        // 연출이 끝난 뒤 풀로 반환
-        if (useDeathEffect && deathEffect != null && gameObject.activeInHierarchy)
-            deathEffect.Play(ReturnToPool);
-        else
-            ReturnToPool();
+            // 연출이 끝난 뒤 풀로 반환
+            using (EffectMarker.Auto())
+            {
+                if (useDeathEffect && deathEffect != null && gameObject.activeInHierarchy)
+                    deathEffect.Play(ReturnToPool);
+                else
+                    ReturnToPool();
+            }
+        }
     }
 
     /// <summary>

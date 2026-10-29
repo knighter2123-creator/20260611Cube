@@ -33,6 +33,8 @@ using UnityEngine;
 ///   - 로그인 유저: 기본 앱 Firestore + 계정 UID (랭킹과 같은 UID)
 ///   - 게스트     : 보조 앱 Firestore + 익명 UID (기기에 저장돼 앱을 다시 켜도 같음)
 ///   ⚠ Firebase 콘솔 > Authentication > 로그인 방법 에서 '익명' 을 켜야 합니다.
+///
+/// [친구·차단 / 개인 메시지]  같은 Firestore 를 쓰는 FirestoreFriendService / FirestoreDirectService 가 맡습니다.
 /// </summary>
 public class FirestoreChatService : IChatService
 {
@@ -45,6 +47,15 @@ public class FirestoreChatService : IChatService
     public event Action<IReadOnlyList<ChatMessage>> MessagesReceived;
     public event Action<IReadOnlyList<string>>      MessagesRemoved;
     public event Action<string>                     Failed;
+
+    public IFriendService Friends { get; }
+    public IDirectService Direct  { get; }
+
+    public FirestoreChatService()
+    {
+        Friends = new FirestoreFriendService(CurrentDb);
+        Direct  = new FirestoreDirectService(CurrentDb);
+    }
 
     private ListenerRegistration listener;
 
@@ -209,7 +220,8 @@ public class FirestoreChatService : IChatService
         if (removed.Count > 0) MessagesRemoved?.Invoke(removed);
     }
 
-    private static bool TryRead(DocumentSnapshot doc, out ChatMessage m)
+    /// <summary>문서 → 메시지. 개인 메시지(FirestoreDirectService)도 같은 필드라 함께 씁니다.</summary>
+    public static bool TryRead(DocumentSnapshot doc, out ChatMessage m)
     {
         doc.TryGetValue("uid",      out string uid);
         doc.TryGetValue("nickname", out string nickname);
@@ -229,20 +241,23 @@ public class FirestoreChatService : IChatService
         return !string.IsNullOrEmpty(text);
     }
 
+    /// <summary>메시지 → 문서. 개인 메시지도 같은 필드.</summary>
+    public static Dictionary<string, object> ToData(ChatMessage m) => new Dictionary<string, object>
+    {
+        { "uid",       m.Uid },
+        { "nickname",  m.Nickname },
+        { "progress",  m.Progress },
+        { "text",      m.Text },
+        { "sentAt",    m.SentAt },
+        { "createdAt", FieldValue.ServerTimestamp },
+        { "expireAt",  Timestamp.FromDateTime(DateTime.UtcNow.AddDays(EXPIRE_DAYS)) },
+    };
+
     // ───────────────────────────── 보내기 ─────────────────────────────
 
     public void Send(ChatMessage m, Action<string> onDone)
     {
-        var data = new Dictionary<string, object>
-        {
-            { "uid",       m.Uid },
-            { "nickname",  m.Nickname },
-            { "progress",  m.Progress },
-            { "text",      m.Text },
-            { "sentAt",    m.SentAt },
-            { "createdAt", FieldValue.ServerTimestamp },
-            { "expireAt",  Timestamp.FromDateTime(DateTime.UtcNow.AddDays(EXPIRE_DAYS)) },
-        };
+        var data = ToData(m);
 
         try
         {

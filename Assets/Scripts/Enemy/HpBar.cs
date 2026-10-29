@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 적 HP 바 관리자 (Canvas 위). 적 위치를 따라 HP 바를 옮깁니다.
@@ -36,6 +37,9 @@ public class HpBar : MonoBehaviour
     {
         canvasRect = GetComponent<RectTransform>();
 
+        // HP 바는 누를 일이 없음 — 터치마다 검사하지 않고, 겹친 자리의 아래쪽 클릭도 가로채지 않게
+        if (TryGetComponent(out GraphicRaycaster raycaster)) raycaster.enabled = false;
+
         int perFrame = Mathf.Max(1, prewarmPerFrame);
         while (freeBars.Count + activeBars.Count < prewarmCount)
         {
@@ -48,6 +52,7 @@ public class HpBar : MonoBehaviour
     GameObject CreateBar()
     {
         GameObject bar = Instantiate(_monsterHPbar, transform);
+        foreach (Graphic g in bar.GetComponentsInChildren<Graphic>(true)) g.raycastTarget = false;
         bar.SetActive(false);
         return bar;
     }

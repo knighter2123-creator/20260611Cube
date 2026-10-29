@@ -40,9 +40,6 @@ public partial class CurrencyManager : MonoBehaviour
         }
 
         Instance = this;
-
-        if (logLifecycle)
-            GameLog.Info($"[Currency] Instance 등록. id={GetInstanceID()}, 씬={gameObject.scene.name}", this);
     }
 
     void OnDestroy()
@@ -52,12 +49,7 @@ public partial class CurrencyManager : MonoBehaviour
         if (Instance == this)
         {
             Instance = null;
-
-            // ★ 이 로그가 찍히면 "살아 있어야 할 매니저가 죽었다"는 뜻입니다.
-            //   Login → Main → Login 왕복 중에 이게 보이면 그게 범인입니다.
-            if (logLifecycle)
-                Debug.LogWarning($"[Currency] 살아 있던 Instance 가 파괴되었습니다. id={GetInstanceID()}. " +
-                                 "이후 재화는 저장도 표시도 되지 않습니다.", this);
+           
         }
     }
 

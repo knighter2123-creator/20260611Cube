@@ -317,7 +317,6 @@ public partial class CompanionManager : MonoBehaviour
             int idx = ownedCompanions.IndexOf(kv.Value);
             if (idx >= 0) placementByIndex[idx] = kv.Key;
         }
-        GameLog.Info($"[CompanionManager] 배치 스냅샷 — {placementByIndex.Count}개");
     }
 
     /// <summary>

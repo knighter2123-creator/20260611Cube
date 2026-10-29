@@ -59,10 +59,6 @@ public class ManagerRoot : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);   // 부모째로 유지 → 자식 매니저 전부 유지
-
-        if (logLifecycle)
-            GameLog.Info($"[ManagerRoot] 루트 등록 — id={GetInstanceID()}, " +
-                      $"자식 {transform.childCount}개, 씬 '{gameObject.scene.name}'", this);
     }
 
     private void OnDestroy()
@@ -74,11 +70,7 @@ public class ManagerRoot : MonoBehaviour
         {
             Instance = null;
 
-            // ★ 이 경고가 Login → Main 왕복 중에 보이면, 살아 있어야 할 루트가 죽은 것이다.
-            //   그 아래 매니저 전부가 함께 사라졌다는 뜻이므로 여기가 출발점이다.
-            if (logLifecycle)
-                Debug.LogWarning("[ManagerRoot] 살아 있던 루트가 파괴되었습니다. " +
-                                 "이후 모든 매니저 Instance 가 null 이 됩니다.", this);
+            
         }
     }
 

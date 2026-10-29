@@ -304,17 +304,11 @@ public partial class HapticManager : MonoBehaviour
             {
                 CallVibrate(effect);
             }
-
-            if (logBlockedCalls)
-                GameLog.Info($"[Haptic] 진동 실행 — {durationMs}ms / 세기 {amp}");
         }
         catch (System.Exception e)
         {
             Debug.LogWarning($"[Haptic] 진동 실패: {e.Message}");
         }
-#elif UNITY_EDITOR
-        // 에디터에서는 진동 대신 로그만. (PC 빌드에는 들어가지 않습니다)
-        GameLog.Info($"[Haptic] (에디터) 진동 {durationMs}ms / 세기 {amplitude}");
 #endif
     }
 
@@ -373,29 +367,23 @@ public partial class HapticManager : MonoBehaviour
         {
             Debug.LogWarning($"[Haptic] 패턴 진동 실패: {e.Message}");
         }
-#else
-        GameLog.Info($"[Haptic] (에디터) 패턴 진동 {timingsMs.Length}단계");
 #endif
     }
 
     /// <summary>
     /// 단발·패턴 진동 공통 관문 — 유저 설정 / 기기 지원 / 쿨다운. 통과하면 쿨다운 시각을 갱신합니다.
     ///
-    /// ★ 막힐 때마다 이유를 남깁니다 (조용한 early return 금지).
-    ///   "진동이 안 온다"의 원인이 설정인지, 기기인지, 쿨다운인지 구분할 방법이 없으면 고칠 수가 없습니다.
+    /// ★ 기기 미지원처럼 원인을 알아야 하는 경우만 이유를 남깁니다.
+    ///   유저가 끈 경우와 쿨다운은 정상 동작이라 조용히 막습니다 (진동 호출마다 경고가 쌓이지 않게).
     /// </summary>
     private bool TryPassGate(bool ignoreCooldown)
     {
-        if (!userEnabled) { LogBlocked("유저 설정이 꺼져 있음 (PlayerPrefs haptic_enabled = 0)"); return false; }
+        if (!userEnabled) return false;
         if (!IsSupported) { LogBlocked("IsSupported = false — 위쪽 '초기화 완료' 로그를 확인하세요"); return false; }
 
         // 방치형에서 레벨이 한 번에 5개 오르면 진동도 5번 겹친다.
         // "따다다닥" 하고 손이 떨려서 연출이 아니라 고장처럼 느껴진다.
-        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval)
-        {
-            LogBlocked($"쿨다운 {minInterval}s 안에 재호출됨");
-            return false;
-        }
+        if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval) return false;
 
         lastVibrateTime = Time.unscaledTime;
         return true;
