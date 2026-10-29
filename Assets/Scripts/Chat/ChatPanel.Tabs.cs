@@ -14,7 +14,7 @@ using UnityEngine.UI;
 ///       Tabs (ScrollRect)
 ///         TabList (VerticalLayoutGroup)   ← tabList
 ///           Tab (Button, 꺼 둠)            ← tabTemplate. 첫 자식 TMP 가 이름
-///     Leave (Button)                      ← leaveButton / leaveLabel
+///     Leave (Button)                      ← leaveButton
 /// </summary>
 public partial class ChatPanel
 {
@@ -26,7 +26,6 @@ public partial class ChatPanel
     [SerializeField] private TextMeshProUGUI titleText;
     [Tooltip("개인 채팅 나가기. 개인 탭을 보는 동안에만 보입니다.")]
     [SerializeField] private Button leaveButton;
-    [SerializeField] private TextMeshProUGUI leaveLabel;
 
     // 탭 색. UIBaker 도 같은 값으로 굽습니다.
     public static readonly Color TabColor         = new Color(1f, 1f, 1f, 0.06f);

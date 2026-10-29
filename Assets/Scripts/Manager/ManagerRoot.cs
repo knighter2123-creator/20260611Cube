@@ -66,12 +66,6 @@ public class ManagerRoot : MonoBehaviour
         // static 이 파괴된 오브젝트를 붙잡지 않게 정리.
         // Instance == this 로 검사하는 이유는, 중복 루트가 스스로 지워질 때
         // 살아 있는 진짜 루트까지 null 로 만들면 안 되기 때문이다.
-        if (Instance == this)
-        {
-            Instance = null;
-
-            
-        }
+        if (Instance == this) Instance = null;
     }
-
 }

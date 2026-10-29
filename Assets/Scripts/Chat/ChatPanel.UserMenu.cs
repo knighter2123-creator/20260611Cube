@@ -24,7 +24,6 @@ public partial class ChatPanel
     [SerializeField] private TextMeshProUGUI menuFriendLabel;
     [SerializeField] private Button menuMessageButton;
     [SerializeField] private Button menuBlockButton;
-    [SerializeField] private TextMeshProUGUI menuBlockLabel;
 
     private string menuUid;
     private string menuName;
@@ -120,7 +119,6 @@ public partial class ChatPanel
         }
 
         if (menuMessageButton != null) menuMessageButton.interactable = !blocked;
-        if (menuBlockLabel    != null) menuBlockLabel.text = blocked ? "차단 해제" : "채팅 차단";
     }
 
     private void OnMenuFriend()
@@ -145,26 +143,20 @@ public partial class ChatPanel
         if (uid != null) OpenDirect(uid, name);
     }
 
+    /// <summary>
+    /// 차단 — 그 사람의 메시지가 바로 사라집니다. 해제는 친구 창의 차단 목록에서만 합니다
+    /// (차단한 사람의 메시지는 채팅에 보이지 않으므로 이 메뉴를 다시 열 수 없음).
+    /// </summary>
     private void OnMenuBlock()
     {
         ChatManager chat = ChatManager.Instance;
         if (chat == null || menuUid == null) return;
 
         string name = menuName;
-        if (chat.IsBlocked(menuUid))
+        chat.Block(menuUid, menuName, error =>
         {
-            chat.Unblock(menuUid, error =>
-            {
-                if (this != null) ShowNotice(error ?? $"{Plain(name)} 님의 차단을 해제했습니다.");
-            });
-        }
-        else
-        {
-            chat.Block(menuUid, menuName, error =>
-            {
-                if (this != null) ShowNotice(error ?? $"{Plain(name)} 님의 채팅을 차단했습니다. 친구 창에서 해제할 수 있습니다.");
-            });
-        }
+            if (this != null) ShowNotice(error ?? $"{Plain(name)} 님의 채팅을 차단했습니다. 친구 창의 차단 목록에서 해제할 수 있습니다.");
+        });
         CloseUserMenu();
     }
 }

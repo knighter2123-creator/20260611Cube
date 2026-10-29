@@ -401,7 +401,7 @@ public static class UIBaker
         Undo.RegisterCreatedObjectUndo(sidebar.gameObject, "채팅 탭 굽기");
 
         // ── 개인 채팅 [나가기] — 오른쪽 위, 닫기 버튼 왼쪽 (개인 탭을 볼 때만 ChatPanel 이 켬) ──
-        Button leaveButton = LabeledButton(b, window, "Leave", "나가기", DangerColor, 32f, out TextMeshProUGUI leaveLabel);
+        Button leaveButton = LabeledButton(b, window, "Leave", "나가기", DangerColor, 32f, out _);
         var lb = (RectTransform)leaveButton.transform;
         lb.anchorMin = lb.anchorMax = lb.pivot = new Vector2(1f, 1f);
         lb.anchoredPosition = new Vector2(-120f, -20f);
@@ -426,7 +426,7 @@ public static class UIBaker
 
         Button menuFriend  = LabeledButton(b, box, "Friend",  "친구 추가",   PopupCloudColor, 34f, out TextMeshProUGUI menuFriendLabel);
         Button menuMessage = LabeledButton(b, box, "Message", "개인 메시지", PopupLocalColor, 34f, out _);
-        Button menuBlock   = LabeledButton(b, box, "Block",   "채팅 차단",   DangerColor,     34f, out TextMeshProUGUI menuBlockLabel);
+        Button menuBlock   = LabeledButton(b, box, "Block",   "채팅 차단",   DangerColor,     34f, out _);
         Builder.PlaceTop((RectTransform)menuFriend.transform,  20f, 20f, -95f,  90f);
         Builder.PlaceTop((RectTransform)menuMessage.transform, 20f, 20f, -200f, 90f);
         Builder.PlaceTop((RectTransform)menuBlock.transform,   20f, 20f, -305f, 90f);
@@ -514,7 +514,6 @@ public static class UIBaker
         so.FindProperty("tabList").objectReferenceValue           = tabList;
         so.FindProperty("tabTemplate").objectReferenceValue       = tabTemplate;
         so.FindProperty("leaveButton").objectReferenceValue       = leaveButton;
-        so.FindProperty("leaveLabel").objectReferenceValue        = leaveLabel;
         so.FindProperty("userMenu").objectReferenceValue          = menu.gameObject;
         so.FindProperty("userMenuDim").objectReferenceValue       = menuDimButton;
         so.FindProperty("userMenuBox").objectReferenceValue       = box;
@@ -523,7 +522,6 @@ public static class UIBaker
         so.FindProperty("menuFriendLabel").objectReferenceValue   = menuFriendLabel;
         so.FindProperty("menuMessageButton").objectReferenceValue = menuMessage;
         so.FindProperty("menuBlockButton").objectReferenceValue   = menuBlock;
-        so.FindProperty("menuBlockLabel").objectReferenceValue    = menuBlockLabel;
         if (title != null) so.FindProperty("titleText").objectReferenceValue = title;
         so.ApplyModifiedProperties();
 

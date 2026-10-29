@@ -27,6 +27,11 @@ public partial class ChatManager
     private readonly Dictionary<string, Conversation> opening = new Dictionary<string, Conversation>(); // 방을 여는 중 — 서버 목록에 들어오기 전에도 탭을 보여 줌
     private readonly HashSet<string> readRequested = new HashSet<string>();   // MarkRead 를 보냈고 아직 목록에 반영 안 됨
 
+    // 서버에 아직 없는 방을 만드는 중 — 서버가 만들었다고 답하기 전엔 메시지를 받지 않음.
+    //   보안 규칙이 메시지 읽기를 '서버에 있는 방 문서의 members' 로 검사하므로, 그 전에 받기 시작하면 권한 오류로 거절되고
+    //   개인 메시지 연결 전체가 끊깁니다. (rooms 목록은 내 쓰기를 서버 확인 전에 미리 보여 주므로 그것으로는 판단할 수 없음)
+    private readonly HashSet<string> creatingRooms = new HashSet<string>();
+
     private readonly List<ChatMessage> directMessages = new List<ChatMessage>();   // watchingPeer 와의 메시지 (보낸 시각 순)
     private readonly HashSet<string>   directIds      = new HashSet<string>();
     private static readonly List<ChatMessage> NoMessages = new List<ChatMessage>();
@@ -107,9 +112,13 @@ public partial class ChatManager
         conversationsDirty = true;
         changed = true;
 
+        if (!rooms.ContainsKey(peerUid)) creatingRooms.Add(peerUid);   // 나갔던 방은 서버에 있으므로 바로 받아도 됨
+
         directService.Open(uid, PlayerProfile.DisplayName, peerUid, peerName, error =>
         {
-            if (this == null || error == null) return;
+            if (this == null) return;
+            creatingRooms.Remove(peerUid);   // 성공이면 다음 프레임 ApplyWatch 가 메시지를 받기 시작
+            if (error == null) return;
             if (opening.Remove(peerUid)) { conversationsDirty = true; changed = true; }
             onFailed?.Invoke(error);
         });
@@ -213,7 +222,8 @@ public partial class ChatManager
     /// <summary>보고 싶은 방(watchedPeer)과 실제로 받는 방을 맞춤. 방이 바뀌면 이전 방의 메시지는 비움.</summary>
     private void ApplyWatch()
     {
-        string want = directKey != null && HasConversation(watchedPeer) ? watchedPeer : null;
+        string want = directKey != null && HasConversation(watchedPeer) && !creatingRooms.Contains(watchedPeer)
+                    ? watchedPeer : null;
         if (want == watchingPeer) return;
 
         if (watchingPeer != null) directService.Unwatch();
@@ -299,6 +309,7 @@ public partial class ChatManager
         if (directKey != null) directService.Disconnect();
         rooms.Clear();
         opening.Clear();
+        creatingRooms.Clear();
         readRequested.Clear();
         directMessages.Clear();
         directIds.Clear();

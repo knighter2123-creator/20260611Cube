@@ -41,10 +41,7 @@ public partial class ChatManager
     {
         if (on) blocked[uid] = nickname;
         else if (!blocked.Remove(uid)) return;
-
-        conversationsDirty = true;
-        FriendsVersion++;
-        changed = true;
+        MarkBlocksChanged();
     }
 
     /// <summary>차단 해제. 나갔던 대화방은 그대로 — 다시 대화하려면 개인 메시지로 다시 엽니다.</summary>
@@ -60,9 +57,13 @@ public partial class ChatManager
     {
         blocked.Clear();
         foreach (KeyValuePair<string, string> pair in list) blocked[pair.Key] = pair.Value;
+        MarkBlocksChanged();
+    }
 
+    private void MarkBlocksChanged()
+    {
         conversationsDirty = true;   // 차단한 상대의 대화 탭을 숨김
-        FriendsVersion++;            // 친구 창의 '차단한 유저' 목록
-        changed = true;
+        FriendsVersion++;            // 친구 창의 차단 목록
+        changed = true;              // 채팅 창 — 차단한 사람의 메시지를 숨김
     }
 }

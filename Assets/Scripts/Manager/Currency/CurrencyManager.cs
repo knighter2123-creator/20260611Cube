@@ -19,7 +19,7 @@ public partial class CurrencyManager : MonoBehaviour
     public int Gem  => gem;
 
     [Header("디버그")]
-    [Tooltip("인스턴스 생성/파괴/복원을 콘솔에 찍습니다. 원인 파악 후 끄세요.")]
+    [Tooltip("중복 제거·복원을 콘솔에 찍습니다. 원인 파악 후 끄세요.")]
     [SerializeField] private bool logLifecycle = true;
 
     void Awake()
@@ -46,11 +46,7 @@ public partial class CurrencyManager : MonoBehaviour
     {
         // static 이 파괴된 오브젝트를 붙잡지 않게 정리.
         // ?. 는 유니티의 가짜 null 처리를 타지 않으므로 이 정리가 필요하다.
-        if (Instance == this)
-        {
-            Instance = null;
-           
-        }
+        if (Instance == this) Instance = null;
     }
 
     void Start()

@@ -152,21 +152,19 @@ public class FriendPanel : MonoBehaviour
         if (showBlocked)
         {
             BlockedSection(chat, $"차단한 유저 {blockedCount}/{ChatManager.MAX_BLOCKS}");
-
-            if (drawnReason != null && blockedCount == 0) ShowStatus(drawnReason);
-            else if (rows.Count == 0) ShowStatus("차단한 유저가 없습니다.");
-            else ShowStatus(string.Empty);
-            return;
+        }
+        else
+        {
+            int friends = chat.CountFriends(FriendState.Friend);
+            Section(chat, FriendState.Incoming, "받은 친구 요청");
+            Section(chat, FriendState.Friend,   $"친구 {friends}/{ChatManager.MAX_FRIENDS}");
+            Section(chat, FriendState.Outgoing, "보낸 친구 요청");
+            if (blockListButton == null) BlockedSection(chat, "차단한 유저");   // 전환 버튼이 없는 옛 씬
         }
 
-        int friends = chat.CountFriends(FriendState.Friend);
-        Section(chat, FriendState.Incoming, "받은 친구 요청");
-        Section(chat, FriendState.Friend,   $"친구 {friends}/{ChatManager.MAX_FRIENDS}");
-        Section(chat, FriendState.Outgoing, "보낸 친구 요청");
-        if (blockListButton == null) BlockedSection(chat, "차단한 유저");   // 전환 버튼이 없는 옛 씬
-
-        if (drawnReason != null && chat.Friendships.Count == 0) ShowStatus(drawnReason);
-        else if (rows.Count == 0) ShowStatus("아직 친구가 없습니다.");
+        bool nothingLoaded = showBlocked ? blockedCount == 0 : chat.Friendships.Count == 0;
+        if (drawnReason != null && nothingLoaded) ShowStatus(drawnReason);
+        else if (rows.Count == 0) ShowStatus(showBlocked ? "차단한 유저가 없습니다." : "아직 친구가 없습니다.");
         else ShowStatus(string.Empty);
     }
 
