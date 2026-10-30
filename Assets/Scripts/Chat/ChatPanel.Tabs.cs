@@ -32,16 +32,21 @@ public partial class ChatPanel
     public static readonly Color TabSelectedColor = new Color(0.30f, 0.55f, 0.95f, 0.9f);
 
     private const string PublicTabName = "전체 채팅";
-    private const string LeftHex       = "#8A8A8A";
 
     private string currentPeer;       // 보고 있는 개인 채팅 상대 (null = 전체 채팅)
     private string currentPeerName;
 
+    /// <summary>탭 오브젝트 하나와 그 탭이 가리키는 채널.</summary>
+    private sealed class Tab
+    {
+        public Button          Button;
+        public TextMeshProUGUI Label;
+        public string          Peer;   // null = 전체 채팅
+        public string          Name;
+    }
+
     // 탭 풀 — [0] 은 항상 전체 채팅. 대화가 줄면 남는 탭은 꺼 둠
-    private readonly List<Button>          tabs      = new List<Button>();
-    private readonly List<TextMeshProUGUI> tabLabels = new List<TextMeshProUGUI>();
-    private readonly List<string>          tabPeers  = new List<string>();
-    private readonly List<string>          tabNames  = new List<string>();
+    private readonly List<Tab> tabs = new List<Tab>();
 
     private bool HasTabs => tabList != null && tabTemplate != null;
 
@@ -75,11 +80,10 @@ public partial class ChatPanel
         SetChannel(peerUid, peerName);
     }
 
-    private void SelectChannel(int index)
+    private void SelectChannel(Tab tab)
     {
-        if (index < 0 || index >= tabPeers.Count) return;
-        if (tabPeers[index] == currentPeer) return;
-        SetChannel(tabPeers[index], tabNames[index]);
+        if (tab.Peer == currentPeer) return;
+        SetChannel(tab.Peer, tab.Name);
     }
 
     private void SetChannel(string peer, string name)
@@ -97,11 +101,11 @@ public partial class ChatPanel
         ChatManager chat = ChatManager.Instance;
         if (chat == null || currentPeer == null) return;
 
-        string peer = currentPeer, name = currentPeerName;
-        chat.LeaveConversation(peer, error =>
+        string name = currentPeerName;
+        chat.LeaveConversation(currentPeer, error =>
         {
             if (this == null) return;
-            ShowNotice(error ?? $"{Plain(name)} 님과의 대화방에서 나갔습니다.");
+            ShowNotice(error ?? $"{ChatText.Plain(name)} 님과의 대화방에서 나갔습니다.");
         });
         SetChannel(null, null);
     }
@@ -115,56 +119,58 @@ public partial class ChatPanel
             currentPeerName = null;
         }
 
-        if (HasTabs)
-        {
-            int count = 0;
-            SetTab(count++, null, PublicTabName, PublicTabName);
-
-            if (chat != null)
-            {
-                foreach (ChatManager.Conversation c in chat.Conversations)
-                {
-                    if (c.PeerUid == currentPeer) currentPeerName = c.PeerName;   // 상대가 이름을 바꿨으면 새 이름으로
-
-                    int unread = c.PeerUid == currentPeer ? 0 : chat.UnreadCount(c.PeerUid);
-                    string label = Plain(c.PeerName);
-                    if (c.PeerLeft)  label += $" <color={LeftHex}>(나감)</color>";
-                    if (unread > 0)  label += $" <color={UnreadHex}>({unread})</color>";
-                    SetTab(count++, c.PeerUid, c.PeerName, label);
-                }
-            }
-
-            for (int i = count; i < tabs.Count; i++) tabs[i].gameObject.SetActive(false);
-        }
+        if (HasTabs) SyncTabList(chat);
 
         if (titleText != null)
-            titleText.text = currentPeer == null ? PublicTabName : $"{Plain(currentPeerName)} 님과 개인 채팅";
+            titleText.text = currentPeer == null ? PublicTabName : $"{ChatText.Plain(currentPeerName)} 님과 개인 채팅";
 
-        if (leaveButton != null && leaveButton.gameObject.activeSelf != (currentPeer != null))
-            leaveButton.gameObject.SetActive(currentPeer != null);
+        bool showLeave = currentPeer != null;
+        if (leaveButton != null && leaveButton.gameObject.activeSelf != showLeave)
+            leaveButton.gameObject.SetActive(showLeave);
+    }
+
+    private void SyncTabList(ChatManager chat)
+    {
+        int count = 0;
+        SetTab(count++, null, PublicTabName, PublicTabName);
+
+        if (chat != null)
+        {
+            foreach (ChatManager.Conversation c in chat.Conversations)
+            {
+                if (c.PeerUid == currentPeer) currentPeerName = c.PeerName;   // 상대가 이름을 바꿨으면 새 이름으로
+
+                int unread = c.PeerUid == currentPeer ? 0 : chat.UnreadCount(c.PeerUid);
+                string label = ChatText.Plain(c.PeerName);
+                if (c.PeerLeft) label += " " + ChatText.Colored(ChatText.LeftHex, "(나감)");
+                if (unread > 0) label += " " + ChatText.Colored(ChatText.UnreadHex, $"({unread})");
+                SetTab(count++, c.PeerUid, c.PeerName, label);
+            }
+        }
+
+        for (int i = count; i < tabs.Count; i++) tabs[i].Button.gameObject.SetActive(false);
     }
 
     private void SetTab(int index, string peer, string name, string label)
     {
-        while (tabs.Count <= index)
-        {
-            int i = tabs.Count;
-            Button tab = Instantiate(tabTemplate, tabList);
-            tab.onClick.AddListener(() => SelectChannel(i));
-            tabs.Add(tab);
-            tabLabels.Add(tab.GetComponentInChildren<TextMeshProUGUI>(true));
-            tabPeers.Add(null);
-            tabNames.Add(null);
-        }
+        while (tabs.Count <= index) tabs.Add(CreateTab());
 
-        Button t = tabs[index];
-        t.gameObject.SetActive(true);
-        tabPeers[index] = peer;
-        tabNames[index] = name;
+        Tab tab = tabs[index];
+        tab.Peer = peer;
+        tab.Name = name;
+        tab.Button.gameObject.SetActive(true);
 
-        TextMeshProUGUI text = tabLabels[index];
-        if (text != null && text.text != label) text.text = label;   // 같으면 메시 재생성 안 함
+        if (tab.Label != null && tab.Label.text != label) tab.Label.text = label;   // 같으면 메시 재생성 안 함
 
-        if (t.targetGraphic != null) t.targetGraphic.color = peer == currentPeer ? TabSelectedColor : TabColor;
+        Graphic background = tab.Button.targetGraphic;
+        if (background != null) background.color = peer == currentPeer ? TabSelectedColor : TabColor;
+    }
+
+    private Tab CreateTab()
+    {
+        var tab = new Tab { Button = Instantiate(tabTemplate, tabList) };
+        tab.Label = tab.Button.GetComponentInChildren<TextMeshProUGUI>(true);
+        tab.Button.onClick.AddListener(() => SelectChannel(tab));
+        return tab;
     }
 }

@@ -28,6 +28,6 @@ public class FriendRow : MonoBehaviour
         if (text == null) return;
 
         if (label != null) label.text = text;
-        if (onClick != null) button.onClick.AddListener(() => onClick());
+        if (onClick != null) button.onClick.AddListener(onClick.Invoke);
     }
 }

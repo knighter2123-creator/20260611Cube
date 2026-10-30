@@ -37,6 +37,8 @@ public partial class ChatManager : MonoBehaviour
     /// <summary>한 메시지 최대 글자 수. 입력창 제한·보안 규칙과 맞춰 주세요.</summary>
     public const int MAX_LENGTH = 60;
 
+    private const string AccountPending = "계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.";
+
     [Tooltip("Firestore = 실제 서버, Local = 서버 없이 나에게만 보이는 테스트")]
     [SerializeField] private Backend backend = Backend.Firestore;
 
@@ -56,19 +58,19 @@ public partial class ChatManager : MonoBehaviour
     public event Action Changed;
 
     /// <summary>보낸 시각 순 최근 메시지.</summary>
-    public IReadOnlyList<ChatMessage> Messages => messages;
+    public IReadOnlyList<ChatMessage> Messages => messages.Items;
 
     /// <summary>지금 채팅을 쓸 수 없는 이유. null 이면 사용 가능.</summary>
     public string UnavailableReason { get; private set; }
 
-    private IChatService service;
-    private readonly List<ChatMessage> messages = new List<ChatMessage>();
-    private readonly HashSet<string>   ids      = new HashSet<string>();
+    /// <summary>지금 연결된 내 ID — 내 메시지 강조용. (게스트면 채팅 전용 익명 UID)</summary>
+    public string MyUid => chatLink.Key;
 
-    private string connectedKey;     // 지금 연결된 계정 (null = 끊김)
+    private IChatService service;
+    private readonly MessageLog messages = new MessageLog();
+    private readonly Connection chatLink = new Connection();
+
     private string messagesKey;      // messages 가 어느 계정으로 받은 것인지
-    private string failReason;       // 연결이 끊긴 이유 (다시 연결될 때까지 표시)
-    private float  nextConnectTime;
     private float  nextSendTime;
     private bool   sending;
     private bool   changed;
@@ -117,43 +119,44 @@ public partial class ChatManager : MonoBehaviour
         }
     }
 
+    /// <summary>서버 콜백을 받을 때 이 매니저가 이미 파괴됐으면 무시하도록 감쌉니다.</summary>
+    private Action<string> IfAlive(Action<string> onDone) => error =>
+    {
+        if (this != null) onDone?.Invoke(error);
+    };
+
     // ───────────────────────────── 연결 ─────────────────────────────
 
     private void Update()
     {
-        string key = DesiredKey(out string reason);
+        string key = service.TryGetIdentity(out string uid, out string reason) ? uid : null;
 
-        if (key != connectedKey)
+        if (chatLink.ShouldDisconnect(key))
         {
-            if (connectedKey != null)
-            {
-                service.Disconnect();   // 로그아웃·계정 전환
-                connectedKey = null;
-            }
+            service.Disconnect();   // 로그아웃·계정 전환
+            chatLink.Disconnected();
+        }
 
-            // 다른 계정(또는 로그아웃)이 되면 이전 대화를 비움. 같은 계정의 재연결이면 남겨 둠.
-            if (key != messagesKey)
-            {
-                messages.Clear();
-                ids.Clear();
-                messagesKey = key;
-                ResetAccountState();   // 개인 메시지·친구·차단 목록도 비움 (새 계정 것은 다시 연결되면 받음)
-                changed     = true;
-            }
+        // 다른 계정(또는 로그아웃)이 되면 이전 대화를 비움. 같은 계정의 재연결이면 남겨 둠.
+        if (key != messagesKey)
+        {
+            messagesKey = key;
+            messages.Clear();
+            ResetAccountState();
+            changed = true;
+        }
 
-            if (key != null && Time.unscaledTime >= nextConnectTime)
-            {
-                connectedKey = key;
-                failReason   = null;
-                service.Connect(historyCount);   // 실패하면 이 안에서 바로 OnServiceFailed 가 불릴 수 있음
-            }
+        if (chatLink.ShouldConnect(key))
+        {
+            chatLink.Connected(key);
+            service.Connect(historyCount);   // 실패하면 이 안에서 바로 OnServiceFailed 가 불릴 수 있음
         }
 
         UpdateFriendsConnection();
         UpdateDirectConnection();
 
-        if (reason == null && connectedKey == null)
-            reason = failReason ?? "채팅 서버에 연결하는 중입니다...";
+        if (reason == null && chatLink.Key == null)
+            reason = chatLink.FailReason ?? "채팅 서버에 연결하는 중입니다...";
 
         if (reason != UnavailableReason)
         {
@@ -168,70 +171,32 @@ public partial class ChatManager : MonoBehaviour
         }
     }
 
-    /// <summary>지금 연결해야 할 ID. null 이면 연결하면 안 되고 reason 에 이유가 담깁니다.</summary>
-    private string DesiredKey(out string reason)
-        => service.TryGetIdentity(out string uid, out reason) ? uid : null;
+    /// <summary>계정이 바뀔 때 — 이전 계정의 개인 메시지·친구·차단을 비움. 새 계정 것은 다시 연결되면 서버에서 받음.</summary>
+    private void ResetAccountState()
+    {
+        ClearDirect();
+        ClearFriends();
+    }
 
     private void OnServiceFailed(string reason)
     {
         // 목록은 남겨 둠 — 다시 연결되면 Id 로 겹치는 것만 걸러서 이어 붙임
         service.Disconnect();
-        connectedKey    = null;
-        failReason      = $"{reason} 잠시 후 다시 연결합니다.";
-        nextConnectTime = Time.unscaledTime + retryDelay;
-        changed         = true;
+        chatLink.Failed($"{reason} 잠시 후 다시 연결합니다.", retryDelay);
+        changed = true;
     }
 
     private void OnMessagesReceived(IReadOnlyList<ChatMessage> received)
     {
-        if (AddMessages(messages, ids, received, historyCount)) changed = true;
+        if (messages.Add(received, historyCount)) changed = true;
     }
 
     private void OnMessagesRemoved(IReadOnlyList<string> removed)
     {
-        if (RemoveMessages(messages, ids, removed)) changed = true;
-    }
-
-    /// <summary>Id 로 겹치는 것을 거르고 보낸 시각 순으로 붙인 뒤, cap 개를 넘는 옛 메시지를 버립니다. 바뀌었으면 true. (개인 메시지도 같이 씀)</summary>
-    private static bool AddMessages(List<ChatMessage> list, HashSet<string> idSet, IReadOnlyList<ChatMessage> received, int cap)
-    {
-        bool any = false;
-        foreach (ChatMessage m in received)
-        {
-            if (string.IsNullOrEmpty(m.Id) || !idSet.Add(m.Id)) continue;
-            list.Add(m);
-            any = true;
-        }
-        if (!any) return false;
-
-        list.Sort((a, b) 
-            => a.SentAt != b.SentAt ? a.SentAt.CompareTo(b.SentAt) : string.CompareOrdinal(a.Id, b.Id));
-
-        int overflow = list.Count - cap;
-        if (overflow > 0)
-        {
-            for (int i = 0; i < overflow; i++) idSet.Remove(list[i].Id);
-            list.RemoveRange(0, overflow);
-        }
-        return true;
-    }
-
-    private static bool RemoveMessages(List<ChatMessage> list, HashSet<string> idSet, IReadOnlyList<string> removed)
-    {
-        bool any = false;
-        foreach (string id in removed)
-        {
-            if (!idSet.Remove(id)) continue;
-            list.RemoveAll(m => m.Id == id);
-            any = true;
-        }
-        return any;
+        if (messages.Remove(removed)) changed = true;
     }
 
     // ───────────────────────────── 보내기 ─────────────────────────────
-
-    /// <summary>지금 연결된 내 ID — 내 메시지 강조용. (게스트면 채팅 전용 익명 UID)</summary>
-    public string MyUid => connectedKey;
 
     /// <summary>
     /// 메시지를 보냅니다. toUid 가 있으면 그 사람과의 대화방으로 (개인 메시지).
@@ -240,16 +205,9 @@ public partial class ChatManager : MonoBehaviour
     /// </summary>
     public void Send(string raw, Action<string> onDone, string toUid = null)
     {
-        string text   = (raw ?? string.Empty).Replace('\n', ' ').Replace('\r', ' ').Trim();
-        bool   direct = toUid != null;
-
-        if (UnavailableReason != null)               { onDone?.Invoke(UnavailableReason); return; }
-        if (direct && CannotSendDirect(toUid, out string directError)) { onDone?.Invoke(directError); return; }
-        if (text.Length == 0)                        { onDone?.Invoke("메시지를 입력해 주세요."); return; }
-        if (text.Length > MAX_LENGTH)                { onDone?.Invoke($"메시지는 {MAX_LENGTH}자까지 보낼 수 있습니다."); return; }
-        if (sending || Time.unscaledTime < nextSendTime) { onDone?.Invoke("너무 빨리 보내고 있습니다. 잠시 후 다시 보내 주세요."); return; }
-        if (!TryGetSender(out string uid))           { onDone?.Invoke("계정 정보를 확인하는 중입니다. 잠시 후 다시 보내 주세요."); return; }
-        if (direct && toUid == uid)                  { onDone?.Invoke("나에게는 개인 메시지를 보낼 수 없습니다."); return; }
+        string text  = (raw ?? string.Empty).Replace('\n', ' ').Replace('\r', ' ').Trim();
+        string error = CheckSend(text, toUid, out string uid);
+        if (error != null) { onDone?.Invoke(error); return; }
 
         var message = new ChatMessage
         {
@@ -263,20 +221,36 @@ public partial class ChatManager : MonoBehaviour
         sending      = true;
         nextSendTime = Time.unscaledTime + sendCooldown;
 
-        Action<string> done = error =>
+        Action<string> done = result =>
         {
             if (this == null) return;
             sending = false;
-            onDone?.Invoke(error);
+            onDone?.Invoke(result);
         };
 
-        if (direct) SendDirect(uid, toUid, message, done);
-        else        service.Send(message, done);
+        if (toUid != null) SendDirect(uid, toUid, message, done);
+        else               service.Send(message, done);
+    }
+
+    /// <summary>보내기 전 검사. 보낼 수 없으면 이유, 보낼 수 있으면 null (uid = 보내는 사람).</summary>
+    private string CheckSend(string text, string toUid, out string uid)
+    {
+        uid = null;
+        bool direct = toUid != null;
+
+        if (UnavailableReason != null)                    return UnavailableReason;
+        if (direct && CannotSendDirect(toUid, out string directError)) return directError;
+        if (text.Length == 0)                             return "메시지를 입력해 주세요.";
+        if (text.Length > MAX_LENGTH)                     return $"메시지는 {MAX_LENGTH}자까지 보낼 수 있습니다.";
+        if (sending || Time.unscaledTime < nextSendTime)  return "너무 빨리 보내고 있습니다. 잠시 후 다시 보내 주세요.";
+        if (!TryGetSender(out uid))                       return "계정 정보를 확인하는 중입니다. 잠시 후 다시 보내 주세요.";
+        if (direct && toUid == uid)                       return "나에게는 개인 메시지를 보낼 수 없습니다.";
+        return null;
     }
 
     private bool TryGetSender(out string uid)
     {
-        uid = connectedKey;
+        uid = chatLink.Key;
         if (uid == null) return false;
 
         // 게스트(또는 Local) — 지금 세이브가 곧 게스트 세이브이므로 바로 보냄
@@ -285,5 +259,91 @@ public partial class ChatManager : MonoBehaviour
         // 로그인 계정 = 지금 세이브의 주인 + 서버 닉네임을 받아 온 뒤 (RankingManager.CanUpload 와 같은 조건)
         if (!ProfileSync.TryGetAccount(out string account) || account != uid) return false;
         return ProfileSync.Instance == null || ProfileSync.Instance.IsPulledFor(uid);
+    }
+
+    // ───────────────────────────── 도우미 타입 ─────────────────────────────
+
+    /// <summary>
+    /// 리스너 하나의 연결 상태 — 연결된 UID, 끊긴 이유, 다시 연결할 시각.
+    /// 채팅은 신원(TryGetIdentity)을, 친구·개인 메시지는 채팅의 Key 를 따라 열고 닫습니다.
+    /// </summary>
+    private sealed class Connection
+    {
+        public string Key        { get; private set; }   // 연결된 UID (null = 끊김)
+        public string FailReason { get; private set; }   // 끊긴 이유 (다시 연결될 때까지 표시)
+        private float nextConnectTime;
+
+        /// <summary>연결돼 있는데 따라가야 할 UID 가 바뀜 (로그아웃·계정 전환·채팅 끊김).</summary>
+        public bool ShouldDisconnect(string target) => Key != null && Key != target;
+
+        /// <summary>끊긴 상태이고 재시도 대기 시간이 지남.</summary>
+        public bool ShouldConnect(string target)
+            => target != null && Key == null && Time.unscaledTime >= nextConnectTime;
+
+        public void Connected(string key) { Key = key; FailReason = null; }
+        public void Disconnected()        { Key = null; }
+
+        public void Failed(string reason, float retryDelay)
+        {
+            Key             = null;
+            FailReason      = reason;
+            nextConnectTime = Time.unscaledTime + retryDelay;
+        }
+
+        public void Reset()
+        {
+            Key             = null;
+            FailReason      = null;
+            nextConnectTime = 0f;
+        }
+    }
+
+    /// <summary>Id 로 겹치는 것을 거른, 보낸 시각 순 최근 메시지 목록. 전체 채팅과 개인 메시지가 함께 씁니다.</summary>
+    private sealed class MessageLog
+    {
+        private readonly List<ChatMessage> items = new List<ChatMessage>();
+        private readonly HashSet<string>   ids   = new HashSet<string>();
+
+        public IReadOnlyList<ChatMessage> Items => items;
+
+        /// <summary>새 메시지만 붙여 보낸 시각 순으로 정렬하고, cap 개를 넘는 옛 메시지를 버립니다. 바뀌었으면 true.</summary>
+        public bool Add(IReadOnlyList<ChatMessage> received, int cap)
+        {
+            bool any = false;
+            foreach (ChatMessage m in received)
+            {
+                if (string.IsNullOrEmpty(m.Id) || !ids.Add(m.Id)) continue;
+                items.Add(m);
+                any = true;
+            }
+            if (!any) return false;
+
+            items.Sort((a, b)
+                => a.SentAt != b.SentAt ? a.SentAt.CompareTo(b.SentAt) : string.CompareOrdinal(a.Id, b.Id));
+
+            int overflow = items.Count - cap;
+            if (overflow > 0)
+            {
+                for (int i = 0; i < overflow; i++) ids.Remove(items[i].Id);
+                items.RemoveRange(0, overflow);
+            }
+            return true;
+        }
+
+        /// <summary>바뀌었으면 true.</summary>
+        public bool Remove(IReadOnlyList<string> removed)
+        {
+            bool any = false;
+            foreach (string id in removed)
+                if (ids.Remove(id)) any = true;
+            if (any) items.RemoveAll(m => !ids.Contains(m.Id));
+            return any;
+        }
+
+        public void Clear()
+        {
+            items.Clear();
+            ids.Clear();
+        }
     }
 }

@@ -50,7 +50,7 @@ public class EnemyWalkAnimator : MonoBehaviour
     void Update()
     {
         if (frames == null || frames.Length < 2) return;
-        if (enemy != null && enemy.isDead) return;   // 사망 연출 중엔 마지막 자세로 고정
+        if (enemy != null && enemy.isDead) return;   // 사망 연출 중엔 EnemyDeathAnimator 가 스프라이트를 넘김
 
         phase += framesPerSecond * SpeedScale() * Time.deltaTime;
         if (phase >= frames.Length) phase %= frames.Length;

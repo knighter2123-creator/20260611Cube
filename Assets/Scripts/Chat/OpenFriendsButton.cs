@@ -13,8 +13,7 @@ public class OpenFriendsButton : MonoBehaviour
     [Tooltip("버튼 글자 (비워 두면 개수 표시 안 함)")]
     [SerializeField] private TextMeshProUGUI label;
 
-    private const string Text      = "친구";
-    private const string BadgeHex  = "#FF7B7B";
+    private const string Text = "친구";
 
     private int shownCount = -1;
 
@@ -35,6 +34,6 @@ public class OpenFriendsButton : MonoBehaviour
         if (incoming == shownCount) return;
 
         shownCount = incoming;
-        label.text = incoming > 0 ? $"{Text} <color={BadgeHex}>{incoming}</color>" : Text;
+        label.text = incoming > 0 ? $"{Text} {ChatText.Colored(ChatText.UnreadHex, incoming.ToString())}" : Text;
     }
 }

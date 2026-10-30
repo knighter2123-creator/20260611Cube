@@ -52,6 +52,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8197083033936464343, guid: c4dd1d77c66f13348ac39e4f612fdae3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6626127792505259553}
+    - targetCorrespondingSourceObject: {fileID: 8197083033936464343, guid: c4dd1d77c66f13348ac39e4f612fdae3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8726243360241498151}
   m_SourcePrefab: {fileID: 100100000, guid: c4dd1d77c66f13348ac39e4f612fdae3, type: 3}
 --- !u!1 &7850769700820258807 stripped
 GameObject:
@@ -76,3 +79,26 @@ MonoBehaviour:
   - {fileID: 21300004, guid: e44c8fac8a0c4a8f989f38cc4e107d07, type: 3}
   - {fileID: 21300006, guid: e44c8fac8a0c4a8f989f38cc4e107d07, type: 3}
   framesPerSecond: 7
+--- !u!114 &8726243360241498151
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7850769700820258807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61dfacf94e7a4378bf734829a4c06640, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyDeathAnimator
+  frames:
+  - {fileID: 8856884110814691476, guid: d1a032bcd958ce945b9a6e294f47a7c3, type: 3}
+  - {fileID: -2479624204102354365, guid: d1a032bcd958ce945b9a6e294f47a7c3, type: 3}
+  - {fileID: 6726958489422057212, guid: d1a032bcd958ce945b9a6e294f47a7c3, type: 3}
+  - {fileID: -7186496624936297025, guid: d1a032bcd958ce945b9a6e294f47a7c3, type: 3}
+  frameDurations:
+  - 0.08
+  - 0.1
+  - 0.11
+  - 0.12
+  fallbackFadeTime: 0.3

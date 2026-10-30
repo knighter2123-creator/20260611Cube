@@ -41,7 +41,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     [SerializeField] protected int rewardExp  = 5;
 
     [Header("사망 연출")]
-    [Tooltip("사망 시 녹색으로 물들며 사라지는 연출을 사용합니다")]
+    [Tooltip("사망 애니메이션(EnemyDeathAnimator)을 재생한 뒤 사라집니다. 끄면 즉시 사라집니다")]
     [SerializeField] private bool useDeathEffect = true;
 
     protected float statMult = 1f;   // 스폰 시 받은 누적 배율 (체력·골드용)
@@ -57,7 +57,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     private EnemyHpBar   hpBarController;
     private Collider2D[] cachedColliders;
 
-    private EnemyDeathEffect deathEffect;
+    private EnemyDeathAnimator deathAnimator;
     private bool returnedToPool;      // 이중 반환 방지
 
     // Profiler 의 CPU Hierarchy 에 이 이름으로 보입니다 (Deep Profile 없이도). 검색창에 "Enemy.Die" 를 치면 됩니다.
@@ -77,7 +77,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         CacheDebuffRefs();   // SpriteRenderer / TargetMove / 원본 색 캐싱
 
         if (useDeathEffect)
-            deathEffect = EnemyDeathEffect.GetOrAdd(gameObject);
+            deathAnimator = EnemyDeathAnimator.GetOrAdd(gameObject);
     }
 
     void OnEnable()  => Active.Add(this);
@@ -100,7 +100,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
 
         SetCollidersEnabled(true);
 
-        deathEffect?.ResetState();
+        deathAnimator?.ResetState();
         ResetDebuffs();
         ApplyStatMultiplier(mult);
         expMult = StageFormula.CurrentExpMult();
@@ -173,7 +173,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
                 // 늦게 들어오는 총알 충돌로 중복 처리되는 것 방지
                 SetCollidersEnabled(false);
 
-                // 반드시 사망 연출보다 먼저. 회색 머티리얼이 '원본'으로 캐싱되는 걸 막습니다.
+                // 반드시 사망 연출보다 먼저. 회색 머티리얼·디버프 색이 남은 채로 사망 프레임이 재생되는 걸 막습니다.
                 GrayscaleEffect.Clear(gameObject);
 
                 StopAllDebuffs();
@@ -186,8 +186,8 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
             // 연출이 끝난 뒤 풀로 반환
             using (EffectMarker.Auto())
             {
-                if (useDeathEffect && deathEffect != null && gameObject.activeInHierarchy)
-                    deathEffect.Play(ReturnToPool);
+                if (useDeathEffect && deathAnimator != null && gameObject.activeInHierarchy)
+                    deathAnimator.Play(ReturnToPool);
                 else
                     ReturnToPool();
             }

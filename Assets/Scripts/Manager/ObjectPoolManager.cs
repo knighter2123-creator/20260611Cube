@@ -113,7 +113,7 @@ public class ObjectPoolManager : MonoBehaviour
     ///      그사이 총알이 부족하면 GetBulletInactive 가 하나씩 만들어 주므로 발사가 막히지 않습니다.
     ///   ② 배치된 동료의 스킬 이펙트 — 풀에서 꺼내 쓰지만 미리 만들어 두지 않아서
     ///      동료마다 첫 스킬을 쓰는 순간 Instantiate + 첫 렌더링 비용이 한꺼번에 들었습니다.
-    ///   ③ 사망·흑백 연출 머티리얼 — 처음 쓸 때 Resources.Load 로 동기 로드해서 첫 적이 죽는 순간 멈칫했습니다.
+    ///   ③ 흑백 연출 머티리얼 — 처음 쓸 때 Resources.Load 로 동기 로드해서 첫 기절 순간 멈칫했습니다.
     ///      머티리얼만 읽어 두면 셰이더의 GPU 프로그램은 여전히 '처음 그릴 때' 만들어지므로,
     ///      RenderWarmup 으로 투명하게 한 번 그려서 그 비용까지 미리 치릅니다.
     ///
@@ -124,7 +124,7 @@ public class ObjectPoolManager : MonoBehaviour
     {
         yield return null;
 
-        StartCoroutine(RenderWarmup.Run(EnemyDeathEffect.Preload(), GrayscaleEffect.Preload()));
+        StartCoroutine(RenderWarmup.Run(GrayscaleEffect.Preload()));
         PrewarmPlacedSkillEffects();
 
         int perFrame = Mathf.Max(1, bulletsPerFrame);

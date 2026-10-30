@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 /// <summary>
 /// 1:1 개인 메시지 — 두 사람 사이의 '대화방' 단위. 서버 구조는 FirestoreDirectService 주석 참고.
@@ -22,6 +21,7 @@ public partial class ChatManager
     }
 
     private IDirectService directService;
+    private readonly Connection directLink = new Connection();
 
     private readonly Dictionary<string, DirectRoom> rooms   = new Dictionary<string, DirectRoom>();   // 서버의 내 대화방 (나간 방 포함)
     private readonly Dictionary<string, Conversation> opening = new Dictionary<string, Conversation>(); // 방을 여는 중 — 서버 목록에 들어오기 전에도 탭을 보여 줌
@@ -32,17 +32,12 @@ public partial class ChatManager
     //   개인 메시지 연결 전체가 끊깁니다. (rooms 목록은 내 쓰기를 서버 확인 전에 미리 보여 주므로 그것으로는 판단할 수 없음)
     private readonly HashSet<string> creatingRooms = new HashSet<string>();
 
-    private readonly List<ChatMessage> directMessages = new List<ChatMessage>();   // watchingPeer 와의 메시지 (보낸 시각 순)
-    private readonly HashSet<string>   directIds      = new HashSet<string>();
-    private static readonly List<ChatMessage> NoMessages = new List<ChatMessage>();
+    private readonly MessageLog directMessages = new MessageLog();   // watchingPeer 와의 메시지
 
     private readonly List<Conversation> conversationList = new List<Conversation>();
     private readonly HashSet<string>    conversationSet  = new HashSet<string>();
     private bool conversationsDirty = true;
 
-    private string directKey;          // 대화방 리스너가 연결된 UID (null = 끊김)
-    private string directFailReason;
-    private float  nextDirectConnectTime;
     private bool   roomsLoaded;
     private string watchedPeer;        // 보고 싶은 방 (ChatPanel 이 정함)
     private string watchingPeer;       // 실제로 메시지를 받고 있는 방
@@ -53,7 +48,7 @@ public partial class ChatManager
         get
         {
             if (UnavailableReason != null) return UnavailableReason;
-            if (directKey == null)         return directFailReason ?? "개인 메시지 서버에 연결하는 중입니다...";
+            if (directLink.Key == null)    return directLink.FailReason ?? "개인 메시지 서버에 연결하는 중입니다...";
             return roomsLoaded ? null : "대화 목록을 불러오는 중입니다...";
         }
     }
@@ -96,11 +91,11 @@ public partial class ChatManager
     /// </summary>
     public string OpenConversation(string peerUid, string peerName, Action<string> onFailed)
     {
-        if (DirectUnavailableReason != null)                 return DirectUnavailableReason;
+        if (DirectUnavailableReason != null)                         return DirectUnavailableReason;
         if (string.IsNullOrEmpty(peerUid) || peerUid == messagesKey) return "나와는 대화할 수 없습니다.";
-        if (IsBlocked(peerUid))                              return "차단한 유저와는 대화할 수 없습니다.";
-        if (HasConversation(peerUid))                        return null;
-        if (!TryGetSender(out string uid))                   return "계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.";
+        if (IsBlocked(peerUid))                                      return "차단한 유저와는 대화할 수 없습니다.";
+        if (HasConversation(peerUid))                                return null;
+        if (!TryGetSender(out string uid))                           return AccountPending;
 
         opening[peerUid] = new Conversation
         {
@@ -109,8 +104,7 @@ public partial class ChatManager
             LastSentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             PeerLeft   = PeerLeft(peerUid),
         };
-        conversationsDirty = true;
-        changed = true;
+        MarkConversationsChanged();
 
         if (!rooms.ContainsKey(peerUid)) creatingRooms.Add(peerUid);   // 나갔던 방은 서버에 있으므로 바로 받아도 됨
 
@@ -119,7 +113,7 @@ public partial class ChatManager
             if (this == null) return;
             creatingRooms.Remove(peerUid);   // 성공이면 다음 프레임 ApplyWatch 가 메시지를 받기 시작
             if (error == null) return;
-            if (opening.Remove(peerUid)) { conversationsDirty = true; changed = true; }
+            if (opening.Remove(peerUid)) MarkConversationsChanged();
             onFailed?.Invoke(error);
         });
         return null;
@@ -128,13 +122,15 @@ public partial class ChatManager
     /// <summary>나가기 — 내 탭이 사라지고, 상대는 더 보낼 수 없게 됩니다. (채팅 창을 닫는 것과는 다름)</summary>
     public void LeaveConversation(string peerUid, Action<string> onDone)
     {
-        if (peerUid == null) { onDone?.Invoke(null); return; }
-        if (!TryGetSender(out string uid)) { onDone?.Invoke("계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (peerUid == null)               { onDone?.Invoke(null); return; }
+        if (!TryGetSender(out string uid)) { onDone?.Invoke(AccountPending); return; }
 
-        if (opening.Remove(peerUid)) { conversationsDirty = true; changed = true; }
+        if (opening.Remove(peerUid)) MarkConversationsChanged();
 
-        if (!rooms.TryGetValue(peerUid, out DirectRoom room) || room.MyState != RoomState.In) { onDone?.Invoke(null); return; }
-        directService.Leave(uid, peerUid, error => { if (this != null) onDone?.Invoke(error); });
+        bool inRoom = rooms.TryGetValue(peerUid, out DirectRoom room) && room.MyState == RoomState.In;
+        if (!inRoom) { onDone?.Invoke(null); return; }
+
+        directService.Leave(uid, peerUid, IfAlive(onDone));
     }
 
     // ───────────────────────────── 메시지 ─────────────────────────────
@@ -151,7 +147,7 @@ public partial class ChatManager
 
     /// <summary>그 상대와 주고받은 메시지 (보낸 시각 순). WatchConversation 으로 보고 있는 방만 채워져 있습니다.</summary>
     public IReadOnlyList<ChatMessage> DirectMessagesWith(string peerUid)
-        => peerUid != null && peerUid == watchingPeer ? directMessages : NoMessages;
+        => peerUid != null && peerUid == watchingPeer ? directMessages.Items : Array.Empty<ChatMessage>();
 
     /// <summary>그 대화를 지금까지 읽은 것으로 표시합니다 (대화 탭을 보고 있는 동안 ChatPanel 이 부름).</summary>
     public void MarkRead(string peerUid)
@@ -201,19 +197,18 @@ public partial class ChatManager
     /// <summary>매 프레임 (ChatManager.Update) — 채팅 연결을 따라 대화방 리스너를 열고 닫음.</summary>
     private void UpdateDirectConnection()
     {
-        if (directKey != null && directKey != connectedKey)
+        if (directLink.ShouldDisconnect(MyUid))
         {
             directService.Disconnect();
-            directKey    = null;
+            directLink.Disconnected();
             watchingPeer = null;
             changed      = true;
         }
 
-        if (connectedKey != null && directKey == null && Time.unscaledTime >= nextDirectConnectTime)
+        if (directLink.ShouldConnect(MyUid))
         {
-            directKey        = connectedKey;
-            directFailReason = null;
-            directService.Connect(connectedKey);   // 실패하면 이 안에서 바로 OnDirectFailed 가 불릴 수 있음
+            directLink.Connected(MyUid);
+            directService.Connect(MyUid);   // 실패하면 이 안에서 바로 OnDirectFailed 가 불릴 수 있음
         }
 
         ApplyWatch();
@@ -222,26 +217,23 @@ public partial class ChatManager
     /// <summary>보고 싶은 방(watchedPeer)과 실제로 받는 방을 맞춤. 방이 바뀌면 이전 방의 메시지는 비움.</summary>
     private void ApplyWatch()
     {
-        string want = directKey != null && HasConversation(watchedPeer) && !creatingRooms.Contains(watchedPeer)
+        string want = directLink.Key != null && HasConversation(watchedPeer) && !creatingRooms.Contains(watchedPeer)
                     ? watchedPeer : null;
         if (want == watchingPeer) return;
 
         if (watchingPeer != null) directService.Unwatch();
         directMessages.Clear();
-        directIds.Clear();
         watchingPeer = want;
         changed = true;
 
-        if (want != null) directService.Watch(directKey, want, directHistoryCount);
+        if (want != null) directService.Watch(directLink.Key, want, directHistoryCount);
     }
 
     private void OnDirectFailed(string reason)
     {
         directService.Disconnect();
-        directKey             = null;
-        watchingPeer          = null;   // 다시 연결되면 보던 방을 다시 받음
-        directFailReason      = $"{reason} 잠시 후 다시 연결합니다.";
-        nextDirectConnectTime = Time.unscaledTime + retryDelay;
+        directLink.Failed($"{reason} 잠시 후 다시 연결합니다.", retryDelay);
+        watchingPeer = null;   // 다시 연결되면 보던 방을 다시 받음
         changed = true;
     }
 
@@ -251,27 +243,30 @@ public partial class ChatManager
         foreach (DirectRoom r in list) rooms[r.PeerUid] = r;
 
         // 서버 목록에 들어온(내가 '대화 중' 인) 방은 여는 중 목록에서 뺌
-        var opened = new List<string>();
-        foreach (string peer in opening.Keys)
-            if (rooms.TryGetValue(peer, out DirectRoom r) && r.MyState == RoomState.In) opened.Add(peer);
-        foreach (string peer in opened) opening.Remove(peer);
+        foreach (string peer in new List<string>(opening.Keys))
+            if (rooms.TryGetValue(peer, out DirectRoom r) && r.MyState == RoomState.In) opening.Remove(peer);
 
         readRequested.Clear();
-        roomsLoaded        = true;
-        conversationsDirty = true;
-        changed            = true;
+        roomsLoaded = true;
+        MarkConversationsChanged();
     }
 
     private void OnDirectMessagesReceived(string peerUid, IReadOnlyList<ChatMessage> received)
     {
         if (peerUid != watchingPeer) return;   // 방을 바꾼 직후 늦게 온 이전 방 메시지
-        if (AddMessages(directMessages, directIds, received, directHistoryCount)) changed = true;
+        if (directMessages.Add(received, directHistoryCount)) changed = true;
     }
 
     private void OnDirectMessagesRemoved(string peerUid, IReadOnlyList<string> removed)
     {
         if (peerUid != watchingPeer) return;
-        if (RemoveMessages(directMessages, directIds, removed)) changed = true;
+        if (directMessages.Remove(removed)) changed = true;
+    }
+
+    private void MarkConversationsChanged()
+    {
+        conversationsDirty = true;
+        changed            = true;
     }
 
     private void RebuildConversations()
@@ -306,26 +301,16 @@ public partial class ChatManager
 
     private void ClearDirect()
     {
-        if (directKey != null) directService.Disconnect();
+        if (directLink.Key != null) directService.Disconnect();
+        directLink.Reset();
         rooms.Clear();
         opening.Clear();
         creatingRooms.Clear();
         readRequested.Clear();
         directMessages.Clear();
-        directIds.Clear();
-        directKey             = null;
-        directFailReason      = null;
-        nextDirectConnectTime = 0f;
-        roomsLoaded           = false;
-        watchedPeer           = null;
-        watchingPeer          = null;
-        conversationsDirty    = true;
-    }
-
-    /// <summary>계정이 바뀔 때 (ChatManager.Update) — 이전 계정의 개인 메시지·친구·차단을 비움. 새 계정 것은 다시 연결되면 서버에서 받음.</summary>
-    private void ResetAccountState()
-    {
-        ClearDirect();
-        ClearFriends();
+        roomsLoaded        = false;
+        watchedPeer        = null;
+        watchingPeer       = null;
+        conversationsDirty = true;
     }
 }

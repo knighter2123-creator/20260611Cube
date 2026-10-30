@@ -20,7 +20,7 @@ public partial class ChatManager
     public void Block(string uid, string nickname, Action<string> onDone)
     {
         if (FriendsUnavailableReason != null)       { onDone?.Invoke(FriendsUnavailableReason); return; }
-        if (!TryGetSender(out string me))           { onDone?.Invoke("계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (!TryGetSender(out string me))           { onDone?.Invoke(AccountPending); return; }
         if (string.IsNullOrEmpty(uid) || uid == me) { onDone?.Invoke("차단할 수 없는 유저입니다."); return; }
         if (IsBlocked(uid))                         { onDone?.Invoke(null); return; }
         if (blocked.Count >= MAX_BLOCKS)            { onDone?.Invoke($"최대 {MAX_BLOCKS}명까지 차단할 수 있습니다."); return; }
@@ -37,20 +37,20 @@ public partial class ChatManager
         });
     }
 
+    /// <summary>차단 해제. 나갔던 대화방은 그대로 — 다시 대화하려면 개인 메시지로 다시 엽니다.</summary>
+    public void Unblock(string uid, Action<string> onDone)
+    {
+        if (!IsBlocked(uid))               { onDone?.Invoke(null); return; }
+        if (!TryGetSender(out string me))  { onDone?.Invoke(AccountPending); return; }
+
+        friendService.Unblock(me, uid, IfAlive(onDone));
+    }
+
     private void SetBlockedLocally(string uid, string nickname, bool on)
     {
         if (on) blocked[uid] = nickname;
         else if (!blocked.Remove(uid)) return;
         MarkBlocksChanged();
-    }
-
-    /// <summary>차단 해제. 나갔던 대화방은 그대로 — 다시 대화하려면 개인 메시지로 다시 엽니다.</summary>
-    public void Unblock(string uid, Action<string> onDone)
-    {
-        if (!IsBlocked(uid))               { onDone?.Invoke(null); return; }
-        if (!TryGetSender(out string me))  { onDone?.Invoke("계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
-
-        friendService.Unblock(me, uid, error => { if (this != null) onDone?.Invoke(error); });
     }
 
     private void OnBlocksReceived(IReadOnlyDictionary<string, string> list)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 /// <summary>
 /// 친구 — 요청을 보내고, 상대가 수락하면 양쪽 친구 창에 서로가 보입니다. 서버 구조는 FirestoreFriendService 주석 참고.
@@ -13,13 +12,12 @@ public partial class ChatManager
     /// <summary>친구 + 보낸 요청 최대 수. 서버 규칙으로는 막지 않는 클라이언트 제한입니다.</summary>
     public const int MAX_FRIENDS = 50;
 
-    private IFriendService friendService;
-    private readonly List<Friendship> friendships = new List<Friendship>();
+    private const string FriendsLoading = "친구 목록을 불러오는 중입니다...";
 
-    private string friendsKey;          // 친구 리스너가 연결된 UID (null = 끊김)
-    private string friendsFailReason;
-    private float  nextFriendsConnectTime;
-    private bool   friendsLoaded;       // 이 계정의 목록을 한 번이라도 받았는가
+    private IFriendService friendService;
+    private readonly Connection friendsLink = new Connection();
+    private readonly List<Friendship> friendships = new List<Friendship>();
+    private bool friendsLoaded;       // 이 계정의 목록을 한 번이라도 받았는가
 
     /// <summary>친구 목록·차단 목록이 바뀔 때마다 올라갑니다 — 친구 창은 이 값이 바뀔 때만 다시 그립니다.</summary>
     public int FriendsVersion { get; private set; }
@@ -33,8 +31,8 @@ public partial class ChatManager
         get
         {
             if (UnavailableReason != null) return UnavailableReason;
-            if (friendsKey == null)        return friendsFailReason ?? "친구 목록을 불러오는 중입니다...";
-            return friendsLoaded ? null : "친구 목록을 불러오는 중입니다...";
+            if (friendsLink.Key == null)   return friendsLink.FailReason ?? FriendsLoading;
+            return friendsLoaded ? null : FriendsLoading;
         }
     }
 
@@ -74,27 +72,24 @@ public partial class ChatManager
     /// <summary>매 프레임 (ChatManager.Update) — 채팅 연결을 따라 친구 리스너를 열고 닫음.</summary>
     private void UpdateFriendsConnection()
     {
-        if (friendsKey != null && friendsKey != connectedKey)
+        if (friendsLink.ShouldDisconnect(MyUid))
         {
             friendService.Disconnect();
-            friendsKey = null;
-            changed    = true;
+            friendsLink.Disconnected();
+            changed = true;
         }
 
-        if (connectedKey != null && friendsKey == null && Time.unscaledTime >= nextFriendsConnectTime)
+        if (friendsLink.ShouldConnect(MyUid))
         {
-            friendsKey        = connectedKey;
-            friendsFailReason = null;
-            friendService.Connect(connectedKey);   // 실패하면 이 안에서 바로 OnFriendsFailed 가 불릴 수 있음
+            friendsLink.Connected(MyUid);
+            friendService.Connect(MyUid);   // 실패하면 이 안에서 바로 OnFriendsFailed 가 불릴 수 있음
         }
     }
 
     private void OnFriendsFailed(string reason)
     {
         friendService.Disconnect();
-        friendsKey             = null;
-        friendsFailReason      = $"{reason} 잠시 후 다시 시도합니다.";
-        nextFriendsConnectTime = Time.unscaledTime + retryDelay;
+        friendsLink.Failed($"{reason} 잠시 후 다시 시도합니다.", retryDelay);
         FriendsVersion++;
         changed = true;
     }
@@ -114,7 +109,16 @@ public partial class ChatManager
         SyncMyName();
     }
 
-    private static int StateOrder(FriendState s) => s == FriendState.Incoming ? 0 : s == FriendState.Friend ? 1 : 2;
+    /// <summary>목록 순서 — 받은 요청(할 일) → 친구 → 보낸 요청.</summary>
+    private static int StateOrder(FriendState s)
+    {
+        switch (s)
+        {
+            case FriendState.Incoming: return 0;
+            case FriendState.Friend:   return 1;
+            default:                   return 2;
+        }
+    }
 
     /// <summary>관계 문서에 남은 내 이름이 지금 이름과 다르면 고쳐 씀 (상대 친구 창에 새 이름이 보이게).</summary>
     private void SyncMyName()
@@ -131,13 +135,11 @@ public partial class ChatManager
 
     private void ClearFriends()
     {
-        if (friendsKey != null) friendService.Disconnect();
+        if (friendsLink.Key != null) friendService.Disconnect();
+        friendsLink.Reset();
         friendships.Clear();
         blocked.Clear();
-        friendsKey             = null;
-        friendsFailReason      = null;
-        friendsLoaded          = false;
-        nextFriendsConnectTime = 0f;
+        friendsLoaded = false;
         FriendsVersion++;
     }
 
@@ -161,31 +163,21 @@ public partial class ChatManager
             }
         }
 
-        if (IsBlocked(peerUid)) { onDone?.Invoke("차단한 유저에게는 친구 요청을 보낼 수 없습니다."); return; }
-        if (CountFriends(FriendState.Friend) + CountFriends(FriendState.Outgoing) >= MAX_FRIENDS)
-        {
-            onDone?.Invoke($"친구는 요청 중인 사람을 포함해 최대 {MAX_FRIENDS}명까지입니다.");
-            return;
-        }
+        if (IsBlocked(peerUid))                { onDone?.Invoke("차단한 유저에게는 친구 요청을 보낼 수 없습니다."); return; }
+        if (FriendLimitReached(out error))     { onDone?.Invoke(error); return; }
 
-        friendService.Request(uid, PlayerProfile.DisplayName, peerUid, peerName, err => { if (this != null) onDone?.Invoke(err); });
+        friendService.Request(uid, PlayerProfile.DisplayName, peerUid, peerName, IfAlive(onDone));
     }
 
     public void AcceptFriend(string peerUid, Action<string> onDone)
     {
         if (!CanEditFriends(peerUid, out string uid, out string error)) { onDone?.Invoke(error); return; }
-        if (!TryGetFriendship(peerUid, out Friendship f) || f.State != FriendState.Incoming)
-        {
-            onDone?.Invoke("받은 친구 요청이 없습니다.");
-            return;
-        }
-        if (CountFriends(FriendState.Friend) + CountFriends(FriendState.Outgoing) >= MAX_FRIENDS)
-        {
-            onDone?.Invoke($"친구는 요청 중인 사람을 포함해 최대 {MAX_FRIENDS}명까지입니다.");
-            return;
-        }
 
-        friendService.Accept(uid, PlayerProfile.DisplayName, peerUid, err => { if (this != null) onDone?.Invoke(err); });
+        bool incoming = TryGetFriendship(peerUid, out Friendship f) && f.State == FriendState.Incoming;
+        if (!incoming)                         { onDone?.Invoke("받은 친구 요청이 없습니다."); return; }
+        if (FriendLimitReached(out error))     { onDone?.Invoke(error); return; }
+
+        friendService.Accept(uid, PlayerProfile.DisplayName, peerUid, IfAlive(onDone));
     }
 
     /// <summary>친구 삭제 · 받은 요청 거절 · 보낸 요청 취소. (상대 친구 창에서도 사라짐)</summary>
@@ -194,7 +186,7 @@ public partial class ChatManager
         if (!CanEditFriends(peerUid, out string uid, out string error)) { onDone?.Invoke(error); return; }
         if (!TryGetFriendship(peerUid, out _)) { onDone?.Invoke(null); return; }   // 이미 없음
 
-        friendService.Remove(uid, peerUid, err => { if (this != null) onDone?.Invoke(err); });
+        friendService.Remove(uid, peerUid, IfAlive(onDone));
     }
 
     private bool CanEditFriends(string peerUid, out string uid, out string error)
@@ -203,8 +195,16 @@ public partial class ChatManager
         error = FriendsUnavailableReason;
         if (error != null) return false;
 
-        if (!TryGetSender(out uid)) { error = "계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요."; return false; }
+        if (!TryGetSender(out uid))                          { error = AccountPending; return false; }
         if (string.IsNullOrEmpty(peerUid) || peerUid == uid) { error = "나에게는 친구 요청을 보낼 수 없습니다."; return false; }
         return true;
+    }
+
+    /// <summary>친구 + 보낸 요청이 MAX_FRIENDS 에 닿았는가.</summary>
+    private bool FriendLimitReached(out string error)
+    {
+        bool full = CountFriends(FriendState.Friend) + CountFriends(FriendState.Outgoing) >= MAX_FRIENDS;
+        error = full ? $"친구는 요청 중인 사람을 포함해 최대 {MAX_FRIENDS}명까지입니다." : null;
+        return full;
     }
 }

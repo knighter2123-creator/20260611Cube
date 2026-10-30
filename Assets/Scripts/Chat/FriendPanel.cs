@@ -47,7 +47,6 @@ public class FriendPanel : MonoBehaviour
     [Tooltip("[삭제] 를 누른 뒤 이 시간(초) 안에 한 번 더 누르면 삭제")]
     [SerializeField] private float confirmSeconds = 3f;
 
-    private const string HeaderHex = "#FFD933";
     private const string BlockHint = "차단한 유저의 채팅은 내 화면에서만 보이지 않습니다. [해제] 를 누르면 다시 보입니다.";
 
     private readonly List<GameObject> rows = new List<GameObject>();
@@ -62,7 +61,7 @@ public class FriendPanel : MonoBehaviour
     private string confirmUid;         // [삭제] 를 한 번 누른 친구
     private float  confirmUntil;
 
-    public bool IsOpen => root != null && root.activeSelf;
+    private bool IsOpen => root != null && root.activeSelf;
 
     private void Awake()
     {
@@ -145,7 +144,7 @@ public class FriendPanel : MonoBehaviour
 
         if (chat == null)
         {
-            ShowStatus("채팅 시스템을 찾을 수 없습니다.");
+            ShowStatus(ChatText.NoManager);
             return;
         }
 
@@ -178,7 +177,7 @@ public class FriendPanel : MonoBehaviour
         foreach (KeyValuePair<string, string> pair in sorted)
         {
             string uid = pair.Key, name = pair.Value;
-            Row(name, null, null, "해제", () => chat.Unblock(uid, Result($"{ChatPanel.Plain(name)} 님의 차단을 해제했습니다.")));
+            Row(name, null, null, "해제", () => chat.Unblock(uid, Result($"{ChatText.Plain(name)} 님의 차단을 해제했습니다.")));
         }
     }
 
@@ -194,7 +193,7 @@ public class FriendPanel : MonoBehaviour
             switch (state)
             {
                 case FriendState.Incoming:
-                    Row(name, "수락", () => chat.AcceptFriend(uid, Result($"{ChatPanel.Plain(name)} 님과 친구가 되었습니다.")),
+                    Row(name, "수락", () => chat.AcceptFriend(uid, Result($"{ChatText.Plain(name)} 님과 친구가 되었습니다.")),
                               "거절", () => chat.RemoveFriend(uid, Result("친구 요청을 거절했습니다.")));
                     break;
 
@@ -221,7 +220,7 @@ public class FriendPanel : MonoBehaviour
         }
 
         confirmUid = null;
-        chat.RemoveFriend(uid, Result($"{ChatPanel.Plain(name)} 님을 친구에서 삭제했습니다."));
+        chat.RemoveFriend(uid, Result($"{ChatText.Plain(name)} 님을 친구에서 삭제했습니다."));
         Draw();
     }
 
@@ -242,7 +241,7 @@ public class FriendPanel : MonoBehaviour
     {
         TextMeshProUGUI h = Instantiate(headerTemplate, content);
         h.gameObject.SetActive(true);
-        h.text = $"<color={HeaderHex}>{title}</color>";
+        h.text = ChatText.Colored(ChatText.ProgressHex, title);
         rows.Add(h.gameObject);
     }
 
@@ -250,7 +249,7 @@ public class FriendPanel : MonoBehaviour
     {
         FriendRow row = Instantiate(rowTemplate, content);
         row.gameObject.SetActive(true);
-        row.Set(ChatPanel.Plain(name), primary, onPrimary, secondary, onSecondary);
+        row.Set(ChatText.Plain(name),primary, onPrimary, secondary, onSecondary);
         rows.Add(row.gameObject);
     }
 

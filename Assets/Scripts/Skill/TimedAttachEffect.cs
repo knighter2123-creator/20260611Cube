@@ -171,7 +171,7 @@ public class TimedAttachEffect : MonoBehaviour
     //
     // ★ SetActive(false) 가 아니라 Destroy 인 이유
     //   부모가 비활성화되는 '도중' 에는 자식의 활성 상태를 바꿀 수 없습니다
-    //   ("Cannot change GameObject hierarchy while activating or deactivating the parent" — EnemyDeathEffect 주석 참고).
+    //   ("Cannot change GameObject hierarchy while activating or deactivating the parent" — EnemyDeathAnimator 주석 참고).
     //   Destroy 는 프레임 끝에 처리되므로 이 시점에도 안전합니다. 드문 경우라 재사용을 포기해도 비용은 작습니다.
     private void OnDisable()
     {

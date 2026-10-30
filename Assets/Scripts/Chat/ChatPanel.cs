@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -33,7 +32,7 @@ using UnityEngine.UI;
 ///
 /// [미리보기]  창이 닫혀 있는 동안 마지막 메시지 한 줄을 띄웁니다. 보여 주기만 하고 터치는 아래 UI 로 통과시킵니다
 ///   (미리보기 캔버스가 위에 있어 오프라인 보상·스탯 강화 버튼을 가리지 않게). 창은 OpenChatButton 으로만 엽니다.
-///   OpenChatButton 이 이 패널을 연결하고 있으면 그 버튼 위쪽에 붙어 따라다닙니다 (버튼이 꺼지면 함께 숨음).
+///   OpenChatButton 이 이 패널을 연결하고 있으면 그 버튼 오른쪽에 붙어 따라다닙니다 (버튼이 꺼지면 함께 숨음).
 ///   버튼이 없으면 씬에 배치한 위치 그대로입니다. 미리보기 폭은 씬에서 정한 폭이 최대입니다.
 ///
 /// [데이터]  ChatManager.Messages 를 그리기만 합니다. ChatManager.Changed 를 받아 미리보기와(열려 있으면) 창을 다시 그립니다.
@@ -81,13 +80,6 @@ public partial class ChatPanel : MonoBehaviour
 
     [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
-
-    // 줄 색 (TMP 리치 텍스트)
-    private const string ProgressHex = "#FFD933";
-    private const string MyNameHex   = "#7FD8FF";
-    private const string NameHex     = "#FFFFFF";
-    private const string TextHex     = "#D8D8D8";
-    private const string UnreadHex   = "#FF7B7B";
 
     private static string DefaultPlaceholder => $"메시지 입력 (최대 {ChatManager.MAX_LENGTH}자)";
     private const string PeerLeftPlaceholder = "상대방이 대화방을 나갔습니다.";
@@ -184,9 +176,7 @@ public partial class ChatPanel : MonoBehaviour
         if (previewBar.gameObject.activeSelf != visible) previewBar.gameObject.SetActive(visible);
         if (!visible || previewFollow == null) return;
 
-        Canvas targetCanvas = previewFollow.GetComponentInParent<Canvas>();
-        Camera cam = targetCanvas == null || targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay
-            ? null : targetCanvas.worldCamera;
+        Camera cam = EventCamera(previewFollow);
 
         previewFollow.GetWorldCorners(corners);   // 0 왼쪽 아래, 1 왼쪽 위, 2 오른쪽 위, 3 오른쪽 아래
         Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, (corners[2] + corners[3]) * 0.5f);   // 오른쪽 변 가운데
@@ -201,6 +191,13 @@ public partial class ChatPanel : MonoBehaviour
         // 화면 오른쪽 밖으로 나가지 않게 폭을 줄임
         float room = canvasRt.rect.width * 0.5f - previewBar.anchoredPosition.x - previewGap;
         previewBar.sizeDelta = new Vector2(Mathf.Clamp(room, 0f, previewWidth), previewBar.sizeDelta.y);
+    }
+
+    /// <summary>이 UI 가 속한 캔버스의 화면 변환 카메라 (Overlay 면 null).</summary>
+    private static Camera EventCamera(Component ui)
+    {
+        Canvas canvas = ui.GetComponentInParent<Canvas>();
+        return canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
     }
 
     // ───────────────────────────── 열기 / 닫기 ─────────────────────────────
@@ -282,37 +279,46 @@ public partial class ChatPanel : MonoBehaviour
             if (direct) chat.MarkRead(currentPeer);
         }
 
-        string reason = chat == null ? "채팅 시스템을 찾을 수 없습니다."
+        string reason = chat == null ? ChatText.NoManager
                       : direct       ? chat.DirectUnavailableReason
                                      : chat.UnavailableReason;
 
         // 상대가 나간 방 — 메시지는 보이지만 더 보낼 수 없음 (입력창 안내 문구로 알림)
         bool peerLeft = direct && reason == null && chat.PeerLeft(currentPeer);
-        if (placeholderText != null)
-        {
-            string hint = peerLeft ? PeerLeftPlaceholder : DefaultPlaceholder;
-            if (placeholderText.text != hint) placeholderText.text = hint;
-        }
 
         // 맨 아래를 보고 있었으면 새 메시지가 와도 맨 아래를 유지, 위로 올려 읽는 중이면 그대로 둠
         bool wasAtBottom = scroll.verticalNormalizedPosition <= 0.01f;
 
         int shown = SyncRows(chat);
-
-        if (reason != null)  ShowStatus(reason);
-        else if (shown == 0) ShowStatus(direct ? $"{Plain(currentPeerName)} 님에게 첫 메시지를 보내 보세요."
-                                               : "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!");
-        else                 ShowStatus(string.Empty);
-
-        bool usable = reason == null && !peerLeft;
-        input.interactable      = usable;
-        sendButton.interactable = usable;
-        if (peerLeft && input.text.Length > 0) input.text = string.Empty;
+        ShowStatus(StatusFor(reason, shown, direct));
+        SetInputState(usable: reason == null && !peerLeft, peerLeft);
 
         if (scrollToBottom || wasAtBottom)
         {
             LayoutRebuilder.ForceRebuildLayoutImmediate(scroll.content);
             scroll.verticalNormalizedPosition = 0f;
+        }
+    }
+
+    /// <summary>목록 위 안내 문구 — 쓸 수 없는 이유, 또는 빈 채널의 첫 인사 안내. 없으면 빈 문자열.</summary>
+    private string StatusFor(string reason, int shown, bool direct)
+    {
+        if (reason != null) return reason;
+        if (shown > 0)      return string.Empty;
+        return direct ? $"{ChatText.Plain(currentPeerName)} 님에게 첫 메시지를 보내 보세요."
+                      : "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!";
+    }
+
+    private void SetInputState(bool usable, bool peerLeft)
+    {
+        input.interactable      = usable;
+        sendButton.interactable = usable;
+        if (peerLeft && input.text.Length > 0) input.text = string.Empty;
+
+        if (placeholderText != null)
+        {
+            string hint = peerLeft ? PeerLeftPlaceholder : DefaultPlaceholder;
+            if (placeholderText.text != hint) placeholderText.text = hint;
         }
     }
 
@@ -345,9 +351,17 @@ public partial class ChatPanel : MonoBehaviour
             }
         }
 
+        RecycleStaleRows();
+        return liveIds.Count;
+    }
+
+    /// <summary>이번에 보이지 않는(liveIds 에 없는) 메시지의 줄을 꺼서 풀로 돌립니다.</summary>
+    private void RecycleStaleRows()
+    {
         staleIds.Clear();
         foreach (string id in rowsById.Keys)
             if (!liveIds.Contains(id)) staleIds.Add(id);
+
         foreach (string id in staleIds)
         {
             TextMeshProUGUI row = rowsById[id];
@@ -355,7 +369,6 @@ public partial class ChatPanel : MonoBehaviour
             row.gameObject.SetActive(false);
             freeRows.Push(row);
         }
-        return liveIds.Count;
     }
 
     private TextMeshProUGUI TakeRow()
@@ -385,53 +398,45 @@ public partial class ChatPanel : MonoBehaviour
 
         ChatManager chat = ChatManager.Instance;
         sb.Clear();
-        sb.Append("<color=").Append(ProgressHex).Append(">채팅</color>  ");
+        sb.AppendColored(ChatText.ProgressHex, "채팅").Append("  ");
 
-        int unread = chat != null ? chat.TotalUnread : 0;
-        if (unread > 0) sb.Append("<color=").Append(UnreadHex).Append(">개인 메시지 ").Append(unread).Append("</color>  ");
-
-        int last = chat != null ? LastVisible(chat) : -1;
         if (chat == null)
-            sb.Append("채팅 시스템을 찾을 수 없습니다.");
-        else if (last >= 0)
         {
-            ChatMessage m = chat.Messages[last];
-            AppendLine(sb, m, m.Uid == chat.MyUid);
+            sb.Append(ChatText.NoManager);
         }
         else
-            sb.Append(chat.UnavailableReason ?? "눌러서 대화에 참여해 보세요!");
+        {
+            int unread = chat.TotalUnread;
+            if (unread > 0) sb.AppendColored(ChatText.UnreadHex, $"개인 메시지 {unread}").Append("  ");
+
+            if (TryGetLastVisible(chat, out ChatMessage last)) AppendLine(sb, last, last.Uid == chat.MyUid);
+            else                                               sb.Append(chat.UnavailableReason ?? "눌러서 대화에 참여해 보세요!");
+        }
 
         previewText.text = sb.ToString();
     }
 
-    /// <summary>차단하지 않은 사람의 마지막 전체 채팅 메시지 위치. 없으면 -1.</summary>
-    private static int LastVisible(ChatManager chat)
+    /// <summary>차단하지 않은 사람의 마지막 전체 채팅 메시지.</summary>
+    private static bool TryGetLastVisible(ChatManager chat, out ChatMessage message)
     {
-        for (int i = chat.Messages.Count - 1; i >= 0; i--)
-            if (!chat.IsBlocked(chat.Messages[i].Uid)) return i;
-        return -1;
+        IReadOnlyList<ChatMessage> list = chat.Messages;
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (chat.IsBlocked(list[i].Uid)) continue;
+            message = list[i];
+            return true;
+        }
+        message = default;
+        return false;
     }
 
     /// <summary>[2-3] 닉네임 : 내용</summary>
     private static void AppendLine(StringBuilder sb, ChatMessage m, bool mine)
     {
-        sb.Append("<color=").Append(ProgressHex).Append(">[").Append(StageRecord.Format(m.Progress)).Append("]</color> ");
-        sb.Append("<color=").Append(mine ? MyNameHex : NameHex).Append('>').Append(Plain(m.Nickname)).Append("</color>");
-        sb.Append(" : <color=").Append(TextHex).Append('>').Append(Plain(m.Text)).Append("</color>");
-    }
-
-    private static readonly Regex NoParseTag = new Regex("</?noparse>", RegexOptions.IgnoreCase);
-
-    /// <summary>
-    /// 다른 사람이 보낸 글을 리치 텍스트로 해석하지 않게 감쌉니다. (예: "&lt;size=300&gt;" 로 화면을 덮는 장난 방지)
-    /// 글 안의 noparse 태그는 지웁니다 — 지운 뒤 다시 태그가 생기는 경우("&lt;nopa&lt;noparse&gt;rse&gt;")까지 반복.
-    /// </summary>
-    public static string Plain(string s)
-    {
-        s = s ?? string.Empty;
-        string prev;
-        do { prev = s; s = NoParseTag.Replace(s, string.Empty); } while (s != prev);
-        return "<noparse>" + s + "</noparse>";
+        sb.AppendColored(ChatText.ProgressHex, $"[{StageRecord.Format(m.Progress)}]").Append(' ');
+        sb.AppendColored(mine ? ChatText.MyNameHex : ChatText.NameHex, ChatText.Plain(m.Nickname));
+        sb.Append(" : ");
+        sb.AppendColored(ChatText.BodyHex, ChatText.Plain(m.Text));
     }
 
     private void ShowStatus(string message)

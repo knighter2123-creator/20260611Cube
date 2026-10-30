@@ -2415,6 +2415,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ChatManager
   backend: 0
   historyCount: 50
+  directHistoryCount: 50
   sendCooldown: 1.5
   retryDelay: 10
 --- !u!1 &866023231

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Firebase.Extensions;   // ContinueWithOnMainThread
 using Firebase.Firestore;
-using UnityEngine;
 
 /// <summary>
 /// Firestore 로 친구 요청·수락·삭제를 주고받습니다. FirestoreChatService.Friends 로 만들어지며 채팅과 같은 Firestore(같은 UID)를 씁니다.
@@ -33,94 +31,44 @@ public class FirestoreFriendService : IFriendService
 
     private const string PENDING  = "pending";
     private const string ACCEPTED = "accepted";
+    private const string LOG_TAG  = "[Friend]";
 
     public event Action<IReadOnlyList<Friendship>> Received;
     public event Action<IReadOnlyDictionary<string, string>> BlocksReceived;
     public event Action<string> Failed;
 
     private readonly Func<FirebaseFirestore> db;   // 로그인 유저는 기본 앱, 게스트는 채팅 보조 앱 (FirestoreChatService ★)
-    private ListenerRegistration listener;
-    private ListenerRegistration blockListener;
+
+    private readonly FirestoreListener listener      = new FirestoreListener("[Friend]", "친구 목록을 불러오지 못했습니다.");
+    private readonly FirestoreListener blockListener = new FirestoreListener("[Friend] 차단 목록", "차단 목록을 불러오지 못했습니다.");
 
     public FirestoreFriendService(Func<FirebaseFirestore> db) { this.db = db; }
 
-    private static string PairId(string a, string b) => string.CompareOrdinal(a, b) < 0 ? a + "_" + b : b + "_" + a;
+    private DocumentReference Doc(string a, string b) => db().Collection(COLLECTION).Document(FirestoreChatData.PairId(a, b));
 
-    private DocumentReference Doc(string a, string b) => db().Collection(COLLECTION).Document(PairId(a, b));
+    private DocumentReference BlockDoc(string myUid) => db().Collection(BLOCK_COLLECTION).Document(myUid);
+
+    private void OnFailed(string reason) => Failed?.Invoke(reason);
 
     // ───────────────────────────── 받기 ─────────────────────────────
 
     public void Connect(string myUid)
     {
-        if (listener != null) return;
+        if (listener.IsActive) return;
 
-        try
-        {
-            ListenerRegistration reg = db().Collection(COLLECTION)
-                .WhereArrayContains("members", myUid)
-                .Listen(snap => OnSnapshot(snap, myUid));
-            listener = reg;
+        bool started = listener.Start(() => db().Collection(COLLECTION)
+                                                .WhereArrayContains("members", myUid)
+                                                .Listen(snap => OnSnapshot(snap, myUid)),
+                                      OnFailed);
+        if (!started) return;
 
-            reg.ListenerTask.ContinueWithOnMainThread(task =>
-            {
-                if (listener != reg) return;   // Disconnect 로 멈춘 것
-                listener = null;
-                if (task.IsFaulted || task.IsCanceled)
-                {
-                    Debug.LogWarning($"[Friend] 리스너 끊김: {task.Exception}");
-                    Failed?.Invoke("친구 목록을 불러오지 못했습니다.");
-                }
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Friend] 리스너 시작 실패: {e}");
-            listener = null;
-            Failed?.Invoke("친구 목록을 불러오지 못했습니다.");
-            return;
-        }
-
-        ConnectBlocks(myUid);
-    }
-
-    private void ConnectBlocks(string myUid)
-    {
-        if (blockListener != null) return;
-
-        try
-        {
-            ListenerRegistration reg = db().Collection(BLOCK_COLLECTION).Document(myUid).Listen(OnBlocksSnapshot);
-            blockListener = reg;
-
-            reg.ListenerTask.ContinueWithOnMainThread(task =>
-            {
-                if (blockListener != reg) return;
-                blockListener = null;
-                if (task.IsFaulted || task.IsCanceled)
-                {
-                    Debug.LogWarning($"[Friend] 차단 목록 리스너 끊김: {task.Exception}");
-                    Failed?.Invoke("차단 목록을 불러오지 못했습니다.");
-                }
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Friend] 차단 목록 리스너 시작 실패: {e}");
-            blockListener = null;
-            Failed?.Invoke("차단 목록을 불러오지 못했습니다.");
-        }
+        blockListener.Start(() => BlockDoc(myUid).Listen(OnBlocksSnapshot), OnFailed);
     }
 
     public void Disconnect()
     {
-        // 먼저 비워서 ListenerTask 완료를 '오류' 로 보지 않게 함
-        ListenerRegistration reg = listener;
-        listener = null;
-        reg?.Stop();
-
-        ListenerRegistration blockReg = blockListener;
-        blockListener = null;
-        blockReg?.Stop();
+        listener.Stop();
+        blockListener.Stop();
     }
 
     /// <summary>문서가 없으면(아직 아무도 차단 안 함) 빈 목록.</summary>
@@ -129,7 +77,7 @@ public class FirestoreFriendService : IFriendService
         var blocks = new Dictionary<string, string>();
         if (doc.Exists && doc.TryGetValue("users", out Dictionary<string, object> users) && users != null)
             foreach (KeyValuePair<string, object> pair in users)
-                blocks[pair.Key] = pair.Value is string s && s.Length > 0 ? s : PlayerProfile.ANONYMOUS_PREFIX;
+                blocks[pair.Key] = FirestoreChatData.NameOrAnonymous(pair.Value);
         BlocksReceived?.Invoke(blocks);
     }
 
@@ -152,19 +100,17 @@ public class FirestoreFriendService : IFriendService
         if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to)) return false;
         if (from != myUid && to != myUid) return false;
 
-        string peer = from == myUid ? to : from;
+        bool iSent = from == myUid;
+        string peer = iSent ? to : from;
         f = new Friendship
         {
             PeerUid  = peer,
-            PeerName = NameOf(names, peer),
-            MyName   = NameOf(names, myUid),
-            State    = status == ACCEPTED ? FriendState.Friend : from == myUid ? FriendState.Outgoing : FriendState.Incoming,
+            PeerName = FirestoreChatData.NameOf(names, peer),
+            MyName   = FirestoreChatData.NameOf(names, myUid),
+            State    = status == ACCEPTED ? FriendState.Friend : iSent ? FriendState.Outgoing : FriendState.Incoming,
         };
         return true;
     }
-
-    private static string NameOf(Dictionary<string, object> names, string uid)
-        => names != null && names.TryGetValue(uid, out object v) && v is string s && s.Length > 0 ? s : PlayerProfile.ANONYMOUS_PREFIX;
 
     // ───────────────────────────── 쓰기 ─────────────────────────────
 
@@ -180,7 +126,7 @@ public class FirestoreFriendService : IFriendService
             { "sentAt",    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() },
             { "createdAt", FieldValue.ServerTimestamp },
         };
-        Run(() => Doc(myUid, peerUid).SetAsync(data), "친구 요청을 보내지 못했습니다.", onDone);
+        FirestoreChatData.Run(LOG_TAG, () => Doc(myUid, peerUid).SetAsync(data), "친구 요청을 보내지 못했습니다.", onDone);
     }
 
     public void Accept(string myUid, string myName, string peerUid, Action<string> onDone)
@@ -191,16 +137,16 @@ public class FirestoreFriendService : IFriendService
             { "names." + myUid,  myName },   // 키는 필드 경로 — names 안의 내 이름만 바꿈
             { "acceptedAt",      FieldValue.ServerTimestamp },
         };
-        Run(() => Doc(myUid, peerUid).UpdateAsync(data), "친구 요청을 수락하지 못했습니다.", onDone);
+        FirestoreChatData.Run(LOG_TAG, () => Doc(myUid, peerUid).UpdateAsync(data), "친구 요청을 수락하지 못했습니다.", onDone);
     }
 
     public void Remove(string myUid, string peerUid, Action<string> onDone)
-        => Run(() => Doc(myUid, peerUid).DeleteAsync(), "처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
+        => FirestoreChatData.Run(LOG_TAG, () => Doc(myUid, peerUid).DeleteAsync(), "처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
 
     public void UpdateMyName(string myUid, string peerUid, string myName)
     {
         var data = new Dictionary<string, object> { { "names." + myUid, myName } };
-        Run(() => Doc(myUid, peerUid).UpdateAsync(data), null, null);
+        FirestoreChatData.Run(LOG_TAG, () => Doc(myUid, peerUid).UpdateAsync(data), null, null);
     }
 
     public void Block(string myUid, string peerUid, string peerName, Action<string> onDone)
@@ -211,8 +157,8 @@ public class FirestoreFriendService : IFriendService
             { "users",     new Dictionary<string, object> { { peerUid, peerName } } },
             { "updatedAt", FieldValue.ServerTimestamp },
         };
-        Run(() => db().Collection(BLOCK_COLLECTION).Document(myUid).SetAsync(data, SetOptions.MergeAll),
-            "차단하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
+        FirestoreChatData.Run(LOG_TAG, () => BlockDoc(myUid).SetAsync(data, SetOptions.MergeAll),
+                              "차단하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
     }
 
     public void Unblock(string myUid, string peerUid, Action<string> onDone)
@@ -222,29 +168,7 @@ public class FirestoreFriendService : IFriendService
             { "users." + peerUid, FieldValue.Delete },
             { "updatedAt",        FieldValue.ServerTimestamp },
         };
-        Run(() => db().Collection(BLOCK_COLLECTION).Document(myUid).UpdateAsync(data),
-            "차단을 해제하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
-    }
-
-    private static void Run(Func<System.Threading.Tasks.Task> write, string error, Action<string> onDone)
-    {
-        try
-        {
-            write().ContinueWithOnMainThread(task =>
-            {
-                if (task.IsFaulted || task.IsCanceled)
-                {
-                    Debug.LogWarning($"[Friend] 쓰기 실패: {task.Exception}");
-                    onDone?.Invoke(error);
-                    return;
-                }
-                onDone?.Invoke(null);
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Friend] 쓰기 호출 실패: {e}");
-            onDone?.Invoke(error);
-        }
+        FirestoreChatData.Run(LOG_TAG, () => BlockDoc(myUid).UpdateAsync(data),
+                              "차단을 해제하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
     }
 }
