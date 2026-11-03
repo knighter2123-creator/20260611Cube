@@ -134,6 +134,23 @@ public class BackendManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 결과 타입이 BackendReturnObject 의 하위 타입인 비동기 호출용 (예: 리더보드 → BackendUserLeaderboardReturnObject).
+    /// 람다로는 T 를 추론할 수 없으니 Call&lt;T&gt;(...) 처럼 타입을 적어 주세요.
+    /// </summary>
+    public static void Call<T>(Action<Backend.BackendCallback<T>> request, Action<T> onDone) where T : BackendReturnObject
+    {
+        try
+        {
+            request(bro => Post(() => onDone?.Invoke(bro)));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Backend] 호출 실패: {e}");
+            Post(() => onDone?.Invoke(null));
+        }
+    }
+
+    /// <summary>
     /// 서버에 닿지 못한 실패인가 (오프라인 · 서버 오류 · 점검 · 요청 과다). true 면 "계정 문제" 가 아니라 나중에 다시 해 볼 일입니다.
     /// </summary>
     public static bool IsNetworkError(BackendReturnObject bro)

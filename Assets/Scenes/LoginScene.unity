@@ -2412,7 +2412,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b324ce3ba260c64f96d2908aa56d4d5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RankingManager
-  rankUuid: 
+  leaderboardUuid: 01a1a011-278d-7957-8c07-c6f5b3dd141c
   tableName: RANK_DATA
   column: progress
   topCount: 50

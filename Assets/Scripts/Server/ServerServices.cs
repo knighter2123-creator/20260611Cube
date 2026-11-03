@@ -9,7 +9,7 @@ using UnityEngine;
 /// [지금 있는 것]
 ///   Nickname  — INicknameService  (뒤끝: BackendNicknameService / 시험: LocalNicknameService)
 ///   Mail      — IMailService      (뒤끝 우편: BackendMailService)
-///   (랭킹은 RankingManager 가 뒤끝 유저 랭킹을 바로 씀)
+///   (랭킹은 RankingManager 가 뒤끝 유저 리더보드를 바로 씀)
 /// [다음 단계에서 추가]  클라우드 세이브 · 친구/쪽지 · 가챠 확률 · 채팅
 ///
 /// 테스트 코드에서 바꿔 끼울 수 있게 setter 를 열어 둡니다. 플레이 시작 때마다 기본값으로 돌아갑니다.

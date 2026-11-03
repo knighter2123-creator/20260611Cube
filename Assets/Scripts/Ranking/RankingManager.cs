@@ -1,21 +1,23 @@
 using System;
 using System.Collections.Generic;
 using BackEnd;
-using LitJson;
+using BackEnd.Leaderboard;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
-/// 주간 스테이지 랭킹 — 뒤끝 유저 랭킹에 내 기록을 올리고, 상위 기록을 받아 옵니다.
+/// 주간 스테이지 랭킹 — 뒤끝 유저 리더보드(SDK 5.4.0+, 옛 '랭킹' 대체)에 내 기록을 올리고, 상위 기록을 받아 옵니다.
 ///
 /// [붙이는 위치]
 ///   로그인 씬의 ManagerRoot 하위. 다른 매니저들과 같은 DontDestroyOnLoad 싱글턴이다.
 ///   우편함 동기화(MailboxSync)도 Awake 에서 같은 오브젝트에 붙입니다.
 ///
-/// [뒤끝 콘솔 준비] — 인스펙터의 rankUuid / tableName / column 과 맞춰야 합니다.
+/// [뒤끝 콘솔 준비] — 인스펙터의 leaderboardUuid / tableName / column 과 맞춰야 합니다.
 ///   1) 게임 정보 관리 > 테이블 생성: tableName (기본 "RANK_DATA"), 컬럼 column (기본 "progress", int)
-///   2) 랭킹 관리 > 유저 랭킹 생성: 위 테이블·컬럼, 내림차순, 초기화 주기 '주간' (가능하면 월요일 06:00)
-///   3) 같은 랭킹의 보상 설정 — 순위 구간별 우편 보상 (아이템 차트 형식은 BackendMailService 주석)
-///   4) 생성된 랭킹 UUID 를 rankUuid 에 넣기
+///      + 스테이지 정보 컬럼 world(int) / stage(int) / clearedAt(dateTime) — 스키마 정의 테이블일 때만 직접 추가
+///   2) 리더보드 > 유저 리더보드 생성: 위 테이블·컬럼, 내림차순, 초기화 주기 '주간' (가능하면 월요일 06:00)
+///   3) 같은 리더보드의 보상 설정 — 순위 구간별 우편 보상 (아이템 차트 형식은 BackendMailService 주석)
+///   4) 생성된 리더보드 UUID 를 leaderboardUuid 에 넣기
 ///
 /// [점수]  StageRecord.BestProgress (누적 클리어 수, 1-1 = 1). 기록은 누적이지만 랭킹은 매주 비워지므로,
 ///   그 주에 한 번이라도 올린 사람만 이번 주 랭킹·보상에 들어갑니다. 그래서 주차가 바뀌면 다시 올립니다.
@@ -38,13 +40,52 @@ public class RankingManager : MonoBehaviour
     /// <summary>옛 Firestore 컬렉션 이름 — ServerAccountData 의 Firestore 경로만 씀 (LegacyFirestore 를 지울 때 함께 지움)</summary>
     public const string COLLECTION = "rankings";
 
-    [Header("뒤끝 랭킹 (클래스 주석 [뒤끝 콘솔 준비])")]
-    [Tooltip("뒤끝 콘솔 > 랭킹 관리 에서 만든 주간 유저 랭킹의 UUID")]
-    [SerializeField] private string rankUuid = "";
+    [Header("뒤끝 리더보드 (클래스 주석 [뒤끝 콘솔 준비])")]
+    [Tooltip("뒤끝 콘솔 > 리더보드 에서 만든 주간 유저 리더보드의 UUID")]
+    [FormerlySerializedAs("rankUuid")]
+    [SerializeField] private string leaderboardUuid = "01a1a011-278d-7957-8c07-c6f5b3dd141c";
     [Tooltip("랭킹이 읽는 게임 정보 테이블")]
     [SerializeField] private string tableName = "RANK_DATA";
     [Tooltip("점수 컬럼 (int) — StageRecord.BestProgress 를 넣음")]
     [SerializeField] private string column = "progress";
+
+    /// <summary>
+    /// RANK_DATA 에 점수와 함께 넣는 스테이지 정보 컬럼 (랭킹 정렬에는 안 씀 — 콘솔·다른 기능에서 읽기 쉽게).
+    /// 테이블이 '스키마 정의' 방식이면 콘솔에 이 컬럼들도 만들어야 합니다 (world/stage int, clearedAt dateTime).
+    /// </summary>
+    public const string COL_WORLD      = "world";
+    public const string COL_STAGE      = "stage";
+    public const string COL_CLEARED_AT = "clearedAt";
+
+    /// <summary>
+    /// RANK_DATA 한 행에 들어갈 스테이지 데이터. progress 기준으로 world/stage 를 계산합니다.
+    /// clearedAt 은 UTC unix ms 로 받아 콘솔 스키마의 DateTime 형식과 똑같은 문자열(CLEARED_AT_FORMAT)로 넣습니다.
+    ///   ⚠ 뒤끝 5.11.5+ 는 스키마 DateTime 컬럼에 '설정한 형식과 정확히 같은' 문자열만 받음 — ISO("…T…Z")도
+    ///     형식이 다르면 400 "bad time dataType". 콘솔에서 형식을 바꾸면 CLEARED_AT_FORMAT 도 같이 바꿀 것.
+    ///   ⚠ DateTime 을 Param 에 직접 넣지 말 것 — GameData.Insert/Update 는 Param.GetValue() 의 원본 값을 LitJson 으로
+    ///     직렬화해서 "11/03/2026 06:00:00" 이 됨 (GetJson() 만 ISO 로 바꿔 줌)
+    ///   시각은 UTC 기준으로 넣습니다 (콘솔에 보이는 값도 UTC — 한국 시간은 +9시간).
+    /// 0 이하(기록 없음)면 clearedAt 은 보내지 않습니다 — dateTime 컬럼에 1970년을 넣지 않게.
+    /// 다시 읽을 때는 BackendJson.DateMs(row, COL_CLEARED_AT).
+    /// </summary>
+    public static Param BuildStageParam(string scoreColumn, int progress, long clearedAtMs)
+    {
+        StageRecord.Split(progress, out int world, out int stage);
+        var p = new Param();
+        p.Add(scoreColumn, progress);
+        p.Add(COL_WORLD,   progress > 0 ? world : 0);
+        p.Add(COL_STAGE,   progress > 0 ? stage : 0);
+        if (clearedAtMs > 0) p.Add(COL_CLEARED_AT, ToClearedAtString(clearedAtMs));
+        return p;
+    }
+
+    /// <summary>콘솔 RANK_DATA.clearedAt 의 DateTime 형식 "YYYY-MM-DD HH:mm:ss" 를 .NET 형식으로 쓴 것.</summary>
+    public const string CLEARED_AT_FORMAT = "yyyy-MM-dd HH:mm:ss";
+
+    /// <summary>UTC unix ms → "2026-11-03 06:00:00" (CLEARED_AT_FORMAT, UTC)</summary>
+    public static string ToClearedAtString(long ms)
+        => DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime
+               .ToString(CLEARED_AT_FORMAT, System.Globalization.CultureInfo.InvariantCulture);
 
     [Tooltip("랭킹 화면에 보여 줄 인원")]
     [SerializeField] private int topCount = 50;
@@ -116,11 +157,11 @@ public class RankingManager : MonoBehaviour
     {
         get
         {
-            if (!string.IsNullOrWhiteSpace(rankUuid)) return true;
+            if (!string.IsNullOrWhiteSpace(leaderboardUuid)) return true;
             if (!warnedNoUuid)
             {
                 warnedNoUuid = true;
-                Debug.LogWarning("[Ranking] rankUuid 가 비어 있어 랭킹을 쓰지 않습니다. RankingManager 인스펙터에 뒤끝 랭킹 UUID 를 넣으세요.", this);
+                Debug.LogWarning("[Ranking] leaderboardUuid 가 비어 있어 랭킹을 쓰지 않습니다. RankingManager 인스펙터에 뒤끝 리더보드 UUID 를 넣으세요.", this);
             }
             return false;
         }
@@ -166,12 +207,8 @@ public class RankingManager : MonoBehaviour
             return;
         }
 
-        BackendTable.GetOrInsertMyRow(tableName, () =>
-        {
-            var p = new Param();
-            p.Add(column, initialProgress);
-            return p;
-        },
+        BackendTable.GetOrInsertMyRow(tableName,
+            () => BuildStageParam(column, initialProgress, StageRecord.BestClearedAt),
         (inDate, row, error) =>
         {
             if (error != null) { onDone(null, 0, error); return; }
@@ -197,10 +234,20 @@ public class RankingManager : MonoBehaviour
             // 다른 기기에서 더 멀리 갔으면 그 기록을 유지 (진행도는 기기마다 따로일 수 있음 — 클라우드 세이브 전까지)
             int score = Mathf.Max(progress, tableProgress);
 
-            var param = new Param();
-            param.Add(column, score);
+            // 이 기기 기록이 이기면 스테이지 정보까지 통째로 갱신.
+            // 테이블 쪽이 더 높으면 그 행의 world/stage/clearedAt 은 이미 그 기록 기준이므로 점수만 다시 보냄.
+            Param param;
+            if (score == progress)
+            {
+                param = BuildStageParam(column, score, StageRecord.BestClearedAt);
+            }
+            else
+            {
+                param = new Param();
+                param.Add(column, score);
+            }
 
-            BackendManager.Call(cb => Backend.URank.User.UpdateUserScore(rankUuid, tableName, inDate, param, cb), bro =>
+            BackendManager.Call<BackendReturnObject>(cb => Backend.Leaderboard.User.UpdateMyDataAndRefreshLeaderboard(leaderboardUuid, tableName, inDate, param, cb), bro =>
             {
                 if (this == null) return;
 
@@ -255,8 +302,7 @@ public class RankingManager : MonoBehaviour
             string inDate = BackendJson.Str(row, "inDate");
             if (string.IsNullOrEmpty(inDate)) { FinishReset(uid); return; }   // 올린 적 없음 — 지울 것 없음
 
-            var param = new Param();
-            param.Add(column, 0);
+            var param = BuildStageParam(column, 0, 0);
             BackendTable.Update(tableName, inDate, param, updateError =>
             {
                 if (this == null) return;
@@ -292,7 +338,8 @@ public class RankingManager : MonoBehaviour
     {
         if (!CheckCanFetch(out string reason)) { onDone?.Invoke(null, reason); return; }
 
-        BackendManager.Call(cb => Backend.URank.User.GetRankList(rankUuid, topCount, cb), bro =>
+        BackendManager.Call<BackendUserLeaderboardReturnObject>(
+            cb => Backend.Leaderboard.User.GetLeaderboard(leaderboardUuid, topCount, cb), bro =>
         {
             if (this == null) return;
 
@@ -304,9 +351,9 @@ public class RankingManager : MonoBehaviour
             }
 
             var list = new List<Entry>();
-            JsonData rows = bro.FlattenRows();
-            if (rows != null && rows.IsArray)
-                foreach (JsonData row in rows) list.Add(ToEntry(row, list.Count + 1));
+            List<UserLeaderboardItem> items = bro.GetUserLeaderboardList();
+            if (items != null)
+                foreach (UserLeaderboardItem item in items) list.Add(ToEntry(item, list.Count + 1));
 
             onDone?.Invoke(list, null);
         });
@@ -317,7 +364,8 @@ public class RankingManager : MonoBehaviour
     {
         if (!CheckCanFetch(out string reason)) { onDone?.Invoke(null, reason); return; }
 
-        BackendManager.Call(cb => Backend.URank.User.GetMyRank(rankUuid, cb), bro =>
+        BackendManager.Call<BackendUserLeaderboardReturnObject>(
+            cb => Backend.Leaderboard.User.GetMyLeaderboard(leaderboardUuid, cb), bro =>
         {
             if (this == null) return;
 
@@ -329,8 +377,14 @@ public class RankingManager : MonoBehaviour
                 return;
             }
 
-            JsonData rows = bro.FlattenRows();
-            onDone?.Invoke(rows != null && rows.IsArray && rows.Count > 0 ? ToEntry(rows[0], 0) : (Entry?)null, null);
+            // gap 없이 부르면 내 줄 하나 — 혹시 앞뒤가 섞여 와도 내 gamerInDate 로 고름. 비었으면 이번 주 기록 없음
+            List<UserLeaderboardItem> items = bro.GetUserLeaderboardList();
+            UserLeaderboardItem mine = null;
+            if (items != null)
+                foreach (UserLeaderboardItem item in items)
+                    if (mine == null || item.gamerInDate == Backend.UserInDate) mine = item;
+
+            onDone?.Invoke(mine != null ? ToEntry(mine, 0) : (Entry?)null, null);
         });
     }
 
@@ -343,15 +397,23 @@ public class RankingManager : MonoBehaviour
         return reason == null;
     }
 
-    private static Entry ToEntry(JsonData row, int fallbackRank)
+    /// <summary>리더보드 항목은 숫자도 문자열로 옵니다 (rank/score). 점수 컬럼이 int 라 소수점은 없지만 "13.0" 같은 형식도 받아 줌.</summary>
+    private static Entry ToEntry(UserLeaderboardItem item, int fallbackRank)
     {
-        string nickname = BackendJson.Str(row, "nickname");
         return new Entry
         {
-            Rank     = (int)BackendJson.Long(row, "rank", fallbackRank),
-            Uid      = BackendJson.Str(row, "gamerInDate"),
-            Nickname = string.IsNullOrEmpty(nickname) ? PlayerProfile.ANONYMOUS_PREFIX : nickname,
-            Progress = (int)BackendJson.Long(row, "score"),
+            Rank     = ParseInt(item.rank, fallbackRank),
+            Uid      = item.gamerInDate,
+            Nickname = string.IsNullOrEmpty(item.nickname) ? PlayerProfile.ANONYMOUS_PREFIX : item.nickname,
+            Progress = ParseInt(item.score, 0),
         };
+    }
+
+    private static int ParseInt(string s, int fallback)
+    {
+        if (int.TryParse(s, out int i)) return i;
+        if (double.TryParse(s, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out double d)) return (int)d;
+        return fallback;
     }
 }
