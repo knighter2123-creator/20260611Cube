@@ -45,6 +45,7 @@ public static class PlayerProfile
     {
         OnNameRegistered = null;
         OnNameChanged = null;
+        IsNameRequestPending = false;
     }
 
     // ───────── 읽기 ─────────
@@ -134,9 +135,21 @@ public static class PlayerProfile
     /// 이미 이름이 있으면 무조건 실패 → "MainScene 에서 임의로 못 바꾸게" 하는 장치.
     /// (MainScene 에서 이름을 바꾸는 새 창구는 아래 TryChangeName 입니다)
     /// </summary>
+    /// ⚠ 이 기기에만 저장합니다 (게스트용). 로그인 계정은 서버 중복 검사를 거치는 RequestRegister 를 쓰세요.
     public static bool TryRegister(string raw, out string error)
     {
-        if (!TryGetData(out SaveData data, out error))
+        if (!CheckRegister(raw, out SaveData data, out string cleaned, out error))
+            return false;
+
+        CommitRegister(data, cleaned);
+        return true;
+    }
+
+    /// <summary>등록 전 검사 (이름 없음 + 규칙). 통과하면 다듬은 이름.</summary>
+    private static bool CheckRegister(string raw, out SaveData data, out string cleaned, out string error)
+    {
+        cleaned = string.Empty;
+        if (!TryGetData(out data, out error))
             return false;
 
         if (HasName)
@@ -146,9 +159,11 @@ public static class PlayerProfile
             return false;
         }
 
-        if (!Validate(raw, out string cleaned, out error))
-            return false;
+        return Validate(raw, out cleaned, out error);
+    }
 
+    private static void CommitRegister(SaveData data, string cleaned)
+    {
         data.playerName    = cleaned;
         data.nameUpdatedAt = NowMs();
 
@@ -156,7 +171,6 @@ public static class PlayerProfile
 
         GameLog.Info($"[PlayerProfile] 이름 등록 완료: {cleaned}");
         OnNameRegistered?.Invoke(cleaned);
-        return true;
     }
 
     // ───────── 쓰기 (MainScene, 보석 소모 개명) ─────────
@@ -176,36 +190,12 @@ public static class PlayerProfile
     ///   (다른 MainScene 코드, 예: CompanionManager.AddCompanion 도 값 변경 후 SaveManager.Save() 를
     ///    쓰는 것과 같은 이유 — 동료도감 셋업 문서 §9 참고)
     /// </summary>
+    /// ⚠ 이 기기에만 저장합니다 (게스트용). 로그인 계정은 서버 중복 검사를 거치는 RequestChangeName 을 쓰세요.
     public static bool TryChangeName(string raw, out string error)
     {
-        if (!TryGetData(out SaveData data, out error))
+        if (!CheckChange(raw, out SaveData data, out string cleaned, out bool same, out error))
             return false;
-
-        if (!HasName)
-        {
-            // NicknameChangePanel 은 이름이 없으면 '최초 설정' 모드(TryRegister)로 열리므로
-            // 정상 흐름에선 여기 오지 않습니다. 다른 곳에서 잘못 불렀을 때를 위한 방어입니다.
-            error = "등록된 이름이 없습니다. 먼저 이름을 설정해 주세요.";
-            return false;
-        }
-
-        if (!Validate(raw, out string cleaned, out error))
-            return false;
-
-        // 지금 이름과 똑같으면 보석을 쓰지 않고 조용히 성공 처리합니다.
-        // 이 검사가 없으면 오타로 같은 이름을 다시 입력한 유저의 보석이 이유 없이 사라집니다.
-        if (cleaned == data.playerName)
-        {
-            error = string.Empty;
-            return true;
-        }
-
-        if (CurrencyManager.Instance == null)
-        {
-            error = "재화 정보를 찾을 수 없습니다.";
-            Debug.LogError("[PlayerProfile] CurrencyManager 가 없습니다.");
-            return false;
-        }
+        if (same) return true;
 
         // ★ 순서가 중요합니다: 유효성 검사를 전부 통과한 "직후", 실제로 이름을 바꾸기 "직전"에 소모합니다.
         //   먼저 차감부터 하고 나중에 실패할 수 있는 순서로 짜면(예: GachaSystem.Draw 가 먼저 보석을
@@ -217,13 +207,193 @@ public static class PlayerProfile
             return false;
         }
 
+        CommitChange(data, cleaned);
+        return true;
+    }
+
+    /// <summary>
+    /// 개명 전 검사 (이름 있음 + 규칙 + 보석 보유). same = 지금 이름과 같음 (보석 없이 성공 처리).
+    /// 보석은 여기서 쓰지 않습니다 — 확인만.
+    /// </summary>
+    private static bool CheckChange(string raw, out SaveData data, out string cleaned, out bool same, out string error)
+    {
+        cleaned = string.Empty;
+        same    = false;
+        if (!TryGetData(out data, out error))
+            return false;
+
+        if (!HasName)
+        {
+            // NicknameChangePanel 은 이름이 없으면 '최초 설정' 모드(TryRegister)로 열리므로
+            // 정상 흐름에선 여기 오지 않습니다. 다른 곳에서 잘못 불렀을 때를 위한 방어입니다.
+            error = "등록된 이름이 없습니다. 먼저 이름을 설정해 주세요.";
+            return false;
+        }
+
+        if (!Validate(raw, out cleaned, out error))
+            return false;
+
+        // 지금 이름과 똑같으면 보석을 쓰지 않고 조용히 성공 처리합니다.
+        // 이 검사가 없으면 오타로 같은 이름을 다시 입력한 유저의 보석이 이유 없이 사라집니다.
+        if (cleaned == data.playerName)
+        {
+            same = true;
+            return true;
+        }
+
+        if (CurrencyManager.Instance == null)
+        {
+            error = "재화 정보를 찾을 수 없습니다.";
+            Debug.LogError("[PlayerProfile] CurrencyManager 가 없습니다.");
+            return false;
+        }
+        if (CurrencyManager.Instance.Gem < CHANGE_NAME_GEM_COST)
+        {
+            error = $"보석이 부족합니다. (필요: {CHANGE_NAME_GEM_COST})";
+            return false;
+        }
+        return true;
+    }
+
+    private static void CommitChange(SaveData data, string cleaned)
+    {
         data.playerName    = cleaned;
         data.nameUpdatedAt = NowMs();
-        SaveManager.Instance.Save();   // 위 설명대로 TryRegister 의 Persist() 가 아니라 전체 Save() 사용
+        SaveManager.Instance.Save();   // 위 설명대로 TryRegister 의 Persist() 가 아니라 전체 Save() 사용 (줄어든 보석도 함께 저장)
 
         GameLog.Info($"[PlayerProfile] 이름 변경 완료: {cleaned} (보석 -{CHANGE_NAME_GEM_COST})");
         OnNameChanged?.Invoke(cleaned);
-        return true;
+    }
+
+    // ───────── 쓰기 (서버를 거치는 창구 — NicknameChangePanel 이 씀) ─────────
+
+    /// <summary>서버에 이름을 묻는 중인가 (확인 버튼 연타 방지).</summary>
+    public static bool IsNameRequestPending { get; private set; }
+
+    /// <summary>
+    /// 최초 등록 (무료). 로그인 계정이면 뒤끝에 먼저 등록하고(중복 검사), 성공하면 이 기기에 적용합니다.
+    /// 게스트면 TryRegister 와 같습니다. 결과는 메인 스레드에서 onDone(성공, 실패 문구).
+    /// </summary>
+    public static void RequestRegister(string raw, System.Action<bool, string> onDone)
+    {
+        if (!ProfileSync.TryGetAccount(out string uid))
+        {
+            bool ok = TryRegister(raw, out string localError);
+            onDone?.Invoke(ok, localError);
+            return;
+        }
+
+        if (!CheckRegister(raw, out _, out string cleaned, out string error) || !CanAskServer(uid, out error))
+        {
+            onDone?.Invoke(false, error);
+            return;
+        }
+
+        AskServer(uid, cleaned, onDone, () =>
+        {
+            if (!TryGetData(out SaveData data, out string e)) return e;
+            if (HasName) return "이미 이름이 정해져 있습니다.";   // 기다리는 사이 다른 경로로 정해짐 (서버 이름은 ProfileSync 가 다시 맞춤)
+            CommitRegister(data, cleaned);
+            return null;
+        });
+    }
+
+    /// <summary>
+    /// 유료 개명 (보석). 로그인 계정이면 뒤끝에서 바꾼 "뒤에" 보석을 쓰고 이 기기에 적용합니다 — 서버가 거절하면 보석은 그대로.
+    /// 게스트면 TryChangeName 과 같습니다. 결과는 메인 스레드에서 onDone(성공, 실패 문구).
+    /// </summary>
+    public static void RequestChangeName(string raw, System.Action<bool, string> onDone)
+    {
+        if (!ProfileSync.TryGetAccount(out string uid))
+        {
+            bool ok = TryChangeName(raw, out string localError);
+            onDone?.Invoke(ok, localError);
+            return;
+        }
+
+        if (!CheckChange(raw, out _, out string cleaned, out bool same, out string error))
+        {
+            onDone?.Invoke(false, error);
+            return;
+        }
+        if (same)
+        {
+            onDone?.Invoke(true, string.Empty);
+            return;
+        }
+        if (!CanAskServer(uid, out error))
+        {
+            onDone?.Invoke(false, error);
+            return;
+        }
+
+        AskServer(uid, cleaned, onDone, () =>
+        {
+            if (!TryGetData(out SaveData data, out string e)) return e;
+
+            // 서버 이름은 이미 바뀌었으므로 이 기기도 반드시 맞춥니다.
+            // 기다리는 사이 보석을 다른 데 써서 모자라면 차감 없이 적용 (서버와 이름이 갈라지는 것보다 낫습니다)
+            if (CurrencyManager.Instance == null || !CurrencyManager.Instance.SpendGem(CHANGE_NAME_GEM_COST))
+                Debug.LogWarning("[PlayerProfile] 서버 개명 후 보석이 모자라 차감하지 못했습니다 — 이름만 적용합니다.");
+
+            CommitChange(data, cleaned);
+            return null;
+        });
+    }
+
+    private static bool CanAskServer(string uid, out string error)
+    {
+        error = null;
+        if (IsNameRequestPending)
+            error = "처리 중입니다. 잠시만 기다려 주세요.";
+        else if (ProfileSync.Instance == null)
+            error = "닉네임 서버를 찾을 수 없습니다.";
+        else
+            ProfileSync.Instance.CanSetName(uid, out error);
+        return error == null;
+    }
+
+    /// <summary>서버에 이름을 정하고, 성공하면 apply 로 이 기기에 적용합니다. apply 는 실패 문구(성공이면 null)를 돌려줍니다.</summary>
+    private static void AskServer(string uid, string cleaned, System.Action<bool, string> onDone, System.Func<string> apply)
+    {
+        IsNameRequestPending = true;
+        ProfileSync.Instance.SetNameOnServer(uid, cleaned, result =>
+        {
+            IsNameRequestPending = false;
+
+            if (!result.Ok)
+            {
+                onDone?.Invoke(false, result.Message);
+                return;
+            }
+
+            // 기다리는 사이 계정이 바뀌었으면 이 기기(다른 계정 세이브)에 적용하지 않음
+            if (!ProfileSync.TryGetAccount(out string nowUid) || nowUid != uid)
+            {
+                onDone?.Invoke(false, "계정이 바뀌어 적용하지 못했습니다.");
+                return;
+            }
+
+            string error = apply();
+            onDone?.Invoke(error == null, error ?? string.Empty);
+        });
+    }
+
+    /// <summary>
+    /// 게스트 때 정한 이름을 서버에 올리려 했는데 다른 유저가 쓰고 있을 때 (ProfileSync 전용).
+    /// 이름을 지워 '최초 설정(무료)' 을 다시 하게 합니다 — NicknamePrompt 가 다시 물어봄.
+    /// </summary>
+    public static void ClearNameAfterServerConflict()
+    {
+        if (!TryGetData(out SaveData data, out _) || !HasName) return;
+
+        string old = data.playerName;
+        data.playerName    = string.Empty;
+        data.nameUpdatedAt = NowMs();
+        RegisterSave();
+
+        GameLog.Info($"[PlayerProfile] 서버에서 쓸 수 없는 이름 '{old}' 을(를) 지웠습니다 — 다시 정해야 합니다.");
+        OnNameChanged?.Invoke(AnonymousName);
     }
 
     // ───────── 서버 이름 적용 (ProfileSync 전용) ─────────

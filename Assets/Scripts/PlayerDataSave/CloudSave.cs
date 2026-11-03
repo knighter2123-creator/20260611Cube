@@ -110,7 +110,8 @@ public class CloudSave : MonoBehaviour
     public void CheckBeforeStart(float timeoutSeconds, Action<StartCheck> onDone)
     {
         // 게스트 / 로그인 정보 없음 / 세이브 주인이 아직 다른 계정 → 클라우드와 상관없이 시작
-        if (!ProfileSync.TryGetAccount(out string uid) || uid == checkedUid || checking)
+        // (뒤끝 이전 중에는 클라우드 확인 없이 이 기기 데이터로 시작 — LegacyFirestore 주석)
+        if (!LegacyFirestore.Enabled || !ProfileSync.TryGetAccount(out string uid) || uid == checkedUid || checking)
         {
             onDone?.Invoke(StartCheck.Proceed);
             return;
@@ -329,6 +330,7 @@ public class CloudSave : MonoBehaviour
 
     private void Update()
     {
+        if (!LegacyFirestore.Enabled) return;   // 뒤끝 이전 중 (LegacyFirestore 주석)
         if (checking || uploading || Time.unscaledTime < nextTryTime) return;
         if (!ProfileSync.TryGetAccount(out string uid)) return;
 

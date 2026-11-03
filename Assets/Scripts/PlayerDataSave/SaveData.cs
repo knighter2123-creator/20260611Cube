@@ -119,6 +119,10 @@ public class SaveData
     // ── 일일 던전 (DailyDungeonProgress 가 직접 읽고 씀) ──
     public DailyDungeonSaveData dailyDungeon = new DailyDungeonSaveData();
 
+    // ── 로컬 우편함 (Mailbox 가 직접 읽고 씀). 서버(뒤끝) 우편은 저장하지 않음 ──
+    // 이 필드가 없던 예전 세이브는 빈 우편함으로 읽힙니다 — Mailbox.Data 가 null 이면 새로 채웁니다.
+    public MailboxSaveData mailbox = new MailboxSaveData();
+
     // ── 튜토리얼 ──
     // ★ 새 세이브(신규 유저)는 false → MainScene 에서 자동 팝업.
     //   이 필드가 생기기 전의 구버전 세이브(기존 유저)는 SaveManager.Load() 에서 true 로 바꿔 준다.

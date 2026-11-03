@@ -1,134 +1,127 @@
 using System;
 using System.Threading.Tasks;
-using Firebase;
-using Firebase.Auth;
-using Firebase.Extensions;   // ContinueWithOnMainThread
+using BackEnd;
 using Google;                // GoogleSignIn (google-signin-unity 플러그인)
 using UnityEngine;
 
 /// <summary>
-/// 로그인(인증) 매니저 — LoginScene 의 ManagerRoot 하위에 둔다.
+/// 로그인(인증) 매니저 — LoginScene 의 ManagerRoot 하위에 둔다. 서버는 뒤끝(BackendManager).
 ///
-/// [하는 일]  Firebase 초기화, 구글 로그인 → Firebase 로그인, 로그아웃, 로그인 상태 보관.
+/// [하는 일]  뒤끝 초기화 요청, 구글 로그인 → 뒤끝 로그인, 이메일 가입/로그인, 자동 로그인, 로그아웃, 탈퇴, 로그인 상태 보관.
 /// [안 하는 일] UI. 버튼/텍스트 참조를 하나도 들고 있지 않다.
 ///   → 이 매니저는 DontDestroyOnLoad 로 씬을 넘어 살아남지만, 버튼은 씬과 함께 파괴된다.
-///     매니저가 씬 UI 를 붙잡고 있으면 씬이 바뀐 뒤 '죽은 참조'가 된다 (learnings 의 데이터/UI 분리 원칙).
-///     UI 는 GoogleLoginButtonUI 가 맡고, 이 매니저의 상태를 읽어 갈 뿐이다.
+///     UI 는 GoogleLoginButtonUI / EmailLoginUI 등이 맡고, 이 매니저의 상태를 읽어 갈 뿐이다.
 ///
-/// [2단계 로그인]
-///   1) GoogleSignIn  : 구글 계정 주인임을 증명하는 ID 토큰을 받는다 (기기 네이티브 창)
-///   2) Firebase Auth : 그 토큰으로 Firebase 에 로그인 → 게임이 쓸 식별자는 Firebase UID
+/// [Firebase 에서 옮겨 오며 지킨 것]  공개 API(IsReady / IsSignedIn / Uid / StateChanged / SignInWith... )는 그대로입니다.
+///   로그인 화면 UI, AccountSwitch, 계정별 세이브는 고치지 않아도 됩니다.
+///   Uid 는 이제 뒤끝의 유저 inDate 입니다 (다른 유저를 가리키는 뒤끝 API — 친구, 랭킹 등 — 가 쓰는 값).
 ///
-/// [세이브] CaptureTo/ApplyFrom 이 없다 → save.json 스키마·저장 흐름과 무관.
-///          로그인 상태는 Firebase 가 기기에 따로 보관한다 (save.json / PlayerPrefs 와 별개).
+/// [구글 로그인 — 2단계]
+///   1) GoogleSignIn : 구글 계정 주인임을 증명하는 ID 토큰을 받는다 (기기 네이티브 창)
+///   2) 뒤끝         : AuthorizeFederation(토큰, Google) 로 로그인. 처음이면 자동 가입.
+///   ★ 뒤끝 콘솔 > 프로젝트 설정 > 구글 로그인(페더레이션) 에 같은 구글 클라이언트 ID 를 등록해야 합니다.
 ///
-/// [이메일 로그인]  SignUpWithEmail / SignInWithEmail — Firebase 의 이메일·비밀번호 로그인.
-///   네이티브 플러그인이 필요 없어서 **에디터(Device Simulator)에서도 동작**합니다.
-///   실패 사유(한국어)는 LastError 에 남고, UI 가 StateChanged 를 받아 읽어서 표시합니다.
+/// [이메일 로그인]  뒤끝 '커스텀 가입/로그인' — 이메일을 아이디로 씁니다.
+///   가입하면 비밀번호 찾기용 이메일(UpdateCustomEmail)도 같은 주소로 등록합니다.
+///   네이티브 플러그인이 필요 없어서 **에디터에서도 동작**합니다.
 ///
-/// [로그아웃]  Firebase + 구글 계정 선택 상태를 지웁니다. 앱 종료·씬 이동·세이브 삭제는 하지 않습니다.
+/// [자동 로그인 / 오프라인]
+///   뒤끝은 로그인 토큰을 기기에 보관합니다. 앱을 다시 켜면 LoginWithTheBackendToken 으로 이어서 로그인합니다.
+///   서버에 닿지 못하면(오프라인·점검) 마지막 계정을 '오프라인 로그인' 으로 유지합니다 — IsSignedIn = true, IsOnline = false.
+///     → 비행기 모드로 켜도 게스트 세이브가 아니라 내 계정 세이브로 이어서 할 수 있습니다 (Firebase 때와 같은 동작).
+///     → 서버 기능은 IsOnline 을 보고 기다리면 됩니다. 연결되면 자동으로 다시 로그인하고 StateChanged 를 보냅니다.
+///   토큰이 만료·탈퇴·차단으로 거부되면 로그아웃 상태가 됩니다.
 ///
-/// [로그인 방식 조회]  IsSignedInWith(SignInMethod) — 로그인 화면의 각 버튼이 "내 방식으로 로그인됐는가" 를 판단.
+/// [로그아웃]  뒤끝 + 구글 계정 선택 상태를 지웁니다. 앱 종료·씬 이동·세이브 삭제는 하지 않습니다.
+/// [세이브]   CaptureTo/ApplyFrom 이 없다 → save.json 스키마와 무관. 마지막 계정 정보만 PlayerPrefs 에 따로 둔다.
 /// </summary>
 public class AuthManager : MonoBehaviour
 {
     public static AuthManager Instance { get; private set; }
 
     /// <summary>
-    /// 로그인 상태가 바뀔 때마다 발행 (준비 완료 / 로그인 시작 / 성공 / 실패·취소 / 로그아웃).
+    /// 로그인 상태가 바뀔 때마다 발행 (준비 완료 / 로그인 시작 / 성공 / 실패·취소 / 로그아웃 / 온라인·오프라인 전환).
     /// 구독하는 쪽은 인자 없이 받고, 필요한 값은 Instance 의 프로퍼티로 직접 읽는다.
-    ///
-    /// ★ static 인 이유
-    ///   같은 씬 안에서 Awake/OnEnable 이 불리는 순서는 정해져 있지 않다.
-    ///   UI 의 OnEnable 이 이 매니저의 Awake 보다 먼저 불리면 Instance 가 아직 null 이라
-    ///   인스턴스 이벤트에는 구독할 수 없다. static 이벤트는 매니저가 태어나기 전에도 구독할 수 있다.
-    ///   계정 삭제로 매니저가 새로 만들어져도 구독이 끊기지 않는 장점도 있다.
-    /// ⚠ 구독한 쪽은 반드시 OnDisable 에서 해제할 것 (static 은 파괴된 구독자를 계속 붙잡는다).
+    /// ★ static 인 이유: UI 의 OnEnable 이 이 매니저의 Awake 보다 먼저 불려도 구독할 수 있게. 계정 삭제로 매니저가 새로 만들어져도 유지.
+    /// ⚠ 구독한 쪽은 반드시 OnDisable 에서 해제할 것.
     /// </summary>
     public static event Action StateChanged;
 
     [Header("Google Sign-In")]
-    [Tooltip("Firebase 콘솔 > Authentication > 로그인 방법 > Google 의 '웹 클라이언트 ID'.\n" +
-             "google-services.json 의 oauth_client 중 client_type 이 3 인 client_id.\n" +
-             "Android 클라이언트 ID(client_type 1)를 넣으면 DEVELOPER_ERROR 가 난다.")]
+    [Tooltip("구글 클라우드 콘솔 > API 및 서비스 > 사용자 인증 정보 의 'OAuth 웹 클라이언트 ID'.\n" +
+             "뒤끝 콘솔의 구글 로그인 설정에도 같은 값을 넣습니다.\n" +
+             "Android 클라이언트 ID 를 넣으면 DEVELOPER_ERROR 가 난다.")]
     [SerializeField] private string webClientId = "";
 
+    [Tooltip("오프라인으로 시작했을 때 다시 로그인을 시도하는 간격(초)")]
+    [SerializeField] private float reconnectInterval = 30f;
+
     // ─────────────── 외부에서 읽는 상태 ───────────────
-    public bool IsReady     { get; private set; }   // Firebase 초기화 완료
-    public bool IsSigningIn { get; private set; }   // 로그인 창이 떠 있는 중
-    public bool IsSignedIn  => auth != null && auth.CurrentUser != null;
+    /// <summary>시작할 때의 확인(뒤끝 초기화 + 자동 로그인 시도)을 마쳤는가. 실패·오프라인이어도 확인을 마치면 true.</summary>
+    public bool IsReady     { get; private set; }
+    public bool IsSigningIn { get; private set; }   // 로그인 창·요청이 진행 중
+    public bool IsSignedIn  => !string.IsNullOrEmpty(uid);
 
-    /// <summary>
-    /// 구글 로그인을 켜 둘 플랫폼. 지금은 Android 만.
-    ///   - 에디터(Device Simulator 포함): 네이티브 플러그인이 없어 동작하지 않는다.
-    ///   - iOS: GoogleService-Info.plist 와 URL 스킴(REVERSED_CLIENT_ID) 설정이 없으면
-    ///          네이티브 SDK 가 예외를 던져 앱이 종료될 수 있다. iOS 설정을 끝낸 뒤 여기에 추가할 것.
-    /// 원래 코드의 Application.isEditor 검사를 이 한 곳으로 모았다 (조건이 여러 곳에 흩어지면 한쪽만 고치게 된다).
-    /// </summary>
+    /// <summary>뒤끝 서버와 로그인 세션이 살아 있는가. 서버 기능(랭킹, 우편, 세이브 등)은 이것을 보고 요청합니다.</summary>
+    public bool IsOnline    => IsSignedIn && online && Backend.IsLogin;
+
+    /// <summary>구글 로그인을 켜 둘 플랫폼. 지금은 Android 만 (에디터·iOS 는 네이티브 설정이 없음).</summary>
     public static bool IsGoogleSignInSupported => Application.platform == RuntimePlatform.Android;
-    public string Uid         => IsSignedIn ? auth.CurrentUser.UserId : null;
-    public string DisplayName => IsSignedIn ? auth.CurrentUser.DisplayName : null;
 
-    /// <summary>로그인한 계정의 이메일 (구글/이메일 공통). 로그아웃 버튼 옆 "어느 계정인지" 표시용.</summary>
-    public string Email => IsSignedIn ? auth.CurrentUser.Email : null;
+    /// <summary>게임이 계정을 구분하는 값 = 뒤끝 유저 inDate. 로그인 안 됨이면 null.</summary>
+    public string Uid         => IsSignedIn ? uid : null;
 
-    /// <summary>로그인 방식. 로그인 화면의 버튼(구글 / 이메일)과 1:1 로 대응합니다.</summary>
-    public enum SignInMethod { Google, Email }
+    /// <summary>뒤끝 닉네임 (아직 없으면 null). 게임 표시 이름은 PlayerProfile.DisplayName 을 쓰세요.</summary>
+    public string DisplayName => IsSignedIn && !string.IsNullOrEmpty(nickname) ? nickname : null;
 
-    // FirebaseUser.ProviderData 의 ProviderId — 연결된 로그인 방식마다 하나씩 들어 있습니다.
-    private const string PROVIDER_GOOGLE = "google.com";
-    private const string PROVIDER_EMAIL  = "password";   // 이메일·비밀번호
+    /// <summary>로그인한 계정의 이메일 (구글/이메일 공통). 로그아웃 버튼 옆 "어느 계정인지" 표시용. 모르면 null.</summary>
+    public string Email       => IsSignedIn && !string.IsNullOrEmpty(email) ? email : null;
 
-    /// <summary>
-    /// 지금 이 방식으로 로그인돼 있는가.
-    /// 로그인 화면의 각 버튼이 "내 방식으로 로그인돼 있으면 [시작하기]" 를 판단할 때 씁니다.
-    /// 계정 연동으로 두 방식이 모두 연결돼 있으면 둘 다 true 입니다.
-    /// </summary>
-    public bool IsSignedInWith(SignInMethod method)
-    {
-        if (!IsSignedIn) return false;
+    /// <summary>로그인 방식. 로그인 화면의 버튼(구글 / 이메일 / 게스트로 시작)과 1:1 로 대응합니다.</summary>
+    public enum SignInMethod { Google, Email, Guest }
 
-        string providerId = method == SignInMethod.Google ? PROVIDER_GOOGLE : PROVIDER_EMAIL;
-        foreach (IUserInfo info in auth.CurrentUser.ProviderData)
-            if (info.ProviderId == providerId) return true;
+    /// <summary>지금 이 방식으로 로그인돼 있는가 (로그인 화면의 각 버튼이 [시작하기] 를 판단할 때).</summary>
+    public bool IsSignedInWith(SignInMethod m) => IsSignedIn && hasMethod && method == m;
 
-        return false;
-    }
+    /// <summary>뒤끝 게스트 계정으로 로그인돼 있는가. 구글 버튼이 [구글 연동] 으로 바뀝니다.</summary>
+    public bool IsGuest => IsSignedInWith(SignInMethod.Guest);
 
-    /// <summary>
-    /// 어떤 방식으로 로그인했는가 — "Google" / "이메일" / "" (로그인 안 됨 / 알 수 없음). 로그아웃 버튼 옆 표시용.
-    /// (계정 연동으로 둘 다 연결돼 있으면 구글을 먼저 표시합니다)
-    /// </summary>
+    /// <summary>"Google" / "이메일" / "게스트" / "" — 로그아웃 버튼 옆 표시용.</summary>
     public string SignInProviderLabel
     {
         get
         {
             if (IsSignedInWith(SignInMethod.Google)) return "Google";
             if (IsSignedInWith(SignInMethod.Email))  return "이메일";
+            if (IsSignedInWith(SignInMethod.Guest))  return "게스트";
             return string.Empty;
         }
     }
 
-    // 마지막 실패 사유 (UI 표시용, 한국어). 새 시도를 시작하면 비워집니다.
-    //   이벤트 인자로 넘기지 않고 프로퍼티로 두는 이유: StateChanged 는 "상태가 바뀌었다" 만 알리고
-    //   값은 구독자가 Instance 에서 직접 읽는 규칙이라 (UI 가 늦게 켜져도 같은 값을 읽을 수 있음).
+    /// <summary>마지막 실패 사유 (UI 표시용, 한국어). 새 시도를 시작하면 비워집니다.</summary>
     public string LastError { get; private set; }
 
-    /// <summary>Firebase 비밀번호 최소 길이 (Firebase 규칙: 6자). UI 안내 문구도 이 값을 씁니다.</summary>
+    /// <summary>비밀번호 최소 길이. UI 안내 문구도 이 값을 씁니다. (Firebase 때와 같은 6자 유지)</summary>
     public const int MIN_PASSWORD_LENGTH = 6;
 
-    private FirebaseAuth auth;
+    // ─────────────── 내부 상태 ───────────────
+    private string       uid;
+    private string       email;
+    private string       nickname;
+    private SignInMethod method;
+    private bool         hasMethod;
+    private bool         online;
+    private float        nextReconnectTime;
+    private bool         reconnecting;
 
-    // GoogleSignIn.Configuration 은 DefaultInstance 가 만들어진 뒤 다시 대입하면 예외를 던진다.
-    // DefaultInstance 는 static 이라 이 매니저가 파괴·재생성돼도(계정 삭제) 살아 있으므로,
-    // "이미 설정했는지" 도 static 으로 기억한다.
-    // ResetStatics 에서 일부러 되돌리지 않는다 — GoogleSignIn 쪽 static 과 항상 짝이 맞아야 하기 때문.
+    // 마지막 계정 — 앱을 다시 켰을 때 자동 로그인 · 오프라인 로그인에 씀 (세이브 파일과 별개)
+    private const string PREF_UID    = "auth.backend.uid";
+    private const string PREF_METHOD = "auth.backend.method";   // "google" / "email"
+    private const string PREF_EMAIL  = "auth.backend.email";
+
+    // GoogleSignIn.Configuration 은 DefaultInstance 가 만들어진 뒤 다시 대입하면 예외를 던진다 → static 으로 기억 (ResetStatics 에서 되돌리지 않음)
     private static bool isGoogleConfigured;
 
-    /// <summary>
-    /// 에디터에서 Enter Play Mode Options(도메인 리로드 끔)를 쓰면 static 이 이전 플레이 값을 들고 온다.
-    /// 플레이 시작 때마다 비워 준다 (SaveManager 의 ResetStatics 와 같은 패턴).
-    /// </summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -140,14 +133,7 @@ public class AuthManager : MonoBehaviour
 
     private void Awake()
     {
-        // 중복 제거 (2중 안전장치)
-        //   로그인 화면으로 돌아오면 LoginScene 의 ManagerRoot 가 또 로드된다.
-        //   1차: ManagerRoot.Awake(실행 순서 -200)가 중복 루트를 SetActive(false) 로 즉시 끈다
-        //        → 비활성 오브젝트의 자식은 Awake 가 불리지 않으므로, 보통은 여기까지 오지도 않는다.
-        //   2차: 그래도 이 Awake 가 불리는 경우(실행 순서 설정이 빠졌을 때 등)를 위해
-        //        다른 자식 매니저들과 같은 패턴으로 한 번 더 막는다.
-        // (DontDestroyOnLoad 는 여기서 부르지 않는다 — 루트인 ManagerRoot 가 담당.
-        //  자식 오브젝트에 DontDestroyOnLoad 를 부르면 무시되고 경고만 뜬다.)
+        // 중복 제거 — ManagerRoot 가 1차로 막고, 여기서 한 번 더 (DontDestroyOnLoad 는 루트인 ManagerRoot 담당)
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -158,96 +144,180 @@ public class AuthManager : MonoBehaviour
 
     private void Start()
     {
-        // 2차 안전장치의 짝: Awake 의 Destroy() 는 프레임 끝에 실행되므로
-        // 지우기로 한 중복 오브젝트도 Start 까지는 불릴 수 있다. 진짜 Instance 만 초기화한다.
-        if (Instance != this) return;
-
-        InitFirebase();
+        if (Instance != this) return;   // Destroy 는 프레임 끝이라 중복 오브젝트도 Start 까지 올 수 있음
+        BackendManager.Initialize(OnBackendInitialized);
     }
 
     private void OnDestroy()
     {
-        // 계정 삭제(AccountReset)는 ManagerRoot 째로 파괴한 뒤 한 프레임 쉬고 LoginScene 을 다시 올린다.
-        // 여기서 Instance 를 비워야 새 AuthManager 가 자신을 '중복' 으로 오해하지 않는다.
         if (Instance == this) Instance = null;
     }
 
-    // ───────────────────────────── Firebase 초기화 ─────────────────────────────
-
-    private void InitFirebase()
+    private void Update()
     {
-        FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
+        // 오프라인 로그인 상태 → 주기적으로 다시 연결
+        if (!IsReady || !IsSignedIn || online || IsSigningIn || reconnecting) return;
+        if (Time.unscaledTime < nextReconnectTime) return;
+
+        nextReconnectTime = Time.unscaledTime + reconnectInterval;
+        reconnecting = true;
+        BackendManager.Initialize(ok =>
         {
-            // 비동기 콜백은 나중에 도착한다. 그 사이 계정 삭제 등으로 이 매니저가 파괴됐을 수 있다.
-            // 파괴된 MonoBehaviour 는 Unity 에서 this == null 이 true.
             if (this == null) return;
-
-            // 실패한 작업의 task.Result 를 읽으면 그 자리에서 예외가 나므로 실패 여부를 먼저 본다.
-            if (task.IsFaulted || task.IsCanceled)
-            {
-                Debug.LogError($"[Auth] Firebase 의존성 확인 실패: {task.Exception}");
-                return;
-            }
-
-            if (task.Result != DependencyStatus.Available)
-            {
-                Debug.LogError($"[Auth] Firebase 를 사용할 수 없음: {task.Result}");
-                return;
-            }
-
-            auth = FirebaseAuth.DefaultInstance;
-            IsReady = true;
-
-            // 자동 로그인: 전에 로그인했다면 앱을 다시 켜도 CurrentUser 가 채워져 있다.
-            if (IsSignedIn)
-                GameLog.Info($"[Auth] 이전 로그인 복원. UID: {Uid}");
-            else
-                GameLog.Info("[Auth] Firebase 준비 완료 (로그인 안 됨)");
-
-            if (!IsGoogleSignInSupported)
-                GameLog.Info($"[Auth] 이 플랫폼({Application.platform})에서는 구글 로그인 버튼이 비활성화됩니다.");
-
-            Notify();
+            if (!ok) { reconnecting = false; return; }
+            TryTokenLogin(startup: false);
         });
+    }
+
+    // ───────────────────────────── 시작: 초기화 + 자동 로그인 ─────────────────────────────
+
+    private void OnBackendInitialized(bool ok)
+    {
+        if (this == null) return;
+
+        LoadRemembered(out string savedUid, out string savedEmail, out bool savedHasMethod, out SignInMethod savedMethod);
+
+        if (string.IsNullOrEmpty(savedUid))
+        {
+            // 이전에 로그인한 적 없음 (또는 로그아웃함) → 게스트 상태로 준비 완료
+            FinishStartup(ok ? "[Auth] 뒤끝 준비 완료 (로그인 안 됨)" : "[Auth] 뒤끝 초기화 실패 — 로그인 없이 시작");
+            return;
+        }
+
+        // 마지막 계정을 먼저 채워 둠 — 서버에 못 닿아도 이 계정으로 이어서 할 수 있게 (클래스 주석 [자동 로그인 / 오프라인])
+        uid       = savedUid;
+        email     = savedEmail;
+        hasMethod = savedHasMethod;
+        method    = savedMethod;
+        online    = false;
+
+        if (!ok)
+        {
+            nextReconnectTime = Time.unscaledTime + reconnectInterval;
+            FinishStartup($"[Auth] 뒤끝 초기화 실패 — 마지막 계정({Short(uid)})으로 오프라인 시작");
+            return;
+        }
+
+        TryTokenLogin(startup: true);
+    }
+
+    private void TryTokenLogin(bool startup)
+    {
+        BackendManager.Call(cb => Backend.BMember.LoginWithTheBackendToken(cb), bro =>
+        {
+            if (this == null) return;
+            reconnecting = false;
+
+            if (bro != null && bro.IsSuccess())
+            {
+                string serverUid = CurrentBackendUid();
+                if (!string.IsNullOrEmpty(uid) && serverUid != uid)
+                    Debug.LogWarning($"[Auth] 저장된 계정({Short(uid)})과 토큰 계정({Short(serverUid)})이 다릅니다 — 토큰 계정을 씁니다.");
+
+                uid    = serverUid;
+                online = true;
+                Remember();
+                RefreshUserInfo();
+                if (startup) FinishStartup($"[Auth] 자동 로그인 완료. UID: {Short(uid)}");
+                else { GameLog.Info("[Auth] 서버 재연결 — 온라인 로그인 완료"); Notify(); }
+                return;
+            }
+
+            if (BackendManager.IsNetworkError(bro))
+            {
+                // 서버에 못 닿음 → 오프라인 로그인 유지, 나중에 다시 시도
+                online = false;
+                nextReconnectTime = Time.unscaledTime + reconnectInterval;
+                if (startup) FinishStartup($"[Auth] 서버에 연결할 수 없어 마지막 계정({Short(uid)})으로 오프라인 시작: {BackendManager.Describe(bro)}");
+                return;
+            }
+
+            // 토큰 거부 (만료·탈퇴·차단·다른 기기에서 탈퇴 등) → 로그아웃 상태
+            Debug.LogWarning($"[Auth] 자동 로그인 거부 — 로그아웃합니다: {BackendManager.Describe(bro)}");
+            ClearAccount();
+            if (startup) FinishStartup(null);
+            else Notify();
+        });
+    }
+
+    private void FinishStartup(string log)
+    {
+        if (!string.IsNullOrEmpty(log)) GameLog.Info(log);
+        if (!IsGoogleSignInSupported)
+            GameLog.Info($"[Auth] 이 플랫폼({Application.platform})에서는 구글 로그인 버튼이 비활성화됩니다.");
+
+        IsReady = true;
+        Notify();
     }
 
     // ───────────────────────────── 구글 로그인 ─────────────────────────────
 
+    // 이번 구글 창이 '게스트 → 구글 연동' 인가 (false = 일반 구글 로그인)
+    private bool linkingGuest;
+
     /// <summary>
     /// 구글 로그인 시작. 결과는 StateChanged 이벤트 + IsSignedIn 으로 확인한다.
+    /// 게스트로 로그인돼 있으면 '구글 연동' — 같은 계정(같은 Uid·진행)에 구글을 붙입니다 (LinkGuestToGoogle).
     /// </summary>
     public void SignInWithGoogle()
     {
-        if (!IsReady)
+        if (IsGuest) { LinkGuestToGoogle(); return; }
+        if (IsSignedIn) return;
+        BeginGoogle(link: false);
+    }
+
+    /// <summary>
+    /// 게스트 계정을 구글 계정으로 바꿉니다 (ChangeCustomToFederation). Uid 는 그대로라 세이브·랭킹·친구가 이어집니다.
+    /// 그 구글 계정이 이미 다른 뒤끝 계정에 쓰이고 있으면 실패합니다 — 그때는 로그아웃 후 구글로 로그인하라고 안내.
+    /// </summary>
+    public void LinkGuestToGoogle()
+    {
+        if (!IsGuest) return;
+        if (!IsOnline)
         {
-            Debug.LogWarning("[Auth] 아직 Firebase 초기화 전입니다.");
+            LastError = "구글 연동은 인터넷에 연결된 상태에서 할 수 있습니다.";
+            Notify();
             return;
         }
-        if (IsSigningIn || IsSignedIn) return;   // 연타 / 중복 로그인 방지
+        BeginGoogle(link: true);
+    }
 
-        // 지원 플랫폼이 아니면 중단 (에디터 / 설정 전 iOS — IsGoogleSignInSupported 주석 참고)
+    private void BeginGoogle(bool link)
+    {
+        if (!IsReady)
+        {
+            Debug.LogWarning("[Auth] 아직 로그인 준비 중입니다.");
+            return;
+        }
+        if (IsSigningIn) return;   // 연타 / 중복 로그인 방지
+        linkingGuest = link;
+
         if (!IsGoogleSignInSupported)
         {
             Debug.LogWarning($"[Auth] 이 플랫폼({Application.platform})에서는 구글 로그인을 쓸 수 없습니다. Android 기기에서 테스트하세요.");
             return;
         }
+        if (!BackendManager.IsInitialized)
+        {
+            LastError = "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.";
+            BackendManager.Initialize(null);   // 다음 시도를 위해 다시 초기화해 둠
+            Notify();
+            return;
+        }
 
         if (!TryConfigureGoogleSignIn()) return;
 
-        LastError = null;   // 이전 이메일 로그인 실패 문구가 구글 시도 중에 남아 보이지 않게
+        LastError = null;
         SetSigningIn(true);
 
         try
         {
-            // ContinueWith 가 아니라 ContinueWithOnMainThread:
-            // 이어지는 코드에서 Unity API 를 써도 안전하도록 메인 스레드로 돌아온다.
+            // GoogleSignIn 의 Task 는 백그라운드에서 끝날 수 있음 → BackendManager.Post 로 메인 스레드에서 처리
             GoogleSignIn.DefaultInstance.SignIn()
-                .ContinueWithOnMainThread(task => OnGoogleSignInFinished(task));
+                .ContinueWith(task => BackendManager.Post(() => OnGoogleSignInFinished(task)));
         }
         catch (Exception e)
         {
-            // 이 catch 는 SignIn() 을 '호출하는 순간' 의 예외만 잡는다.
-            // 로그인 도중 실패는 task.IsFaulted 로 온다.
             Debug.LogError($"[Auth] SignIn 호출 실패: {e}");
             SetSigningIn(false);
         }
@@ -266,9 +336,9 @@ public class AuthManager : MonoBehaviour
         GoogleSignIn.Configuration = new GoogleSignInConfiguration
         {
             WebClientId    = webClientId.Trim(),
-            RequestIdToken = true,    // Firebase 에 넘길 ID 토큰 (false 면 2단계 불가)
+            RequestIdToken = true,    // 뒤끝에 넘길 ID 토큰
             RequestEmail   = true,
-            UseGameSignIn  = false,   // 일반 구글 로그인 모드
+            UseGameSignIn  = false,
         };
 
         isGoogleConfigured = true;
@@ -301,14 +371,117 @@ public class AuthManager : MonoBehaviour
             return;
         }
 
-        SignInToFirebase(idToken);
+        string googleEmail = task.Result.Email;
+
+        if (linkingGuest)
+        {
+            LinkWithGoogleToken(idToken, googleEmail);
+            return;
+        }
+
+        BackendManager.Call(cb => Backend.BMember.AuthorizeFederation(idToken, FederationType.Google, cb), bro =>
+        {
+            if (this == null) return;
+
+            if (bro == null || !bro.IsSuccess())
+            {
+                string message = ToKoreanMessage(bro, "로그인");
+                Debug.LogError($"[Auth] 뒤끝 구글 로그인 실패: {BackendManager.Describe(bro)}");
+                Fail(message);
+                return;
+            }
+
+            // 비밀번호 찾기·관리용으로 구글 이메일을 뒤끝에도 기록 (실패해도 로그인에는 지장 없음)
+            BackendManager.Call(cb => Backend.BMember.UpdateFederationEmail(idToken, FederationType.Google, cb), eb =>
+            {
+                if (eb == null || !eb.IsSuccess())
+                    Debug.LogWarning($"[Auth] 구글 이메일 기록 실패 (무시): {BackendManager.Describe(eb)}");
+            });
+
+            OnSignedIn(SignInMethod.Google, googleEmail, bro.GetStatusCode() == "201" ? "가입" : "로그인");
+        });
     }
 
+    /// <summary>게스트 → 구글 연동 (구글 토큰을 받은 뒤). 성공하면 같은 Uid 로 로그인 방식만 구글이 됩니다.</summary>
+    private void LinkWithGoogleToken(string idToken, string googleEmail)
+    {
+        string guestUid = uid;
+        BackendManager.Call(cb => Backend.BMember.ChangeCustomToFederation(idToken, FederationType.Google, cb), bro =>
+        {
+            if (this == null) return;
+
+            if (bro == null || !bro.IsSuccess())
+            {
+                Debug.LogError($"[Auth] 게스트 → 구글 연동 실패: {BackendManager.Describe(bro)}");
+                Fail(bro != null && bro.GetStatusCode() == "409"
+                    ? "이미 다른 계정에 쓰이는 구글 계정입니다. 로그아웃한 뒤 그 구글 계정으로 로그인해 주세요."
+                    : ToKoreanMessage(bro, "구글 연동"));
+                return;
+            }
+
+            BackendManager.Call(cb => Backend.BMember.UpdateFederationEmail(idToken, FederationType.Google, cb), eb =>
+            {
+                if (eb == null || !eb.IsSuccess())
+                    Debug.LogWarning($"[Auth] 구글 이메일 기록 실패 (무시): {BackendManager.Describe(eb)}");
+            });
+
+            string nowUid = CurrentBackendUid();
+            if (!string.IsNullOrEmpty(nowUid) && nowUid != guestUid)
+                Debug.LogWarning($"[Auth] 연동 후 계정 값이 바뀌었습니다 ({Short(guestUid)} → {Short(nowUid)}). 새 값으로 이어 갑니다.");
+
+            OnSignedIn(SignInMethod.Google, googleEmail, "구글 연동");
+        });
+    }
+
+    // ───────────────────────────── 게스트 로그인 ─────────────────────────────
+
     /// <summary>
-    /// 구글 로그인 실패는 대부분 코드가 아니라 '설정' 문제라 Status 값이 디버깅의 출발점이다.
-    ///   DeveloperError(10) → SHA-1 지문 미등록 / 웹 클라이언트 ID 오류 / 패키지명 불일치
-    ///   Canceled           → 사용자가 창을 닫음 (플러그인 버전에 따라 IsFaulted 로 오기도 함)
+    /// 뒤끝 게스트 계정으로 로그인합니다 (이 기기에 게스트 ID 가 저장돼 있으면 같은 계정). 결과는 StateChanged + IsSignedIn.
+    /// Login_Name 이 "로그인 안 한 채 [시작]" 을 누르면 부릅니다. 실패하면(오프라인 등) 기기 게스트로 시작하게 둡니다.
+    /// ⚠ 앱을 지우면 게스트 ID 가 사라져 계정을 잃습니다 — 구글 연동을 권하세요.
     /// </summary>
+    public void SignInAsGuest()
+    {
+        if (!IsReady || IsSigningIn || IsSignedIn) return;
+        if (!BackendManager.IsInitialized)
+        {
+            BackendManager.Initialize(null);   // 다음 시도를 위해 다시 초기화해 둠
+            Fail("서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            return;
+        }
+
+        LastError = null;
+        SetSigningIn(true);
+        GuestLogin(retryWithNewId: true);
+    }
+
+    private void GuestLogin(bool retryWithNewId)
+    {
+        BackendManager.Call(cb => Backend.BMember.GuestLogin(cb), bro =>
+        {
+            if (this == null) return;
+
+            if (bro != null && bro.IsSuccess())
+            {
+                OnSignedIn(SignInMethod.Guest, null, bro.GetStatusCode() == "201" ? "게스트 가입" : "게스트 로그인");
+                return;
+            }
+
+            // 이 기기에 저장된 게스트 ID 의 계정이 없어짐(탈퇴·콘솔에서 삭제) → 기기 기록을 지우고 새 게스트로 한 번 더
+            if (retryWithNewId && bro != null && (bro.GetStatusCode() == "401" || bro.GetStatusCode() == "410"))
+            {
+                Debug.LogWarning($"[Auth] 저장된 게스트 계정을 쓸 수 없어 새 게스트 계정을 만듭니다: {BackendManager.Describe(bro)}");
+                Backend.BMember.DeleteGuestInfo();
+                GuestLogin(retryWithNewId: false);
+                return;
+            }
+
+            Debug.LogWarning($"[Auth] 게스트 로그인 실패: {BackendManager.Describe(bro)}");
+            Fail(ToKoreanMessage(bro, "게스트 로그인"));
+        });
+    }
+
+    /// <summary>구글 로그인 실패는 대부분 '설정' 문제 — DeveloperError(10) → SHA-1 / 웹 클라이언트 ID / 패키지명.</summary>
     private static void LogGoogleSignInError(AggregateException ex)
     {
         if (ex == null)
@@ -333,109 +506,91 @@ public class AuthManager : MonoBehaviour
         }
     }
 
-    private void SignInToFirebase(string idToken)
-    {
-        // 두 번째 인자(accessToken)는 Firebase 로그인에 필요 없어서 null
-        Credential credential = GoogleAuthProvider.GetCredential(idToken, null);
+    // ───────────────────────────── 이메일 로그인 ─────────────────────────────
+    //
+    //  뒤끝 '커스텀 계정' 에 이메일을 아이디로 넣습니다. (뒤끝은 아이디가 이메일 형식인지 검사하지 않아서 여기서 검사)
+    //  [먼저 해 둘 것]  뒤끝 콘솔에서 커스텀 회원가입이 허용돼 있는지 확인하세요.
 
-        auth.SignInWithCredentialAsync(credential).ContinueWithOnMainThread(signInTask =>
+    /// <summary>새 계정 만들기. 성공하면 바로 로그인된 상태가 됩니다.</summary>
+    public void SignUpWithEmail(string inputEmail, string password)
+    {
+        if (!TryBeginEmailAuth(inputEmail, password, out string cleanEmail)) return;
+
+        BackendManager.Call(cb => Backend.BMember.CustomSignUp(cleanEmail, password, cb), bro =>
         {
             if (this == null) return;
 
-            if (signInTask.IsCanceled)
+            if (bro == null || !bro.IsSuccess())
             {
-                Debug.LogWarning("[Auth] Firebase 로그인이 취소되었습니다.");
-                SetSigningIn(false);
+                Debug.LogError($"[Auth] 이메일 회원가입 실패: {BackendManager.Describe(bro)}");
+                Fail(ToKoreanMessage(bro, "회원가입"));
                 return;
             }
 
-            if (signInTask.IsFaulted)
+            // 비밀번호 찾기용 이메일 등록 (실패해도 가입·로그인에는 지장 없음)
+            BackendManager.Call(cb => Backend.BMember.UpdateCustomEmail(cleanEmail, cb), eb =>
             {
-                Debug.LogError($"[Auth] Firebase 로그인 실패: {signInTask.Exception}");
-                SetSigningIn(false);
+                if (eb == null || !eb.IsSuccess())
+                    Debug.LogWarning($"[Auth] 비밀번호 찾기용 이메일 등록 실패 (무시): {BackendManager.Describe(eb)}");
+            });
+
+            if (Backend.IsLogin)
+            {
+                OnSignedIn(SignInMethod.Email, cleanEmail, "회원가입");
                 return;
             }
 
-            // 반환 타입(FirebaseUser / AuthResult)이 SDK 버전마다 달라서 결과 대신 CurrentUser 를 읽는다.
-            if (IsSignedIn)
-                GameLog.Info($"[Auth] 로그인 완료. UID: {Uid}, 이름: {DisplayName}");
-            else
-                Debug.LogError("[Auth] 로그인은 끝났는데 CurrentUser 가 없습니다.");
-
-            SetSigningIn(false);   // 내부에서 Notify → UI 갱신
+            // 가입만 되고 로그인 세션이 없으면 바로 로그인
+            BackendManager.Call(cb => Backend.BMember.CustomLogin(cleanEmail, password, cb), lb =>
+            {
+                if (this == null) return;
+                if (lb != null && lb.IsSuccess()) OnSignedIn(SignInMethod.Email, cleanEmail, "회원가입");
+                else Fail("가입은 됐지만 로그인하지 못했습니다. 다시 로그인해 주세요.");
+            });
         });
     }
 
-    // ───────────────────────────── 이메일 로그인 ─────────────────────────────
-    //
-    //  [구글 로그인과 무엇이 다른가]
-    //    구글 : 구글 ID 토큰(구글이 발급) → Firebase 에 넘겨 로그인
-    //    이메일: 이메일·비밀번호를 Firebase 에 직접 보내 로그인 — 중간에 "구글 토큰" 이 없습니다.
-    //    둘 다 결과는 똑같이 Firebase 사용자(UID) 이고, 그 뒤의 게임 흐름(StateChanged, IsSignedIn, Uid)도 같습니다.
-    //    서버 검증 등에 쓸 "토큰" 이 필요하면 구글 토큰이 아니라 Firebase ID 토큰(auth.CurrentUser.TokenAsync)을 씁니다.
-    //
-    //  [먼저 해 둘 것]
-    //    Firebase 콘솔 > Authentication > 로그인 방법(Sign-in method) > '이메일/비밀번호' 사용 설정.
-    //    안 켜면 OperationNotAllowed 오류가 납니다.
-    //
-    //  [같은 이메일로 구글 로그인도 하면?]
-    //    Firebase 기본 설정(이메일당 계정 1개)에서는, 같은 주소로 구글 로그인을 하면 구글 쪽이 우선되어
-    //    이메일·비밀번호 방식이 그 계정에서 빠질 수 있습니다. 테스트용으로는 서로 다른 주소를 쓰세요.
-
-    /// <summary>새 계정 만들기. 성공하면 바로 로그인된 상태가 됩니다.</summary>
-    public void SignUpWithEmail(string email, string password)
-    {
-        if (!TryBeginEmailAuth(email, password, out string cleanEmail)) return;
-
-        // try/catch — Firebase 호출이 '부르는 순간' 예외를 던지면(드묾) 결과 콜백이 영영 오지 않아
-        //   IsSigningIn 이 true 로 굳고 모든 로그인 버튼이 잠긴 채 남습니다. 구글 로그인 쪽 SignIn() 과 같은 방어입니다.
-        try
-        {
-            auth.CreateUserWithEmailAndPasswordAsync(cleanEmail, password)
-                .ContinueWithOnMainThread(task => OnEmailAuthFinished(task, "회원가입"));
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Auth] 이메일 회원가입 호출 실패: {e}");
-            Fail("회원가입에 실패했습니다.");
-        }
-    }
-
     /// <summary>기존 계정으로 로그인.</summary>
-    public void SignInWithEmail(string email, string password)
+    public void SignInWithEmail(string inputEmail, string password)
     {
-        if (!TryBeginEmailAuth(email, password, out string cleanEmail)) return;
+        if (!TryBeginEmailAuth(inputEmail, password, out string cleanEmail)) return;
 
-        try   // 위 SignUpWithEmail 의 try/catch 와 같은 이유
+        BackendManager.Call(cb => Backend.BMember.CustomLogin(cleanEmail, password, cb), bro =>
         {
-            auth.SignInWithEmailAndPasswordAsync(cleanEmail, password)
-                .ContinueWithOnMainThread(task => OnEmailAuthFinished(task, "로그인"));
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Auth] 이메일 로그인 호출 실패: {e}");
-            Fail("로그인에 실패했습니다.");
-        }
+            if (this == null) return;
+
+            if (bro == null || !bro.IsSuccess())
+            {
+                Debug.LogError($"[Auth] 이메일 로그인 실패: {BackendManager.Describe(bro)}");
+                Fail(ToKoreanMessage(bro, "로그인"));
+                return;
+            }
+
+            OnSignedIn(SignInMethod.Email, cleanEmail, "로그인");
+        });
     }
 
-    /// <summary>
-    /// 이메일 로그인/가입 공통 시작 검사. 통과하면 '진행 중' 상태로 바꿉니다.
-    /// 서버에 보내기 전에 걸러낼 수 있는 것(빈 칸, 비밀번호 길이)은 여기서 막습니다 — 네트워크 왕복 없이 바로 안내.
-    /// </summary>
-    private bool TryBeginEmailAuth(string email, string password, out string cleanEmail)
+    /// <summary>이메일 로그인/가입 공통 시작 검사. 통과하면 '진행 중' 상태로 바꿉니다.</summary>
+    private bool TryBeginEmailAuth(string inputEmail, string password, out string cleanEmail)
     {
-        cleanEmail = (email ?? string.Empty).Trim();   // 앞뒤 공백은 흔한 입력 실수라 지워 줌 (비밀번호는 공백도 글자라 그대로)
+        // 앞뒤 공백 제거 + 소문자 — 뒤끝 아이디는 대소문자를 구분하므로 같은 주소가 두 계정이 되지 않게
+        cleanEmail = (inputEmail ?? string.Empty).Trim().ToLowerInvariant();
 
         if (!IsReady)
         {
             Fail("아직 로그인 준비 중입니다. 잠시 후 다시 시도해 주세요.");
             return false;
         }
-        if (IsSigningIn || IsSignedIn) return false;   // 연타 / 이미 로그인됨 (구글 로그인과 같은 규칙)
+        if (IsSigningIn || IsSignedIn) return false;
 
         if (cleanEmail.Length == 0)
         {
             Fail("이메일을 입력해 주세요.");
+            return false;
+        }
+        if (!LooksLikeEmail(cleanEmail))
+        {
+            Fail("이메일 형식이 올바르지 않습니다.");
             return false;
         }
         if (string.IsNullOrEmpty(password) || password.Length < MIN_PASSWORD_LENGTH)
@@ -443,133 +598,266 @@ public class AuthManager : MonoBehaviour
             Fail($"비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다.");
             return false;
         }
+        if (!BackendManager.IsInitialized)
+        {
+            BackendManager.Initialize(null);   // 다음 시도를 위해 다시 초기화해 둠
+            Fail("서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            return false;
+        }
 
-        LastError = null;        // 새 시도 → 이전 오류 문구 지움
-        SetSigningIn(true);      // 내부에서 Notify → UI 버튼 비활성
+        LastError = null;
+        SetSigningIn(true);
         return true;
     }
 
-    /// <summary>
-    /// 이메일 로그인/가입 결과 처리.
-    /// task 의 타입을 적지 않고(Task) 받는 이유: Firebase SDK 버전에 따라 결과가 FirebaseUser 또는 AuthResult 로 달라서,
-    /// 결과값 대신 auth.CurrentUser 를 읽으면 버전을 올려도 이 코드는 그대로 동작합니다 (구글 로그인 쪽과 같은 방식).
-    /// </summary>
-    private void OnEmailAuthFinished(Task task, string actionName)
+    /// <summary>a@b.c 꼴인가 (공백 없음, @ 하나, @ 뒤에 점)</summary>
+    private static bool LooksLikeEmail(string s)
     {
-        if (this == null) return;   // 기다리는 사이 매니저가 파괴됐을 수 있음 (계정 삭제 등)
-
-        if (task.IsCanceled)
-        {
-            Fail($"{actionName}이(가) 취소되었습니다.");
-            return;
-        }
-
-        if (task.IsFaulted)
-        {
-            string message = ToKoreanMessage(task.Exception);
-            Debug.LogError($"[Auth] 이메일 {actionName} 실패: {message}\n{task.Exception}");
-            Fail(message);
-            return;
-        }
-
-        if (IsSignedIn)
-            GameLog.Info($"[Auth] 이메일 {actionName} 완료. UID: {Uid}");
-        else
-            Debug.LogError($"[Auth] 이메일 {actionName}은(는) 끝났는데 CurrentUser 가 없습니다.");
-
-        SetSigningIn(false);   // Notify → UI 갱신 (GoogleLoginButtonUI 등도 '로그인됨' 으로 바뀜)
-    }
-
-    /// <summary>실패 사유를 남기고 '진행 중' 을 풉니다. (Notify 는 SetSigningIn 이 함)</summary>
-    private void Fail(string message)
-    {
-        LastError = message;
-        SetSigningIn(false);
+        if (s.IndexOf(' ') >= 0) return false;
+        int at = s.IndexOf('@');
+        if (at <= 0 || at != s.LastIndexOf('@')) return false;
+        int dot = s.LastIndexOf('.');
+        return dot > at + 1 && dot < s.Length - 1;
     }
 
     /// <summary>
-    /// Firebase 오류 코드를 유저에게 보여 줄 한국어 문구로 바꿉니다.
-    /// FirebaseException.ErrorCode 는 숫자라, AuthError 열거형으로 바꾸면 어떤 오류인지 이름으로 구분할 수 있습니다.
-    ///
-    /// ⚠ 최근 Firebase 프로젝트는 '이메일 열거 보호' 가 기본으로 켜져 있어서, 없는 계정·틀린 비밀번호를
-    ///   구분하지 않고 InvalidCredential 하나로 돌려줍니다 (남이 "이 이메일이 가입돼 있나" 알아내지 못하게).
-    ///   그래서 두 경우를 같은 문구로 안내합니다.
+    /// 뒤끝 응답을 유저에게 보여 줄 한국어 문구로 바꿉니다.
+    /// 커스텀 로그인은 없는 아이디·틀린 비밀번호가 둘 다 401 이라 같은 문구로 안내합니다 (가입 여부를 알려 주지 않게).
     /// </summary>
-    private static string ToKoreanMessage(AggregateException ex)
+    private static string ToKoreanMessage(BackendReturnObject bro, string actionName)
     {
-        if (ex != null)
+        if (bro == null || bro.IsClientRequestFailError()) return "인터넷 연결을 확인해 주세요.";
+        if (bro.IsMaintenanceError())                        return "서버 점검 중입니다. 잠시 후 다시 시도해 주세요.";
+        if (bro.IsTooManyRequestError() || bro.IsTooManyRequestByLocalError())
+                                                             return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+        if (bro.IsDeviceBlockError())                        return "이 기기는 사용이 제한되었습니다.";
+        if (bro.IsServerError())                             return "서버 오류입니다. 잠시 후 다시 시도해 주세요.";
+
+        switch (bro.GetStatusCode())
         {
-            foreach (Exception e in ex.Flatten().InnerExceptions)
+            case "409": return "이미 가입된 이메일입니다. 로그인해 주세요.";
+            case "401": return "이메일 또는 비밀번호가 맞지 않습니다.";
+            case "403": return "사용이 중지된 계정입니다.";
+            case "410": return "탈퇴 처리 중인 계정입니다.";
+            case "400": return "입력 형식이 올바르지 않습니다.";
+            default:    return $"{actionName}에 실패했습니다. ({bro.GetStatusCode()} {bro.GetErrorCode()})";
+        }
+    }
+
+    // ───────────────────────────── 로그인 성공 공통 ─────────────────────────────
+
+    private void OnSignedIn(SignInMethod how, string knownEmail, string actionName)
+    {
+        uid       = CurrentBackendUid();
+        email     = knownEmail;
+        method    = how;
+        hasMethod = true;
+        online    = true;
+
+        if (string.IsNullOrEmpty(uid))
+        {
+            Debug.LogError($"[Auth] {actionName}은(는) 성공했는데 뒤끝 유저 inDate 가 없습니다.");
+            ClearAccount();
+            Fail($"{actionName}에 실패했습니다.");
+            return;
+        }
+
+        Remember();
+        GameLog.Info($"[Auth] {actionName} 완료 ({MethodKey(how)}). UID: {Short(uid)}");
+        RefreshUserInfo();
+        SetSigningIn(false);   // Notify → UI 갱신
+    }
+
+    /// <summary>게임이 쓰는 계정 값 — 뒤끝 유저 inDate (없으면 UID).</summary>
+    private static string CurrentBackendUid()
+    {
+        string inDate = Backend.UserInDate;
+        return !string.IsNullOrEmpty(inDate) ? inDate : Backend.UID;
+    }
+
+    /// <summary>
+    /// 서버의 계정 정보(이메일, 가입 방식, 닉네임)로 표시 값을 맞춥니다. 실패해도 로그인 상태는 그대로.
+    /// 자동 로그인은 어떤 방식으로 가입했는지 모를 수 있어서 여기서 채웁니다.
+    /// </summary>
+    private void RefreshUserInfo()
+    {
+        string forUid = uid;
+        BackendManager.Call(cb => Backend.BMember.GetUserInfo(cb), bro =>
+        {
+            if (this == null || uid != forUid) return;
+            if (bro == null || !bro.IsSuccess())
             {
-                if (!(e is FirebaseException fe)) continue;
-
-                switch ((AuthError)fe.ErrorCode)
-                {
-                    case AuthError.InvalidEmail:         return "이메일 형식이 올바르지 않습니다.";
-                    case AuthError.EmailAlreadyInUse:    return "이미 가입된 이메일입니다. 로그인해 주세요.";
-                    case AuthError.WeakPassword:         return $"비밀번호가 너무 약합니다. ({MIN_PASSWORD_LENGTH}자 이상)";
-                    case AuthError.WrongPassword:
-                    case AuthError.UserNotFound:
-                    case AuthError.InvalidCredential:    return "이메일 또는 비밀번호가 맞지 않습니다.";
-                    case AuthError.UserDisabled:         return "사용이 중지된 계정입니다.";
-                    case AuthError.NetworkRequestFailed: return "인터넷 연결을 확인해 주세요.";
-                    case AuthError.OperationNotAllowed:  return "이메일 로그인이 꺼져 있습니다. (개발자: Firebase 콘솔에서 이메일/비밀번호 사용 설정)";
-                    default:                             return $"로그인에 실패했습니다. ({(AuthError)fe.ErrorCode})";
-                }
+                Debug.LogWarning($"[Auth] 계정 정보 조회 실패 (무시): {BackendManager.Describe(bro)}");
+                return;
             }
-        }
-        return "로그인에 실패했습니다.";
+
+            UserInfoRow row = null;
+            try { row = JsonUtility.FromJson<UserInfoResponse>(bro.GetReturnValue())?.row; }
+            catch (Exception e) { Debug.LogWarning($"[Auth] 계정 정보 읽기 실패 (무시): {e.Message}"); }
+            if (row == null) return;
+
+            if (!string.IsNullOrEmpty(row.emailForFindPassword)) email = row.emailForFindPassword;
+            nickname = row.nickname;
+
+            // 가입 방식으로 로그인 방식을 맞춤. 게스트도 뒤끝 안에서는 커스텀 계정이라, 게스트로 기억하고 있으면 이메일로 바꾸지 않음
+            string type = (row.subscriptionType ?? string.Empty).ToLowerInvariant();
+            if (type.Contains("google"))      { method = SignInMethod.Google; hasMethod = true; }
+            else if (type.Contains("guest"))  { method = SignInMethod.Guest;  hasMethod = true; }
+            else if (type.Contains("custom") && !(hasMethod && method == SignInMethod.Guest))
+                                              { method = SignInMethod.Email;  hasMethod = true; }
+
+            Remember();
+            Notify();
+        });
     }
 
-    // ───────────────────────────── 로그아웃 ─────────────────────────────
+    // JsonUtility 가 채우는 필드 — "할당되지 않음" 경고(CS0649)를 끔
+#pragma warning disable 0649
+    [Serializable] private class UserInfoResponse { public UserInfoRow row; }
 
-    /// <summary>
-    /// Firebase + 구글 양쪽 로그아웃. 구글 쪽도 해야 다음 로그인 때 계정 선택 창이 다시 뜬다.
-    /// (계정 전환 / 계정 삭제 흐름에서 호출할 용도)
-    /// </summary>
+    [Serializable]
+    private class UserInfoRow
+    {
+        public string nickname;
+        public string subscriptionType;       // "customSignUp" / "google" ...
+        public string emailForFindPassword;
+    }
+#pragma warning restore 0649
+
+    /// <summary>서버 닉네임이 바뀌었을 때 DisplayName 을 맞춥니다. (ProfileSync 가 닉네임을 정하거나 받아 온 뒤)</summary>
+    public void SetServerNickname(string value)
+    {
+        if (!IsSignedIn || nickname == value) return;
+        nickname = value;
+        Notify();
+    }
+
+    // ───────────────────────────── 로그아웃 / 탈퇴 ─────────────────────────────
+
+    /// <summary>뒤끝 + 구글 양쪽 로그아웃. 구글 쪽도 해야 다음 로그인 때 계정 선택 창이 다시 뜬다.</summary>
     public void SignOut()
     {
-        // 로그인 처리 중에는 무시.
-        //   구글 창이나 이메일 요청이 진행 중일 때 로그아웃하면, 잠시 뒤 그 결과가 도착하면서
-        //   "로그아웃했는데 다시 로그인돼 있는" 상태가 됩니다. 버튼도 막아 두지만 여기서 한 번 더 막습니다.
+        // 로그인 처리 중에는 무시 — 잠시 뒤 그 결과가 도착하면 "로그아웃했는데 다시 로그인된" 상태가 됨
         if (IsSigningIn)
         {
             Debug.LogWarning("[Auth] 로그인 처리 중이라 로그아웃을 건너뜁니다.");
             return;
         }
 
-        // 어떤 방식(구글/이메일)으로 로그인했든 Firebase 로그아웃은 같습니다 — 기기에 저장된 로그인 상태가 지워짐
-        if (auth != null) auth.SignOut();
+        // 기기에 남은 마지막 계정 기록부터 지움 — 서버 로그아웃이 실패(오프라인)해도 다음 실행에 자동 로그인하지 않게
+        //   (자동 로그인은 이 기록이 있을 때만 시도함 — OnBackendInitialized)
+        ClearAccount();
 
-        // 구글 쪽 로그아웃 — 이걸 해야 다음 구글 로그인 때 "계정 선택 창" 이 다시 뜹니다.
-        //   예전에는 isGoogleConfigured 일 때만 했는데, 앱을 다시 켜서 '자동 로그인' 된 상태에서는
-        //   이번 실행에 구글 설정을 한 번도 안 했으므로(false) 구글 로그아웃이 건너뛰어졌습니다.
-        //   → 그러면 다음 구글 로그인이 계정 선택 없이 예전 계정으로 바로 들어가 계정을 바꿀 수 없었습니다.
-        //   그래서 필요하면 여기서 설정을 먼저 넣고 로그아웃합니다 (이메일로 로그인했던 경우에도 무해).
-        if (IsGoogleSignInSupported && TryConfigureGoogleSignIn())
+        if (BackendManager.IsInitialized)
         {
-            try
+            BackendManager.Call(cb => Backend.BMember.Logout(cb), bro =>
             {
-                GoogleSignIn.DefaultInstance.SignOut();
-            }
-            catch (Exception e)
-            {
-                // 네이티브 플러그인 쪽 예외. Firebase 로그아웃은 이미 끝났으므로 게임 진행에는 지장 없음 → 로그만
-                Debug.LogWarning($"[Auth] 구글 로그아웃 중 예외 (Firebase 로그아웃은 완료): {e.Message}");
-            }
+                if (bro == null || !bro.IsSuccess())
+                    Debug.LogWarning($"[Auth] 뒤끝 로그아웃 요청 실패 (기기의 로그인 기록은 이미 지움): {BackendManager.Describe(bro)}");
+            });
         }
 
+        SignOutGoogle();
+
         GameLog.Info("[Auth] 로그아웃");
-        LastError = null;   // 로그아웃하면 이전 실패 문구도 지움
-        SetSigningIn(false);   // Notify → 로그인 화면 UI 들이 '로그인 전' 상태로 돌아감
+        LastError = null;
+        SetSigningIn(false);   // Notify
     }
 
-    // 에디터 테스트용: 컴포넌트 우클릭 → 로그아웃 (Firebase 는 로그인 상태를 기억하므로
-    //   같은 계정으로 다시 테스트하거나 다른 계정으로 바꿀 때 필요합니다)
+    /// <summary>
+    /// 뒤끝 계정 탈퇴 (계정 삭제). 온라인이어야 합니다. 결과는 메인 스레드에서 onDone(성공, 실패 문구).
+    /// 성공하면 로그아웃 상태가 됩니다. ServerAccountData 가 부릅니다.
+    /// </summary>
+    public void DeleteAccount(Action<bool, string> onDone)
+    {
+        if (!IsOnline)
+        {
+            onDone?.Invoke(false, "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            return;
+        }
+
+        BackendManager.Call(cb => Backend.BMember.WithdrawAccount(cb), bro =>
+        {
+            if (this == null) return;
+
+            if (bro == null || !bro.IsSuccess())
+            {
+                Debug.LogWarning($"[Auth] 뒤끝 탈퇴 실패: {BackendManager.Describe(bro)}");
+                onDone?.Invoke(false, BackendManager.IsNetworkError(bro)
+                    ? "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요."
+                    : "계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                return;
+            }
+
+            GameLog.Info($"[Auth] 뒤끝 탈퇴 완료: {Short(uid)}");
+            // 게스트였으면 기기에 저장된 게스트 ID 도 지움 — 남기면 다음 '게스트로 시작' 이 지운 계정에 로그인하려 함
+            if (IsGuest) Backend.BMember.DeleteGuestInfo();
+            ClearAccount();
+            SignOutGoogle();
+            Notify();
+            onDone?.Invoke(true, null);
+        });
+    }
+
+    private void SignOutGoogle()
+    {
+        // 자동 로그인으로 들어와 이번 실행에 구글 설정을 안 했어도 로그아웃되게 필요하면 설정부터
+        if (!IsGoogleSignInSupported || !TryConfigureGoogleSignIn()) return;
+        try
+        {
+            GoogleSignIn.DefaultInstance.SignOut();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Auth] 구글 로그아웃 중 예외 (뒤끝 로그아웃은 진행됨): {e.Message}");
+        }
+    }
+
     [ContextMenu("테스트: 로그아웃")]
     private void DebugSignOut() => SignOut();
 
+    // ───────────────────────────── 마지막 계정 기록 ─────────────────────────────
+
+    private void Remember()
+    {
+        PlayerPrefs.SetString(PREF_UID,    uid ?? string.Empty);
+        PlayerPrefs.SetString(PREF_EMAIL,  email ?? string.Empty);
+        PlayerPrefs.SetString(PREF_METHOD, !hasMethod ? string.Empty : MethodKey(method));
+        PlayerPrefs.Save();
+    }
+
+    private static string MethodKey(SignInMethod m)
+        => m == SignInMethod.Google ? "google" : m == SignInMethod.Guest ? "guest" : "email";
+
+    private static void LoadRemembered(out string savedUid, out string savedEmail, out bool savedHasMethod, out SignInMethod savedMethod)
+    {
+        savedUid   = PlayerPrefs.GetString(PREF_UID, string.Empty);
+        savedEmail = PlayerPrefs.GetString(PREF_EMAIL, string.Empty);
+        string m   = PlayerPrefs.GetString(PREF_METHOD, string.Empty);
+        savedHasMethod = m == "google" || m == "email" || m == "guest";
+        savedMethod    = m == "google" ? SignInMethod.Google : m == "guest" ? SignInMethod.Guest : SignInMethod.Email;
+    }
+
+    private void ClearAccount()
+    {
+        uid       = null;
+        email     = null;
+        nickname  = null;
+        hasMethod = false;
+        online    = false;
+        PlayerPrefs.DeleteKey(PREF_UID);
+        PlayerPrefs.DeleteKey(PREF_EMAIL);
+        PlayerPrefs.DeleteKey(PREF_METHOD);
+        PlayerPrefs.Save();
+    }
+
     // ───────────────────────────── 내부 도우미 ─────────────────────────────
+
+    private void Fail(string message)
+    {
+        LastError = message;
+        SetSigningIn(false);
+    }
 
     private void SetSigningIn(bool value)
     {
@@ -577,9 +865,8 @@ public class AuthManager : MonoBehaviour
         Notify();
     }
 
-    private static void Notify()
-    {
-        // C# 이벤트(일반 델리게이트)라 ?.Invoke 가 안전하다 (Unity 오브젝트가 아님)
-        StateChanged?.Invoke();
-    }
+    private static void Notify() => StateChanged?.Invoke();
+
+    private static string Short(string id)
+        => string.IsNullOrEmpty(id) ? "-" : id.Substring(0, Math.Min(10, id.Length)) + "…";
 }

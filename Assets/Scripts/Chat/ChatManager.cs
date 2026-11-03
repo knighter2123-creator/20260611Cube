@@ -86,6 +86,9 @@ public partial class ChatManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
+        // 뒤끝 이전 중 — Firestore 채팅은 Firebase 로그인이 필요해서, 뒤끝 채팅이 생길 때까지 Local 로 (LegacyFirestore 주석)
+        if (!LegacyFirestore.Enabled) backend = Backend.Local;
+
         service = CreateService(backend);
         service.MessagesReceived += OnMessagesReceived;
         service.MessagesRemoved  += OnMessagesRemoved;

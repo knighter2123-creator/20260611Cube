@@ -5,8 +5,9 @@ using UnityEngine.UI;
 /// <summary>
 /// MainScene 닉네임 팝업. 이름 유무에 따라 두 가지 모드로 열립니다.
 ///
-///   이름 없음 → '최초 설정' 모드 : 무료, PlayerProfile.TryRegister
-///   이름 있음 → '변경' 모드      : 보석 소모, PlayerProfile.TryChangeName (기존 동작 그대로)
+///   이름 없음 → '최초 설정' 모드 : 무료, PlayerProfile.RequestRegister
+///   이름 있음 → '변경' 모드      : 보석 소모, PlayerProfile.RequestChangeName
+///   로그인 계정은 뒤끝에서 중복 검사를 거친 뒤 적용되므로 응답을 기다리는 동안 "확인 중..." 을 보여 줍니다.
 ///
 /// 여는 쪽(네임플레이트 클릭, NicknamePrompt 의 스테이지 도달 자동 팝업)은 모드를 신경 쓰지 않고
 /// Open() 만 부르면 됩니다. 모드는 "여는 순간의 이름 유무" 로 이 스크립트가 정합니다.
@@ -221,14 +222,38 @@ public class NicknameChangePanel : MonoBehaviour
             return;
         }
 
-        // 모드에 따라 PlayerProfile 의 다른 창구를 부릅니다. 규칙 검사·저장은 전부 PlayerProfile 이 합니다.
-        string error;
-        bool ok = isRegisterMode
-            ? PlayerProfile.TryRegister(nameInputField.text, out error)
-            : PlayerProfile.TryChangeName(nameInputField.text, out error);
+        if (PlayerProfile.IsNameRequestPending) return;   // 서버 응답 기다리는 중 — 연타 무시
 
-        if (ok) Close();
-        else    SetError(error);
+        // 모드에 따라 PlayerProfile 의 다른 창구를 부릅니다. 규칙 검사·서버 중복 검사·보석·저장은 전부 PlayerProfile 이 합니다.
+        //   로그인 계정은 뒤끝에 먼저 묻기 때문에 결과가 다음 프레임 이후에 옵니다 (게스트는 바로 옴).
+        SetBusy(true);
+        System.Action<bool, string> onDone = (ok, error) =>
+        {
+            if (this == null) return;   // 기다리는 사이 씬이 바뀜
+            SetBusy(false);
+
+            if (ok) Close();
+            else    SetError(error);
+        };
+
+        if (isRegisterMode) PlayerProfile.RequestRegister(nameInputField.text, onDone);
+        else                PlayerProfile.RequestChangeName(nameInputField.text, onDone);
+    }
+
+    /// <summary>서버 응답을 기다리는 동안 입력·확인을 막고 안내합니다. 끝나면 비용 문구·버튼 상태를 다시 계산합니다.</summary>
+    private void SetBusy(bool busy)
+    {
+        if (nameInputField != null) nameInputField.interactable = !busy && !isLocked;
+        if (busy)
+        {
+            SetError(string.Empty);
+            if (confirmButton != null) confirmButton.interactable = false;
+            SetText(costText, "확인 중...");
+        }
+        else
+        {
+            RefreshCostText();
+        }
     }
 
     private void SetError(string message)

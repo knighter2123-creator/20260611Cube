@@ -30,6 +30,10 @@ public class Login_Name : MonoBehaviour
              "보통 1초 안에 끝납니다. 넘으면(오프라인 등) 마지막으로 쓰던 계정 데이터로 시작합니다.")]
     [SerializeField] private float authWaitSeconds = 3f;
 
+    [Header("게스트 로그인")]
+    [Tooltip("로그인하지 않고 시작하면 뒤끝 게스트 계정으로 로그인합니다. 최대 이만큼 기다리고(초), 실패하면 이 기기 게스트로 시작합니다.")]
+    [SerializeField] private float guestWaitSeconds = 5f;
+
     [Header("클라우드 세이브")]
     [Tooltip("클라우드 세이브를 확인할 때 최대 이만큼 기다립니다(초). 넘으면(오프라인 등) 이 기기 데이터로 시작합니다.")]
     [SerializeField] private float cloudWaitSeconds = 5f;
@@ -85,6 +89,9 @@ public class Login_Name : MonoBehaviour
     /// </summary>
     private IEnumerator StartRoutine()
     {
+        // 로그인하지 않고 시작 → 뒤끝 게스트 계정으로 로그인 (구글·이메일 버튼은 로그인한 뒤에 여기로 오므로 건너뜀)
+        yield return EnsureGuestAccount();
+
         float deadline = Time.realtimeSinceStartup + Mathf.Max(0f, authWaitSeconds);   // 실제 시간 (timeScale 무관)
 
         AccountSwitch.StartResult result = AccountSwitch.PrepareForStart();
@@ -111,6 +118,26 @@ public class Login_Name : MonoBehaviour
         }
 
         LoadMainScene();
+    }
+
+    /// <summary>
+    /// 로그인 안 된 채 시작하면 뒤끝 게스트 로그인을 합니다. 기기에 남은 게스트 진행(save.json)은
+    /// 이어지는 AccountSwitch 가 새 게스트 계정으로 옮깁니다. 실패·시간 초과면 이 기기 게스트로 그대로 시작합니다.
+    /// </summary>
+    private IEnumerator EnsureGuestAccount()
+    {
+        AuthManager auth = AuthManager.Instance;
+        if (auth == null) yield break;
+
+        float deadline = Time.realtimeSinceStartup + Mathf.Max(0f, guestWaitSeconds);
+        while (auth != null && !auth.IsReady && Time.realtimeSinceStartup < deadline) yield return null;   // 자동 로그인 확인이 먼저
+        if (auth == null || !auth.IsReady || auth.IsSignedIn || auth.IsSigningIn) yield break;
+
+        auth.SignInAsGuest();
+        while (auth != null && auth.IsSigningIn && Time.realtimeSinceStartup < deadline) yield return null;
+
+        if (auth != null && !auth.IsSignedIn)
+            Debug.LogWarning($"[Login_Name] 게스트 로그인을 하지 못해 이 기기 게스트로 시작합니다: {auth.LastError}");
     }
 
     private static void LoadMainScene()

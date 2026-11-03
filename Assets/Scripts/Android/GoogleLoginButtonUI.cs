@@ -34,6 +34,8 @@ public class GoogleLoginButtonUI : AuthStateUI
     [SerializeField] private TextMeshProUGUI buttonLabel;
     [SerializeField] private string signInLabel = "Google 로그인";
     [SerializeField] private string startLabel  = "시작하기";
+    [Tooltip("게스트로 로그인돼 있을 때 — 누르면 지금 게스트 계정에 구글을 연결 (진행 유지)")]
+    [SerializeField] private string linkLabel   = "구글 연동";
 
     // 이 버튼으로 로그인을 시작했는가. 성공이 확인되면 게임을 시작하고 바로 내립니다.
     // 자동 로그인(앱 재실행, 로그인 화면 복귀)은 이 버튼을 누르지 않았으므로 false → 시작하지 않습니다.
@@ -77,6 +79,13 @@ public class GoogleLoginButtonUI : AuthStateUI
             return;
         }
 
+        if (auth.IsGuest)
+        {
+            // 게스트 → [구글 연동]. 같은 계정에 구글을 붙임 — 연동만 하고 자동으로 시작하지는 않음 (버튼이 [시작하기] 로 바뀜)
+            auth.SignInWithGoogle();
+            return;
+        }
+
         if (auth.IsSignedIn)
         {
             // 구글로 로그인된 상태 → 이 버튼은 [시작하기]. 다른 방식이면 Refresh 가 버튼을 막아 두지만 한 번 더 확인.
@@ -109,15 +118,17 @@ public class GoogleLoginButtonUI : AuthStateUI
 
         AuthView a = ReadAuth();
         bool signedInWithGoogle = a.SignedInWith(AuthManager.SignInMethod.Google);
+        bool guest              = a.SignedInWith(AuthManager.SignInMethod.Guest);
 
         // 누를 수 있는 조건
         //   구글로 로그인됨 : [시작하기] — 플랫폼과 무관
+        //   게스트로 로그인됨 : [구글 연동] — 지원 플랫폼(Android)에서만
         //   로그인 전       : [Google 로그인] — 지원 플랫폼(Android)에서만
-        //   다른 방식으로 로그인됨 : 비활성
+        //   이메일로 로그인됨 : 비활성
         googleLoginButton.interactable = a.Ready && !a.SigningIn
-            && (signedInWithGoogle || (!a.SignedIn && AuthManager.IsGoogleSignInSupported));
+            && (signedInWithGoogle || ((!a.SignedIn || guest) && AuthManager.IsGoogleSignInSupported));
 
-        SetText(buttonLabel, signedInWithGoogle ? startLabel : signInLabel);
+        SetText(buttonLabel, signedInWithGoogle ? startLabel : guest ? linkLabel : signInLabel);
         SetText(userIdTMP,   a.SignedIn ? $"UID: {a.Auth.Uid}" : "");
         SetText(userNameTMP, a.SignedIn ? $"이름: {a.Auth.DisplayName}" : "");
 

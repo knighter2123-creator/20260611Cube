@@ -196,6 +196,16 @@ public class RankingPanel : MonoBehaviour
         myRankText.text = StageRecord.HasRecord
             ? $"내 기록  {myName}{Sep}{myStage}  ({top}위 밖)"
             : $"{myName}{Sep}스테이지를 클리어하면 랭킹에 등록됩니다";
+
+        // 목록 밖이면 이번 주 내 순위를 따로 물어봄 (주간 랭킹이라 이번 주에 기록을 올려야 순위가 있음)
+        if (list != null && StageRecord.HasRecord && RankingManager.Instance != null)
+        {
+            RankingManager.Instance.FetchMine((mine, error) =>
+            {
+                if (this == null || !IsOpen || error != null || mine == null) return;
+                myRankText.text = $"내 순위  {mine.Value.Rank}위{Sep}{myName}{Sep}{StageRecord.Format(mine.Value.Progress)}";
+            });
+        }
     }
 
     private void ShowStatus(string message)

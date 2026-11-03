@@ -11,6 +11,7 @@ using UnityEngine.UI;
 ///   Tools/UI 굽기/랭킹 창            — StageScene 을 열고 실행 (RankingPanel)
 ///   Tools/UI 굽기/저장 데이터 선택 팝업 — LoginScene 을 열고 실행 (CloudSaveConflictPopup)
 ///   Tools/UI 굽기/채팅 탭·친구 창      — StageScene 을 열고 실행 (ChatPanel 탭·나가기·유저 메뉴 + FriendPanel + 랭킹 옆 친구 버튼)
+///   Tools/UI 굽기/우편함              — StageScene 을 열고 실행 (MailboxPanel + 친구(없으면 랭킹) 옆 우편 버튼). 채팅 탭·친구 창을 먼저 굽는 것을 권장
 /// 실행한 뒤 씬을 저장하세요. 이미 구운 창이 있으면 지우고 새로 만듭니다 (Ctrl+Z 로 되돌릴 수 있음).
 /// 굽고 나면 모양은 씬에서 자유롭게 고쳐도 됩니다 — 다시 굽기 전까지는 고친 모양이 그대로 쓰입니다.
 /// </summary>
@@ -537,30 +538,7 @@ public static class UIBaker
     /// </summary>
     private static GameObject FriendsButtonFrom(OpenRankingButton ranking, FriendPanel friends)
     {
-        var rankRt = (RectTransform)ranking.transform;
-
-        float spacing = rankRt.rect.width + 16f;
-        float nearest = float.NegativeInfinity;
-        foreach (Transform t in rankRt.parent)
-        {
-            if (t == rankRt || !(t is RectTransform rt)) continue;
-            bool sameRow = rt.anchorMin == rankRt.anchorMin && rt.anchorMax == rankRt.anchorMax
-                        && Mathf.Abs(rt.anchoredPosition.y - rankRt.anchoredPosition.y) < 1f;
-            float x = rt.anchoredPosition.x;
-            if (sameRow && x < rankRt.anchoredPosition.x && x > nearest) nearest = x;
-        }
-        if (!float.IsNegativeInfinity(nearest)) spacing = rankRt.anchoredPosition.x - nearest;
-
-        GameObject go = Object.Instantiate(ranking.gameObject, rankRt.parent);
-        go.name = "Open Friends Button";
-        go.transform.SetSiblingIndex(rankRt.GetSiblingIndex() + 1);
-        ((RectTransform)go.transform).anchoredPosition = rankRt.anchoredPosition + new Vector2(spacing, 0f);
-
-        Object.DestroyImmediate(go.GetComponent<OpenRankingButton>());
-        go.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();   // 씬에서 랭킹을 여는 OnClick 을 달아 뒀어도 따라오지 않게
-
-        TextMeshProUGUI label = go.GetComponentInChildren<TextMeshProUGUI>(true);
-        if (label != null) label.text = "친구";
+        GameObject go = CloneButtonRightOf(ranking, "Open Friends Button", "친구", out TextMeshProUGUI label);
 
         var open = go.AddComponent<OpenFriendsButton>();
         var so = new SerializedObject(open);
@@ -570,6 +548,181 @@ public static class UIBaker
 
         Undo.RegisterCreatedObjectUndo(go, "친구 버튼 굽기");
         return go;
+    }
+
+    /// <summary>
+    /// 여는 버튼(source)을 복제해 그 오른쪽에 둡니다 (같은 모양·크기). 간격은 source − 같은 줄 왼쪽 이웃 버튼,
+    /// 이웃이 없으면 버튼 폭 + 16. 복제본에서 source 의 여는 컴포넌트와 OnClick 은 지웁니다 — 새 컴포넌트는 부른 쪽이 붙임.
+    /// </summary>
+    private static GameObject CloneButtonRightOf(Component source, string name, string text, out TextMeshProUGUI label)
+    {
+        var srcRt = (RectTransform)source.transform;
+
+        float spacing = srcRt.rect.width + 16f;
+        float nearest = float.NegativeInfinity;
+        foreach (Transform t in srcRt.parent)
+        {
+            if (t == srcRt || !(t is RectTransform rt)) continue;
+            bool sameRow = rt.anchorMin == srcRt.anchorMin && rt.anchorMax == srcRt.anchorMax
+                        && Mathf.Abs(rt.anchoredPosition.y - srcRt.anchoredPosition.y) < 1f;
+            float x = rt.anchoredPosition.x;
+            if (sameRow && x < srcRt.anchoredPosition.x && x > nearest) nearest = x;
+        }
+        if (!float.IsNegativeInfinity(nearest)) spacing = srcRt.anchoredPosition.x - nearest;
+
+        GameObject go = Object.Instantiate(source.gameObject, srcRt.parent);
+        go.name = name;
+        go.transform.SetSiblingIndex(srcRt.GetSiblingIndex() + 1);
+        ((RectTransform)go.transform).anchoredPosition = srcRt.anchoredPosition + new Vector2(spacing, 0f);
+
+        Object.DestroyImmediate(go.GetComponent(source.GetType()));
+        go.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();   // 씬에서 원래 창을 여는 OnClick 을 달아 뒀어도 따라오지 않게
+
+        label = go.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null) label.text = text;
+        return go;
+    }
+
+    // ═════════════════════════════ 우편함 ═════════════════════════════
+
+    [MenuItem("Tools/UI 굽기/우편함 (StageScene)")]
+    private static void BakeMailbox()
+    {
+        // 우편함 버튼은 친구 버튼(없으면 랭킹 버튼) 오른쪽에 — 둘 다 없으면 시작 전에 멈춤
+        Component neighbor = FindInOpenScenes<OpenFriendsButton>();
+        if (neighbor == null) neighbor = FindInOpenScenes<OpenRankingButton>();
+        if (neighbor == null)
+        {
+            EditorUtility.DisplayDialog("UI 굽기", "열린 씬에 OpenRankingButton 이 없습니다. StageScene 을 열고 다시 실행하세요.", "확인");
+            return;
+        }
+        Scene scene = neighbor.gameObject.scene;
+
+        MailboxPanel panel = FindInOpenScenes<MailboxPanel>();
+        OpenMailboxButton oldButton = FindInOpenScenes<OpenMailboxButton>();
+        GameObject oldRoot = panel != null ? new SerializedObject(panel).FindProperty("root").objectReferenceValue as GameObject : null;
+
+        if (oldRoot != null || oldButton != null)
+        {
+            if (!EditorUtility.DisplayDialog("UI 굽기", "이미 우편함이 있습니다. 지우고 새로 만들까요?", "새로 만들기", "취소")) return;
+            if (oldRoot   != null) Undo.DestroyObjectImmediate(oldRoot);
+            if (oldButton != null) Undo.DestroyObjectImmediate(oldButton.gameObject);
+        }
+
+        // 컴포넌트를 둘 항상 켜진 빈 오브젝트 — 없으면 씬 최상위에 만듦
+        if (panel == null)
+        {
+            var host = new GameObject("MailboxPanel");
+            if (host.scene != scene) SceneManager.MoveGameObjectToScene(host, scene);
+            Undo.RegisterCreatedObjectUndo(host, "우편함 굽기");
+            panel = Undo.AddComponent<MailboxPanel>(host);
+        }
+
+        TMP_FontAsset font = panel.Font != null ? panel.Font : MostUsedFont(scene);
+        var b = new Builder(font);
+
+        // 캔버스 — 씬 최상위 (RankingPanel 클래스 주석의 이유)
+        GameObject root = b.Canvas("MailboxCanvas", panel.SortingOrder, scene);
+
+        RectTransform dim = b.Image("Dim", root.transform, RankDimColor, true);
+        Builder.Stretch(dim);
+        Button dimButton = dim.gameObject.AddComponent<Button>();
+
+        RectTransform window = b.Image("Window", root.transform, RankWindowColor, true);
+        window.sizeDelta = new Vector2(1100f, 900f);
+
+        TextMeshProUGUI title = b.Text("Title", window, "우편함", 52f, TextAlignmentOptions.Center, false);
+        Builder.PlaceTop(title.rectTransform, 120f, 120f, -20f, 80f);
+        title.color = GoldColor;
+
+        RectTransform closeRt = b.Image("Close", window, RankHeaderColor, true);
+        closeRt.anchorMin = closeRt.anchorMax = closeRt.pivot = new Vector2(1f, 1f);
+        closeRt.anchoredPosition = new Vector2(-20f, -20f);
+        closeRt.sizeDelta = new Vector2(80f, 80f);
+        Button closeButton = closeRt.gameObject.AddComponent<Button>();
+        Builder.Stretch(b.Text("X", closeRt, "X", 44f, TextAlignmentOptions.Center, false).rectTransform);
+
+        RectTransform content = VerticalScroll(b, window, "Viewport", "Content", 8f, out RectTransform viewport);
+        viewport.offsetMin = new Vector2(40f, 140f);
+        viewport.offsetMax = new Vector2(-40f, -120f);
+
+        MailRow rowTemplate = MailRowObject(b, content);
+        rowTemplate.gameObject.SetActive(false);
+
+        TextMeshProUGUI status = b.Text("Status", viewport, string.Empty, 36f, TextAlignmentOptions.Center, false);
+        Builder.Stretch(status.rectTransform);
+        status.color = new Color(1f, 1f, 1f, 0.7f);
+
+        // 모두 받기 — 아래 가운데
+        Button claimAll = LabeledButton(b, window, "ClaimAll", "모두 받기", PopupCloudColor, 38f, out _);
+        var caRt = (RectTransform)claimAll.transform;
+        caRt.anchorMin = caRt.anchorMax = caRt.pivot = new Vector2(0.5f, 0f);
+        caRt.anchoredPosition = new Vector2(0f, 30f);
+        caRt.sizeDelta        = new Vector2(360f, 90f);
+
+        root.SetActive(false);   // 평소엔 닫혀 있음 (MailboxPanel.Awake 도 끔)
+        Undo.RegisterCreatedObjectUndo(root, "우편함 굽기");
+
+        var so = new SerializedObject(panel);
+        so.Update();
+        so.FindProperty("root").objectReferenceValue           = root;
+        so.FindProperty("dimButton").objectReferenceValue      = dimButton;
+        so.FindProperty("closeButton").objectReferenceValue    = closeButton;
+        so.FindProperty("content").objectReferenceValue        = content;
+        so.FindProperty("rowTemplate").objectReferenceValue    = rowTemplate;
+        so.FindProperty("statusText").objectReferenceValue     = status;
+        so.FindProperty("claimAllButton").objectReferenceValue = claimAll;
+        if (panel.Font == null) so.FindProperty("font").objectReferenceValue = font;
+        so.ApplyModifiedProperties();
+
+        // ── 우편함 버튼 ──
+        GameObject button = CloneButtonRightOf(neighbor, "Open Mailbox Button", "우편", out TextMeshProUGUI label);
+        var open = button.AddComponent<OpenMailboxButton>();
+        var bso = new SerializedObject(open);
+        bso.FindProperty("mailboxPanel").objectReferenceValue = panel;
+        bso.FindProperty("label").objectReferenceValue        = label;
+        bso.ApplyModifiedPropertiesWithoutUndo();   // 막 만든 오브젝트 — 아래 생성 Undo 에 함께 묶임
+        Undo.RegisterCreatedObjectUndo(button, "우편함 버튼 굽기");
+
+        Finish(scene, root, "우편함·우편함 버튼");
+    }
+
+    /// <summary>우편 한 줄 — 제목 / 내용 / 보상 세 줄 + 오른쪽 [받기]</summary>
+    private static MailRow MailRowObject(Builder b, Transform parent)
+    {
+        RectTransform row = b.Image("Row", parent, MailboxPanel.RowColor, false);
+        row.gameObject.AddComponent<LayoutElement>().preferredHeight = 150f;
+
+        TextMeshProUGUI title  = MailLine(b, row, "Title",  "주간 랭킹 1위 보상", 36f, 0.64f, 1f);
+        TextMeshProUGUI body   = MailLine(b, row, "Body",   "내용",               28f, 0.34f, 0.64f);
+        TextMeshProUGUI reward = MailLine(b, row, "Reward", "보석 3,000",         30f, 0.04f, 0.34f);
+        body.color   = new Color(1f, 1f, 1f, 0.7f);
+        reward.color = MailboxPanel.RewardColor;
+
+        Button claim = LabeledButton(b, row, "Claim", "받기", PopupCloudColor, 32f, out _);
+        PlaceRight((RectTransform)claim.transform, -16f, 180f);
+        var cRt = (RectTransform)claim.transform;
+        cRt.offsetMin = new Vector2(cRt.offsetMin.x, 30f);
+        cRt.offsetMax = new Vector2(cRt.offsetMax.x, -30f);
+
+        var comp = row.gameObject.AddComponent<MailRow>();
+        var so = new SerializedObject(comp);
+        so.FindProperty("titleText").objectReferenceValue   = title;
+        so.FindProperty("bodyText").objectReferenceValue    = body;
+        so.FindProperty("rewardText").objectReferenceValue  = reward;
+        so.FindProperty("claimButton").objectReferenceValue = claim;
+        so.ApplyModifiedPropertiesWithoutUndo();   // 막 만든 오브젝트 — 생성 Undo 에 함께 묶임
+        return comp;
+    }
+
+    private static TextMeshProUGUI MailLine(Builder b, RectTransform row, string name, string value, float size, float yMin, float yMax)
+    {
+        TextMeshProUGUI t = b.Text(name, row, value, size, TextAlignmentOptions.MidlineLeft, false);
+        t.rectTransform.anchorMin = new Vector2(0f, yMin);
+        t.rectTransform.anchorMax = new Vector2(1f, yMax);
+        t.rectTransform.offsetMin = new Vector2(24f, 0f);
+        t.rectTransform.offsetMax = new Vector2(-220f, 0f);
+        return t;
     }
 
     /// <summary>친구 창 한 줄 — 닉네임 + 오른쪽 버튼 두 개</summary>

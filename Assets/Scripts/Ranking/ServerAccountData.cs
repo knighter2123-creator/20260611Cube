@@ -54,8 +54,17 @@ public static class ServerAccountData
         }
         if (!auth.IsSignedIn || auth.Uid != owner)
         {
-            // 보안 규칙상 본인으로 로그인해야만 지울 수 있음
+            // 본인으로 로그인해야만 지울 수 있음
             onDone?.Invoke(false, "로그인 정보가 맞지 않아 서버 기록을 지울 수 없습니다. 다시 로그인해 주세요.");
+            return;
+        }
+
+        // 뒤끝 이전 중 — Firestore 기록은 접근할 수 없으므로 뒤끝 계정 탈퇴만 합니다 (LegacyFirestore 주석).
+        //   랭킹·닉네임·게임 정보를 뒤끝으로 옮기면, 탈퇴 때 무엇이 함께 지워지는지 뒤끝 문서로 확인하고 필요하면 여기서 먼저 지웁니다.
+        if (!LegacyFirestore.Enabled)
+        {
+            IsDeleting = true;
+            auth.DeleteAccount((ok, error) => Finish(onDone, ok, error));
             return;
         }
 
