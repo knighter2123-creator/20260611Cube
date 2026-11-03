@@ -1595,6 +1595,7 @@ MonoBehaviour:
   buttonLabel: {fileID: 0}
   signInLabel: "Google \uB85C\uADF8\uC778"
   startLabel: "\uC2DC\uC791\uD558\uAE30"
+  linkLabel: "\uAD6C\uAE00 \uC5F0\uB3D9"
 --- !u!1 &539690445
 GameObject:
   m_ObjectHideFlags: 0
@@ -2411,6 +2412,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b324ce3ba260c64f96d2908aa56d4d5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RankingManager
+  rankUuid: 
+  tableName: RANK_DATA
+  column: progress
   topCount: 50
   retryDelay: 30
 --- !u!1 &834874870
@@ -2584,6 +2588,54 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 102}
   m_SizeDelta: {x: 160, y: 50}
   m_Pivot: {x: 0.5, y: 0}
+--- !u!1 &868860517
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 868860519}
+  - component: {fileID: 868860518}
+  m_Layer: 0
+  m_Name: BackEnd Test
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &868860518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 868860517}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acc3a7e5d1e03104da9c2f8df175cdc7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackendConsoleTest
+  testId: 123@123.com
+  testPassword: 123123
+  runOnStart: 1
+  insertGameData: 1
+--- !u!4 &868860519
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 868860517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &878899160
 GameObject:
   m_ObjectHideFlags: 0
@@ -5785,6 +5837,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Login_Name
   startButton: {fileID: 1638794476}
   authWaitSeconds: 3
+  guestWaitSeconds: 5
   cloudWaitSeconds: 5
 --- !u!4 &1531211608
 Transform:
@@ -7699,3 +7752,4 @@ SceneRoots:
   - {fileID: 1979724214}
   - {fileID: 921800338}
   - {fileID: 296343997}
+  - {fileID: 868860519}
