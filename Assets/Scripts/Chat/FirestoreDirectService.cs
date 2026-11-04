@@ -62,6 +62,8 @@ public class FirestoreDirectService : IDirectService
                             OnFailed);
     }
 
+    public void Refresh() { }   // 실시간 리스너가 바뀔 때마다 보내 줌
+
     public void Disconnect()
     {
         Unwatch();

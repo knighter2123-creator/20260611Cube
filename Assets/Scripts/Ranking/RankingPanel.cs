@@ -69,8 +69,12 @@ public class RankingPanel : MonoBehaviour
     private readonly List<GameObject> rows = new List<GameObject>();
 
     private List<RankingManager.Entry> cached;
+    private string cachedUid;          // cached 를 어느 계정으로 받았나 — 계정이 바뀌면 다시 받음 (내 줄 강조·내 순위가 계정마다 다름)
     private float cachedTime = float.NegativeInfinity;
     private bool  loading;
+    private string loadingUid;
+
+    private static string CurrentUid => AuthManager.Instance != null ? AuthManager.Instance.Uid : null;
 
     public bool IsOpen => root != null && root.activeSelf;
 
@@ -100,7 +104,7 @@ public class RankingPanel : MonoBehaviour
         if (!ready) return;
         root.SetActive(true);
 
-        if (cached != null && Time.unscaledTime - cachedTime < refreshCooldown)
+        if (cached != null && cachedUid == CurrentUid && Time.unscaledTime - cachedTime < refreshCooldown)
         {
             Draw(cached);
             return;
@@ -115,7 +119,8 @@ public class RankingPanel : MonoBehaviour
 
     private void Refresh()
     {
-        if (loading) return;
+        string uid = CurrentUid;
+        if (loading && loadingUid == uid) return;   // 같은 계정으로 이미 받는 중 (다른 계정이면 새로 받고, 늦게 온 이전 응답은 버림)
 
         if (RankingManager.Instance == null)
         {
@@ -124,13 +129,15 @@ public class RankingPanel : MonoBehaviour
             return;
         }
 
-        loading = true;
+        loading    = true;
+        loadingUid = uid;
         ClearRows();
         ShowStatus("불러오는 중...");
 
         RankingManager.Instance.FetchTop((list, error) =>
         {
             if (this == null) return;   // 기다리는 사이 씬이 바뀜
+            if (uid != CurrentUid || uid != loadingUid) return;   // 기다리는 사이 계정이 바뀜 — 이전 계정 결과는 버림
             loading = false;
 
             if (error != null)
@@ -142,6 +149,7 @@ public class RankingPanel : MonoBehaviour
             }
 
             cached     = list;
+            cachedUid  = uid;
             cachedTime = Time.unscaledTime;
             if (IsOpen) Draw(list);
         });
@@ -200,9 +208,11 @@ public class RankingPanel : MonoBehaviour
         // 목록 밖이면 이번 주 내 순위를 따로 물어봄 (주간 랭킹이라 이번 주에 기록을 올려야 순위가 있음)
         if (list != null && StageRecord.HasRecord && RankingManager.Instance != null)
         {
+            string askedUid = AuthManager.Instance.Uid;
             RankingManager.Instance.FetchMine((mine, error) =>
             {
                 if (this == null || !IsOpen || error != null || mine == null) return;
+                if (askedUid != CurrentUid) return;   // 기다리는 사이 계정이 바뀜
                 myRankText.text = $"내 순위  {mine.Value.Rank}위{Sep}{myName}{Sep}{StageRecord.Format(mine.Value.Progress)}";
             });
         }

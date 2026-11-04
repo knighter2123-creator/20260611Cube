@@ -5,8 +5,9 @@ using System.Collections.Generic;
 /// 채팅 서버와 실제로 주고받는 부분. ChatManager 는 이 인터페이스만 알고, 어느 서버인지는 모릅니다.
 ///
 /// [구현체]
-///   FirestoreChatService — Firestore 실시간 리스너 (기본)
+///   BackendChatService   — 뒤끝챗(BackndChat SDK) 공개 채널 + 뒤끝 친구·쪽지 (기본)
 ///   LocalChatService     — 서버 없이 내 메시지만 보이는 테스트용
+///   FirestoreChatService — 옛 Firebase 서버 (뒤끝 이전 전, LegacyFirestore 가 켜져 있을 때만)
 ///   → Realtime Database 등으로 바꾸려면 이 인터페이스를 구현한 클래스를 추가하고 ChatManager.CreateService 에 한 줄 추가하면 됩니다.
 ///
 /// [약속]  모든 이벤트·콜백은 메인 스레드에서 호출합니다 (Unity API 를 바로 써도 되게).
@@ -38,6 +39,9 @@ public interface IChatService
     void Connect(int historyCount);
 
     void Disconnect();
+
+    /// <summary>매 프레임 (ChatManager.Update). 직접 돌려 줘야 하는 SDK(뒤끝챗 ChatClient.Update)용 — 할 일 없으면 비워 둠.</summary>
+    void Tick();
 
     /// <summary>보내기. 성공이면 onDone(null), 실패면 onDone(오류 문구).</summary>
     void Send(ChatMessage message, Action<string> onDone);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// 친구 — 요청을 보내고, 상대가 수락하면 양쪽 친구 창에 서로가 보입니다. 서버 구조는 FirestoreFriendService 주석 참고.
@@ -13,6 +14,14 @@ public partial class ChatManager
     public const int MAX_FRIENDS = 50;
 
     private const string FriendsLoading = "친구 목록을 불러오는 중입니다...";
+
+    /// <summary>
+    /// 실시간 리스너가 없는 서버(뒤끝)에서 받은 요청 · 수락을 알아채기 위해 목록을 다시 받는 간격(초).
+    /// 친구 창을 열 때 · 친구 실시간 알림(BackendNotify)을 받을 때도 바로 다시 받습니다 (RefreshFriends).
+    /// 알림이 연결돼 있으면 놓쳤을 때의 대비일 뿐이라 길게. 뒤끝 호출 수 = 3회 / 간격.
+    /// </summary>
+    private static float FriendsPollSeconds => BackendNotify.IsConnected ? 300f : 120f;
+    private float nextFriendsPoll;
 
     private IFriendService friendService;
     private readonly Connection friendsLink = new Connection();
@@ -82,8 +91,24 @@ public partial class ChatManager
         if (friendsLink.ShouldConnect(MyUid))
         {
             friendsLink.Connected(MyUid);
+            nextFriendsPoll = Time.unscaledTime + FriendsPollSeconds;
             friendService.Connect(MyUid);   // 실패하면 이 안에서 바로 OnFriendsFailed 가 불릴 수 있음
         }
+
+        // 연결돼 있고 한 번 받은 뒤에만 주기적으로 다시 받음 (받는 중이면 서비스가 알아서 한 번으로 합침)
+        if (friendsLink.Key != null && friendsLoaded && Time.unscaledTime >= nextFriendsPoll)
+        {
+            nextFriendsPoll = Time.unscaledTime + FriendsPollSeconds;
+            friendService.Refresh();
+        }
+    }
+
+    /// <summary>친구 목록을 지금 다시 받습니다 (친구 창을 열 때). 연결 전이면 아무것도 안 함.</summary>
+    public void RefreshFriends()
+    {
+        if (friendsLink.Key == null) return;
+        nextFriendsPoll = Time.unscaledTime + FriendsPollSeconds;
+        friendService.Refresh();
     }
 
     private void OnFriendsFailed(string reason)
@@ -168,6 +193,30 @@ public partial class ChatManager
 
         friendService.Request(uid, PlayerProfile.DisplayName, peerUid, peerName, IfAlive(onDone));
     }
+
+    /// <summary>
+    /// 닉네임으로 유저를 찾아 친구 요청을 보냅니다 (친구 창의 검색 칸). 닉네임은 정확히 같아야 합니다.
+    /// 그 사람이 이미 나에게 요청했으면 수락합니다 (RequestFriend 와 같음). 결과는 onDone(오류 문구) — 성공이면 null.
+    /// </summary>
+    public void RequestFriendByName(string nickname, Action<string> onDone)
+    {
+        string name = (nickname ?? string.Empty).Trim();
+        if (name.Length == 0)                    { onDone?.Invoke("닉네임을 입력해 주세요."); return; }
+        if (name == PlayerProfile.DisplayName)   { onDone?.Invoke("나에게는 친구 요청을 보낼 수 없습니다."); return; }
+        if (FriendsUnavailableReason != null)    { onDone?.Invoke(FriendsUnavailableReason); return; }
+
+        friendService.FindUser(name, IfAlive2((uid, error) =>
+        {
+            if (error != null) { onDone?.Invoke(error); return; }
+            RequestFriend(uid, name, onDone);
+        }));
+    }
+
+    /// <summary>IfAlive 의 (uid, 오류) 콜백판 — 이 매니저가 파괴됐으면 무시.</summary>
+    private Action<string, string> IfAlive2(Action<string, string> onDone) => (a, b) =>
+    {
+        if (this != null) onDone?.Invoke(a, b);
+    };
 
     public void AcceptFriend(string peerUid, Action<string> onDone)
     {

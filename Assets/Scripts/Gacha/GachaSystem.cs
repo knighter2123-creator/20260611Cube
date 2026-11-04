@@ -1,6 +1,17 @@
+using System;
 using System.Collections.Generic;
+using BackEnd;
+using LitJson;
 using UnityEngine;
 
+/// <summary>
+/// 동료 뽑기. 확률은 클라이언트가 아니라 뒤끝 확률 차트(분류: percent)가 정합니다.
+///
+/// [흐름]  결제(소환권 우선 → 보석) → Backend.Probability.GetProbabilitys(차트, 횟수) 로 서버가 추첨
+///         → 응답의 companionId 를 풀 에셋에서 찾아 동료/조각 지급 → 저장.  서버 실패 시 결제를 되돌립니다.
+/// [차트]  Assets/Datas/BackEndChart/CompanionGachaChart.xlsx — 'percent' 열이 확률, 'companionId' 열이 동료 키.
+///         업로드(재업로드) 후 콘솔에 보이는 파일 ID 를 인스펙터 probabilityFileId 에 넣으세요.
+/// </summary>
 public class GachaSystem : MonoBehaviour
 {
     public static GachaSystem Instance;
@@ -11,11 +22,14 @@ public class GachaSystem : MonoBehaviour
     [SerializeField] private int cost10  = 2700;
     [SerializeField] private int cost100 = 27000;
 
-    [Header("등급별 확률 (합계 100)")]
-    [SerializeField] private float chanceNormal    = 50f;
-    [SerializeField] private float chanceRare      = 30f;
-    [SerializeField] private float chanceEpic      = 15f;
-    [SerializeField] private float chanceLegendary = 5f;
+    // 확률은 뒤끝 확률 차트의 percent 열이 정합니다. (예전 등급별 chance 값은 더 이상 쓰지 않음)
+    [Header("뒤끝 확률 차트")]
+    [Tooltip("뒤끝 콘솔 > 차트 관리에서 분류 percent 로 올린 동료 뽑기 차트의 파일 ID.\n" +
+             "차트를 다시 올리면 파일 ID 가 바뀌므로 여기도 바꿔야 합니다.")]
+    [SerializeField] private string probabilityFileId = "20586";
+
+    [Tooltip("차트에서 동료를 가리키는 열 이름 (CompanionData.id 와 같은 값)")]
+    [SerializeField] private string companionIdColumn = "companionId";
 
     // 가챠에서 나오는 동료 목록. 도감(CompanionCodexUI)도 같은 에셋을 봅니다.
     [Header("동료 풀 에셋 — 도감과 공유")]
@@ -47,9 +61,13 @@ public class GachaSystem : MonoBehaviour
     // ──────────────────────────────────────────────
     //  뽑기 공개 API
     // ──────────────────────────────────────────────
-    public List<GachaResult> DrawOne()    => Draw(1,   cost1);
-    public List<GachaResult> DrawTen()    => Draw(10,  cost10);
-    public List<GachaResult> DrawHundred()=> Draw(100, cost100);
+    // 서버 추첨이라 결과는 콜백으로 옵니다 (메인 스레드). 결제 실패 · 서버 실패면 빈 리스트입니다.
+    public void DrawOne(Action<List<GachaResult>> onDone)     => Draw(1,   cost1,   onDone);
+    public void DrawTen(Action<List<GachaResult>> onDone)     => Draw(10,  cost10,  onDone);
+    public void DrawHundred(Action<List<GachaResult>> onDone) => Draw(100, cost100, onDone);
+
+    /// <summary>서버 응답을 기다리는 중인가. 그동안 다시 뽑기를 막습니다 (이중 결제 방지).</summary>
+    public bool IsDrawing { get; private set; }
 
     /// <summary>count 회 소환의 보석 비용 (1 / 10 / 100 회만 정의됨, 그 외는 -1).</summary>
     public int GemCostFor(int count) => count switch
@@ -66,46 +84,73 @@ public class GachaSystem : MonoBehaviour
     /// <summary>어떤 재화로 결제했는가 — 결과가 없을 때 같은 재화로 되돌려 주기 위해 기억합니다.</summary>
     private enum Payment { None, Ticket, Gem }
 
-    private List<GachaResult> Draw(int count, int gemCost)
+    private void Draw(int count, int gemCost, Action<List<GachaResult>> onDone)
     {
         List<GachaResult> results = new List<GachaResult>();
+
+        if (IsDrawing) { onDone?.Invoke(results); return; }
 
         if (CurrencyManager.Instance == null)
         {
             Debug.LogError("[Gacha] CurrencyManager가 없습니다.");
-            return results;
+            onDone?.Invoke(results);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(probabilityFileId))
+        {
+            Debug.LogError("[Gacha] probabilityFileId 가 비어 있습니다. 뒤끝 확률 차트의 파일 ID 를 인스펙터에 넣으세요.", this);
+            onDone?.Invoke(results);
+            return;
         }
 
         // 재화 부족 → 빈 결과를 돌려줍니다. (호출한 UI 가 results.Count == 0 으로 판단)
         Payment paid = Pay(count, gemCost);
         if (paid == Payment.None)
-            return results;
-
-        for (int i = 0; i < count; i++)
         {
-            CompanionData data = GetRandomCompanion();
-            if (data == null) continue;
-
-            GachaResult result = ProcessResult(data);
-            results.Add(result);
+            onDone?.Invoke(results);
+            return;
         }
 
-        if (results.Count > 0)
+        // ★ 결제를 먼저 하고 서버에 묻습니다. 실패하면 Refund 로 되돌리므로, 응답 전에 앱이 꺼져도
+        //   (저장 전이라) 재화가 사라지지 않습니다.
+        IsDrawing = true;
+        string fileId = probabilityFileId.Trim();
+        BackendManager.Call(cb => Backend.Probability.GetProbabilitys(fileId, count, cb), bro =>
         {
-            // ★ 미션 진행도 / 가이드 퀘스트 리포트 (실제 뽑힌 개수만큼)
-            MissionManager.Instance?.ReportGachaPull(results.Count);
-            GuideQuestManager.Instance?.ReportSummon(results.Count);
-        }
-        else
-        {
-            // 풀이 비어 한 장도 못 뽑았으면 결제를 되돌립니다. (안 그러면 재화만 사라집니다)
-            Refund(paid, count, gemCost);
-        }
+            IsDrawing = false;
 
-        // ★ 재화 차감 + 동료/조각 획득을 한 번에 저장 (루프 밖에서 1회)
-        SaveManager.Instance?.Save();
+            if (bro == null || !bro.IsSuccess())
+            {
+                Debug.LogError($"[Gacha] 서버 추첨 실패 — 결제를 되돌립니다: {BackendManager.Describe(bro)}");
+                Refund(paid, count, gemCost);
+                onDone?.Invoke(results);
+                return;
+            }
 
-        return results;
+            foreach (CompanionData data in ParsePicks(bro))
+                results.Add(ProcessResult(data));
+
+            if (results.Count > 0)
+            {
+                if (results.Count < count)
+                    Debug.LogWarning($"[Gacha] {count}회 중 {results.Count}회만 지급했습니다. 차트의 {companionIdColumn} 값과 풀 에셋을 확인하세요.");
+
+                // ★ 미션 진행도 / 가이드 퀘스트 리포트 (실제 뽑힌 개수만큼)
+                MissionManager.Instance?.ReportGachaPull(results.Count);
+                GuideQuestManager.Instance?.ReportSummon(results.Count);
+            }
+            else
+            {
+                // 한 장도 지급하지 못했으면 결제를 되돌립니다. (안 그러면 재화만 사라집니다)
+                Refund(paid, count, gemCost);
+            }
+
+            // ★ 재화 차감 + 동료/조각 획득을 한 번에 저장 (루프 밖에서 1회)
+            SaveManager.Instance?.Save();
+
+            onDone?.Invoke(results);
+        });
     }
 
     /// <summary>소환권 우선, 모자라면 보석. 둘 다 안 되면 아무것도 차감하지 않고 None.</summary>
@@ -118,7 +163,7 @@ public class GachaSystem : MonoBehaviour
 
     private static void Refund(Payment paid, int count, int gemCost)
     {
-        Debug.LogWarning("[Gacha] 뽑을 동료가 없어 결제를 되돌립니다. 동료 풀을 확인하세요.");
+        Debug.LogWarning("[Gacha] 지급한 동료가 없어 결제를 되돌립니다.");
 
         if (paid == Payment.Ticket) GachaTicket.Add(count);
         else if (paid == Payment.Gem) CurrencyManager.Instance?.AddGem(gemCost);
@@ -175,41 +220,64 @@ public class GachaSystem : MonoBehaviour
     public CompanionPoolAsset Pool => poolAsset;
 
     // ──────────────────────────────────────────────
-    //  등급 및 동료 랜덤 선택
+    //  서버 추첨 결과 → 동료
     // ──────────────────────────────────────────────
-    private CompanionData GetRandomCompanion()
+
+    /// <summary>
+    /// GetProbabilitys 응답의 elements(뽑힌 행 목록)를 풀 에셋의 동료로 바꿉니다.
+    /// 풀에 없는 companionId 는 건너뜁니다 (차트와 에셋이 어긋난 경우 — 경고 로그).
+    /// </summary>
+    private List<CompanionData> ParsePicks(BackendReturnObject bro)
     {
-        CompanionGrade grade = RollGrade();
+        List<CompanionData> picks = new List<CompanionData>();
 
-        // 'poolAsset != null' 은 유니티식 null 검사입니다 (연결 안 됨 / 파괴됨 모두 걸러냄).
-        IReadOnlyList<CompanionData> pool = poolAsset != null ? poolAsset.GetPool(grade) : null;
-
-        if (pool == null || pool.Count == 0)
+        JsonData elements;
+        try
         {
-            Debug.LogWarning($"[Gacha] {grade} 풀이 비어있습니다.");
-            return null;
+            JsonData root = bro.GetFlattenJSON();
+            elements = root != null && root.IsObject && root.ContainsKey("elements") ? root["elements"] : null;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Gacha] 서버 응답을 읽지 못했습니다: {e.Message}\n{bro}");
+            return picks;
         }
 
-        return pool[Random.Range(0, pool.Count)];
+        if (elements == null || !elements.IsArray)
+        {
+            Debug.LogError($"[Gacha] 서버 응답에 elements 가 없습니다: {bro}");
+            return picks;
+        }
+
+        Dictionary<string, CompanionData> byId = BuildIdLookup();
+
+        for (int i = 0; i < elements.Count; i++)
+        {
+            JsonData row = elements[i];
+            string id = row != null && row.IsObject && row.ContainsKey(companionIdColumn)
+                ? row[companionIdColumn]?.ToString()
+                : null;
+
+            if (!string.IsNullOrEmpty(id) && byId.TryGetValue(id, out CompanionData data))
+                picks.Add(data);
+            else
+                Debug.LogWarning($"[Gacha] 차트의 {companionIdColumn} '{id}' 에 맞는 동료가 풀 에셋에 없습니다.");
+        }
+        return picks;
     }
 
-    private CompanionGrade RollGrade()
+    /// <summary>풀 에셋의 동료를 id 로 찾는 표. 뽑을 때마다 만들어도 18명 정도라 비용이 거의 없습니다.</summary>
+    private Dictionary<string, CompanionData> BuildIdLookup()
     {
-        float roll = Random.Range(0f, 100f);
+        var byId = new Dictionary<string, CompanionData>();
 
-        // ✅ 누적 방식으로 chanceNormal까지 전부 사용
-        float legendaryThreshold = chanceLegendary;
-        float epicThreshold      = legendaryThreshold + chanceEpic;
-        float rareThreshold      = epicThreshold + chanceRare;
-        float normalThreshold    = rareThreshold + chanceNormal; // ✅ chanceNormal 사용
+        // 'poolAsset != null' 은 유니티식 null 검사입니다 (연결 안 됨 / 파괴됨 모두 걸러냄).
+        if (poolAsset == null) return byId;
 
-        if (roll < legendaryThreshold) return CompanionGrade.Legendary;
-        if (roll < epicThreshold)      return CompanionGrade.Epic;
-        if (roll < rareThreshold)      return CompanionGrade.Rare;
-        if (roll < normalThreshold)    return CompanionGrade.Normal;
+        foreach (CompanionData d in poolAsset.All())
+            if (d != null && !string.IsNullOrEmpty(d.id) && !byId.ContainsKey(d.id))
+                byId.Add(d.id, d);
 
-        // ✅ 합계가 100이 아닐 경우 Normal로 폴백
-        Debug.LogWarning($"[Gacha] 확률 합계가 100이 아닙니다. 현재 합계: {normalThreshold}");
-        return CompanionGrade.Normal;
+        return byId;
     }
 }

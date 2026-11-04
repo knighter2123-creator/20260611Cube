@@ -40,7 +40,6 @@ public class BackendChart
             content.AppendLine("itemID : " + int.Parse(gameData["itemId"].ToString()));
             content.AppendLine("itemName : " + gameData["itemName"].ToString());
             content.AppendLine("itemType : " + gameData["itemType"].ToString());
-            content.AppendLine("itemID : " + long.Parse(gameData["itemPower"].ToString()));
             content.AppendLine("itemInfo : " + gameData["itemInfo"].ToString());
 
             Debug.Log(content.ToString());

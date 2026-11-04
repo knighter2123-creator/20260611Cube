@@ -44,6 +44,9 @@ public interface IDirectService
     void Connect(string myUid);
     void Disconnect();
 
+    /// <summary>대화방 목록과 보고 있는 방의 메시지를 서버에서 다시 받습니다. 실시간 리스너가 있는 서버(Firestore)는 할 일 없음.</summary>
+    void Refresh();
+
     /// <summary>그 방의 최근 count 개 메시지를 받기 시작합니다 (이전에 보던 방은 멈춤).</summary>
     void Watch(string myUid, string peerUid, int count);
     void Unwatch();

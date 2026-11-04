@@ -36,6 +36,12 @@ public interface IFriendService
     void Connect(string myUid);
     void Disconnect();
 
+    /// <summary>목록을 서버에서 다시 받아 Received 로 보냅니다. 실시간 리스너가 있는 서버(Firestore)는 할 일 없음.</summary>
+    void Refresh();
+
+    /// <summary>닉네임(정확히 일치)으로 유저를 찾습니다. onDone(uid, 오류 문구) — 찾으면 오류가 null.</summary>
+    void FindUser(string nickname, Action<string, string> onDone);
+
     void Request(string myUid, string myName, string peerUid, string peerName, Action<string> onDone);
     void Accept(string myUid, string myName, string peerUid, Action<string> onDone);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// 1:1 개인 메시지 — 두 사람 사이의 '대화방' 단위. 서버 구조는 FirestoreDirectService 주석 참고.
@@ -143,6 +144,7 @@ public partial class ChatManager
         if (watchedPeer == peerUid) return;
         watchedPeer = peerUid;
         ApplyWatch();
+        if (peerUid != null) RefreshDirect();   // 대화 탭을 열면 최신 쪽지부터 (실시간 리스너가 없는 서버)
     }
 
     /// <summary>그 상대와 주고받은 메시지 (보낸 시각 순). WatchConversation 으로 보고 있는 방만 채워져 있습니다.</summary>
@@ -208,10 +210,40 @@ public partial class ChatManager
         if (directLink.ShouldConnect(MyUid))
         {
             directLink.Connected(MyUid);
+            nextDirectPoll = Time.unscaledTime + DirectPollSeconds;
             directService.Connect(MyUid);   // 실패하면 이 안에서 바로 OnDirectFailed 가 불릴 수 있음
         }
 
         ApplyWatch();
+
+        // 실시간 리스너가 없는 서버(뒤끝 쪽지)용 — 목록을 받은 뒤에만 주기적으로 다시 받음
+        if (directLink.Key != null && roomsLoaded && Time.unscaledTime >= nextDirectPoll)
+            RefreshDirect();
+    }
+
+    /// <summary>
+    /// 개인 메시지를 다시 받는 간격(초). 대화 탭을 보고 있으면 짧게.
+    /// 실시간 알림(BackendNotify)이 연결돼 있으면 새 쪽지는 알림으로 바로 받으므로 길게 — 알림을 놓쳤을 때의 대비일 뿐.
+    /// 뒤끝 호출 수 = 2회 / 간격.
+    /// </summary>
+    private float DirectPollSeconds
+    {
+        get
+        {
+            bool realtime = BackendNotify.IsConnected;
+            if (watchedPeer != null) return realtime ? 30f : 10f;
+            return realtime ? 300f : 60f;
+        }
+    }
+
+    private float nextDirectPoll;
+
+    /// <summary>개인 메시지를 지금 다시 받습니다 (쪽지 알림을 받았을 때 등). 연결 전이면 아무것도 안 함.</summary>
+    public void RefreshDirect()
+    {
+        if (directLink.Key == null) return;
+        nextDirectPoll = Time.unscaledTime + DirectPollSeconds;
+        directService.Refresh();
     }
 
     /// <summary>보고 싶은 방(watchedPeer)과 실제로 받는 방을 맞춤. 방이 바뀌면 이전 방의 메시지는 비움.</summary>

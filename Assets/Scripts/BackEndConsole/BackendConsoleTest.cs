@@ -16,9 +16,19 @@ public class BackendConsoleTest : MonoBehaviour
 
     private bool running;
 
-    private void Start()
+    // ★ Start 에서 바로 실행하면 안 됩니다. 이 시점엔 AuthManager 가 아직 '마지막 계정 자동 로그인' 을 하기 전이라
+    //   IsSignedIn 이 false 로 보여서 아래 검사를 통과하고, 테스트 계정으로 로그인해 기기의 로그인 토큰을 덮어씁니다.
+    //   그러면 이어지는 자동 로그인이 테스트 계정 토큰으로 들어가 "저장된 계정과 토큰 계정이 다릅니다" 경고가 뜨고,
+    //   게임이 내 계정 대신 테스트 계정으로 바뀝니다 (친구·랭킹이 엉뚱한 계정 것으로 보임).
+    //   → AuthManager 가 시작 확인(IsReady)을 마칠 때까지 기다렸다가 판단합니다.
+    private System.Collections.IEnumerator Start()
     {
-        if (runOnStart) RunTest();
+        if (!runOnStart) yield break;
+
+        while (AuthManager.Instance != null && !AuthManager.Instance.IsReady)
+            yield return null;
+
+        RunTest();
     }
 
     [ContextMenu("뒤끝 가이드 테스트 실행")]
@@ -31,7 +41,7 @@ public class BackendConsoleTest : MonoBehaviour
         }
         if (running) return;
 
-        if (AuthManager.Instance != null && AuthManager.Instance.IsSignedIn)
+        if (AuthManager.Instance != null && (AuthManager.Instance.IsSignedIn || AuthManager.Instance.IsSigningIn))
         {
             Debug.LogWarning("[BackendConsoleTest] 게임에서 이미 로그인돼 있어 테스트를 건너뜁니다 — 테스트가 로그인 세션을 바꾸기 때문입니다. 로그아웃한 뒤 다시 실행하세요.");
             return;

@@ -172,6 +172,7 @@ public class FirestoreChatService : IChatService
     }
 
     public void Disconnect() => listener.Stop();
+    public void Tick() { }   // Firestore 리스너는 스스로 돎
 
     private void OnSnapshot(QuerySnapshot snap)
     {

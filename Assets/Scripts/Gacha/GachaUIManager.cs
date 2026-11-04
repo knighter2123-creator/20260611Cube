@@ -177,14 +177,22 @@ public class GachaUIManager : MonoBehaviour
         if (revealing != null) return;
 
         GachaSystem gacha = GachaSystem.Instance;
-        if (gacha == null) return;
+        if (gacha == null || gacha.IsDrawing) return;   // 서버 응답 대기 중 → 연타로 이중 결제 방지
 
-        OnDraw(count switch
+        // 서버 추첨이라 결과는 나중에 옵니다. 그 사이 씬이 바뀌어 이 UI 가 사라졌으면 무시합니다
+        // (지급·저장은 GachaSystem 이 이미 끝냈으므로 보상은 남습니다).
+        System.Action<List<GachaSystem.GachaResult>> onDone = results =>
         {
-            1   => gacha.DrawOne(),
-            10  => gacha.DrawTen(),
-            _   => gacha.DrawHundred()
-        });
+            if (this == null) return;
+            OnDraw(results);
+        };
+
+        switch (count)
+        {
+            case 1:  gacha.DrawOne(onDone);     break;
+            case 10: gacha.DrawTen(onDone);     break;
+            default: gacha.DrawHundred(onDone); break;
+        }
     }
 
     private void OnDraw(List<GachaSystem.GachaResult> results)

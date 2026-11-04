@@ -143,6 +143,11 @@ public class FirestoreFriendService : IFriendService
     public void Remove(string myUid, string peerUid, Action<string> onDone)
         => FirestoreChatData.Run(LOG_TAG, () => Doc(myUid, peerUid).DeleteAsync(), "처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", onDone);
 
+    public void Refresh() { }   // 실시간 리스너가 바뀔 때마다 보내 줌
+
+    public void FindUser(string nickname, Action<string, string> onDone)
+        => onDone?.Invoke(null, "닉네임 검색은 지원하지 않습니다. 채팅에서 상대 메시지를 눌러 신청하세요.");
+
     public void UpdateMyName(string myUid, string peerUid, string myName)
     {
         var data = new Dictionary<string, object> { { "names." + myUid, myName } };

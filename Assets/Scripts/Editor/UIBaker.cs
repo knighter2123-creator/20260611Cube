@@ -7,13 +7,19 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 예전에 런타임 코드로 만들던 창을 씬에 실제 오브젝트로 "굽고", 컴포넌트의 인스펙터 칸을 채우는 메뉴.
-///   Tools/UI 굽기/랭킹 창            — StageScene 을 열고 실행 (RankingPanel)
-///   Tools/UI 굽기/저장 데이터 선택 팝업 — LoginScene 을 열고 실행 (CloudSaveConflictPopup)
-///   Tools/UI 굽기/채팅 탭·친구 창      — StageScene 을 열고 실행 (ChatPanel 탭·나가기·유저 메뉴 + FriendPanel + 랭킹 옆 친구 버튼)
-///   Tools/UI 굽기/우편함              — StageScene 을 열고 실행 (MailboxPanel + 친구(없으면 랭킹) 옆 우편 버튼). 채팅 탭·친구 창을 먼저 굽는 것을 권장
-/// 실행한 뒤 씬을 저장하세요. 이미 구운 창이 있으면 지우고 새로 만듭니다 (Ctrl+Z 로 되돌릴 수 있음).
-/// 굽고 나면 모양은 씬에서 자유롭게 고쳐도 됩니다 — 다시 굽기 전까지는 고친 모양이 그대로 쓰입니다.
+/// 창 UI 를 '처음 한 번' 만들어 프리팹(Assets/Prefabs/UI)으로 저장하고, 컴포넌트의 인스펙터 칸을 채우는 메뉴.
+///
+/// ★ UI 를 고칠 때는 이 메뉴를 다시 누르지 말고, 프리팹(또는 씬의 프리팹 인스턴스)을 하이어라키에서 직접 고치세요.
+///   이 메뉴들은 이미 있는 창을 지우거나 덮어쓰지 않습니다 — 있으면 안내만 하고 멈춥니다.
+///   (예전에는 다시 구우면 지우고 새로 만들어서 손으로 고친 내용이 사라졌습니다)
+///
+///   Tools/UI 굽기/열린 씬의 창을 프리팹으로 저장 — 예전에 씬에 구워 둔 창을 프리팹으로 바꿈 (씬마다 한 번)
+///   Tools/UI 굽기/랭킹 창            — StageScene (RankingPanel)                     → RankingCanvas.prefab
+///   Tools/UI 굽기/저장 데이터 선택 팝업 — LoginScene (CloudSaveConflictPopup)           → CloudSaveConflictCanvas.prefab
+///   Tools/UI 굽기/채팅 탭·친구 창      — StageScene (ChatPanel 탭·유저 메뉴 + FriendPanel) → ChatCanvas.prefab (+ 랭킹 옆 친구 버튼은 씬에)
+///   Tools/UI 굽기/친구 창 - 닉네임 검색 칸 — 친구 창에 검색 칸이 없을 때만 더함 (ChatCanvas 프리팹에도 반영)
+///   Tools/UI 굽기/우편함              — StageScene (MailboxPanel)                     → MailboxCanvas.prefab (+ 우편 버튼은 씬에)
+/// 실행한 뒤 씬을 저장하세요.
 /// </summary>
 public static class UIBaker
 {
@@ -43,7 +49,7 @@ public static class UIBaker
         }
 
         var so = new SerializedObject(panel);
-        if (!ConfirmRebuild(so.FindProperty("root"), "랭킹 창")) return;
+        if (AlreadyExists(so.FindProperty("root").objectReferenceValue as GameObject, "랭킹 창")) return;
 
         TMP_FontAsset font = panel.Font != null ? panel.Font : MostUsedFont(panel.gameObject.scene);
         var b = new Builder(font);
@@ -137,7 +143,7 @@ public static class UIBaker
         if (panel.Font == null) so.FindProperty("font").objectReferenceValue = font;
         so.ApplyModifiedProperties();
 
-        Finish(panel.gameObject.scene, root, "랭킹 창");
+        Finish(panel.gameObject.scene, root, "랭킹 창", SaveAsPrefab(root, "RankingCanvas"));
     }
 
     /// <summary>순위 / 닉네임 / 스테이지 칸 세 개가 있는 줄 (배경 Image)</summary>
@@ -188,14 +194,8 @@ public static class UIBaker
             return;
 
         CloudSaveConflictPopup old = FindInOpenScenes<CloudSaveConflictPopup>();
-        TMP_FontAsset font = old != null && old.Font != null ? old.Font : MostUsedFont(scene);
-
-        if (old != null)
-        {
-            if (!EditorUtility.DisplayDialog("UI 굽기", "이미 저장 데이터 선택 팝업이 있습니다. 지우고 새로 만들까요?", "새로 만들기", "취소")) return;
-            scene = old.gameObject.scene;
-            Undo.DestroyObjectImmediate(old.gameObject);
-        }
+        if (AlreadyExists(old != null ? old.gameObject : null, "저장 데이터 선택 팝업")) return;
+        TMP_FontAsset font = MostUsedFont(scene);
 
         var b = new Builder(font);
 
@@ -250,7 +250,7 @@ public static class UIBaker
         so.ApplyModifiedPropertiesWithoutUndo();   // 막 만든 오브젝트 — 아래 생성 Undo 에 함께 묶임
 
         Undo.RegisterCreatedObjectUndo(root, "저장 데이터 선택 팝업 굽기");
-        Finish(scene, root, "저장 데이터 선택 팝업");
+        Finish(scene, root, "저장 데이터 선택 팝업", SaveAsPrefab(root, "CloudSaveConflictCanvas"));
     }
 
     private struct Side
@@ -331,28 +331,20 @@ public static class UIBaker
             return;
         }
 
-        // 예전에 구운 것 — 지우고 새로 (Window 는 이미 넓혀 둔 만큼을 빼고 다시 넓힘)
-        Transform         oldSidebar   = window.Find("Sidebar");
-        Transform         oldLeave     = window.Find("Leave");
-        var               oldMenu      = so.FindProperty("userMenu").objectReferenceValue as GameObject;
-        FriendPanel       friends      = chat.GetComponent<FriendPanel>();
-        GameObject        oldFriends   = friends != null ? new SerializedObject(friends).FindProperty("root").objectReferenceValue as GameObject : null;
-        OpenFriendsButton oldFriendBtn = FindInOpenScenes<OpenFriendsButton>();
+        // 이미 구운 것이 하나라도 있으면 멈춤 — 지우고 새로 만들면 손으로 고친 내용이 사라짐
+        FriendPanel friends = chat.GetComponent<FriendPanel>();
+        bool baked = window.Find("Sidebar") != null || window.Find("Leave") != null
+                  || so.FindProperty("userMenu").objectReferenceValue != null
+                  || (friends != null && new SerializedObject(friends).FindProperty("root").objectReferenceValue != null)
+                  || FindInOpenScenes<OpenFriendsButton>() != null;
+        if (AlreadyExists(baked ? chat.gameObject : null, "채팅 탭·친구 창")) return;
 
-        float shifted = 0f;
-        if (oldSidebar != null || oldLeave != null || oldMenu != null || oldFriends != null || oldFriendBtn != null)
-        {
-            if (!EditorUtility.DisplayDialog("UI 굽기", "이미 채팅 탭·친구 창이 있습니다. 지우고 새로 만들까요?", "새로 만들기", "취소")) return;
-            if (oldSidebar != null)
-            {
-                shifted = ((RectTransform)oldSidebar).offsetMax.x + 10f;   // 그때 민 거리 (ChatSidebarSpace 공식과 같음)
-                Undo.DestroyObjectImmediate(oldSidebar.gameObject);
-            }
-            if (oldLeave     != null) Undo.DestroyObjectImmediate(oldLeave.gameObject);
-            if (oldMenu      != null) Undo.DestroyObjectImmediate(oldMenu);
-            if (oldFriends   != null) Undo.DestroyObjectImmediate(oldFriends);
-            if (oldFriendBtn != null) Undo.DestroyObjectImmediate(oldFriendBtn.gameObject);
-        }
+        if (PrefabUtility.IsPartOfPrefabInstance(chat.gameObject) &&
+            !EditorUtility.DisplayDialog("UI 굽기", "ChatCanvas 가 이미 프리팹입니다. 씬에만 만들어지고 프리팹에는 자동 반영되지 않습니다 " +
+                                                   "(만든 뒤 인스펙터의 Overrides > Apply All 로 반영하세요). 계속할까요?", "계속", "취소"))
+            return;
+
+        const float shifted = 0f;
 
         var lineTemplate = so.FindProperty("logLineTemplate").objectReferenceValue as TMP_Text;
         TMP_FontAsset font = lineTemplate != null && lineTemplate.font != null ? lineTemplate.font : MostUsedFont(chat.gameObject.scene);
@@ -526,10 +518,152 @@ public static class UIBaker
         if (title != null) so.FindProperty("titleText").objectReferenceValue = title;
         so.ApplyModifiedProperties();
 
-        // ── 친구 버튼 — 랭킹 버튼 오른쪽, 그 줄의 버튼 간격 그대로 ──
+        // ── 친구 창 위쪽의 닉네임 검색 칸 ──
+        AddFriendSearchObjects(b, friends);
+
+        // ── 친구 버튼 — 랭킹 버튼 오른쪽, 그 줄의 버튼 간격 그대로 (HUD 에 있으므로 씬 오브젝트로 둠) ──
         GameObject friendButton = FriendsButtonFrom(rankingButton, friends);
 
-        Finish(chat.gameObject.scene, friendButton, "채팅 탭·유저 메뉴·친구 창·친구 버튼");
+        string prefab = PrefabUtility.IsPartOfPrefabInstance(chat.gameObject) ? null : SaveAsPrefab(chat.gameObject, "ChatCanvas");
+        Finish(chat.gameObject.scene, friendButton, "채팅 탭·유저 메뉴·친구 창·친구 버튼", prefab);
+    }
+
+    // 검색 칸 자리 — 목록(Viewport) 위쪽을 이만큼 내려서 만듦
+    private const float FriendSearchTop    = -120f;
+    private const float FriendSearchHeight = 90f;
+    private const float FriendListTopWithSearch = -230f;
+
+    /// <summary>
+    /// 이미 만든 친구 창에 '닉네임 검색 칸' 만 더합니다 — 검색 칸이 없을 때만 (있으면 지우거나 바꾸지 않음).
+    /// ChatCanvas 가 프리팹이면 더한 칸과 바뀐 값을 프리팹에도 반영합니다 (다른 수정 사항은 건드리지 않음).
+    /// </summary>
+    [MenuItem("Tools/UI 굽기/친구 창 - 닉네임 검색 칸 (StageScene)")]
+    private static void BakeFriendSearch()
+    {
+        FriendPanel friends = FindInOpenScenes<FriendPanel>();
+        if (friends == null)
+        {
+            EditorUtility.DisplayDialog("UI 굽기", "열린 씬에 FriendPanel 이 없습니다. StageScene 을 열고 '채팅 탭·친구 창' 부터 구우세요.", "확인");
+            return;
+        }
+
+        if (!TryAddFriendSearch(friends, out string error, out string prefabNote))
+        {
+            if (error != null) EditorUtility.DisplayDialog("UI 굽기", error, "확인");
+            return;
+        }
+        Finish(friends.gameObject.scene, friends.gameObject, "친구 창 닉네임 검색 칸", prefabNote);
+    }
+
+    /// <summary>
+    /// 검색 칸이 없으면 만들고, 프리팹 인스턴스면 프리팹에 반영합니다. 만들었으면 true.
+    /// 이미 있으면 false + error (안내 문구). 프리팹으로 저장(SaveAllAsPrefabs)하기 전에도 부릅니다.
+    /// </summary>
+    private static bool TryAddFriendSearch(FriendPanel friends, out string error, out string prefabNote)
+    {
+        error = null;
+        prefabNote = null;
+
+        var so = new SerializedObject(friends);
+        if (so.FindProperty("searchInput").objectReferenceValue != null)
+        {
+            error = "친구 창에 이미 닉네임 검색 칸이 있습니다. 모양은 하이어라키(프리팹)에서 직접 고치세요.";
+            return false;
+        }
+
+        var content = so.FindProperty("content").objectReferenceValue as RectTransform;
+        TMP_FontAsset font = content != null ? content.GetComponentsInChildren<TMP_Text>(true).Select(t => t.font).FirstOrDefault(f => f != null) : null;
+        if (font == null) font = MostUsedFont(friends.gameObject.scene);
+
+        if (!AddFriendSearchObjects(new Builder(font), friends, out RectTransform bar, out RectTransform viewport))
+        {
+            error = "FriendPanel 의 content 칸이 비어 있습니다. '채팅 탭·친구 창' 부터 구우세요.";
+            return false;
+        }
+
+        // 프리팹 인스턴스면 이번에 바꾼 것만 프리팹에 반영 (Apply All 처럼 다른 수정까지 밀어 넣지 않음)
+        if (PrefabUtility.IsPartOfPrefabInstance(friends.gameObject))
+        {
+            string path = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(friends.gameObject);
+            PrefabUtility.ApplyAddedGameObject(bar.gameObject, path, InteractionMode.UserAction);
+            PrefabUtility.ApplyObjectOverride(viewport, path, InteractionMode.UserAction);
+            PrefabUtility.ApplyObjectOverride(friends,  path, InteractionMode.UserAction);
+            prefabNote = $"프리팹에도 반영: {path}";
+        }
+        return true;
+    }
+
+    /// <summary>검색 칸 오브젝트를 만들고 FriendPanel 칸을 채웁니다 (있는지 검사는 부른 쪽에서).</summary>
+    private static bool AddFriendSearchObjects(Builder b, FriendPanel friends) => AddFriendSearchObjects(b, friends, out _, out _);
+
+    private static bool AddFriendSearchObjects(Builder b, FriendPanel friends, out RectTransform bar, out RectTransform viewport)
+    {
+        bar = null;
+        var so = new SerializedObject(friends);
+        var content = so.FindProperty("content").objectReferenceValue as RectTransform;
+        viewport = content != null ? content.parent as RectTransform : null;
+        var window = viewport != null ? viewport.parent as RectTransform : null;
+        if (window == null) return false;
+
+        // 목록을 아래로 내려 자리 만들기
+        Undo.RecordObject(viewport, "친구 검색 칸 굽기");
+        viewport.offsetMax = new Vector2(viewport.offsetMax.x, FriendListTopWithSearch);
+
+        bar = Container("Search", window);
+        Builder.PlaceTop(bar, 40f, 40f, FriendSearchTop, FriendSearchHeight);
+
+        TMP_InputField input = InputBox(b, bar, "Input", "친구 닉네임", 34f, PlayerProfile.MAX_LENGTH);
+        var inRt = (RectTransform)input.transform;
+        inRt.anchorMin = Vector2.zero;
+        inRt.anchorMax = Vector2.one;
+        inRt.offsetMin = Vector2.zero;
+        inRt.offsetMax = new Vector2(-250f, 0f);
+
+        Button send = LabeledButton(b, bar, "Request", "친구 요청", PopupCloudColor, 32f, out _);
+        var sRt = (RectTransform)send.transform;
+        sRt.anchorMin = new Vector2(1f, 0f);
+        sRt.anchorMax = new Vector2(1f, 1f);
+        sRt.pivot     = new Vector2(1f, 0.5f);
+        sRt.offsetMin = new Vector2(-230f, 0f);
+        sRt.offsetMax = Vector2.zero;
+
+        Undo.RegisterCreatedObjectUndo(bar.gameObject, "친구 검색 칸 굽기");
+
+        so.Update();
+        so.FindProperty("searchInput").objectReferenceValue  = input;
+        so.FindProperty("searchButton").objectReferenceValue = send;
+        so.ApplyModifiedProperties();
+        return true;
+    }
+
+    /// <summary>한 줄 입력 칸 (배경 + 글자 영역 RectMask2D + 안내 글자 + 입력 글자)</summary>
+    private static TMP_InputField InputBox(Builder b, Transform parent, string name, string placeholder, float size, int limit)
+    {
+        RectTransform bg = b.Image(name, parent, new Color(1f, 1f, 1f, 0.08f), true);
+
+        RectTransform area = Container("Text Area", bg);
+        area.offsetMin = new Vector2(20f, 6f);
+        area.offsetMax = new Vector2(-20f, -6f);
+        area.gameObject.AddComponent<RectMask2D>();
+
+        TextMeshProUGUI hint = b.Text("Placeholder", area, placeholder, size, TextAlignmentOptions.MidlineLeft, false);
+        Builder.Stretch(hint.rectTransform);
+        hint.color = new Color(1f, 1f, 1f, 0.4f);
+
+        TextMeshProUGUI text = b.Text("Text", area, string.Empty, size, TextAlignmentOptions.MidlineLeft, false);
+        Builder.Stretch(text.rectTransform);
+        text.richText = false;   // 입력한 <b> 같은 글자가 서식으로 바뀌지 않게
+
+        var input = bg.gameObject.AddComponent<TMP_InputField>();
+        input.targetGraphic  = bg.GetComponent<Image>();
+        input.textViewport   = area;
+        input.textComponent  = text;
+        input.placeholder    = hint;
+        input.characterLimit = limit;
+        input.lineType       = TMP_InputField.LineType.SingleLine;
+        input.richText       = false;
+        input.pointSize      = size;
+        return input;
     }
 
     /// <summary>
@@ -602,12 +736,7 @@ public static class UIBaker
         OpenMailboxButton oldButton = FindInOpenScenes<OpenMailboxButton>();
         GameObject oldRoot = panel != null ? new SerializedObject(panel).FindProperty("root").objectReferenceValue as GameObject : null;
 
-        if (oldRoot != null || oldButton != null)
-        {
-            if (!EditorUtility.DisplayDialog("UI 굽기", "이미 우편함이 있습니다. 지우고 새로 만들까요?", "새로 만들기", "취소")) return;
-            if (oldRoot   != null) Undo.DestroyObjectImmediate(oldRoot);
-            if (oldButton != null) Undo.DestroyObjectImmediate(oldButton.gameObject);
-        }
+        if (AlreadyExists(oldRoot != null ? oldRoot : oldButton != null ? oldButton.gameObject : null, "우편함")) return;
 
         // 컴포넌트를 둘 항상 켜진 빈 오브젝트 — 없으면 씬 최상위에 만듦
         if (panel == null)
@@ -684,7 +813,7 @@ public static class UIBaker
         bso.ApplyModifiedPropertiesWithoutUndo();   // 막 만든 오브젝트 — 아래 생성 Undo 에 함께 묶임
         Undo.RegisterCreatedObjectUndo(button, "우편함 버튼 굽기");
 
-        Finish(scene, root, "우편함·우편함 버튼");
+        Finish(scene, root, "우편함·우편함 버튼", SaveAsPrefab(root, "MailboxCanvas"));
     }
 
     /// <summary>우편 한 줄 — 제목 / 내용 / 보상 세 줄 + 오른쪽 [받기]</summary>
@@ -817,17 +946,97 @@ public static class UIBaker
 
     // ═════════════════════════════ 공용 ═════════════════════════════
 
-    /// <summary>예전에 구운 창이 있으면 지울지 묻고 지웁니다. 계속하면 true.</summary>
-    private static bool ConfirmRebuild(SerializedProperty rootProp, string what)
+    /// <summary>
+    /// 이미 있으면 안내하고 true (부른 쪽은 멈춤). 지우거나 덮어쓰지 않습니다 — 손으로 고친 UI 를 지키기 위해.
+    /// </summary>
+    private static bool AlreadyExists(GameObject existing, string what)
     {
-        var old = rootProp.objectReferenceValue as GameObject;
-        if (old == null) return true;
+        if (existing == null) return false;
 
-        if (!EditorUtility.DisplayDialog("UI 굽기", $"이미 {what}이 있습니다 ({old.name}). 지우고 새로 만들까요?", "새로 만들기", "취소"))
-            return false;
-
-        Undo.DestroyObjectImmediate(old);
+        string where = PrefabUtility.IsPartOfPrefabInstance(existing)
+            ? $"프리팹 '{PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(existing)}' 을 열어"
+            : "하이어라키에서 (또는 'Tools/UI 굽기/열린 씬의 창을 프리팹으로 저장' 으로 프리팹을 만든 뒤)";
+        EditorUtility.DisplayDialog("UI 굽기",
+            $"이미 {what}이(가) 있습니다 ({existing.name}).\n이 메뉴는 처음 한 번만 만듭니다. 모양은 {where} 직접 고치세요.", "확인");
+        EditorGUIUtility.PingObject(existing);
         return true;
+    }
+
+    private const string PrefabFolder = "Assets/Prefabs/UI";
+
+    /// <summary>
+    /// 씬 오브젝트를 Assets/Prefabs/UI 에 프리팹으로 저장하고 씬의 것을 그 프리팹 인스턴스로 바꿉니다. 결과 한 줄 (이미 프리팹이면 그 안내).
+    /// 창 밖 씬 오브젝트를 가리키는 칸은 프리팹 파일에는 빈칸으로, 씬의 인스턴스에는 그대로(오버라이드) 남습니다.
+    /// </summary>
+    private static string SaveAsPrefab(GameObject root, string fileName)
+    {
+        if (root == null) return null;
+        if (PrefabUtility.IsPartOfPrefabInstance(root))
+            return $"{root.name}: 이미 프리팹 ({PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(root)})";
+
+        EnsureFolder(PrefabFolder);
+        string path = AssetDatabase.GenerateUniqueAssetPath($"{PrefabFolder}/{fileName}.prefab");
+        GameObject asset = PrefabUtility.SaveAsPrefabAssetAndConnect(root, path, InteractionMode.UserAction, out bool ok);
+        return ok && asset != null ? $"{root.name} → {path}" : $"{root.name}: 프리팹 저장 실패 (콘솔 확인)";
+    }
+
+    private static void EnsureFolder(string folder)
+    {
+        string[] parts = folder.Split('/');
+        string current = parts[0];   // "Assets"
+        for (int i = 1; i < parts.Length; i++)
+        {
+            string next = current + "/" + parts[i];
+            if (!AssetDatabase.IsValidFolder(next)) AssetDatabase.CreateFolder(current, parts[i]);
+            current = next;
+        }
+    }
+
+    /// <summary>
+    /// 예전에 씬에 구워 둔 창들을 프리팹으로 바꿉니다 (열린 씬 전부). 이미 프리팹인 것은 건너뜁니다.
+    /// 친구 창에 닉네임 검색 칸이 없으면 먼저 더한 뒤 저장합니다.
+    /// StageScene 과 LoginScene 에서 각각 한 번씩 실행하고 씬을 저장하세요.
+    /// </summary>
+    [MenuItem("Tools/UI 굽기/열린 씬의 창을 프리팹으로 저장")]
+    private static void SaveAllAsPrefabs()
+    {
+        var lines = new System.Collections.Generic.List<string>();
+        var dirty = new System.Collections.Generic.HashSet<Scene>();
+
+        void Save(Component owner, GameObject root, string fileName)
+        {
+            if (owner == null || root == null) return;
+            string line = SaveAsPrefab(root, fileName);
+            if (line != null) lines.Add(line);
+            dirty.Add(root.scene);
+        }
+
+        RankingPanel ranking = FindInOpenScenes<RankingPanel>();
+        if (ranking != null) Save(ranking, new SerializedObject(ranking).FindProperty("root").objectReferenceValue as GameObject, "RankingCanvas");
+
+        MailboxPanel mailbox = FindInOpenScenes<MailboxPanel>();
+        if (mailbox != null) Save(mailbox, new SerializedObject(mailbox).FindProperty("root").objectReferenceValue as GameObject, "MailboxCanvas");
+
+        ChatPanel chat = FindInOpenScenes<ChatPanel>();
+        if (chat != null)
+        {
+            FriendPanel friends = chat.GetComponent<FriendPanel>();
+            if (friends != null && !PrefabUtility.IsPartOfPrefabInstance(chat.gameObject)
+                && TryAddFriendSearch(friends, out _, out _))
+                lines.Add("친구 창에 닉네임 검색 칸을 더했습니다.");
+            Save(chat, chat.gameObject, "ChatCanvas");
+        }
+
+        CloudSaveConflictPopup popup = FindInOpenScenes<CloudSaveConflictPopup>();
+        if (popup != null) Save(popup, popup.gameObject, "CloudSaveConflictCanvas");
+
+        foreach (Scene s in dirty) EditorSceneManager.MarkSceneDirty(s);
+
+        EditorUtility.DisplayDialog("UI 굽기",
+            lines.Count == 0
+                ? "열린 씬에서 프리팹으로 바꿀 창을 찾지 못했습니다. StageScene(또는 LoginScene)을 열고 다시 실행하세요."
+                : string.Join("\n", lines) + "\n\n씬을 저장하세요. 이제부터는 프리팹을 열어(또는 씬에서 고친 뒤 Overrides > Apply) 모양을 고치면 됩니다.",
+            "확인");
     }
 
     private static T FindInOpenScenes<T>() where T : Component
@@ -849,12 +1058,14 @@ public static class UIBaker
         return font;
     }
 
-    private static void Finish(Scene scene, GameObject root, string what)
+    private static void Finish(Scene scene, GameObject root, string what, string prefabNote = null)
     {
         EditorSceneManager.MarkSceneDirty(scene);
         Selection.activeGameObject = root;
         EditorGUIUtility.PingObject(root);
-        Debug.Log($"[UIBaker] {what}을(를) '{scene.name}' 에 만들고 인스펙터 칸을 채웠습니다. 씬을 저장하세요.", root);
+        string note = string.IsNullOrEmpty(prefabNote) ? string.Empty : $" 프리팹: {prefabNote}.";
+        Debug.Log($"[UIBaker] {what}을(를) '{scene.name}' 에 만들고 인스펙터 칸을 채웠습니다.{note} 씬을 저장하세요. " +
+                  "이후 모양은 프리팹/하이어라키에서 직접 고치세요 (이 메뉴는 다시 만들지 않습니다).", root);
     }
 
     /// <summary>UI 오브젝트를 만드는 도우미 (폰트를 한 번만 넘기려고 인스턴스로 둠)</summary>

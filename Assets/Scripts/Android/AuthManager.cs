@@ -212,7 +212,14 @@ public class AuthManager : MonoBehaviour
             {
                 string serverUid = CurrentBackendUid();
                 if (!string.IsNullOrEmpty(uid) && serverUid != uid)
+                {
+                    // 다른 코드가 이 기기의 뒤끝 로그인 토큰을 바꿨을 때 (예: 테스트 스크립트가 다른 계정으로 로그인).
+                    // 저장해 둔 이메일·로그인 방식은 이전 계정 것이므로 버리고, RefreshUserInfo 가 새 계정 값으로 채웁니다.
                     Debug.LogWarning($"[Auth] 저장된 계정({Short(uid)})과 토큰 계정({Short(serverUid)})이 다릅니다 — 토큰 계정을 씁니다.");
+                    email     = null;
+                    nickname  = null;
+                    hasMethod = false;
+                }
 
                 uid    = serverUid;
                 online = true;

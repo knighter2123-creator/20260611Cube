@@ -11,8 +11,9 @@ using UnityEngine;
 /// [하는 일]  연결 관리 / 최근 메시지 보관 / 보내기 전 검사(길이·도배).
 /// [안 하는 일]  서버 통신 — IChatService 구현체가 함.  UI — ChatPanel 이 Changed 를 받아 그림.
 ///
+/// [서버]  뒤끝 (BackendChatService) — 전체 채팅은 뒤끝챗, 친구는 뒤끝 친구, 개인 메시지는 뒤끝 쪽지.
 /// [언제 연결하는가]  서비스가 "나" 의 ID 를 줄 수 있게 되면 (IChatService.TryGetIdentity).
-///   Firestore 는 로그인 유저면 계정 UID, 게스트면 채팅 전용 익명 UID (FirestoreChatService 주석 ★ 참고).
+///   뒤끝은 로그인(온라인) + 닉네임이 정해진 계정의 UID(gamer inDate). 로그인 전에는 채팅을 쓸 수 없습니다.
 ///   ID 가 바뀌면(로그인·로그아웃·계정 전환) 끊고 목록을 비운 뒤 다시 연결합니다.
 ///   패널이 닫혀 있어도 연결을 유지합니다 → 미리보기 한 줄이 계속 갱신되고, 열자마자 대화가 보입니다.
 ///
@@ -20,7 +21,9 @@ using UnityEngine;
 ///   로그인 유저는 ProfileSync.TryGetAccount 가 통과할 때만 보냄 — 계정 전환 중 다른(게스트) 세이브의 이름·기록으로 말하지 않게.
 ///   게스트는 게스트 세이브의 이름(없으면 "익명1234")으로 바로 보냅니다.
 ///
-/// ⚠ 길이·간격 검사는 클라이언트 검사입니다. 서버 쪽은 Firestore 보안 규칙으로 막아야 합니다 (uid 본인 확인, 글자 수).
+/// [길이·도배 제한]  전체 채팅은 뒤끝챗 콘솔 설정(금칙어·도배·최대 길이·저장 기간)만 따릅니다 — 클라이언트는 검사하지 않고,
+///   서버가 거절하면 BackendChatService 가 오류 문구(MESSAGE_SPAM / MESSAGE_TOO_LONG 등)로 알려 줍니다.
+///   개인 메시지(뒤끝 쪽지)에는 콘솔 채팅 설정이 적용되지 않으므로 DIRECT_MAX_LENGTH · sendCooldown 으로 클라이언트에서 막습니다.
 ///
 /// [나눠 둔 파일]
 ///   ChatManager.Direct.cs  — 1:1 개인 메시지 (대화방, 나가기, 안 읽은 수)
@@ -32,15 +35,23 @@ public partial class ChatManager : MonoBehaviour
 {
     public static ChatManager Instance { get; private set; }
 
-    public enum Backend { Firestore, Local }
+    // ★ 값(숫자)이 씬에 저장됩니다 — 0 은 예전 Firestore 자리였고 지금은 뒤끝입니다 (씬에 0 으로 저장된 것이 그대로 뒤끝이 되게).
+    //   새 값은 맨 뒤에 추가하세요.
+    public enum Backend { Backnd = 0, Local = 1, Firestore = 2 }
 
-    /// <summary>한 메시지 최대 글자 수. 입력창 제한·보안 규칙과 맞춰 주세요.</summary>
-    public const int MAX_LENGTH = 60;
+    /// <summary>개인 메시지(쪽지) 한 통 최대 글자 수. 전체 채팅 길이는 뒤끝챗 콘솔에서 정합니다.</summary>
+    public const int DIRECT_MAX_LENGTH = 60;
 
     private const string AccountPending = "계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.";
 
-    [Tooltip("Firestore = 실제 서버, Local = 서버 없이 나에게만 보이는 테스트")]
-    [SerializeField] private Backend backend = Backend.Firestore;
+    [Tooltip("Backnd = 뒤끝 서버 (전체 채팅 뒤끝챗 · 친구 · 쪽지), Local = 서버 없이 나에게만 보이는 테스트, " +
+             "Firestore = 옛 Firebase 서버 (LegacyFirestore 가 꺼져 있으면 Backnd 로 바뀜)")]
+    [SerializeField] private Backend backend = Backend.Backnd;
+
+    [Tooltip("뒤끝챗 콘솔에서 만든 공개 채널 그룹 이름")]
+    [SerializeField] private string channelGroup = "global";
+    [Tooltip("그 그룹 안의 채널 이름. 비우면 그룹 이름과 같게")]
+    [SerializeField] private string channelName = "";
 
     [Tooltip("보관·표시할 최근 메시지 수 (연결할 때 이만큼 받아 옴)")]
     [SerializeField] private int historyCount = 50;
@@ -48,7 +59,7 @@ public partial class ChatManager : MonoBehaviour
     [Tooltip("개인 채팅 탭을 열 때 받아 오는 최근 메시지 수")]
     [SerializeField] private int directHistoryCount = 50;
 
-    [Tooltip("메시지 사이 최소 간격(초) — 도배 방지")]
+    [Tooltip("개인 메시지 사이 최소 간격(초) — 도배 방지. 전체 채팅 도배는 뒤끝챗 콘솔 설정으로 막습니다.")]
     [SerializeField] private float sendCooldown = 1.5f;
 
     [Tooltip("연결이 끊겼을 때 다시 연결하기까지 기다리는 시간(초)")]
@@ -86,16 +97,20 @@ public partial class ChatManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        // 뒤끝 이전 중 — Firestore 채팅은 Firebase 로그인이 필요해서, 뒤끝 채팅이 생길 때까지 Local 로 (LegacyFirestore 주석)
-        if (!LegacyFirestore.Enabled) backend = Backend.Local;
+        // 뒤끝으로 옮긴 뒤에는 Firestore 를 쓸 수 없음 (Firebase 로그인이 없음 — LegacyFirestore 주석)
+        if (!LegacyFirestore.Enabled && backend == Backend.Firestore) backend = Backend.Backnd;
 
-        service = CreateService(backend);
+        service = CreateService(backend, channelGroup, channelName);
         service.MessagesReceived += OnMessagesReceived;
         service.MessagesRemoved  += OnMessagesRemoved;
         service.Failed           += OnServiceFailed;
 
         AwakeFriends();
         AwakeDirect();
+
+        usesBackendSocial = friendService is BackendFriendService || directService is BackendDirectService;
+        BackendNotify.FriendsChanged  += OnRealtimeFriends;
+        BackendNotify.MessageReceived += OnRealtimeMessage;
     }
 
     private void OnDestroy()
@@ -110,15 +125,42 @@ public partial class ChatManager : MonoBehaviour
 
         DestroyFriends();
         DestroyDirect();
+
+        BackendNotify.FriendsChanged  -= OnRealtimeFriends;
+        BackendNotify.MessageReceived -= OnRealtimeMessage;
+        if (usesBackendSocial) BackendNotify.Tick(null);   // 실시간 알림 끊기
+    }
+
+    // ───────────────────────────── 뒤끝 실시간 알림 ─────────────────────────────
+
+    private bool usesBackendSocial;   // 친구·개인 메시지가 뒤끝이면 실시간 알림을 씀
+
+    /// <summary>친구나 개인 메시지가 연결돼 있는 동안 그 계정으로 실시간 알림을 받음 (BackendNotify 주석).</summary>
+    private void UpdateRealtime()
+    {
+        if (!usesBackendSocial) return;
+        string uid = friendsLink.Key ?? directLink.Key;
+        BackendNotify.Tick(uid == "local" ? null : uid);
+    }
+
+    private void OnRealtimeFriends()
+    {
+        if (friendsLink.Key != null) RefreshFriends();
+    }
+
+    private void OnRealtimeMessage()
+    {
+        if (directLink.Key != null) RefreshDirect();
     }
 
     /// <summary>서버 종류를 늘리려면 여기에 한 줄 추가 (IChatService 주석 참고).</summary>
-    private static IChatService CreateService(Backend backend)
+    private static IChatService CreateService(Backend backend, string group, string name)
     {
         switch (backend)
         {
-            case Backend.Local: return new LocalChatService();
-            default:            return new FirestoreChatService();
+            case Backend.Local:     return new LocalChatService();
+            case Backend.Firestore: return new FirestoreChatService();
+            default:                return new BackendChatService(group, name);   // 전체 채팅 뒤끝챗 + 친구 뒤끝 친구 + 개인 메시지 뒤끝 쪽지
         }
     }
 
@@ -132,6 +174,8 @@ public partial class ChatManager : MonoBehaviour
 
     private void Update()
     {
+        service.Tick();   // 뒤끝챗 ChatClient.Update — 받은 메시지 콜백이 이 안에서 옴
+
         string key = service.TryGetIdentity(out string uid, out string reason) ? uid : null;
 
         if (chatLink.ShouldDisconnect(key))
@@ -157,6 +201,7 @@ public partial class ChatManager : MonoBehaviour
 
         UpdateFriendsConnection();
         UpdateDirectConnection();
+        UpdateRealtime();
 
         if (reason == null && chatLink.Key == null)
             reason = chatLink.FailReason ?? "채팅 서버에 연결하는 중입니다...";
@@ -221,8 +266,8 @@ public partial class ChatManager : MonoBehaviour
             SentAt   = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
 
-        sending      = true;
-        nextSendTime = Time.unscaledTime + sendCooldown;
+        sending = true;   // 한 번에 하나 — 서비스가 보내는 중인 메시지를 하나만 추적함
+        if (toUid != null) nextSendTime = Time.unscaledTime + sendCooldown;
 
         Action<string> done = result =>
         {
@@ -244,8 +289,10 @@ public partial class ChatManager : MonoBehaviour
         if (UnavailableReason != null)                    return UnavailableReason;
         if (direct && CannotSendDirect(toUid, out string directError)) return directError;
         if (text.Length == 0)                             return "메시지를 입력해 주세요.";
-        if (text.Length > MAX_LENGTH)                     return $"메시지는 {MAX_LENGTH}자까지 보낼 수 있습니다.";
-        if (sending || Time.unscaledTime < nextSendTime)  return "너무 빨리 보내고 있습니다. 잠시 후 다시 보내 주세요.";
+        if (sending)                                      return "보내는 중입니다. 잠시 후 다시 보내 주세요.";
+        // 전체 채팅의 길이·도배는 뒤끝챗 콘솔 설정으로 서버가 막음 — 여기서는 개인 메시지만 검사
+        if (direct && text.Length > DIRECT_MAX_LENGTH)    return $"개인 메시지는 {DIRECT_MAX_LENGTH}자까지 보낼 수 있습니다.";
+        if (direct && Time.unscaledTime < nextSendTime)   return "너무 빨리 보내고 있습니다. 잠시 후 다시 보내 주세요.";
         if (!TryGetSender(out uid))                       return "계정 정보를 확인하는 중입니다. 잠시 후 다시 보내 주세요.";
         if (direct && toUid == uid)                       return "나에게는 개인 메시지를 보낼 수 없습니다.";
         return null;

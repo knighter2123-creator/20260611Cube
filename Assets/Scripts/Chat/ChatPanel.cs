@@ -81,7 +81,8 @@ public partial class ChatPanel : MonoBehaviour
     [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
 
-    private static string DefaultPlaceholder => $"메시지 입력 (최대 {ChatManager.MAX_LENGTH}자)";
+    private const string DefaultPlaceholder = "메시지 입력";
+    private static string DirectPlaceholder => $"메시지 입력 (최대 {ChatManager.DIRECT_MAX_LENGTH}자)";
     private const string PeerLeftPlaceholder = "상대방이 대화방을 나갔습니다.";
     private TMP_Text placeholderText;
 
@@ -112,8 +113,8 @@ public partial class ChatPanel : MonoBehaviour
         foreach (Graphic g in previewBar.GetComponentsInChildren<Graphic>(true))
             g.raycastTarget = false;
 
-        // 글자 수 제한은 ChatManager 상수를 따름 (씬 값과 어긋나지 않게 코드에서 덮어씀)
-        input.characterLimit = ChatManager.MAX_LENGTH;
+        // 글자 수 제한 — 전체 채팅은 0(제한 없음, 뒤끝챗 콘솔이 막음), 개인 메시지는 ChatManager 상수 (SetInputState 에서 탭마다 바꿈)
+        input.characterLimit = 0;
         input.onSubmit.AddListener(_ => Submit());   // PC 엔터 / 모바일 키보드 완료
         placeholderText = input.placeholder as TMP_Text;
         if (placeholderText != null) placeholderText.text = DefaultPlaceholder;
@@ -291,7 +292,7 @@ public partial class ChatPanel : MonoBehaviour
 
         int shown = SyncRows(chat);
         ShowStatus(StatusFor(reason, shown, direct));
-        SetInputState(usable: reason == null && !peerLeft, peerLeft);
+        SetInputState(usable: reason == null && !peerLeft, peerLeft, direct);
 
         if (scrollToBottom || wasAtBottom)
         {
@@ -309,15 +310,23 @@ public partial class ChatPanel : MonoBehaviour
                       : "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!";
     }
 
-    private void SetInputState(bool usable, bool peerLeft)
+    private void SetInputState(bool usable, bool peerLeft, bool direct)
     {
         input.interactable      = usable;
         sendButton.interactable = usable;
         if (peerLeft && input.text.Length > 0) input.text = string.Empty;
 
+        // 개인 메시지 탭만 클라이언트 글자 수 제한 (전체 채팅은 뒤끝챗 콘솔 설정)
+        int limit = direct ? ChatManager.DIRECT_MAX_LENGTH : 0;
+        if (input.characterLimit != limit)
+        {
+            input.characterLimit = limit;
+            if (limit > 0 && input.text.Length > limit) input.text = input.text.Substring(0, limit);   // 전체 탭에서 길게 쓰다 넘어온 경우
+        }
+
         if (placeholderText != null)
         {
-            string hint = peerLeft ? PeerLeftPlaceholder : DefaultPlaceholder;
+            string hint = peerLeft ? PeerLeftPlaceholder : direct ? DirectPlaceholder : DefaultPlaceholder;
             if (placeholderText.text != hint) placeholderText.text = hint;
         }
     }

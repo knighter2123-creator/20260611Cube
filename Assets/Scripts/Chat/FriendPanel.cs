@@ -43,11 +43,18 @@ public class FriendPanel : MonoBehaviour
     [SerializeField] private TextMeshProUGUI noticeText;
     [SerializeField] private ChatPanel chatPanel;
 
+    [Header("닉네임으로 친구 요청 (Tools/UI 굽기/친구 창 - 닉네임 검색 칸 이 채움 · 비워 두면 숨김)")]
+    [SerializeField] private TMP_InputField searchInput;
+    [SerializeField] private Button         searchButton;
+
     [SerializeField] private float noticeDuration = 3f;
     [Tooltip("[삭제] 를 누른 뒤 이 시간(초) 안에 한 번 더 누르면 삭제")]
     [SerializeField] private float confirmSeconds = 3f;
 
-    private const string BlockHint = "차단한 유저의 채팅은 내 화면에서만 보이지 않습니다. [해제] 를 누르면 다시 보입니다.";
+    private const string BlockHint  = "차단한 유저의 채팅은 내 화면에서만 보이지 않습니다. [해제] 를 누르면 다시 보입니다.";
+    private const string SearchHint = "상대의 닉네임을 정확히 입력하고 [친구 요청] 을 누르세요. 친구가 되면 [메시지] 로 대화할 수 있습니다.";
+
+    private bool searching;   // 검색·요청 중 — 연타 방지
 
     private readonly List<GameObject> rows = new List<GameObject>();
     private bool   ready;
@@ -76,7 +83,11 @@ public class FriendPanel : MonoBehaviour
         if (closeButton != null) closeButton.onClick.AddListener(Close);
         if (blockListButton != null) blockListButton.onClick.AddListener(ToggleBlocked);
 
-        hint         = noticeText != null ? noticeText.text : null;
+        if (searchButton != null) searchButton.onClick.AddListener(OnSearch);
+        if (searchInput  != null) searchInput.onSubmit.AddListener(_ => OnSearch());
+
+        // 검색 칸이 있으면 안내 문구도 그에 맞춤 (굽기 때 넣은 문구는 '채팅에서 누르기' 안내)
+        hint         = searchInput != null ? SearchHint : noticeText != null ? noticeText.text : null;
         friendsTitle = titleText  != null ? titleText.text  : null;
         headerTemplate.gameObject.SetActive(false);
         rowTemplate.gameObject.SetActive(false);
@@ -91,6 +102,9 @@ public class FriendPanel : MonoBehaviour
         confirmUid  = null;
         showBlocked = false;
         noticeUntil = float.NegativeInfinity;
+        // 서버(뒤끝)는 실시간 알림이 없어 열 때 최신 목록을 받음 (유니티 오브젝트라 ?. 대신 != null)
+        ChatManager chat = ChatManager.Instance;
+        if (chat != null) chat.RefreshFriends();
         Draw();
     }
 
@@ -207,6 +221,41 @@ public class FriendPanel : MonoBehaviour
                     break;
             }
         }
+    }
+
+    /// <summary>[친구 요청] — 입력한 닉네임의 유저에게 요청 (이미 나에게 요청한 사람이면 수락).</summary>
+    private void OnSearch()
+    {
+        if (searching || searchInput == null) return;
+
+        ChatManager chat = ChatManager.Instance;
+        if (chat == null) { Notice(ChatText.NoManager); return; }
+
+        string name = searchInput.text.Trim();
+        // 이미 나에게 요청한 사람이면 RequestFriendByName 이 '수락' 으로 처리함 — 완료 문구를 고르려고 미리 봐 둠
+        bool accepting = chat.TryGetFriendship(PeerUidByName(chat, name), out Friendship before) && before.State == FriendState.Incoming;
+        searching = true;
+        if (searchButton != null) searchButton.interactable = false;
+
+        chat.RequestFriendByName(name, error =>
+        {
+            if (this == null) return;
+            searching = false;
+            if (searchButton != null) searchButton.interactable = true;
+
+            if (error == null)
+            {
+                searchInput.text = string.Empty;
+                Notice(accepting ? $"{ChatText.Plain(name)} 님과 친구가 되었습니다." : $"{ChatText.Plain(name)} 님에게 친구 요청을 보냈습니다.");
+            }
+            else Notice(error);
+        });
+    }
+
+    private static string PeerUidByName(ChatManager chat, string name)
+    {
+        foreach (Friendship f in chat.Friendships) if (f.PeerName == name) return f.PeerUid;
+        return null;
     }
 
     private void OnRemoveFriend(ChatManager chat, string uid, string name)

@@ -11,18 +11,33 @@ public class LocalChatService : IChatService
     public event Action<IReadOnlyList<string>> MessagesRemoved { add { } remove { } }   // 지울 일이 없음
     public event Action<string> Failed { add { } remove { } }                           // 끊길 일이 없음
 
-    public IFriendService Friends { get; } = new LocalFriendService();
-    public IDirectService Direct  { get; } = new LocalDirectService();
+    public IFriendService Friends { get; }
+    public IDirectService Direct  { get; }
 
+    /// <param name="friends">친구를 실제 서버로 쓸 때 (뒤끝 이전 중 — BackendFriendService). 비우면 LocalFriendService.</param>
+    /// <param name="direct">개인 메시지를 실제 서버로 쓸 때 (BackendDirectService). 비우면 LocalDirectService.</param>
+    public LocalChatService(IFriendService friends = null, IDirectService direct = null)
+    {
+        Friends = friends ?? new LocalFriendService();
+        Direct  = direct  ?? new LocalDirectService();
+    }
+
+    /// <summary>
+    /// 로그인했으면 그 계정 UID, 아니면 "local".
+    /// 계정이 바뀌면 값도 바뀌어 ChatManager 가 친구·대화를 비우고 새 계정으로 다시 연결합니다
+    /// (계속 "local" 이면 다른 계정으로 로그인해도 이전 계정의 친구 목록이 남음).
+    /// </summary>
     public bool TryGetIdentity(out string uid, out string reason)
     {
-        uid    = "local";
+        AuthManager auth = AuthManager.Instance;
+        uid    = auth != null && auth.IsSignedIn && !string.IsNullOrEmpty(auth.Uid) ? auth.Uid : "local";
         reason = null;
         return true;
     }
 
     public void Connect(int historyCount) { }
     public void Disconnect() { }
+    public void Tick() { }
 
     public void Send(ChatMessage message, Action<string> onDone)
     {
@@ -49,6 +64,10 @@ public class LocalFriendService : IFriendService
     }
 
     public void Disconnect() { }
+    public void Refresh() => Publish();
+
+    // 상대가 없는 테스트용 — 닉네임을 그대로 가짜 uid 로
+    public void FindUser(string nickname, Action<string, string> onDone) => onDone?.Invoke("local:" + nickname, null);
 
     public void Request(string myUid, string myName, string peerUid, string peerName, Action<string> onDone)
     {
@@ -117,6 +136,7 @@ public class LocalDirectService : IDirectService
 
     public void Connect(string myUid) => Publish();
     public void Disconnect() => watching = null;
+    public void Refresh() => Publish();
 
     public void Watch(string myUid, string peerUid, int count)
     {
