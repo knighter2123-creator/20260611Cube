@@ -79,12 +79,7 @@ public class FriendPanel : MonoBehaviour
             return;
         }
 
-        if (dimButton   != null) dimButton.onClick.AddListener(Close);
-        if (closeButton != null) closeButton.onClick.AddListener(Close);
-        if (blockListButton != null) blockListButton.onClick.AddListener(ToggleBlocked);
-
-        if (searchButton != null) searchButton.onClick.AddListener(OnSearch);
-        if (searchInput  != null) searchInput.onSubmit.AddListener(_ => OnSearch());
+        AddListenerButton();
 
         // 검색 칸이 있으면 안내 문구도 그에 맞춤 (굽기 때 넣은 문구는 '채팅에서 누르기' 안내)
         hint         = searchInput != null ? SearchHint : noticeText != null ? noticeText.text : null;
@@ -92,6 +87,16 @@ public class FriendPanel : MonoBehaviour
         headerTemplate.gameObject.SetActive(false);
         rowTemplate.gameObject.SetActive(false);
         root.SetActive(false);
+    }
+
+    void AddListenerButton()
+    {
+        if (dimButton   != null) dimButton.onClick.AddListener(Close);
+        if (closeButton != null) closeButton.onClick.AddListener(Close);
+        if (blockListButton != null) blockListButton.onClick.AddListener(ToggleBlocked);
+
+        if (searchButton != null) searchButton.onClick.AddListener(OnSearch);
+        if (searchInput  != null) searchInput.onSubmit.AddListener(_ => OnSearch());
     }
 
     public void Open()
