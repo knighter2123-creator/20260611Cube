@@ -23,7 +23,7 @@ public class BackendLogin
     }
 
     // ⚠ 뒤끝 가이드 실습용 — 동기 호출이라 응답이 올 때까지 게임이 멈춥니다. 실제 게임 로그인은 AuthManager 가 합니다.
-    //   결과를 알 수 있도록 성공 여부(bool)를 돌려줍니다 (BackendConsoleTest 가 다음 단계로 갈지 정함).
+    //   결과를 알 수 있도록 성공 여부(bool)를 돌려줍니다.
 
     public bool CustomSignUp(string id, string pw)
     {

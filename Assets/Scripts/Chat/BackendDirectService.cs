@@ -329,9 +329,11 @@ public class BackendDirectService : IDirectService
         if (BackendManager.IsNetworkError(bro)) return "서버에 연결할 수 없습니다. 잠시 후 다시 보내 주세요.";
         switch (bro.GetStatusCode())
         {
+            case "400": return "나에게는 개인 메시지를 보낼 수 없습니다.";
             case "403": return "이 유저에게는 메시지를 보낼 수 없습니다 (친구만 보낼 수 있을 수 있습니다).";
             case "404": return "상대를 찾을 수 없습니다.";
-            case "412": return "상대의 쪽지함이 가득 찼습니다.";
+            case "405": return "상대의 쪽지함이 가득 찼습니다.";
+            case "412": return "메시지가 너무 깁니다.";   // 내용 길이가 뒤끝 콘솔의 쪽지 글자 수 설정을 넘음 (진행도 접두사 "12|" 포함)
             default:    return $"메시지를 보내지 못했습니다. ({bro.GetStatusCode()})";
         }
     }

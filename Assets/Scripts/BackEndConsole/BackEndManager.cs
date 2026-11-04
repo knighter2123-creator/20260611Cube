@@ -60,8 +60,8 @@ public class BackendManager : MonoBehaviour
     {
         if (instance == this) instance = null;
     }
-    // ★ 뒤끝 가이드 실습(로그인 / 게임 정보) 코드는 BackendConsoleTest 로 옮겼습니다.
-    //   여기(Start)에 두면 이 매니저는 게임이 켜질 때마다 자동으로 만들어지므로, 실제 게임에서도 매번
+    // ★ 뒤끝 가이드 실습(로그인 / 게임 정보) 코드를 여기(Start)에 두지 마세요 (예전 BackendConsoleTest 는 삭제됨).
+    //   여기에 두면 이 매니저는 게임이 켜질 때마다 자동으로 만들어지므로, 실제 게임에서도 매번
     //   테스트 계정으로 로그인해 플레이어의 로그인 세션을 바꿔 버리고, 초기화도 AuthManager 와 겹쳐 두 번 돕니다.
 
     private void Update()
