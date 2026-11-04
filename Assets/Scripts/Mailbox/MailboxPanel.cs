@@ -110,6 +110,6 @@ public class MailboxPanel : MonoBehaviour
                       : string.Empty;
         statusText.text = status;
         statusText.gameObject.SetActive(status.Length > 0);
-        if (claimAllButton != null) claimAllButton.interactable = !empty && !busy;
+        if (claimAllButton != null) claimAllButton.interactable = Mailbox.Count > 0 && !busy;   // 받은 우편만 남았으면 막음
     }
 }

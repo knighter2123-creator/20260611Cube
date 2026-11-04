@@ -58,9 +58,6 @@ public static class DailyDungeonProgress
         return r != null ? r.purchasedToday : 0;
     }
 
-    /// <summary>오늘 더 추가할 수 있는 횟수.</summary>
-    public static int RemainingPurchases(DailyDungeonData dungeon)
-        => dungeon != null ? Mathf.Max(0, dungeon.MaxExtraEntries - PurchasedToday(dungeon)) : 0;
 
     /// <summary>다음 1회 추가 비용. 오늘 더 추가할 수 없으면 -1.</summary>
     public static int NextPurchaseCost(DailyDungeonData dungeon)

@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// GameSettingManager 의 설정 항목 바인딩 전담 partial 파일.
-/// 블룸(레벨업 이펙트) 강도·on/off, 진동 on/off.
+/// 블룸(레벨업 이펙트) 강도·on/off, 진동 on/off, 효과음·배경음 볼륨.
 ///
 /// 이 파일은 패널을 열거나 닫지 않는다. timeScale 도 건드리지 않는다.
 /// 그건 전부 GameSettingManager.cs 의 책임이고, 여기는 "열렸을 때 UI를 맞추는" 일만 한다.
@@ -27,6 +27,16 @@ public partial class GameSettingManager
     [Tooltip("선택 - 진동 모터가 없는 기기에 보여줄 안내")]
     [SerializeField] private GameObject hapticUnsupportedNotice;
 
+    [Header("소리 (SoundManager)")]
+    [Tooltip("효과음 볼륨 슬라이더 (0~1 로 맞춰짐)")]
+    [SerializeField] private Slider sfxSlider;
+    [Tooltip("선택 - 효과음 볼륨을 퍼센트로 보여줄 텍스트")]
+    [SerializeField] private TMP_Text sfxValueLabel;
+    [Tooltip("배경음 볼륨 슬라이더 (0~1 로 맞춰짐)")]
+    [SerializeField] private Slider bgmSlider;
+    [Tooltip("선택 - 배경음 볼륨을 퍼센트로 보여줄 텍스트")]
+    [SerializeField] private TMP_Text bgmValueLabel;
+
     // ───────────────────────── 진입점 ─────────────────────────
 
     /// <summary>패널을 열 때 GameSettingManager.Open() 이 호출한다.</summary>
@@ -40,6 +50,7 @@ public partial class GameSettingManager
         BindBloom();
         BindFlash();
         BindHaptic();
+        BindSound();
     }
 
     /// <summary>
@@ -68,6 +79,12 @@ public partial class GameSettingManager
 
         LevelUpEffect.Instance?.UnbindFlashToggle();
         HapticManager.Instance?.UnbindToggle();
+
+        // 소리 — SoundManager 가 건 리스너를 떼고 볼륨을 저장 + 내가 건 라벨 리스너도 뗌
+        SoundManager sound = SoundManager.Instance;
+        if (sound != null) sound.UnbindSliders(sfxSlider, bgmSlider);
+        if (sfxSlider != null) sfxSlider.onValueChanged.RemoveListener(UpdateSfxLabel);
+        if (bgmSlider != null) bgmSlider.onValueChanged.RemoveListener(UpdateBgmLabel);
     }
 
     // ───────────────────────── 블룸 ─────────────────────────
@@ -181,4 +198,43 @@ public partial class GameSettingManager
         if (hapticUnsupportedNotice != null)
             hapticUnsupportedNotice.SetActive(!haptic.IsSupported);
     }
+
+    // ───────────────────────── 소리 ─────────────────────────
+
+    /// <summary>효과음 · 배경음 볼륨 슬라이더. 둘 다 선택 항목 — 비어 있으면 조용히 넘어간다.</summary>
+    private void BindSound()
+    {
+        if (sfxSlider == null && bgmSlider == null) return;
+
+        SoundManager sound = SoundManager.Instance;
+        if (sound == null)
+        {
+            Debug.LogWarning("[Setting] SoundManager.Instance 가 없습니다. ManagerRoot 에 SoundManager 가 있는지 확인하세요.", this);
+            if (sfxSlider != null) sfxSlider.interactable = false;
+            if (bgmSlider != null) bgmSlider.interactable = false;
+            return;
+        }
+
+        // min/max + 저장값으로 위치 맞춤 + 적용 리스너는 SoundManager 가, 퍼센트 라벨은 여기서
+        if (sfxSlider != null)
+        {
+            sfxSlider.interactable = true;
+            sound.BindSfxSlider(sfxSlider);
+            sfxSlider.onValueChanged.RemoveListener(UpdateSfxLabel);
+            sfxSlider.onValueChanged.AddListener(UpdateSfxLabel);
+        }
+        if (bgmSlider != null)
+        {
+            bgmSlider.interactable = true;
+            sound.BindBgmSlider(bgmSlider);
+            bgmSlider.onValueChanged.RemoveListener(UpdateBgmLabel);
+            bgmSlider.onValueChanged.AddListener(UpdateBgmLabel);
+        }
+
+        UpdateSfxLabel(sound.SfxVolume01);
+        UpdateBgmLabel(sound.BgmVolume01);
+    }
+
+    private void UpdateSfxLabel(float value01) { if (sfxValueLabel != null) sfxValueLabel.text = $"{value01 * 100f:0}%"; }
+    private void UpdateBgmLabel(float value01) { if (bgmValueLabel != null) bgmValueLabel.text = $"{value01 * 100f:0}%"; }
 }

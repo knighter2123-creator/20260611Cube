@@ -11,16 +11,8 @@ public class LocalChatService : IChatService
     public event Action<IReadOnlyList<string>> MessagesRemoved { add { } remove { } }   // 지울 일이 없음
     public event Action<string> Failed { add { } remove { } }                           // 끊길 일이 없음
 
-    public IFriendService Friends { get; }
-    public IDirectService Direct  { get; }
-
-    /// <param name="friends">친구를 실제 서버로 쓸 때 (뒤끝 이전 중 — BackendFriendService). 비우면 LocalFriendService.</param>
-    /// <param name="direct">개인 메시지를 실제 서버로 쓸 때 (BackendDirectService). 비우면 LocalDirectService.</param>
-    public LocalChatService(IFriendService friends = null, IDirectService direct = null)
-    {
-        Friends = friends ?? new LocalFriendService();
-        Direct  = direct  ?? new LocalDirectService();
-    }
+    public IFriendService Friends { get; } = new LocalFriendService();
+    public IDirectService Direct  { get; } = new LocalDirectService();
 
     /// <summary>
     /// 로그인했으면 그 계정 UID, 아니면 "local".
@@ -69,19 +61,18 @@ public class LocalFriendService : IFriendService
     // 상대가 없는 테스트용 — 닉네임을 그대로 가짜 uid 로
     public void FindUser(string nickname, Action<string, string> onDone) => onDone?.Invoke("local:" + nickname, null);
 
-    public void Request(string myUid, string myName, string peerUid, string peerName, Action<string> onDone)
+    public void Request(string myUid, string peerUid, string peerName, Action<string> onDone)
     {
         list[peerUid] = new Friendship
         {
             PeerUid  = peerUid,
             PeerName = peerName,
-            MyName   = myName,
             State    = FriendState.Friend,
         };
         Done(onDone);
     }
 
-    public void Accept(string myUid, string myName, string peerUid, Action<string> onDone)
+    public void Accept(string myUid, string peerUid, Action<string> onDone)
     {
         if (list.TryGetValue(peerUid, out Friendship f)) { f.State = FriendState.Friend; list[peerUid] = f; }
         Done(onDone);
@@ -91,12 +82,6 @@ public class LocalFriendService : IFriendService
     {
         list.Remove(peerUid);
         Done(onDone);
-    }
-
-    public void UpdateMyName(string myUid, string peerUid, string myName)
-    {
-        if (list.TryGetValue(peerUid, out Friendship f)) { f.MyName = myName; list[peerUid] = f; }
-        Publish();
     }
 
     public void Block(string myUid, string peerUid, string peerName, Action<string> onDone)
@@ -127,7 +112,6 @@ public class LocalDirectService : IDirectService
 {
     public event Action<IReadOnlyList<DirectRoom>>          RoomsReceived;
     public event Action<string, IReadOnlyList<ChatMessage>> MessagesReceived;
-    public event Action<string, IReadOnlyList<string>>      MessagesRemoved { add { } remove { } }
     public event Action<string>                             Failed { add { } remove { } }
 
     private readonly Dictionary<string, DirectRoom>        rooms    = new Dictionary<string, DirectRoom>();
@@ -147,7 +131,7 @@ public class LocalDirectService : IDirectService
 
     public void Unwatch() => watching = null;
 
-    public void Open(string myUid, string myName, string peerUid, string peerName, Action<string> onDone)
+    public void Open(string myUid, string peerUid, string peerName, Action<string> onDone)
     {
         DirectRoom room = rooms.TryGetValue(peerUid, out DirectRoom r) ? r : new DirectRoom
         {
@@ -168,7 +152,7 @@ public class LocalDirectService : IDirectService
         onDone?.Invoke(null);
     }
 
-    public void Send(string myUid, string peerUid, ChatMessage message, bool invitePeer, Action<string> onDone)
+    public void Send(string myUid, string peerUid, ChatMessage message, Action<string> onDone)
     {
         message.Id = Guid.NewGuid().ToString("N");
         if (!messages.TryGetValue(peerUid, out List<ChatMessage> list)) messages[peerUid] = list = new List<ChatMessage>();
@@ -177,7 +161,6 @@ public class LocalDirectService : IDirectService
         if (rooms.TryGetValue(peerUid, out DirectRoom room))
         {
             room.LastSentAt = message.SentAt;
-            if (invitePeer) room.PeerState = RoomState.In;
             rooms[peerUid] = room;
         }
 

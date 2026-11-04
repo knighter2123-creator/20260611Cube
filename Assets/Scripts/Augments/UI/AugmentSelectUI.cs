@@ -160,8 +160,6 @@ public partial class AugmentSelectUI : MonoBehaviour
             SetTimerVisible(false);
     }
 
-    /// <summary>강제로 닫기 (선택 없이). 보통 쓸 일 없습니다.</summary>
-    public void ForceClose() => Close();
 
     // ─────────────────────────────────────────────────────────
     //  선택 / 닫기
@@ -178,6 +176,7 @@ public partial class AugmentSelectUI : MonoBehaviour
         StopIntro();
         StopTimer();
         if (audioSource != null && pickSfx != null) audioSource.PlayOneShot(pickSfx);
+        HapticManager.PlayHeavy();   // 증강 카드 획득 진동
 
         StartCoroutine(PlayPickAndClose(card, cardGo));   // → Anim.cs
     }

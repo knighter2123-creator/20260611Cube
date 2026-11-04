@@ -169,6 +169,7 @@ public class EnemyRespawn : MonoBehaviour
 
         // 보스는 항상 정확히 waypoint 위치에서 등장 (오프셋 없음)
         Spawn(currentBossPrefab, Vector2.zero);
+        HapticManager.PlayHeavy();   // 보스 등장 진동 (일일 던전·진화 보스도 각 매니저의 SpawnBoss 에서 같게)
         GameLog.Info("[EnemyRespawn] 보스 소환!");
     }
 

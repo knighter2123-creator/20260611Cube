@@ -50,9 +50,6 @@ public static class PlayerStatusText
     /// <summary>배율 기호. 폰트에 곱셈기호(×)가 있으면 "×" 로 바꾸세요.</summary>
     public const string MULTIPLY = "x";
 
-    /// <summary>닫기 버튼 라벨. 폰트에 ✕ 가 있으면 "✕" 가 더 예쁩니다.</summary>
-    public const string CLOSE_LABEL = "X";
-
     // ══════════════════════════════════════════════════════════
     //  표시 옵션
     // ══════════════════════════════════════════════════════════

@@ -12,20 +12,16 @@ using UnityEngine;
 ///   ※ 나중에 최소 버전을 30 미만으로 낮추면 이 파일을 반드시 다시 봐야 한다.
 ///     (createOneShot / createWaveform / VibrationAttributes 가 전부 없는 기기가 생긴다)
 ///
-/// [왜 Handheld.Vibrate()를 안 쓰는가]
+/// [왜 Handheld.Vibrate()를 주로 쓰지 않는가]
 ///   유니티 기본 Handheld.Vibrate()는 안드로이드에서 무조건 약 500ms를 통째로 울린다.
 ///   레벨업처럼 톡 치고 지나가야 하는 연출에 쓰면 "윙—" 하고 손이 얼얼해진다.
+///   그래서 JNI(VibrationEffect)로 길이·세기를 정해 울리고, JNI 호출이 실패했을 때만 대신 씁니다 (FallbackVibrate).
 ///
 /// [★ 가장 중요한 함정 — 권한]
-///   AndroidManifest.xml 에 아래 줄이 없으면 진동이 "조용히" 실패한다.
-///   에러도 안 나고 로그도 안 찍히고 그냥 아무 일도 안 일어난다.
-///
-///     &lt;uses-permission android:name="android.permission.VIBRATE" /&gt;
-///
-///   유니티는 코드에 Handheld.Vibrate()가 있으면 이 권한을 자동으로 넣어주지만,
-///   이 스크립트처럼 JNI로만 호출하면 자동 추가가 안 된다.
-///   → Player Settings → Publishing Settings → Custom Main Manifest 체크 후
-///     Assets/Plugins/Android/AndroidManifest.xml 에 직접 추가할 것.
+///   AndroidManifest.xml 에 VIBRATE 권한이 없으면 진동이 "조용히" 실패한다 (에러도 로그도 없음).
+///   유니티는 코드에 Handheld.Vibrate() 가 있으면 빌드할 때 이 권한을 자동으로 넣어 준다.
+///   → FallbackVibrate 의 Handheld.Vibrate() 호출이 그 역할도 합니다. 지우면 권한이 빠지니
+///     지우려면 Custom Main Manifest 에 &lt;uses-permission android:name="android.permission.VIBRATE" /&gt; 를 직접 넣을 것.
 /// </summary>
 public partial class HapticManager : MonoBehaviour
 {
@@ -55,6 +51,13 @@ public partial class HapticManager : MonoBehaviour
     [Range(1, 255)]
     [SerializeField] private int levelUpAmplitude = 160;
 
+    [Tooltip("묵직한 진동(보스 등장 · 증강 카드 획득) 길이(ms).")]
+    [SerializeField] private int heavyDurationMs = 90;
+
+    [Tooltip("묵직한 진동 세기 1~255.")]
+    [Range(1, 255)]
+    [SerializeField] private int heavyAmplitude = 255;
+
     [Header("디버그")]
     [Tooltip("진동이 '건너뛰어진' 이유를 콘솔에 찍습니다. 원인 파악 후 끄세요.")]
     [SerializeField] private bool logBlockedCalls = true;
@@ -73,7 +76,6 @@ public partial class HapticManager : MonoBehaviour
     // ───────────────────────── JNI 캐시 ─────────────────────────
 #if UNITY_ANDROID && !UNITY_EDITOR
     private const int DEFAULT_AMPLITUDE = -1;   // VibrationEffect.DEFAULT_AMPLITUDE
-    private const int NO_REPEAT         = -1;   // createWaveform 의 repeat 인자
 
     private static AndroidJavaObject vibrator;
     private static AndroidJavaClass  vibrationEffectClass;
@@ -275,11 +277,15 @@ public partial class HapticManager : MonoBehaviour
     /// <summary>레벨업 연출용 진동. LevelUpEffect.Play()와 같은 타이밍에 부른다.</summary>
     public void LevelUp() => Vibrate(levelUpDurationMs, levelUpAmplitude);
 
-    /// <summary>버튼 터치 등 가벼운 피드백.</summary>
-    public void Light() => Vibrate(15, 80);
-
-    /// <summary>보스 등장, 증강 카드 획득 등 묵직한 피드백.</summary>
-    public void Heavy() => Vibrate(90, 255);
+    /// <summary>
+    /// 보스 등장 · 증강 카드 획득 같은 묵직한 피드백. 어디서든 바로 부르면 됩니다 —
+    /// 매니저가 없거나(씬 단독 테스트) 유저가 진동을 껐으면 아무것도 하지 않습니다.
+    /// </summary>
+    public static void PlayHeavy()
+    {
+        HapticManager h = Instance;
+        if (h != null) h.Vibrate(h.heavyDurationMs, h.heavyAmplitude);   // Unity 오브젝트라 ?. 대신 != null
+    }
 
     /// <summary>단발 진동.</summary>
     /// <param name="durationMs">길이(밀리초)</param>
@@ -291,7 +297,7 @@ public partial class HapticManager : MonoBehaviour
         if (!TryPassGate(ignoreCooldown)) return;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        if (vibrator == null || vibrationEffectClass == null) return;
+        if (vibrator == null || vibrationEffectClass == null) { FallbackVibrate("Vibrator 없음"); return; }
 
         try
         {
@@ -307,71 +313,26 @@ public partial class HapticManager : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"[Haptic] 진동 실패: {e.Message}");
+            FallbackVibrate($"진동 실패: {e.Message}");
         }
 #endif
     }
-
-    /// <summary>
-    /// 패턴 진동. 예: 톡-쉬고-톡 하는 2단 타격감.
-    /// timingsMs는 [대기, 진동, 대기, 진동, ...] 순서다. 첫 값이 대기라는 점이 헷갈리기 쉽다.
-    /// amplitudes를 주려면 timingsMs와 길이가 같아야 한다.
-    /// </summary>
-    public void VibratePattern(long[] timingsMs, int[] amplitudes = null, bool ignoreCooldown = false)
-    {
-        if (timingsMs == null || timingsMs.Length == 0) { LogBlocked("timingsMs 가 비어 있음"); return; }
-
-        // ★ 추가된 검사 — createWaveform 은 두 배열의 길이가 다르면
-        //   IllegalArgumentException 을 던진다. 이전 코드는 확인하지 않아서
-        //   호출부가 길이를 잘못 맞추면 진동이 통째로 실패했다.
-        if (amplitudes != null && amplitudes.Length != timingsMs.Length)
-        {
-            Debug.LogWarning($"[Haptic] timings({timingsMs.Length})와 amplitudes({amplitudes.Length})의 " +
-                             "길이가 다릅니다. 세기를 무시하고 켜기/끄기 패턴으로 재생합니다.");
-            amplitudes = null;
-        }
-
-        if (!TryPassGate(ignoreCooldown)) return;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        if (vibrator == null || vibrationEffectClass == null) return;
-
-        try
-        {
-            AndroidJavaObject effect;
-
-            if (hasAmplitudeControl && amplitudes != null)
-            {
-                int[] safe = new int[amplitudes.Length];
-                for (int i = 0; i < amplitudes.Length; i++)
-                    safe[i] = Mathf.Clamp(amplitudes[i], 0, 255);   // 0 = 쉬는 구간이라 허용
-
-                effect = vibrationEffectClass.CallStatic<AndroidJavaObject>(
-                    "createWaveform", timingsMs, safe, NO_REPEAT);
-            }
-            else
-            {
-                // ★ 이전에는 여기서 deprecated 된 vibrator.vibrate(long[], int) 를 썼다.
-                //   minSdk 30 이므로 createWaveform 의 타이밍 전용 오버로드를 쓰는 게 맞다.
-                //   (세기 없이 켜기/끄기만 반복하는 패턴)
-                effect = vibrationEffectClass.CallStatic<AndroidJavaObject>(
-                    "createWaveform", timingsMs, NO_REPEAT);
-            }
-
-            using (effect)
-            {
-                CallVibrate(effect);
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogWarning($"[Haptic] 패턴 진동 실패: {e.Message}");
-        }
-#endif
+    /// <summary>
+    /// JNI 진동을 쓸 수 없을 때 유니티 기본 진동(약 500ms)으로 대신합니다 — 길지만 아무 느낌도 없는 것보다 낫습니다.
+    /// ★ 이 Handheld.Vibrate() 호출 덕분에 빌드에 VIBRATE 권한이 자동으로 들어갑니다 (클래스 주석 [권한]).
+    /// </summary>
+    private static void FallbackVibrate(string reason)
+    {
+        Debug.LogWarning($"[Haptic] {reason} — 기본 진동으로 대신합니다.");
+        try   { Handheld.Vibrate(); }
+        catch (System.Exception e) { Debug.LogWarning($"[Haptic] 기본 진동도 실패: {e.Message}"); }
     }
+#endif
 
     /// <summary>
-    /// 단발·패턴 진동 공통 관문 — 유저 설정 / 기기 지원 / 쿨다운. 통과하면 쿨다운 시각을 갱신합니다.
+    /// 진동 공통 관문 — 유저 설정 / 기기 지원 / 쿨다운. 통과하면 쿨다운 시각을 갱신합니다.
     ///
     /// ★ 기기 미지원처럼 원인을 알아야 하는 경우만 이유를 남깁니다.
     ///   유저가 끈 경우와 쿨다운은 정상 동작이라 조용히 막습니다 (진동 호출마다 경고가 쌓이지 않게).

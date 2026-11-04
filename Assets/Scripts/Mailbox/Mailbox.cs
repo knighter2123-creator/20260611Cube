@@ -13,13 +13,20 @@ using UnityEngine;
 ///   화면(MailboxPanel)·개수 표시(OpenMailboxButton)는 둘을 합쳐서 봅니다.
 ///
 /// [받기]
-///   로컬 — 바로 지급하고 지운 뒤 저장.
+///   로컬 — 받음 표시(claimed)를 먼저 하고 지급한 뒤 저장.
 ///   서버 — 서버에 '받음' 처리를 먼저 하고(IMailService.Claim), 성공한 뒤에 지급·저장합니다.
 ///          그래서 결과가 다음 프레임 이후에 옵니다. 진행 중에는 IsClaiming, 실패하면 LastError + OnChanged.
+///          뒤끝은 받은 우편을 목록에서 빼므로, 받은 기록을 로컬 우편함에 복사해 둡니다 (같은 id 의 서버 우편은 숨김).
 ///   서버 우편은 로그인 계정 + 온라인 + 지금 세이브의 주인일 때만 받을 수 있습니다 (다른 계정 세이브에 지급하지 않게).
+///
+/// [받은 우편]  지우지 않고 "받음" 으로 남깁니다. 세이브가 끝없이 커지지 않게 받은 기록은 MAX_CLAIMED_KEPT 개까지만
+///   (넘으면 가장 오래전에 받은 것부터 정리). 받은 기록은 이 기기 세이브에 있으므로 클라우드 세이브와 함께 옮겨집니다.
 /// </summary>
 public static class Mailbox
 {
+    /// <summary>남겨 두는 받은 우편 수. 넘으면 오래전에 받은 것부터 정리합니다.</summary>
+    public const int MAX_CLAIMED_KEPT = 50;
+
     /// <summary>우편이 들어오거나 받아서 없어질 때, 받기가 실패했을 때. (우편함 창 · 버튼 개수 표시용)</summary>
     public static event Action OnChanged;
 
@@ -59,22 +66,37 @@ public static class Mailbox
         }
     }
 
-    /// <summary>지금 계정의 서버 우편 (계정이 바뀌었으면 빈 목록)</summary>
-    private static List<MailItem> CurrentServerMails
-        => ProfileSync.TryGetAccount(out string uid) && uid == serverUid ? serverMails : EmptyList;
+    /// <summary>
+    /// 지금 계정의 아직 안 받은 서버 우편 (계정이 바뀌었으면 빈 목록).
+    /// 로컬 우편함에 이미 받은 기록이 있는 id 는 뺍니다 — 서버가 받은 우편을 한동안 더 돌려줘도 두 번 보이지 않게.
+    /// </summary>
+    private static List<MailItem> CurrentServerMails()
+    {
+        if (!ProfileSync.TryGetAccount(out string uid) || uid != serverUid) return new List<MailItem>();
+        MailboxSaveData box = Data;
+        return box == null ? new List<MailItem>(serverMails)
+                           : serverMails.FindAll(s => !box.mails.Exists(m => m.id == s.id));
+    }
 
-    private static readonly List<MailItem> EmptyList = new List<MailItem>();
+    /// <summary>아직 받지 않은 우편 수 (버튼 개수 표시).</summary>
+    public static int Count
+    {
+        get
+        {
+            MailboxSaveData box = Data;
+            int local = box != null ? box.mails.FindAll(m => !m.claimed).Count : 0;
+            return local + CurrentServerMails().Count;
+        }
+    }
 
-    public static int Count => (Data != null ? Data.mails.Count : 0) + CurrentServerMails.Count;
-
-    /// <summary>로컬 + 서버 우편을 최신 순으로. 목록을 고치지 마세요.</summary>
+    /// <summary>로컬 + 서버 우편 — 안 받은 것 먼저, 그 안에서 최신 순. 목록을 고치지 마세요.</summary>
     public static List<MailItem> NewestFirst()
     {
         var list = new List<MailItem>();
         MailboxSaveData box = Data;
         if (box != null) list.AddRange(box.mails);
-        list.AddRange(CurrentServerMails);
-        list.Sort((a, b) => b.sentAt.CompareTo(a.sentAt));
+        list.AddRange(CurrentServerMails());
+        list.Sort((a, b) => a.claimed != b.claimed ? a.claimed.CompareTo(b.claimed) : b.sentAt.CompareTo(a.sentAt));
         return list;
     }
 
@@ -151,13 +173,14 @@ public static class Mailbox
         MailboxSaveData box = Data;
         if (box.mails.Exists(m => m.id == mailId))
         {
-            if (!ClaimLocal(mailId)) return false;
+            if (!ClaimLocal(mailId)) return false;   // 이미 받음
+            TrimClaimed();
             SaveManager.Instance.Save();
             OnChanged?.Invoke();
             return true;
         }
 
-        MailItem server = CurrentServerMails.Find(m => m.id == mailId);
+        MailItem server = CurrentServerMails().Find(m => m.id == mailId);
         if (server == null) return false;
 
         ClaimServer(new Queue<MailItem>(new[] { server }));
@@ -175,12 +198,13 @@ public static class Mailbox
             if (ClaimLocal(m.id)) local++;
         if (local > 0)
         {
+            TrimClaimed();
             SaveManager.Instance.Save();
             OnChanged?.Invoke();
         }
 
         var queue = new Queue<MailItem>();
-        foreach (MailItem m in CurrentServerMails)
+        foreach (MailItem m in CurrentServerMails())
             if (!m.hasUnknownReward) queue.Enqueue(m);
         if (queue.Count > 0) ClaimServer(queue);
     }
@@ -198,14 +222,29 @@ public static class Mailbox
 
     private static bool ClaimLocal(string mailId)
     {
-        MailboxSaveData box = Data;
-        int index = box.mails.FindIndex(m => m.id == mailId);
-        if (index < 0) return false;
+        MailItem mail = Data.mails.Find(m => m.id == mailId);
+        if (mail == null || mail.claimed) return false;
 
-        MailItem mail = box.mails[index];
-        box.mails.RemoveAt(index);   // 지우고 나서 지급 — 지급 중 예외가 나도 두 번 받지 않게
+        MarkClaimed(mail);   // 표시하고 나서 지급 — 지급 중 예외가 나도 두 번 받지 않게
         Grant(mail);
         return true;
+    }
+
+    private static void MarkClaimed(MailItem mail)
+    {
+        mail.claimed   = true;
+        mail.claimedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    }
+
+    /// <summary>받은 기록이 MAX_CLAIMED_KEPT 를 넘으면 가장 오래전에 받은 것부터 정리 (안 받은 우편은 건드리지 않음).</summary>
+    private static void TrimClaimed()
+    {
+        List<MailItem> mails = Data.mails;
+        List<MailItem> claimed = mails.FindAll(m => m.claimed);
+        if (claimed.Count <= MAX_CLAIMED_KEPT) return;
+
+        claimed.Sort((a, b) => a.claimedAt.CompareTo(b.claimedAt));
+        for (int i = 0; i < claimed.Count - MAX_CLAIMED_KEPT; i++) mails.Remove(claimed[i]);
     }
 
     /// <summary>서버 우편을 하나씩: 서버 '받음' 처리 → 성공하면 지급·저장 → 다음. 실패하면 거기서 멈춤.</summary>
@@ -240,8 +279,12 @@ public static class Mailbox
                 return;
             }
 
+            // 뒤끝은 받은 우편을 목록에서 빼므로 받은 기록을 로컬 우편함에 남김 (화면에서 "받음" 으로 보이게)
             serverMails.Remove(mail);
+            MarkClaimed(mail);
+            if (!Data.mails.Exists(m => m.id == mail.id)) Data.mails.Add(mail);
             Grant(mail);
+            TrimClaimed();
             SaveManager.Instance.Save();
             OnChanged?.Invoke();
 

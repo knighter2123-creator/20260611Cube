@@ -142,7 +142,6 @@ public partial class ChatPanel
 
                 int unread = c.PeerUid == currentPeer ? 0 : chat.UnreadCount(c.PeerUid);
                 string label = ChatText.Plain(c.PeerName);
-                if (c.PeerLeft) label += " " + ChatText.Colored(ChatText.LeftHex, "(나감)");
                 if (unread > 0) label += " " + ChatText.Colored(ChatText.UnreadHex, $"({unread})");
                 SetTab(count++, c.PeerUid, c.PeerName, label);
             }

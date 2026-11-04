@@ -39,12 +39,6 @@ public class GameSpeedManager : MonoBehaviour
         ApplySpeed();
     }
 
-    /// <summary>배속을 1x(기본)으로 즉시 초기화합니다.</summary>
-    public void ResetSpeed()
-    {
-        _currentIndex = 0;
-        ApplySpeed();
-    }
 
     private void ApplySpeed()
     {

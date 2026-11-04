@@ -78,14 +78,6 @@ public class CursorManager : MonoBehaviour
         Cursor.SetCursor(cursorTexture, hotspot * scale, cursorMode);
     }
 
-    /// <summary>실행 중에 커서 모양을 바꿉니다 (예: 조준 커서).</summary>
-    public void SetCursorSprite(Sprite sprite, Vector2 newHotspot)
-    {
-        cursorSprite = sprite;
-        hotspot      = newHotspot;
-        if (cursorTexture != null) { Destroy(cursorTexture); cursorTexture = null; }
-        Apply();
-    }
 
     /// <summary>스프라이트 영역만 잘라 scale 배로 키운 RGBA32 텍스처를 만듭니다.</summary>
     private static Texture2D BuildTexture(Sprite sprite, int scale)

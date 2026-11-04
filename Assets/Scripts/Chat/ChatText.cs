@@ -11,7 +11,6 @@ public static class ChatText
     public const string NameHex     = "#FFFFFF";
     public const string BodyHex     = "#D8D8D8";
     public const string UnreadHex   = "#FF7B7B";   // 안 읽은 수 · 받은 요청 배지
-    public const string LeftHex     = "#8A8A8A";   // (나감)
 
     public const string NoManager = "채팅 시스템을 찾을 수 없습니다.";
 

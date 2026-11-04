@@ -93,11 +93,4 @@ public class ShopTabController : MonoBehaviour
         }
     }
 
-    /// <summary>id로 탭 전환 (추후 외부 호출용).</summary>
-    public void SelectById(string id)
-    {
-        int idx = tabs.FindIndex(t => t.id == id);
-        if (idx >= 0) Select(idx);
-        else Debug.LogWarning($"[ShopTabController] '{id}' 탭을 찾지 못했습니다.", this);
-    }
 }

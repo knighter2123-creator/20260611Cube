@@ -114,16 +114,14 @@ public class GuideQuestHUD : MonoBehaviour
                 loader.EnsureStageScene();
                 break;
 
-            // 동료 소환 → 가챠 (Additive)
+            // 동료 소환 → 가챠 (이미 가챠면 GoToGacha 가 아무것도 안 함)
             case GuideQuestType.SummonCompanion:
-                if (!loader.IsGachaOpen)
-                    loader.GoToGacha();
+                loader.GoToGacha();
                 break;
 
             // 스탯 강화 → 스테이지의 강화 UI 열기
             case GuideQuestType.StatUpgrade:
-                bool alreadyInStage =
-                    loader.CurrentScene == SceneLoader.STAGE_SCENE && !loader.IsGachaOpen;
+                bool alreadyInStage = loader.CurrentScene == SceneLoader.STAGE_SCENE;
 
                 if (alreadyInStage)
                 {
@@ -131,7 +129,7 @@ public class GuideQuestHUD : MonoBehaviour
                 }
                 else
                 {
-                    // 씬 전환 필요 → 예약 후 이동 (UpgradeUI.Start가 소비)
+                    // 씬 전환 필요 → 예약 후 이동 (TabWindow.Start 가 소비)
                     m.RequestStatFocus(q.statType, immediate: false);
                     loader.EnsureStageScene();
                 }

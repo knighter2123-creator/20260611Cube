@@ -147,7 +147,11 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         //   ShowDamage 안에서 MissingReferenceException 이 납니다. (유니티식 == null 은 파괴됨도 걸러냄)
         DamageTextPool damageText = DamageTextPool.Instance;
         if (damageText != null)
-            damageText.ShowDamage(transform.position, Mathf.RoundToInt(finalDamage), isCritical);
+        {
+            int shown = Mathf.RoundToInt(finalDamage);
+            if (_dotTick) damageText.ShowDoT(transform.position, shown);   // 독 틱 — Enemy.Debuffs.DotRoutine
+            else          damageText.ShowDamage(transform.position, shown, isCritical);
+        }
 
         if (currentHealth <= 0)
             Die();

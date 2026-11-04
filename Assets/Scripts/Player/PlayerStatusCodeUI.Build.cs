@@ -35,7 +35,6 @@ public partial class PlayerStatusCodeUI
     [SerializeField] private float windowWidth  = 920f;
     [SerializeField] private int   cornerRadius = 28;
     [SerializeField] private Color windowColor  = new Color(0.11f, 0.13f, 0.18f, 0.98f);
-    [SerializeField] private Color dimColor     = new Color(0f, 0f, 0f, 0.65f);
     [SerializeField] private Color dividerColor = new Color(1f, 1f, 1f, 0.10f);
 
     [Header("글자")]
@@ -49,16 +48,11 @@ public partial class PlayerStatusCodeUI
     [SerializeField] private Color labelColor = new Color(0.78f, 0.82f, 0.90f);
     [SerializeField] private Color totalColor = Color.white;
 
-    [Header("버튼 색")]
-    [SerializeField] private Color buttonColor     = new Color(0.20f, 0.42f, 0.85f, 1f);
-    [SerializeField] private Color buttonTextColor = Color.white;
-
     // ══════════════════════════════════════════════════════════
     //  만들어진 부품들 — 코어의 Refresh() 가 이걸 채웁니다
     // ══════════════════════════════════════════════════════════
     private bool          built;
     private GameObject    panelRoot;
-    private CanvasGroup   panelCanvasGroup;
     private RectTransform windowRect;
 
     private TMP_Text levelText;
@@ -96,62 +90,19 @@ public partial class PlayerStatusCodeUI
             Debug.LogWarning("[PlayerStatusCodeUI] 씬에 EventSystem 이 없어 버튼이 눌리지 않습니다.");
 
         BuildPanel(parent);
-
-        // ★ Status 버튼만은 Build Parent 가 아니라 '캔버스 루트' 에 만듭니다.
-        //   패널 안에 두면 panelRoot 를 끄는 순간 버튼까지 꺼져 다시 열 방법이 없어집니다.
-        //   탭 안에 두면 탭이 가려질 때 같이 꺼지므로 더 나쁩니다.
-        //   (탭 모드에서는 코어가 createOpenButton 을 강제로 꺼서 애초에 만들지 않습니다)
-        Transform buttonParent = targetCanvas != null ? targetCanvas.transform : parent;
-        BuildOpenButton(buttonParent);
-
         panelRoot.SetActive(false);
     }
 
-    /// <summary>
-    /// UI 를 붙일 부모를 정합니다.
-    ///
-    /// ★ targetCanvas 를 없애고 Panel 필드로 바꾸지 않은 이유
-    ///   ResolveCanvas() 는 '부모 찾기' 외에도 일을 합니다 — 씬에 캔버스가 없으면
-    ///   CanvasScaler 와 GraphicRaycaster 까지 갖춘 캔버스를 만들어 줍니다.
-    ///   필드를 통째로 갈아치우면 그 안전장치가 사라집니다.
-    ///   그래서 '부모만' 갈아끼우고 캔버스 확보 로직은 그대로 둡니다.
-    /// </summary>
+    /// <summary>UI 를 붙일 부모 — Build Parent (탭 내용). 비어 있으면 경고하고 씬의 첫 Canvas.</summary>
     private Transform ResolveBuildParent()
     {
-        if (buildParent != null)
-        {
-            // 캔버스는 Status 버튼을 붙일 때 필요할 수 있으니 미리 잡아 둡니다.
-            // 실패해도 패널 생성 자체는 진행합니다 (buildParent 가 이미 캔버스 밑에 있을 테니까요).
-            ResolveCanvas();
-            return buildParent;
-        }
+        if (buildParent != null) return buildParent;
 
-        Canvas canvas = ResolveCanvas();
+        // 그냥 두면 캔버스 한가운데에 만들어져 탭과 무관하게 화면을 덮습니다 — 원인을 찾기 어려운 증상이라 경고.
+        Debug.LogWarning("[PlayerStatusCodeUI] Build Parent 가 비어 있습니다. 탭 내용(예: Status_Content)을 연결하세요. " +
+                         "지금은 씬의 첫 Canvas 아래에 만들어집니다.", this);
+        Canvas canvas = FindFirstObjectByType<Canvas>();
         return canvas != null ? canvas.transform : null;
-    }
-
-    private Canvas ResolveCanvas()
-    {
-        if (targetCanvas != null) return targetCanvas;
-
-        targetCanvas = FindFirstObjectByType<Canvas>();
-        if (targetCanvas != null) return targetCanvas;
-
-        // 씬에 캔버스가 아예 없을 때만 새로 만듭니다.
-        var go = new GameObject("Canvas(Auto)");
-        targetCanvas = go.AddComponent<Canvas>();
-        targetCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
-        // CanvasScaler 가 없으면 기기 해상도마다 UI 크기가 달라집니다.
-        // 세로 모바일 기준 1080×1920, 높이를 기준으로 맞춥니다.
-        var scaler = go.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1080f, 1920f);
-        scaler.screenMatchMode     = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight  = 1f;
-
-        go.AddComponent<GraphicRaycaster>();
-        return targetCanvas;
     }
 
     // ══════════════════════════════════════════════════════════
@@ -163,24 +114,9 @@ public partial class PlayerStatusCodeUI
         // ── 루트 (부모를 꽉 채움) ──
         RectTransform root = NewRect("PlayerStatusPanel(Auto)", parentTransform);
         Stretch(root);
-        panelRoot        = root.gameObject;
-        panelCanvasGroup = panelRoot.AddComponent<CanvasGroup>();
+        panelRoot = root.gameObject;
 
-        // ── 어두운 배경: 눌러서 닫기 ──
-        //
-        // ★ 탭 모드에서는 만들지 않습니다.
-        //   ① 탭 창에는 이미 자체 Dimmed 가 깔려 있어, 여기서 또 깔면 창 '안쪽'이
-        //      한 겹 더 어두워집니다. 화면 전체가 아니라 탭 영역만 덮으니 더 어색합니다.
-        //   ② 이 Dim 의 클릭은 Close() 입니다. 탭 모드에서 Close() 는 내용만 감추므로,
-        //      눌러도 탭 창은 열린 채 '빈 탭' 이 됩니다.
-        if (!useAsTabPage)
-        {
-            RectTransform dim = NewRect("Dim", root);
-            Stretch(dim);
-            Image dimImage = dim.gameObject.AddComponent<Image>();
-            dimImage.color = dimColor;
-            AddClick(dim.gameObject, dimImage, Close);
-        }
+        // 어두운 배경(Dim)은 만들지 않습니다 — 탭 창(TabWindow)에 이미 깔려 있어, 또 깔면 창 '안쪽'만 한 겹 더 어두워집니다.
 
         // ── 창 ──
         // 높이를 0 으로 두고 ContentSizeFitter 에게 맡깁니다.
@@ -228,7 +164,8 @@ public partial class PlayerStatusCodeUI
         BuildStatRow(windowRect, PlayerStatusText.LABEL_CRIT_CHANCE,  out critChanceTotal,  out critChanceDetail);
     }
 
-    // ── 헤더: 제목 · 닫기 버튼 · 레벨 · 경험치 ──────────────────
+    // ── 헤더: 제목 · 레벨 · 경험치 ──────────────────
+    // (닫기 ✕ 는 만들지 않습니다 — TabWindow 헤더에 있음)
     private void BuildHeader(RectTransform parent)
     {
         // 제목 줄
@@ -237,30 +174,6 @@ public partial class PlayerStatusCodeUI
         TMP_Text title = NewText("Title", titleRow, PlayerStatusText.TITLE,
                                  titleFontSize, titleColor, TextAlignmentOptions.Left);
         Flexible(title.gameObject, 1f);
-
-        // 닫기 버튼 — 정사각형이라 레이아웃이 늘리지 않게 고정 크기를 줍니다
-        //
-        // ★ 탭 모드에서는 만들지 않습니다.
-        //   TabWindow 헤더에 이미 ✕ 가 있고, 여기 ✕ 는 Close() 만 부릅니다.
-        //   탭 모드의 Close() 는 '이 탭 내용을 감추는' 것이라, 눌러도 창은 열린 채
-        //   아무것도 없는 탭이 남습니다. 닫는 버튼이 창을 안 닫으면 유저는 고장으로 받아들입니다.
-        if (!useAsTabPage)
-        {
-            RectTransform closeRect = NewRect("CloseButton", titleRow);
-            Fixed(closeRect.gameObject, 56f, 56f);
-
-            Image closeImage = closeRect.gameObject.AddComponent<Image>();
-            closeImage.sprite = RoundedSprite(14);
-            closeImage.type   = Image.Type.Sliced;
-            closeImage.color  = new Color(1f, 1f, 1f, 0.12f);
-            AddClick(closeRect.gameObject, closeImage, Close);
-
-            RectTransform closeLabelRect = NewRect("Label", closeRect);
-            Stretch(closeLabelRect);
-            // 닫기 라벨도 PlayerStatusText 의 상수를 씁니다.
-            // 폰트에 없는 기호를 직접 박아두면 나중에 찾기 어렵습니다.
-            NewTextOn(closeLabelRect, PlayerStatusText.CLOSE_LABEL, 30f, Color.white, TextAlignmentOptions.Center);
-        }
 
         // 레벨 + 경험치 숫자 줄
         RectTransform levelRow = NewRow("LevelRow", parent, 8f);
@@ -336,38 +249,6 @@ public partial class PlayerStatusCodeUI
     }
 
     // ══════════════════════════════════════════════════════════
-    //  Status 버튼
-    // ══════════════════════════════════════════════════════════
-
-    private void BuildOpenButton(Transform canvasTransform)
-    {
-        // 이미 만들어 둔 버튼이 있으면 그걸 씁니다.
-        if (externalOpenButton != null)
-        {
-            externalOpenButton.onClick.AddListener(Toggle);
-            return;
-        }
-
-        if (!createOpenButton) return;
-
-        // ★ 버튼은 패널 **밖**에 만듭니다.
-        //   패널 안에 두면 panelRoot.SetActive(false) 로 버튼까지 꺼져서
-        //   창을 한 번 닫은 뒤 다시 열 방법이 없어집니다.
-        RectTransform rect = NewRect("StatusButton(Auto)", canvasTransform);
-        PlaceInCorner(rect, buttonCorner, buttonOffset, buttonSize);
-
-        Image image = rect.gameObject.AddComponent<Image>();
-        image.sprite = RoundedSprite(18);
-        image.type   = Image.Type.Sliced;
-        image.color  = buttonColor;
-        AddClick(rect.gameObject, image, Toggle);
-
-        RectTransform labelRect = NewRect("Label", rect);
-        Stretch(labelRect);
-        NewTextOn(labelRect, buttonLabel, labelFontSize, buttonTextColor, TextAlignmentOptions.Center);
-    }
-
-    // ══════════════════════════════════════════════════════════
     //  범용 UI 도구 — 여기부터는 '스탯' 이라는 단어를 모릅니다
     // ══════════════════════════════════════════════════════════
     //
@@ -426,29 +307,6 @@ public partial class PlayerStatusCodeUI
         rect.localScale       = Vector3.one;
     }
 
-    /// <summary>화면 모서리에 붙입니다. 앵커를 모서리에 맞추므로 해상도가 바뀌어도 유지됩니다.</summary>
-    private static void PlaceInCorner(RectTransform rect, ScreenCorner corner, Vector2 offset, Vector2 size)
-    {
-        // 모서리별 앵커와 부호를 표로 다룹니다. if 를 네 번 쓰는 것보다 읽기 쉽습니다.
-        Vector2 anchor;
-        Vector2 sign;
-
-        switch (corner)
-        {
-            case ScreenCorner.TopLeft:     anchor = new Vector2(0f, 1f); sign = new Vector2( 1f, -1f); break;
-            case ScreenCorner.BottomLeft:  anchor = new Vector2(0f, 0f); sign = new Vector2( 1f,  1f); break;
-            case ScreenCorner.BottomRight: anchor = new Vector2(1f, 0f); sign = new Vector2(-1f,  1f); break;
-            default:                       anchor = new Vector2(1f, 1f); sign = new Vector2(-1f, -1f); break;
-        }
-
-        rect.anchorMin        = anchor;
-        rect.anchorMax        = anchor;
-        rect.pivot            = anchor;
-        rect.sizeDelta        = size;
-        rect.anchoredPosition = new Vector2(offset.x * sign.x, offset.y * sign.y);
-        rect.localScale       = Vector3.one;
-    }
-
     /// <summary>가로로 아이템을 늘어놓는 줄을 만듭니다.</summary>
     private static RectTransform NewRow(string name, Transform parent, float spacing)
     {
@@ -502,14 +360,6 @@ public partial class PlayerStatusCodeUI
         LayoutElement element = go.AddComponent<LayoutElement>();
         if (width  > 0f) element.preferredWidth  = width;
         if (height > 0f) element.preferredHeight = height;
-    }
-
-    /// <summary>클릭 가능하게 만듭니다. targetGraphic 을 지정해야 눌림 표현이 동작합니다.</summary>
-    private static void AddClick(GameObject go, Graphic graphic, UnityEngine.Events.UnityAction action)
-    {
-        Button button = go.AddComponent<Button>();
-        button.targetGraphic = graphic;
-        button.onClick.AddListener(action);
     }
 
     // ══════════════════════════════════════════════════════════

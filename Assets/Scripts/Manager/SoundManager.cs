@@ -6,9 +6,9 @@ using UnityEngine;
 /// ManagerRoot 하위에 배치하세요 (DontDestroyOnLoad는 ManagerRoot가 담당).
 ///
 /// 사용법 :
-///   SoundManager.Instance?.PlaySfx(clip);
-///   SoundManager.Instance?.PlayBgm(bgmClip);
-///   SoundManager.Instance?.BindSfxSlider(slider);   // 설정 패널
+///   효과음  — SoundManager.Instance.PlaySfx(clip)            (Unity 오브젝트라 ?. 대신 != null 로 확인)
+///   배경음  — 씬에 SceneBgm 컴포넌트를 두고 클립을 넣으면 그 씬에 들어갈 때 바뀝니다 (비우면 멈춤).
+///   볼륨    — 설정 창의 효과음 / 배경음 슬라이더 (GameSettingManager.Bindings)
 ///
 /// 소리가 안 나면 컴포넌트 우클릭 → "사운드 진단" 을 실행하세요.
 /// </summary>
@@ -145,25 +145,41 @@ public class SoundManager : MonoBehaviour
     }
 
     // ══════════════════════════════════════════════
-    //  볼륨 설정 (설정 패널용)
+    //  볼륨 설정 (설정 패널 — GameSettingManager.Bindings 가 열 때 Bind, 닫을 때 Unbind)
+    //  마스터 볼륨은 슬라이더가 없어 저장된 값(기본 defaultMaster)을 그대로 씁니다.
     // ══════════════════════════════════════════════
 
-    public void SetMasterVolume01(float v) => SetVolume(PrefsMaster, ref master, v);
-    public void SetBgmVolume01(float v)    => SetVolume(PrefsBgm,    ref bgmVol, v);
-    public void SetSfxVolume01(float v)    => SetVolume(PrefsSfx,    ref sfxVol, v);
+    public void SetBgmVolume01(float v) => SetVolume(PrefsBgm, ref bgmVol, v);
+    public void SetSfxVolume01(float v) => SetVolume(PrefsSfx, ref sfxVol, v);
 
+    /// <summary>
+    /// 값만 바꾸고 바로 적용합니다. 디스크 저장(PlayerPrefs.Save)은 하지 않습니다 —
+    /// 슬라이더를 끄는 동안 매 프레임 불리므로, 저장은 패널을 닫을 때 한 번 (UnbindSliders → SaveVolumes).
+    /// </summary>
     private void SetVolume(string key, ref float field, float value)
     {
         field = Mathf.Clamp01(value);
         PlayerPrefs.SetFloat(key, field);
-        PlayerPrefs.Save();
         ApplyVolumes();
     }
 
-    /// <summary>UI Slider 연결 — 저장값으로 위치를 맞추고 리스너까지 겁니다. (Min 0 / Max 1)</summary>
-    public void BindMasterSlider(UnityEngine.UI.Slider s) => Bind(s, master, SetMasterVolume01);
-    public void BindBgmSlider(UnityEngine.UI.Slider s)    => Bind(s, bgmVol, SetBgmVolume01);
-    public void BindSfxSlider(UnityEngine.UI.Slider s)    => Bind(s, sfxVol, SetSfxVolume01);
+    /// <summary>볼륨 설정을 디스크에 저장합니다 (앱이 꺼질 때도 유니티가 저장하지만, 강제 종료에 대비).</summary>
+    public void SaveVolumes() => PlayerPrefs.Save();
+
+    /// <summary>UI Slider 연결 — 저장값으로 위치를 맞추고 리스너까지 겁니다. (Min 0 / Max 1) 닫을 때 UnbindSliders 로 짝을 맞추세요.</summary>
+    public void BindBgmSlider(UnityEngine.UI.Slider s) => Bind(s, bgmVol, SetBgmVolume01);
+    public void BindSfxSlider(UnityEngine.UI.Slider s) => Bind(s, sfxVol, SetSfxVolume01);
+
+    /// <summary>
+    /// Bind*Slider 의 짝 — 건 리스너를 떼고 저장합니다. 안 떼면 패널을 열 때마다 리스너가 하나씩 쌓입니다.
+    /// (UnityEvent 는 대상 오브젝트 + 메서드로 비교하므로 등록 때와 다른 델리게이트로도 정확히 제거됨)
+    /// </summary>
+    public void UnbindSliders(UnityEngine.UI.Slider sfx, UnityEngine.UI.Slider bgm)
+    {
+        if (sfx != null) sfx.onValueChanged.RemoveListener(SetSfxVolume01);
+        if (bgm != null) bgm.onValueChanged.RemoveListener(SetBgmVolume01);
+        SaveVolumes();
+    }
 
     private static void Bind(UnityEngine.UI.Slider slider, float value,
                              UnityEngine.Events.UnityAction<float> setter)
@@ -173,6 +189,7 @@ public class SoundManager : MonoBehaviour
         slider.minValue = 0f;
         slider.maxValue = 1f;
         slider.SetValueWithoutNotify(value);
+        slider.onValueChanged.RemoveListener(setter);   // 혹시 Unbind 없이 다시 열려도 겹치지 않게
         slider.onValueChanged.AddListener(setter);
     }
 

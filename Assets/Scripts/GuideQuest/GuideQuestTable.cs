@@ -109,9 +109,6 @@ public class GuideQuestTable : ScriptableObject
     [SerializeField] private int levelBase = 5;
     [SerializeField] private int levelPerCycle = 5;
 
-    // 외부(매니저)에서 참조할 수 있으므로 호환용으로 유지
-    public int CycleLength => Mathf.Max(1, baseCycle.Length);
-
     // ──────────────────────────────────────────────
     //  각성이 삽입되는 "사이클 번호" 계산
     // ──────────────────────────────────────────────

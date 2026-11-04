@@ -59,15 +59,8 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     // ══════════════════════════════════════════════
     //  인스펙터 연결
     // ══════════════════════════════════════════════
-    [Header("동작 모드")]
-    [Tooltip("TabWindow 안의 한 탭으로 쓸 때 체크하세요.\n" +
-             "체크하면 이 스크립트는 패널을 스스로 켜고 끄지 않고, 가이드 퀘스트 구독도 하지 않습니다.\n" +
-             "그 두 가지는 TabWindow 가 대신합니다. (같은 오브젝트를 둘이 켜고 끄면 반드시 어긋납니다)")]
-    [SerializeField] private bool useAsTabPage = false;
-
-    [Header("공통 UI")]
-    [Tooltip("단독 창 모드에서만 씁니다. ★ 이 컴포넌트가 붙은 오브젝트와 달라야 함 (같으면 Start에서 자신을 꺼버림)")]
-    [SerializeField] private GameObject upgradePanel;   // 패널 전체 (열기/닫기용)
+    // ★ 이 UI 는 항상 TabWindow 의 한 탭입니다. 창을 열고 닫는 일과 가이드 퀘스트의 "강화 창 열기" 구독은
+    //   TabWindow 가 합니다 (같은 오브젝트를 둘이 켜고 끄면 반드시 어긋나므로 여기서는 하지 않음).
 
     [Header("공용 배수 버튼")]
     [SerializeField] private MultiplierButton[] multiplierButtons;
@@ -116,7 +109,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     //   인스턴스를 비교하면 바뀐 순간 자동으로 갈아탑니다.
     private LevelUpManager    boundLm;
     private CurrencyManager   boundCurrency;
-    private GuideQuestManager boundGuide;
 
     // 골드 캐시
     private int  cachedGold;
@@ -138,14 +130,8 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     private bool  refreshPending;
     private float nextRefreshTime;
 
-    // 패널이 닫혀 있으면 갱신할 이유가 없다.
-    //
-    // ★ 단독 창 모드: 이 컴포넌트는 패널의 '부모'에 붙어 있어서 패널을 닫아도 계속 살아 있습니다.
-    //   이 검사가 없으면 적을 잡을 때마다(=골드가 오를 때마다) 닫힌 UI를 계속 다시 그립니다.
-    //
-    // ★ 탭 모드: 이 컴포넌트가 탭 내용 안에 붙어 있어, 탭이 가려지면 컴포넌트째 꺼집니다.
-    //   즉 "살아서 Update 가 돌고 있다 = 지금 보이고 있다" 이므로 항상 true 로 둡니다.
-    private bool IsPanelOpen => useAsTabPage || upgradePanel == null || upgradePanel.activeInHierarchy;
+    // ★ 이 컴포넌트는 탭 내용 안에 붙어 있어, 탭이 가려지면 컴포넌트째 꺼집니다.
+    //   즉 "살아서 Update 가 돌고 있다 = 지금 보이고 있다" 이므로 '닫혀 있으면 그리지 않기' 검사가 필요 없습니다.
 
     // ══════════════════════════════════════════════
     //  Unity 생명주기
@@ -153,25 +139,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     private void Awake()
     {
         BuildRowIndex();
-
-        // ★ 탭 모드에서는 패널 소유권이 TabWindow 에 있습니다.
-        //   여기에 참조가 남아 있으면 TabWindow 가 켠 내용을 이 스크립트가 도로 꺼버립니다.
-        //   "같은 오브젝트를 두 주체가 SetActive 한다"는 추적하기 가장 괴로운 종류의 버그라
-        //   아예 참조를 끊어 둡니다.
-        if (useAsTabPage && upgradePanel != null)
-        {
-            upgradePanel = null;
-        }
-
-        // upgradePanel 을 자기 자신으로 지정하면 Start에서 스스로를 꺼버려
-        // 이후 아무 이벤트도 받지 못하는 상태가 됩니다. 툴팁 경고를 코드로도 막습니다.
-        if (upgradePanel == gameObject)
-        {
-            Debug.LogError("[UpgradeUI] upgradePanel 에 이 컴포넌트가 붙은 오브젝트 자신이 들어가 있습니다. " +
-                           "자식 패널 오브젝트를 넣어주세요. 자기 자신 참조는 무시합니다.", this);
-            upgradePanel = null;
-        }
-
         RestoreSelectedMultiplier();
     }
 
@@ -225,24 +192,8 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         return 1;   // 배수 버튼을 아예 안 쓰는 구성이면 ×1 고정
     }
 
-    private void Start()
-    {
-        // ★ 탭 모드에서는 여는 일에 일절 관여하지 않습니다.
-        //   탭이 꺼져 있으면 이 Start 자체가 돌지 않으므로, 아래 예약 소비를 여기 두면
-        //   "가이드 퀘스트가 강화창을 열어주지 않는" 조용한 고장이 됩니다.
-        //   그래서 그 책임은 항상 켜져 있는 TabWindow.Start() 로 옮겼습니다.
-        if (useAsTabPage) return;
-
-        // 게임 시작 시 패널 숨김
-        if (upgradePanel != null)
-            upgradePanel.SetActive(false);
-
-        // ★ 가이드 퀘스트: 씬 전환으로 넘어온 "강화 UI 열기" 예약 소비
-        //   (OnEnable은 Start보다 먼저 실행되므로 예약은 여기서 처리해야 함)
-        var gq = GuideQuestManager.Instance;
-        if (gq != null && gq.TryConsumeStatFocus(out LevelUpManager.StatType type))
-            FocusStat(type);
-    }
+    // ★ 가이드 퀘스트가 씬 전환으로 넘긴 "강화 UI 열기" 예약은 항상 켜져 있는 TabWindow.Start() 가 소비합니다.
+    //   (탭이 꺼져 있으면 이 컴포넌트의 Start 자체가 돌지 않으므로 여기 두면 조용히 고장 남)
 
     private void OnEnable()
     {
@@ -315,33 +266,16 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
                 RefreshAllImmediate();
             }
         }
-
-        // ── GuideQuestManager ──
-        // ★ 탭 모드에서는 TabWindow 가 구독합니다. 여기서도 구독하면 한 번의 포커스 요청에
-        //   창을 여는 동작이 두 번 돌아갑니다.
-        if (useAsTabPage) return;
-
-        var currentGq = GuideQuestManager.Instance;
-        if (currentGq != boundGuide)
-        {
-            if (boundGuide != null) boundGuide.OnFocusStatUpgrade -= FocusStat;
-
-            boundGuide = currentGq;
-
-            if (boundGuide != null)
-                boundGuide.OnFocusStatUpgrade += FocusStat;
-        }
+        // GuideQuestManager.OnFocusStatUpgrade 는 TabWindow 가 구독합니다 (여기서도 하면 창 열기가 두 번 돎).
     }
 
     private void UnbindAll()
     {
-        if (boundLm != null)       boundLm.OnStatUpgraded        -= HandleStatUpgraded;
-        if (boundCurrency != null) boundCurrency.OnGoldChanged   -= HandleGoldChanged;
-        if (boundGuide != null)    boundGuide.OnFocusStatUpgrade -= FocusStat;
+        if (boundLm != null)       boundLm.OnStatUpgraded      -= HandleStatUpgraded;
+        if (boundCurrency != null) boundCurrency.OnGoldChanged -= HandleGoldChanged;
 
         boundLm       = null;
         boundCurrency = null;
-        boundGuide    = null;
     }
 
     /// <summary>
@@ -491,33 +425,15 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         RefreshAllImmediate();
     }
 
-    /// <summary>닫기 버튼 (단독 창 모드 전용 — 탭 모드에서는 TabWindow.Close 를 쓰세요)</summary>
-    public void OnClickClose()
-    {
-        if (upgradePanel != null)
-            upgradePanel.SetActive(false);
-    }
-
-    /// <summary>열기 — 외부(HUD 버튼 등)에서 호출. 탭 모드에서는 '갱신'만 합니다.</summary>
-    public void Open()
-    {
-        if (upgradePanel != null)
-            upgradePanel.SetActive(true);
-
-        // ★ 패널이 열리는 시점에 갱신
-        //   OnEnable은 씬 로드 직후 1회만 발화하며, 그땐 Player.Instance가 아직 없을 수 있음.
-        //   Open()은 UpgradeUI 자신을 켜는 게 아니라 자식 패널만 켜므로 OnEnable이 재발화하지 않는다.
-        TryBindAll();
-        RefreshMultiplierVisual();
-        RefreshAllImmediate();
-    }
-
     // ══════════════════════════════════════════════
     //  ITabPage — TabWindow 가 부른다
     // ══════════════════════════════════════════════
 
     /// <summary>이 탭이 선택됐다. 탭이 켜지면서 OnEnable 도 돌지만, 갱신을 한 번 더 보장한다.</summary>
-    public void OnTabShow()
+    public void OnTabShow() => RefreshNow();
+
+    /// <summary>매니저 구독을 확인하고 배수 표시·모든 행을 바로 다시 그린다.</summary>
+    private void RefreshNow()
     {
         TryBindAll();
         RefreshMultiplierVisual();
@@ -533,7 +449,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     /// <summary>가이드 퀘스트가 지정한 스탯 강화 항목을 열고 강조한다. (IStatFocusTarget)</summary>
     public void FocusStat(LevelUpManager.StatType type)
     {
-        Open();   // 내부에서 RefreshAllImmediate 수행
+        RefreshNow();   // 탭은 TabWindow 가 이미 열었음
 
         if (rowIndex.ContainsKey(type))
             GameLog.Info($"[UpgradeUI] 가이드 퀘스트 포커스 → {GuideQuest.StatName(type)}");
@@ -564,8 +480,6 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     /// <summary>"곧 다시 그려라" 예약. 골드처럼 초당 수십 번 오는 이벤트용.</summary>
     private void RequestRefresh()
     {
-        if (!IsPanelOpen) return;             // 닫혀 있으면 그릴 이유가 없다 (Open() 에서 어차피 그린다)
-
         if (refreshInterval <= 0f) { RefreshAllImmediate(); return; }
 
         if (!refreshPending)
@@ -613,7 +527,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 
         int  upgradeLv = lm.GetUpgradeLevel(type);
         int  maxLv     = lm.MaxUpgradeLevel;      // ★ 하드코딩 5000 제거 — 매니저의 상한을 그대로 사용
-        bool isMaxed   = upgradeLv >= maxLv;
+        bool isMaxed   = lm.IsMaxUpgraded(type);  // 최대 판정도 매니저 한 곳에서 (TryUpgrade 와 같은 기준)
 
         if (row.upgradeLevelText != null)
             row.upgradeLevelText.text = isMaxed ? "MAX" : $"{upgradeLv:N0} / {maxLv:N0}";

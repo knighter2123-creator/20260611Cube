@@ -107,6 +107,7 @@ public partial class EvolveStageManager : MonoBehaviour
             : (bossSpawnPoint != null ? bossSpawnPoint.position : Vector3.zero);
 
         EvolveBoss boss = Instantiate(prefab, spawnPos, Quaternion.identity);
+        HapticManager.PlayHeavy();   // 보스 등장 진동
 
         // ★ 스탯 초기화 — 반드시 호출해야 합니다.
         //

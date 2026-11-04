@@ -137,33 +137,4 @@ public partial class AugmentManager
         OnChanged?.Invoke();
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  조회 (HUD 표시용)
-    // ─────────────────────────────────────────────────────────
-
-    /// <summary>남은 시간이 가장 긴 버프의 잔여 초. 없으면 0.</summary>
-    public float GetRemaining(AugmentBuffKind kind)
-    {
-        float best = 0f;
-        float now  = Time.time;
-
-        for (int i = 0; i < tempBuffs.Count; i++)
-        {
-            if (tempBuffs[i].kind != kind) continue;
-            if (tempBuffs[i].stageScoped)  continue;
-
-            best = Mathf.Max(best, tempBuffs[i].endTime - now);
-        }
-
-        return Mathf.Max(0f, best);
-    }
-
-    /// <summary>지금 이 종류의 버프가 걸려 있는가. HUD 아이콘 표시에 씁니다.</summary>
-    public bool HasBuff(AugmentBuffKind kind)
-    {
-        for (int i = 0; i < tempBuffs.Count; i++)
-            if (tempBuffs[i].kind == kind) return true;
-
-        return false;
-    }
 }

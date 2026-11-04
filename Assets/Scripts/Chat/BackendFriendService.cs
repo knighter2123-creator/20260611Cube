@@ -10,14 +10,13 @@ using UnityEngine;
 /// [신원]  myUid = 뒤끝 유저 inDate (= AuthManager.Uid). 다른 유저를 가리키는 값도 모두 gamer inDate 입니다.
 ///   지금 뒤끝 세션(Backend.UserInDate)이 그 계정이 아니면 연결하지 않습니다 — 다른 계정의 친구가 섞여 보이지 않게.
 ///
-/// [목록]  뒤끝에는 실시간 알림이 없어 세 목록(친구 / 받은 요청 / 보낸 요청)을 차례로 받아 한 번에 보냅니다.
-///   연결할 때, 요청·수락·삭제 뒤, ChatManager 가 부르는 Refresh (친구 창을 열 때 · 일정 간격) 에 다시 받습니다.
+/// [목록]  세 목록(친구 / 받은 요청 / 보낸 요청)을 차례로 받아 한 번에 보냅니다 (뒤끝 호출 3회).
+///   연결할 때, 요청·수락·삭제 뒤, ChatManager 가 부르는 Refresh (친구 창을 열 때 · 친구 실시간 알림(BackendNotify) · 일정 간격) 에 다시 받습니다.
 ///
 /// [삭제]  관계 상태에 따라 다른 API — 친구 BreakFriend / 받은 요청 RejectFriend / 보낸 요청 RevokeSentRequest.
-/// [이름]  닉네임은 뒤끝이 목록에 매번 최신 값을 실어 주므로 UpdateMyName 은 할 일이 없습니다.
+/// [이름]  닉네임은 뒤끝이 목록에 매번 최신 값을 실어 주므로 따로 맞출 일이 없습니다.
 ///
-/// [차단]  아직 서버 저장이 없습니다 — 이 기기의 PlayerPrefs 에 계정별로 둡니다 (다른 기기에는 안 보임).
-///   TODO(뒤끝 이전 D단계): 게임 정보 테이블로 옮겨 계정 공통으로.
+/// [차단]  뒤끝 게임 정보 테이블 BLOCK_DATA 에 계정마다 저장합니다 (BackendBlockStore — 콘솔 준비는 그 주석 참고).
 /// [약속]  IFriendService 와 같음 — 모든 이벤트·콜백은 메인 스레드 (BackendManager.Call).
 /// </summary>
 public class BackendFriendService : IFriendService
@@ -27,18 +26,19 @@ public class BackendFriendService : IFriendService
     public event Action<string>                             Failed;
 
     // 한 번에 받는 목록 길이. 클라이언트 친구 제한(ChatManager.MAX_FRIENDS = 50)과 맞춤
-    private const int    PAGE        = 50;
-    private const string PREF_BLOCKS = "friends.blocks.";   // + 내 uid
-    private const string NoName      = "(이름 없음)";
+    private const int    PAGE   = 50;
+    private const string NoName = "(이름 없음)";
 
     private string myUid;
-    private int    generation;      // Connect/Disconnect 마다 올림 — 이전 계정의 늦은 응답을 버리기 위해
-    private bool   loadedOnce;
-    private bool   refreshing;
-    private bool   refreshAgain;
+    private readonly RefreshGate gate = new RefreshGate();   // 받기 하나씩 + 이전 계정의 늦은 응답 버리기
 
     private readonly Dictionary<string, Friendship> current = new Dictionary<string, Friendship>();
-    private readonly Dictionary<string, string>     blocks  = new Dictionary<string, string>();
+    private readonly BackendBlockStore blockStore = new BackendBlockStore();
+
+    public BackendFriendService()
+    {
+        blockStore.Changed += list => BlocksReceived?.Invoke(list);
+    }
 
     // ───────────────────────────── 연결 ─────────────────────────────
 
@@ -46,34 +46,20 @@ public class BackendFriendService : IFriendService
     {
         Disconnect();
 
-        string reason = SessionProblem(uid);
+        string reason = BackendSession.Problem(uid, "로그인하면 친구 기능을 쓸 수 있습니다.");
         if (reason != null) { Failed?.Invoke(reason); return; }
 
         myUid = uid;
-        LoadBlocks();
-        BlocksReceived?.Invoke(new Dictionary<string, string>(blocks));
+        blockStore.Open(uid);   // 이 기기 캐시를 바로 보내고, 서버 목록이 오면 다시 보냄
         Refresh();
     }
 
     public void Disconnect()
     {
         myUid = null;
-        generation++;
-        loadedOnce   = false;
-        refreshing   = false;
-        refreshAgain = false;
+        gate.Reset();
         current.Clear();
-        blocks.Clear();
-    }
-
-    /// <summary>지금 이 계정으로 서버에 물을 수 있는가. 안 되면 화면에 보일 이유.</summary>
-    private static string SessionProblem(string uid)
-    {
-        AuthManager auth = AuthManager.Instance;
-        if (auth == null || !auth.IsSignedIn)                       return "로그인하면 친구 기능을 쓸 수 있습니다.";
-        if (!auth.IsOnline)                                         return "서버에 연결할 수 없습니다.";
-        if (string.IsNullOrEmpty(uid) || uid != Backend.UserInDate) return "계정 정보를 확인하는 중입니다.";
-        return null;
+        blockStore.Close();
     }
 
     // ───────────────────────────── 목록 ─────────────────────────────
@@ -81,10 +67,8 @@ public class BackendFriendService : IFriendService
     public void Refresh()
     {
         if (myUid == null) return;
-        if (refreshing) { refreshAgain = true; return; }
-
-        refreshing = true;
-        int gen = generation;
+        blockStore.EnsureLoaded();   // 차단 목록 처음 받기가 실패했으면 다시
+        if (!gate.TryBegin(out int gen)) return;   // 받는 중이면 끝난 뒤 한 번 더
         var list = new Dictionary<string, Friendship>();
 
         // 친구 → 받은 요청 → 보낸 요청 순. 같은 사람이 겹치면 앞의 상태를 씁니다.
@@ -108,7 +92,7 @@ public class BackendFriendService : IFriendService
     {
         BackendManager.Call(request, bro =>
         {
-            if (gen != generation) return;   // 그 사이 끊김·계정 전환
+            if (!gate.IsCurrent(gen)) return;   // 그 사이 끊김·계정 전환
 
             if (fallback != null && bro != null && bro.GetStatusCode() == "400")
             {
@@ -126,7 +110,6 @@ public class BackendFriendService : IFriendService
                 return;
             }
 
-            string myName = PlayerProfile.DisplayName;
             JsonData rows = bro.FlattenRows();
             for (int i = 0; rows != null && i < rows.Count; i++)
             {
@@ -138,7 +121,6 @@ public class BackendFriendService : IFriendService
                 {
                     PeerUid  = peer,
                     PeerName = string.IsNullOrEmpty(name) ? NoName : name,
-                    MyName   = myName,   // 서버가 늘 최신 닉네임을 주므로 고쳐 쓸 일 없음 (ChatManager.SyncMyName 이 건너뜀)
                     State    = state,
                 };
             }
@@ -148,35 +130,28 @@ public class BackendFriendService : IFriendService
 
     private void FinishRefresh(int gen, Dictionary<string, Friendship> list, string error)
     {
-        if (gen != generation) return;
-        refreshing = false;
+        if (!gate.IsCurrent(gen)) return;
 
-        if (error != null)
+        // 처음 받기에 실패하면 ChatManager 가 끊고 잠시 뒤 다시 연결 / 이미 받은 목록이 있으면 그대로 두고 다음 갱신을 기다림
+        bool firstFailed = error != null && !gate.LoadedOnce;
+        if (error == null)
         {
-            // 처음 받기에 실패하면 ChatManager 가 끊고 잠시 뒤 다시 연결 / 이미 받은 목록이 있으면 그대로 두고 다음 갱신을 기다림
-            if (!loadedOnce) { Failed?.Invoke(error); return; }
-        }
-        else
-        {
-            loadedOnce = true;
             current.Clear();
             foreach (KeyValuePair<string, Friendship> pair in list) current[pair.Key] = pair.Value;
             Received?.Invoke(new List<Friendship>(current.Values));
         }
 
-        if (refreshAgain)
-        {
-            refreshAgain = false;
-            Refresh();
-        }
+        bool again = gate.End(error == null);
+        if (firstFailed) { Failed?.Invoke(error); return; }
+        if (again) Refresh();
     }
 
     // ───────────────────────────── 요청 / 수락 / 삭제 ─────────────────────────────
 
-    public void Request(string uid, string myName, string peerUid, string peerName, Action<string> onDone)
+    public void Request(string uid, string peerUid, string peerName, Action<string> onDone)
         => Act(uid, cb => Backend.Friend.RequestFriend(peerUid, cb), "친구 요청", onDone);
 
-    public void Accept(string uid, string myName, string peerUid, Action<string> onDone)
+    public void Accept(string uid, string peerUid, Action<string> onDone)
         => Act(uid, cb => Backend.Friend.AcceptFriend(peerUid, cb), "친구 수락", onDone);
 
     public void Remove(string uid, string peerUid, Action<string> onDone)
@@ -191,17 +166,15 @@ public class BackendFriendService : IFriendService
         }
     }
 
-    public void UpdateMyName(string uid, string peerUid, string myName) { }   // 클래스 주석 [이름]
-
     /// <summary>닉네임 → gamer inDate (Backend.Social.GetUserInfoByNickName). 닉네임은 정확히 같아야 합니다.</summary>
     public void FindUser(string nickname, Action<string, string> onDone)
     {
         if (myUid == null) { onDone?.Invoke(null, "친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
 
-        int gen = generation;
+        int gen = gate.Generation;
         BackendManager.Call(cb => Backend.Social.GetUserInfoByNickName(nickname, cb), bro =>
         {
-            if (gen != generation) { onDone?.Invoke(null, "계정이 바뀌어 처리하지 않았습니다."); return; }
+            if (!gate.IsCurrent(gen)) { onDone?.Invoke(null, "계정이 바뀌어 처리하지 않았습니다."); return; }
 
             if (bro != null && bro.GetStatusCode() == "404") { onDone?.Invoke(null, "그 닉네임의 유저가 없습니다."); return; }
             if (bro == null || !bro.IsSuccess())
@@ -225,10 +198,10 @@ public class BackendFriendService : IFriendService
     {
         if (myUid == null || uid != myUid) { onDone?.Invoke("친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
 
-        int gen = generation;
+        int gen = gate.Generation;
         BackendManager.Call(request, bro =>
         {
-            if (gen != generation) { onDone?.Invoke("계정이 바뀌어 처리하지 않았습니다."); return; }
+            if (!gate.IsCurrent(gen)) { onDone?.Invoke("계정이 바뀌어 처리하지 않았습니다."); return; }
 
             string error = null;
             if (bro == null || !bro.IsSuccess())
@@ -255,49 +228,17 @@ public class BackendFriendService : IFriendService
         }
     }
 
-    // ───────────────────────────── 차단 (이 기기 · 계정별) ─────────────────────────────
+    // ───────────────────────────── 차단 (뒤끝 테이블 — BackendBlockStore) ─────────────────────────────
 
     public void Block(string uid, string peerUid, string peerName, Action<string> onDone)
     {
         if (myUid == null || uid != myUid) { onDone?.Invoke("친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
-        blocks[peerUid] = peerName ?? NoName;
-        SaveBlocks();
-        onDone?.Invoke(null);
+        blockStore.Set(peerUid, peerName ?? NoName, true, onDone);
     }
 
     public void Unblock(string uid, string peerUid, Action<string> onDone)
     {
         if (myUid == null || uid != myUid) { onDone?.Invoke("친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
-        if (blocks.Remove(peerUid)) SaveBlocks();
-        onDone?.Invoke(null);
-    }
-
-    [Serializable] private class BlockList { public List<string> uids = new List<string>(); public List<string> names = new List<string>(); }
-
-    private void LoadBlocks()
-    {
-        blocks.Clear();
-        string json = PlayerPrefs.GetString(PREF_BLOCKS + myUid, string.Empty);
-        if (string.IsNullOrEmpty(json)) return;
-
-        try
-        {
-            BlockList saved = JsonUtility.FromJson<BlockList>(json);
-            for (int i = 0; saved != null && i < saved.uids.Count && i < saved.names.Count; i++)
-                blocks[saved.uids[i]] = saved.names[i];
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[Friends] 차단 목록을 읽지 못해 비웁니다: {e.Message}");
-        }
-    }
-
-    private void SaveBlocks()
-    {
-        var list = new BlockList();
-        foreach (KeyValuePair<string, string> pair in blocks) { list.uids.Add(pair.Key); list.names.Add(pair.Value); }
-        PlayerPrefs.SetString(PREF_BLOCKS + myUid, JsonUtility.ToJson(list));
-        PlayerPrefs.Save();
-        BlocksReceived?.Invoke(new Dictionary<string, string>(blocks));
+        blockStore.Set(peerUid, null, false, onDone);
     }
 }

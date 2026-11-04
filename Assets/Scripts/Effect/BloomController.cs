@@ -382,8 +382,6 @@ public class BloomController : MonoBehaviour
         holdUntil = 0f;
     }
 
-    /// <summary>연출 요청과 무관하게 상시 켜둘지 여부.</summary>
-    public void SetAlwaysOn(bool on) => alwaysOn = on;
 
     // ─────────────────────────────────────────────
     private void Update()

@@ -83,7 +83,6 @@ public partial class ChatPanel : MonoBehaviour
 
     private const string DefaultPlaceholder = "메시지 입력";
     private static string DirectPlaceholder => $"메시지 입력 (최대 {ChatManager.DIRECT_MAX_LENGTH}자)";
-    private const string PeerLeftPlaceholder = "상대방이 대화방을 나갔습니다.";
     private TMP_Text placeholderText;
 
     private readonly StringBuilder sb = new StringBuilder();
@@ -242,16 +241,25 @@ public partial class ChatPanel : MonoBehaviour
         if (string.IsNullOrWhiteSpace(text)) return;
 
         bool rejected = false;
+        bool cleared  = false;
         chat.Send(text, error =>
         {
             if (this == null || error == null) return;
             rejected = true;
             ShowNotice(error);
+
+            // 서버가 나중에 거절하면(뒤끝챗 콘솔의 도배·길이·금칙어 설정) 이미 비운 글을 되돌려 고쳐 보낼 수 있게.
+            //   그사이 새 글을 쓰기 시작했으면 덮어쓰지 않음.
+            if (cleared && input.text.Length == 0) input.text = text;
         }, currentPeer);
 
-        // 검사에 걸리면(도배·길이 등) 콜백이 바로 와서 rejected = true → 고쳐 보낼 수 있게 글을 남겨 둠.
-        // 그 외에는 서버 응답을 기다리지 않고 비움 — 내 메시지는 리스너가 서버 확인 전에 바로 보여 줌.
-        if (!rejected) input.text = string.Empty;
+        // 클라이언트 검사에 걸리면 콜백이 바로 와서 rejected = true → 글을 그대로 남겨 둠.
+        // 그 외에는 서버 응답을 기다리지 않고 비움 (연달아 입력할 수 있게).
+        if (!rejected)
+        {
+            input.text = string.Empty;
+            cleared    = true;
+        }
 
         Redraw(true);   // 내가 보낸 직후에는 맨 아래로
         input.ActivateInputField();   // 연달아 입력할 수 있게 포커스 유지
@@ -284,15 +292,12 @@ public partial class ChatPanel : MonoBehaviour
                       : direct       ? chat.DirectUnavailableReason
                                      : chat.UnavailableReason;
 
-        // 상대가 나간 방 — 메시지는 보이지만 더 보낼 수 없음 (입력창 안내 문구로 알림)
-        bool peerLeft = direct && reason == null && chat.PeerLeft(currentPeer);
-
         // 맨 아래를 보고 있었으면 새 메시지가 와도 맨 아래를 유지, 위로 올려 읽는 중이면 그대로 둠
         bool wasAtBottom = scroll.verticalNormalizedPosition <= 0.01f;
 
         int shown = SyncRows(chat);
         ShowStatus(StatusFor(reason, shown, direct));
-        SetInputState(usable: reason == null && !peerLeft, peerLeft, direct);
+        SetInputState(usable: reason == null, direct);
 
         if (scrollToBottom || wasAtBottom)
         {
@@ -310,11 +315,10 @@ public partial class ChatPanel : MonoBehaviour
                       : "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!";
     }
 
-    private void SetInputState(bool usable, bool peerLeft, bool direct)
+    private void SetInputState(bool usable, bool direct)
     {
         input.interactable      = usable;
         sendButton.interactable = usable;
-        if (peerLeft && input.text.Length > 0) input.text = string.Empty;
 
         // 개인 메시지 탭만 클라이언트 글자 수 제한 (전체 채팅은 뒤끝챗 콘솔 설정)
         int limit = direct ? ChatManager.DIRECT_MAX_LENGTH : 0;
@@ -326,7 +330,7 @@ public partial class ChatPanel : MonoBehaviour
 
         if (placeholderText != null)
         {
-            string hint = peerLeft ? PeerLeftPlaceholder : direct ? DirectPlaceholder : DefaultPlaceholder;
+            string hint = direct ? DirectPlaceholder : DefaultPlaceholder;
             if (placeholderText.text != hint) placeholderText.text = hint;
         }
     }

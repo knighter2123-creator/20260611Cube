@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 /// <summary>
 /// 채팅 차단 — 차단한 사람의 전체 채팅을 내 화면에서 숨기고, 그 사람과의 대화방에서 나갑니다 (상대에게는 '나갔다' 로만 보임).
-/// 목록은 아직 이 기기에만 저장됩니다 (BackendFriendService — 계정별 PlayerPrefs). 다른 기기에서는 차단 목록이 보이지 않습니다.
+/// 목록은 서버(뒤끝 게임 정보 테이블 BLOCK_DATA — BackendBlockStore)에 저장되어, 같은 계정이면 어느 기기에서나 같습니다.
+/// 차단은 내 화면에서 바로 숨긴 뒤 서버에 저장하고, 저장에 실패하면 되돌립니다.
 /// </summary>
 public partial class ChatManager
 {
@@ -25,7 +26,7 @@ public partial class ChatManager
         if (IsBlocked(uid))                         { onDone?.Invoke(null); return; }
         if (blocked.Count >= MAX_BLOCKS)            { onDone?.Invoke($"최대 {MAX_BLOCKS}명까지 차단할 수 있습니다."); return; }
 
-        // 서버 응답을 기다리지 않고 내 화면에서 바로 숨김 — 실패하면 되돌림 (성공이면 리스너가 같은 목록을 다시 보냄)
+        // 서버 응답을 기다리지 않고 내 화면에서 바로 숨김 — 실패하면 되돌림 (성공이면 서비스가 같은 목록을 다시 보냄)
         SetBlockedLocally(uid, nickname, true);
 
         friendService.Block(me, uid, nickname, error =>

@@ -85,12 +85,6 @@ public class SkillCooldownIndicator : MonoBehaviour
         SetVisible(true);
     }
 
-    /// <summary>쿨다운을 즉시 끝냅니다.(쿨감 아이템 등)</summary>
-    public void FinishNow()
-    {
-        if (!_running) return;
-        _endTime = Time.time;
-    }
 
     // ─────────────────────────────────────────────
     private void LateUpdate()

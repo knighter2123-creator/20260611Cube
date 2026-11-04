@@ -5,8 +5,8 @@ using UnityEngine;
 /// <summary>
 /// 친구 — 요청을 보내고, 상대가 수락하면 양쪽 친구 창에 서로가 보입니다. 서버 구조는 BackendFriendService 주석 참고 (뒤끝 친구).
 ///
-/// [연결]  채팅이 연결된 신원(MyUid)으로 친구·차단 목록 리스너를 엽니다. 목록만 실패하면 채팅은 그대로 두고 retryDelay 뒤 다시 시도.
-/// [이름]  요청·수락 때 서로의 닉네임을 남깁니다. 내가 이름을 바꾸면 다음 목록 갱신 때 내 이름 칸을 고쳐 씁니다 (상대 화면에 반영).
+/// [연결]  채팅이 연결된 신원(MyUid)으로 친구·차단 목록을 받습니다. 목록만 실패하면 채팅은 그대로 두고 retryDelay 뒤 다시 시도.
+/// [이름]  상대 닉네임은 서버가 목록마다 최신 값을 줍니다.
 /// </summary>
 public partial class ChatManager
 {
@@ -16,7 +16,7 @@ public partial class ChatManager
     private const string FriendsLoading = "친구 목록을 불러오는 중입니다...";
 
     /// <summary>
-    /// 실시간 리스너가 없는 서버(뒤끝)에서 받은 요청 · 수락을 알아채기 위해 목록을 다시 받는 간격(초).
+    /// 받은 요청 · 수락을 알아채기 위해 목록을 다시 받는 간격(초).
     /// 친구 창을 열 때 · 친구 실시간 알림(BackendNotify)을 받을 때도 바로 다시 받습니다 (RefreshFriends).
     /// 알림이 연결돼 있으면 놓쳤을 때의 대비일 뿐이라 길게. 뒤끝 호출 수 = 3회 / 간격.
     /// </summary>
@@ -130,8 +130,6 @@ public partial class ChatManager
         friendsLoaded = true;
         FriendsVersion++;
         changed = true;
-
-        SyncMyName();
     }
 
     /// <summary>목록 순서 — 받은 요청(할 일) → 친구 → 보낸 요청.</summary>
@@ -143,19 +141,6 @@ public partial class ChatManager
             case FriendState.Friend:   return 1;
             default:                   return 2;
         }
-    }
-
-    /// <summary>관계 문서에 남은 내 이름이 지금 이름과 다르면 고쳐 씀 (상대 친구 창에 새 이름이 보이게).</summary>
-    private void SyncMyName()
-    {
-        if (!TryGetSender(out string uid)) return;
-        string name = PlayerProfile.DisplayName;
-
-        // 먼저 모아 둠 — LocalFriendService 는 UpdateMyName 안에서 바로 목록을 다시 보내 friendships 가 바뀜
-        var stale = new List<string>();
-        foreach (Friendship f in friendships)
-            if (f.MyName != name) stale.Add(f.PeerUid);
-        foreach (string peer in stale) friendService.UpdateMyName(uid, peer, name);
     }
 
     private void ClearFriends()
@@ -191,7 +176,7 @@ public partial class ChatManager
         if (IsBlocked(peerUid))                { onDone?.Invoke("차단한 유저에게는 친구 요청을 보낼 수 없습니다."); return; }
         if (FriendLimitReached(out error))     { onDone?.Invoke(error); return; }
 
-        friendService.Request(uid, PlayerProfile.DisplayName, peerUid, peerName, IfAlive(onDone));
+        friendService.Request(uid, peerUid, peerName, IfAlive(onDone));
     }
 
     /// <summary>
@@ -205,18 +190,12 @@ public partial class ChatManager
         if (name == PlayerProfile.DisplayName)   { onDone?.Invoke("나에게는 친구 요청을 보낼 수 없습니다."); return; }
         if (FriendsUnavailableReason != null)    { onDone?.Invoke(FriendsUnavailableReason); return; }
 
-        friendService.FindUser(name, IfAlive2((uid, error) =>
+        friendService.FindUser(name, IfAlive<string, string>((uid, error) =>
         {
             if (error != null) { onDone?.Invoke(error); return; }
             RequestFriend(uid, name, onDone);
         }));
     }
-
-    /// <summary>IfAlive 의 (uid, 오류) 콜백판 — 이 매니저가 파괴됐으면 무시.</summary>
-    private Action<string, string> IfAlive2(Action<string, string> onDone) => (a, b) =>
-    {
-        if (this != null) onDone?.Invoke(a, b);
-    };
 
     public void AcceptFriend(string peerUid, Action<string> onDone)
     {
@@ -226,7 +205,7 @@ public partial class ChatManager
         if (!incoming)                         { onDone?.Invoke("받은 친구 요청이 없습니다."); return; }
         if (FriendLimitReached(out error))     { onDone?.Invoke(error); return; }
 
-        friendService.Accept(uid, PlayerProfile.DisplayName, peerUid, IfAlive(onDone));
+        friendService.Accept(uid, peerUid, IfAlive(onDone));
     }
 
     /// <summary>친구 삭제 · 받은 요청 거절 · 보낸 요청 취소. (상대 친구 창에서도 사라짐)</summary>

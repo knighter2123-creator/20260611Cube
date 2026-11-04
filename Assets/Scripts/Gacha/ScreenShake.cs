@@ -35,21 +35,6 @@ public class ScreenShake : MonoBehaviour
         shaking = StartCoroutine(ShakeRoutine(duration, magnitude));
     }
 
-    /// <summary>흔들림을 즉시 멈추고 원위치로 되돌립니다.</summary>
-    public void StopShake()
-    {
-        if (shaking != null)
-        {
-            StopCoroutine(shaking);
-            shaking = null;
-        }
-
-        if (hasOrigin)
-        {
-            transform.localPosition = originLocalPos;
-            hasOrigin = false;
-        }
-    }
 
     private IEnumerator ShakeRoutine(float duration, float magnitude)
     {
@@ -64,21 +49,22 @@ public class ScreenShake : MonoBehaviour
             yield return null;
         }
 
-        transform.localPosition = originLocalPos;
-        hasOrigin = false;
-        shaking   = null;
+        RestoreOrigin();
+        shaking = null;
     }
 
     // ★ 흔들리는 도중에 패널이 닫히면(SetActive(false)) 코루틴이 중단되면서
     //   오브젝트가 어긋난 위치에 영구히 남습니다. 여기서 원위치로 되돌립니다.
     private void OnDisable()
     {
-        shaking = null;
+        shaking = null;   // 꺼지면 코루틴은 유니티가 이미 멈춤
+        RestoreOrigin();
+    }
 
-        if (hasOrigin)
-        {
-            transform.localPosition = originLocalPos;
-            hasOrigin = false;
-        }
+    private void RestoreOrigin()
+    {
+        if (!hasOrigin) return;
+        transform.localPosition = originLocalPos;
+        hasOrigin = false;
     }
 }

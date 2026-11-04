@@ -86,6 +86,9 @@ public partial class Enemy
     // ──────────────────────────────────────────
     //  독 (DoT)
     // ──────────────────────────────────────────
+    /// <summary>지금 들어가는 피해가 독 틱인가 — Enemy.TakeDamage 가 피해 숫자를 독 색으로 띄울 때 봄.</summary>
+    private bool _dotTick;
+
     public void ApplyDot(float dotDamage, float dotInterval, float duration)
     {
         RestartDebuff(ref _dotCoroutine, DotRoutine(dotDamage, dotInterval, duration));
@@ -105,7 +108,12 @@ public partial class Enemy
             yield return wait;
             elapsed += dotInterval;
             if (isDead) yield break;
-            TakeDamage(dotDamage);
+
+            // 독 피해 숫자는 독 색(DamageTextType.DoT)으로 — 피해 처리 자체는 일반 경로 그대로
+            //   (TakeDamage 를 덮어쓴 자식 클래스 — EvolveBoss 등 — 도 똑같이 거치게, 메서드를 나누지 않고 표시만 바꿈)
+            _dotTick = true;
+            try     { TakeDamage(dotDamage); }
+            finally { _dotTick = false; }
         }
 
         _dotCoroutine = null;

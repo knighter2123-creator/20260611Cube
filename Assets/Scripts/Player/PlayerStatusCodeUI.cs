@@ -1,14 +1,13 @@
-using System;
-using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 플레이어 스탯 창 — **코드 생성 버전.** 이 파일은 상태 · 열고 닫기 · 갱신을 담당합니다.
+/// 플레이어 스탯 창 — **코드 생성 버전.** 이 파일은 상태 · 보이기/숨기기 · 갱신을 담당합니다.
 ///
-/// 씬 작업이 거의 없습니다. 빈 오브젝트에 이 컴포넌트 하나만 붙이면
-/// 캔버스 · 버튼 · 패널 · 텍스트를 전부 스크립트가 만듭니다.
+/// 항상 TabWindow 의 한 탭으로 씁니다 (열고 닫기·Dim·✕ 는 TabWindow 가 가짐).
+///   ★ 이 컴포넌트는 창 '밖'의 항상 켜져 있는 오브젝트에 두고, Build Parent 에 탭 내용(Status_Content)을 연결하세요.
+///   그러면 패널 · 텍스트를 전부 스크립트가 그 아래에 만듭니다.
 ///
 /// ─────────────────────────────────────────────────────────────
 /// [partial 로 두 파일에 나눈 기준 — AugmentSelectUI 와 같은 방식]
@@ -32,33 +31,11 @@ using UnityEngine.UI;
 public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
 {
     // ══════════════════════════════════════════════════════════
-    //  인스펙터 설정 — 열기 / 닫기
+    //  인스펙터 설정
     // ══════════════════════════════════════════════════════════
-    [Header("동작 모드")]
-    [Tooltip("TabWindow 의 한 탭으로 쓸 때 체크하세요.\n" +
-             "체크하면 Status 버튼을 만들지 않고, 열고 닫기는 TabWindow 가 시킵니다.\n" +
-             "★ 이 컴포넌트는 창 '밖'의 항상 켜져 있는 오브젝트에 두고,\n" +
-             "  Build Parent 에 탭 내용(Status_Content)을 연결하세요.")]
-    [SerializeField] private bool useAsTabPage = false;
-
-    [Header("Status 버튼")]
-    [Tooltip("이미 만들어 둔 버튼을 쓰려면 여기에 연결하세요. 연결하면 아래 '버튼 자동 생성'은 무시됩니다")]
-    [SerializeField] private Button externalOpenButton;
-
-    [Tooltip("Status 버튼을 코드로 만들어 화면 모서리에 붙입니다")]
-    [SerializeField] private bool createOpenButton = true;
-
-    [SerializeField] private ScreenCorner buttonCorner = ScreenCorner.TopRight;
-    [SerializeField] private Vector2      buttonOffset = new Vector2(28f, 28f);
-    [SerializeField] private Vector2      buttonSize   = new Vector2(190f, 76f);
-    [SerializeField] private string       buttonLabel  = "Status";
-
     [Header("생성 위치")]
-    [Tooltip("비워두면 씬의 Canvas 를 찾고, 없으면 새로 만듭니다")]
-    [SerializeField] private Canvas targetCanvas;
-
-    [Tooltip("여기에 연결하면 이 RectTransform 아래에 UI 를 만듭니다 (예: 탭 창의 Status_Content).\n" +
-             "비워두면 예전처럼 targetCanvas 바로 아래에 만듭니다.")]
+    [Tooltip("이 RectTransform 아래에 UI 를 만듭니다 (탭 창의 Status_Content).\n" +
+             "비워두면 씬의 첫 Canvas 아래에 만들어 탭과 무관하게 화면을 덮으니 꼭 연결하세요.")]
     [SerializeField] private RectTransform buildParent;
 
     [Tooltip("체크하면 Start 에서 UI 를 만듭니다. 끄면 처음 열 때 만듭니다(메모리 절약)")]
@@ -67,20 +44,10 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     [Header("표시 설정")]
     [SerializeField] private PlayerStatusText.Style style = new PlayerStatusText.Style();
 
-    [Header("연출")]
-    [Tooltip("열고 닫을 때 살짝 커지며 나타나는 연출")]
-    [SerializeField] private bool  animate         = true;
-    [SerializeField] private float animateDuration = 0.14f;
-
-    /// <summary>화면 어느 모서리에 Status 버튼을 붙일지.</summary>
-    public enum ScreenCorner { TopLeft, TopRight, BottomLeft, BottomRight }
-
     // ══════════════════════════════════════════════════════════
     //  런타임 상태
     // ══════════════════════════════════════════════════════════
     private bool isOpen;
-    private bool tabModeApplied;
-    private Coroutine animRoutine;
 
     // ★ bool 플래그가 아니라 '구독한 인스턴스' 를 들고 비교합니다.
     //   이 프로젝트의 매니저들은 씬 왕복 중 파괴 후 재생성되는 경우가 있어서,
@@ -107,43 +74,8 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
         //   실행 순서에 따라 Instance 가 아직 null 일 수 있습니다.
         //   Start 는 모든 Awake 가 끝난 뒤에 불리므로 안전합니다.
 
-        ApplyTabModeSettings();
-
         if (buildOnStart) EnsureBuilt();   // → Build.cs
         TrySubscribe();
-    }
-
-    /// <summary>
-    /// 탭 모드에서 반드시 꺼야 하는 설정들을 코드로 강제합니다.
-    /// 인스펙터에서 하나만 빠뜨려도 증상이 애매하게 나타나는 것들이라 여기서 못을 박습니다.
-    /// Start 와 Open 양쪽에서 불리지만(아래 Open 주석 참고) 실제 적용과 경고는 한 번만 합니다.
-    /// </summary>
-    private void ApplyTabModeSettings()
-    {
-        if (!useAsTabPage || tabModeApplied) return;
-        tabModeApplied = true;
-
-        // ① Status 버튼을 만들면 안 됩니다.
-        //    진입점은 화살표 하나로 통일했고, 자동 생성된 버튼이 탭 내용 안에 생기면
-        //    탭이 꺼질 때 같이 꺼져서 더 이상 눌리지도 않습니다.
-        if (createOpenButton || externalOpenButton != null)
-        {
-            createOpenButton   = false;
-            externalOpenButton = null;
-        }
-
-        // ② 연출을 끕니다.
-        //    Close() 는 코루틴으로 페이드한 뒤 마지막에 panelRoot 를 끕니다.
-        //    그런데 탭 전환은 TabWindow 가 내용을 즉시 꺼버리므로, 그 사이에 코루틴이
-        //    중단되면 '마지막 줄'에 영영 도달하지 못합니다. 탭 전환은 즉시가 자연스럽기도 합니다.
-        animate = false;
-
-        // ③ 부모를 안 정했으면 경고합니다. 그냥 두면 캔버스 한가운데에 만들어져
-        //    탭과 무관하게 화면을 덮습니다 — 원인을 찾기 어려운 증상입니다.
-        if (buildParent == null)
-            Debug.LogWarning("[PlayerStatusCodeUI] 탭 모드인데 Build Parent 가 비어 있습니다. " +
-                             "탭 내용(예: Status_Content)을 연결하세요. " +
-                             "지금은 Canvas 바로 아래에 만들어집니다.", this);
     }
 
     // ══════════════════════════════════════════════════════════
@@ -165,13 +97,7 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     /// </summary>
     public void OnTabHide() => Close();
 
-    private void OnDestroy()
-    {
-        Unsubscribe();
-
-        // 외부 버튼은 이 컴포넌트보다 오래 살 수 있으므로 걸어 둔 리스너를 풀어 줍니다.
-        if (externalOpenButton != null) externalOpenButton.onClick.RemoveListener(Toggle);
-    }
+    private void OnDestroy() => Unsubscribe();
 
     // ══════════════════════════════════════════════════════════
     //  이벤트 구독
@@ -293,25 +219,13 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     }
 
     // ══════════════════════════════════════════════════════════
-    //  열기 / 닫기
+    //  보이기 / 숨기기 (탭 전환 — 연출 없이 즉시)
     // ══════════════════════════════════════════════════════════
-
-    public void Toggle()
-    {
-        if (isOpen) Close();
-        else        Open();
-    }
 
     public void Open()
     {
-        // ★ Start() 보다 먼저 불릴 수 있습니다.
-        //   TabWindow 는 탭 내용을 SetActive(true) 한 '직후' OnTabShow 를 부르는데,
-        //   유니티는 Awake → OnEnable 까지만 즉시 돌리고 Start 는 그 프레임 뒤쪽에 돌립니다.
-        //   즉 첫 탭 열기에서는 Open() 이 Start() 를 앞지릅니다.
-        //   그대로 두면 탭 모드 설정이 적용되지 않은 채 UI 가 만들어져,
-        //   Status 버튼이 생기고 연출이 켜진 상태가 됩니다. 멱등하니 여기서도 부릅니다.
-        ApplyTabModeSettings();
-
+        // ★ Start() 보다 먼저 불릴 수 있습니다 — TabWindow 는 탭 내용을 켠 '직후' OnTabShow 를 부르는데,
+        //   Start 는 그 프레임 뒤쪽에 돕니다. 그래서 여기서도 만들기·구독을 확인합니다 (둘 다 여러 번 불러도 안전).
         EnsureBuilt();    // → Build.cs. 아직 안 만들었으면 지금 만듭니다
         TrySubscribe();   // 매니저가 없었거나 교체된 경우를 대비
 
@@ -321,16 +235,12 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
         // ★ 이벤트를 놓쳤더라도 열 때 무조건 전체를 다시 읽습니다.
         //   "이벤트로만 갱신" 하는 UI 는 이벤트 하나가 빠지면 조용히 거짓 정보를 보여줍니다.
         Refresh();
-
-        PlayAnim(true);
     }
 
     public void Close()
     {
         isOpen = false;
-
-        // 연출이 끝난 뒤에 꺼야 하므로 여기서 바로 SetActive(false) 하지 않습니다.
-        PlayAnim(false);
+        if (panelRoot != null) panelRoot.SetActive(false);
     }
 
     // ══════════════════════════════════════════════════════════
@@ -370,74 +280,6 @@ public partial class PlayerStatusCodeUI : MonoBehaviour, ITabPage
     private static void SetText(TMP_Text label, string value)
     {
         if (label != null) label.text = value;
-    }
-
-    // ══════════════════════════════════════════════════════════
-    //  연출
-    // ══════════════════════════════════════════════════════════
-
-    private void PlayAnim(bool opening)
-    {
-        // 열고 닫기를 빠르게 반복해도 코루틴이 겹치지 않게 이전 것을 먼저 멈춥니다.
-        if (animRoutine != null)
-        {
-            StopCoroutine(animRoutine);
-            animRoutine = null;
-        }
-
-        // 연출을 끈 경우 / 아직 안 만든 경우는 즉시 반영하고 끝냅니다.
-        if (!animate || panelRoot == null)
-        {
-            if (panelRoot != null) panelRoot.SetActive(opening);
-            if (panelCanvasGroup != null) panelCanvasGroup.alpha = 1f;
-            if (windowRect != null) windowRect.localScale = Vector3.one;
-            return;
-        }
-
-        animRoutine = StartCoroutine(AnimateRoutine(opening));
-    }
-
-    private IEnumerator AnimateRoutine(bool opening)
-    {
-        float from = opening ? 0f : 1f;
-        float to   = opening ? 1f : 0f;
-        float t    = 0f;
-
-        while (t < animateDuration)
-        {
-            // ★ unscaledDeltaTime 을 쓰는 이유
-            //   증강 카드창이 열려 있으면 Time.timeScale 이 0 입니다.
-            //   deltaTime 을 쓰면 그동안 연출이 아예 진행되지 않아 창이 멈춰 보입니다.
-            //   "게임 시간"과 "UI 시간"은 분리해서 다뤄야 합니다.
-            t += Time.unscaledDeltaTime;
-
-            float k = Mathf.Clamp01(t / animateDuration);
-            ApplyAnimValue(Mathf.Lerp(from, to, EaseOut(k)));
-            yield return null;
-        }
-
-        ApplyAnimValue(to);
-
-        // 닫는 연출이 끝난 뒤에 비활성화합니다.
-        if (!opening) panelRoot.SetActive(false);
-
-        animRoutine = null;
-    }
-
-    private void ApplyAnimValue(float k)
-    {
-        if (panelCanvasGroup != null) panelCanvasGroup.alpha = k;
-
-        // 0.92 → 1.0 로 살짝만 커집니다. 크게 튀면 저사양 기기에서 어지럽습니다.
-        if (windowRect != null)
-            windowRect.localScale = Vector3.one * Mathf.Lerp(0.92f, 1f, k);
-    }
-
-    /// <summary>끝에서 부드럽게 감속. 1-(1-k)^3 (ease-out cubic)</summary>
-    private static float EaseOut(float k)
-    {
-        float inv = 1f - k;
-        return 1f - inv * inv * inv;
     }
 
     // ══════════════════════════════════════════════════════════

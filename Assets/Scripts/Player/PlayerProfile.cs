@@ -428,19 +428,6 @@ public static class PlayerProfile
         return true;
     }
 
-    /// <summary>서버에 있는 익명 이름을 이 기기에도 씁니다 (어느 기기에서나 같은 "익명1234").</summary>
-    public static void ApplyAnonymousFromServer(string anonymousName)
-    {
-        SaveData data = Data;
-        if (data == null || string.IsNullOrEmpty(anonymousName) || data.anonymousName == anonymousName) return;
-
-        data.anonymousName = anonymousName;
-        RegisterSave();
-
-        // 이름이 없는 유저에게는 익명 이름이 곧 표시 이름 → 네임플레이트 갱신
-        if (!HasName) OnNameChanged?.Invoke(anonymousName);
-    }
-
     private static long NowMs() => System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     // ───────── 파일 기록 ─────────

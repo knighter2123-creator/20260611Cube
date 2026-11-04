@@ -49,7 +49,7 @@ public partial class ChatPanel
         if (chat == null || !HasUserMenu) return;
 
         ChatMessage m = press.Message;
-        if (string.IsNullOrEmpty(m.Uid) || m.Uid == chat.MyUid) return;   // 내 메시지
+        if (!m.HasPlayerUid || m.Uid == chat.MyUid) return;   // 내 메시지 · 공지 · uid 를 모르는 메시지
 
         menuUid  = m.Uid;
         menuName = m.Nickname;

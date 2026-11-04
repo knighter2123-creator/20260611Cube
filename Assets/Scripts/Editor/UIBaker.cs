@@ -19,6 +19,7 @@ using UnityEngine.UI;
 ///   Tools/UI 굽기/채팅 탭·친구 창      — StageScene (ChatPanel 탭·유저 메뉴 + FriendPanel) → ChatCanvas.prefab (+ 랭킹 옆 친구 버튼은 씬에)
 ///   Tools/UI 굽기/친구 창 - 닉네임 검색 칸 — 친구 창에 검색 칸이 없을 때만 더함 (ChatCanvas 프리팹에도 반영)
 ///   Tools/UI 굽기/우편함              — StageScene (MailboxPanel)                     → MailboxCanvas.prefab (+ 우편 버튼은 씬에)
+///   Tools/UI 굽기/설정 창 - 효과음·배경음 슬라이더 — 게임 씬마다 (GameSettingManager) — 설정 창에 직접 (프리팹 아님)
 /// 실행한 뒤 씬을 저장하세요.
 /// </summary>
 public static class UIBaker
@@ -942,6 +943,106 @@ public static class UIBaker
         scroll.movementType      = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 40f;
         return content;
+    }
+
+    // ═════════════════════════════ 설정 창 — 효과음·배경음 슬라이더 ═════════════════════════════
+    //
+    // 설정 창(Setting Panel)은 게임 씬마다(StageScene · DailyDungeonScene · EvolveScene) 따로 있어 씬마다 한 번씩 실행합니다.
+    // 블룸 슬라이더 줄(라벨 + 슬라이더)을 복제해 모양을 맞추고, 비어 있는 창 왼쪽에 두 줄로 둡니다.
+    //   창 1600×780 기준: 가운데 버튼 열(폭 350)과 겹치지 않게 라벨 폭만 250 으로 줄임.
+
+    private const float SoundLabelRight = 270f;   // 창 왼쪽 끝 → 라벨 오른쪽 끝 (라벨 피벗이 오른쪽 — 블룸 줄과 같음)
+    private const float SoundLabelWidth = 250f;   // "효과음" (글자 50) 이 들어가는 폭
+    private const float SoundRowOffsetY = 60f;    // 창 가운데에서 위(효과음) / 아래(배경음)
+
+    [MenuItem("Tools/UI 굽기/설정 창 - 효과음·배경음 슬라이더 (게임 씬)")]
+    private static void BakeSoundSliders()
+    {
+        GameSettingManager[] managers = Object.FindObjectsByType<GameSettingManager>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                                              .Where(m => !EditorUtility.IsPersistent(m)).ToArray();
+        if (managers.Length == 0)
+        {
+            EditorUtility.DisplayDialog("UI 굽기",
+                "열린 씬에 GameSettingManager 가 없습니다. StageScene · DailyDungeonScene · EvolveScene 중 하나를 열고 다시 실행하세요.", "확인");
+            return;
+        }
+
+        var lines = new System.Collections.Generic.List<string>();
+        foreach (GameSettingManager manager in managers)
+            lines.Add($"{manager.gameObject.scene.name}: {BakeSoundSlidersFor(manager)}");
+
+        EditorUtility.DisplayDialog("UI 굽기",
+            string.Join("\n", lines) +
+            "\n\n씬을 저장하세요. 설정 창은 씬마다 따로 있으니 다른 게임 씬(StageScene · DailyDungeonScene · EvolveScene)에서도 한 번씩 실행하세요.",
+            "확인");
+    }
+
+    /// <summary>한 설정 창에 두 줄을 만들고 GameSettingManager 칸을 채웁니다. 결과 한 줄.</summary>
+    private static string BakeSoundSlidersFor(GameSettingManager manager)
+    {
+        var so = new SerializedObject(manager);
+        if (so.FindProperty("sfxSlider").objectReferenceValue != null || so.FindProperty("bgmSlider").objectReferenceValue != null)
+            return "이미 소리 슬라이더가 있어 건너뜀 (모양은 하이어라키에서 직접 고치세요)";
+
+        var bloom = so.FindProperty("bloomSlider").objectReferenceValue as Slider;
+        var row   = bloom != null ? bloom.transform.parent as RectTransform : null;   // "Bloom Slide" — 라벨 글자 + 슬라이더 자식
+        var panel = row != null ? row.parent as RectTransform : null;                // "Setting Panel"
+        if (panel == null)
+            return "블룸 슬라이더(Bloom Slider 칸)가 연결돼 있지 않아 모양을 따라 만들 수 없어 건너뜀";
+
+        TMP_Text template = row.GetComponent<TMP_Text>();
+        var b = new Builder(template != null ? template.font : MostUsedFont(manager.gameObject.scene));
+
+        Slider sfx = SoundRow(b, row, panel, "Sfx", "효과음",  SoundRowOffsetY, out TMP_Text sfxValue);
+        Slider bgm = SoundRow(b, row, panel, "Bgm", "배경음", -SoundRowOffsetY, out TMP_Text bgmValue);
+
+        so.Update();
+        so.FindProperty("sfxSlider").objectReferenceValue     = sfx;
+        so.FindProperty("sfxValueLabel").objectReferenceValue = sfxValue;
+        so.FindProperty("bgmSlider").objectReferenceValue     = bgm;
+        so.FindProperty("bgmValueLabel").objectReferenceValue = bgmValue;
+        so.ApplyModifiedProperties();
+
+        EditorSceneManager.MarkSceneDirty(manager.gameObject.scene);
+        Selection.activeGameObject = sfx.transform.parent.gameObject;
+        EditorGUIUtility.PingObject(sfx);
+        return "효과음 · 배경음 슬라이더를 설정 창 왼쪽에 만들고 인스펙터 칸을 채웠습니다";
+    }
+
+    /// <summary>블룸 줄(template)을 복제해 한 줄 — 라벨 + 슬라이더 + 오른쪽 퍼센트 글자.</summary>
+    private static Slider SoundRow(Builder b, RectTransform template, RectTransform panel, string id, string title, float y,
+                                   out TMP_Text valueLabel)
+    {
+        GameObject go = Object.Instantiate(template.gameObject, panel);
+        go.name = $"{id} Volume";
+        Undo.RegisterCreatedObjectUndo(go, "소리 슬라이더 굽기");
+
+        // 창 왼쪽 가운데 기준으로 — 블룸 줄은 오른쪽 기준이라 앵커만 바꾸고 피벗(오른쪽)은 그대로
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
+        rt.sizeDelta        = new Vector2(SoundLabelWidth, rt.sizeDelta.y);
+        rt.anchoredPosition = new Vector2(SoundLabelRight, y);
+
+        TMP_Text label = go.GetComponent<TMP_Text>();
+        if (label != null) label.text = title;
+
+        Slider slider = go.GetComponentInChildren<Slider>(true);
+        slider.name           = $"{id} Slider";
+        slider.onValueChanged = new Slider.SliderEvent();   // 블룸 슬라이더에 인스펙터로 건 연결이 있어도 따라오지 않게 (런타임에 SoundManager 가 검)
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.SetValueWithoutNotify(1f);
+
+        // 퍼센트 — 슬라이더 오른쪽 (GameSettingManager 가 열 때 채움)
+        float size = label != null ? label.fontSize * 0.8f : 40f;
+        valueLabel = b.Text("Value", slider.transform, "100%", size, TextAlignmentOptions.MidlineLeft, false);
+        if (label != null) valueLabel.color = label.color;
+        RectTransform vrt = valueLabel.rectTransform;
+        vrt.anchorMin = vrt.anchorMax = new Vector2(1f, 0.5f);
+        vrt.pivot            = new Vector2(0f, 0.5f);
+        vrt.sizeDelta        = new Vector2(110f, 50f);
+        vrt.anchoredPosition = new Vector2(12f, 0f);
+        return slider;
     }
 
     // ═════════════════════════════ 공용 ═════════════════════════════

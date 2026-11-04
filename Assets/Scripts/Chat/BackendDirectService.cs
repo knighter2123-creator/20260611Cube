@@ -11,9 +11,9 @@ using UnityEngine;
 /// [대화방]  뒤끝에는 '대화방' 이 없고 받은 쪽지함 / 보낸 쪽지함만 있습니다.
 ///   두 쪽지함을 받아 상대(gamer inDate)별로 묶어 대화방처럼 보여 줍니다.
 ///   이 기기에서 연 방 · 나간 방은 PlayerPrefs 에 계정별로 기억합니다 (나간 방은 그 뒤에 새 쪽지가 오면 다시 보임).
-///   상대가 나갔는지는 알 수 없어서 PeerLeft 는 늘 false 입니다.
+///   상대가 나갔는지는 뒤끝이 알려 주지 않아, 나가도 상대는 계속 보낼 수 있습니다.
 ///
-/// [받기]  실시간 리스너가 없어 Refresh 때 두 쪽지함을 다시 받습니다 (뒤끝 호출 2회).
+/// [받기]  Refresh 때 두 쪽지함을 다시 받습니다 (뒤끝 호출 2회).
 ///   ChatManager 가 연결할 때 · 보낸 뒤 · 쪽지 실시간 알림(BackendNotify) · 일정 간격으로 부릅니다.
 ///
 /// [안 읽은 수]  이 기기에서 마지막으로 읽은 쪽지 시각을 계정·상대별로 기억해 셉니다 (서버 '읽음' 표시는 쓰지 않음 —
@@ -28,17 +28,13 @@ public class BackendDirectService : IDirectService
 {
     public event Action<IReadOnlyList<DirectRoom>>          RoomsReceived;
     public event Action<string, IReadOnlyList<ChatMessage>> MessagesReceived;
-    public event Action<string, IReadOnlyList<string>>      MessagesRemoved { add { } remove { } }   // 지운 것은 다음 목록에서 빠질 뿐
     public event Action<string>                             Failed;
 
     private const string PREF_ROOMS = "dm.rooms.";   // + 내 uid — 이 기기에서 연 방 / 나간 방 / 읽은 시각
     private const char   ProgressSep = '|';
 
     private string myUid;
-    private int    generation;
-    private bool   loadedOnce;
-    private bool   refreshing;
-    private bool   refreshAgain;
+    private readonly RefreshGate gate = new RefreshGate();   // 받기 하나씩 + 이전 계정의 늦은 응답 버리기
 
     private string watching;
     private int    watchCount = 50;
@@ -67,7 +63,7 @@ public class BackendDirectService : IDirectService
     {
         Disconnect();
 
-        string reason = SessionProblem(uid);
+        string reason = BackendSession.Problem(uid, "로그인하면 개인 메시지를 쓸 수 있습니다.");
         if (reason != null) { Failed?.Invoke(reason); return; }
 
         myUid = uid;
@@ -77,35 +73,19 @@ public class BackendDirectService : IDirectService
 
     public void Disconnect()
     {
-        myUid = null;
-        generation++;
-        loadedOnce   = false;
-        refreshing   = false;
-        refreshAgain = false;
-        watching     = null;
+        myUid    = null;
+        watching = null;
+        gate.Reset();
         byPeer.Clear();
         names.Clear();
         local.Clear();
-    }
-
-    private static string SessionProblem(string uid)
-    {
-        AuthManager auth = AuthManager.Instance;
-        if (auth == null || !auth.IsSignedIn)                       return "로그인하면 개인 메시지를 쓸 수 있습니다.";
-        if (!auth.IsOnline)                                         return "서버에 연결할 수 없습니다.";
-        if (string.IsNullOrEmpty(uid) || uid != Backend.UserInDate) return "계정 정보를 확인하는 중입니다.";
-        return null;
     }
 
     // ───────────────────────────── 받기 ─────────────────────────────
 
     public void Refresh()
     {
-        if (myUid == null) return;
-        if (refreshing) { refreshAgain = true; return; }
-
-        refreshing = true;
-        int gen = generation;
+        if (myUid == null || !gate.TryBegin(out int gen)) return;   // 받는 중이면 끝난 뒤 한 번 더
         var received = new List<JsonData>();
         var sent     = new List<JsonData>();
 
@@ -121,7 +101,7 @@ public class BackendDirectService : IDirectService
     {
         BackendManager.Call(request, bro =>
         {
-            if (gen != generation) return;
+            if (!gate.IsCurrent(gen)) return;
             if (bro != null && bro.GetStatusCode() == "404") { next(null); return; }   // 비었음
             if (bro == null || !bro.IsSuccess())
             {
@@ -138,26 +118,19 @@ public class BackendDirectService : IDirectService
 
     private void FinishRefresh(int gen, List<JsonData> received, List<JsonData> sent, string error)
     {
-        if (gen != generation) return;
-        refreshing = false;
+        if (!gate.IsCurrent(gen)) return;
 
-        if (error != null)
+        bool firstFailed = error != null && !gate.LoadedOnce;   // 처음이면 ChatManager 가 끊고 잠시 뒤 다시 연결
+        if (error == null)
         {
-            if (!loadedOnce) { Failed?.Invoke(error); return; }   // 처음이면 ChatManager 가 끊고 잠시 뒤 다시 연결
-        }
-        else
-        {
-            loadedOnce = true;
             Rebuild(received, sent);
             PublishRooms();
             PublishWatched();
         }
 
-        if (refreshAgain)
-        {
-            refreshAgain = false;
-            Refresh();
-        }
+        bool again = gate.End(error == null);
+        if (firstFailed) { Failed?.Invoke(error); return; }
+        if (again) Refresh();
     }
 
     /// <summary>두 쪽지함을 상대별 대화로 묶습니다.</summary>
@@ -244,7 +217,6 @@ public class BackendDirectService : IDirectService
                 PeerUid    = peer,
                 PeerName   = names.TryGetValue(peer, out string n) ? n : room?.name ?? "?",
                 MyState    = left ? RoomState.Left : RoomState.In,
-                PeerState  = RoomState.In,   // 상대가 나갔는지는 알 수 없음
                 Unread     = left ? 0 : unread,
                 LastSentAt = Math.Max(last, room != null ? room.since : 0),
             });
@@ -271,7 +243,7 @@ public class BackendDirectService : IDirectService
 
     public void Unwatch() => watching = null;
 
-    public void Open(string uid, string myName, string peerUid, string peerName, Action<string> onDone)
+    public void Open(string uid, string peerUid, string peerName, Action<string> onDone)
     {
         if (myUid == null || uid != myUid) { onDone?.Invoke("개인 메시지를 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
 
@@ -301,16 +273,16 @@ public class BackendDirectService : IDirectService
 
     // ───────────────────────────── 보내기 / 읽음 ─────────────────────────────
 
-    public void Send(string uid, string peerUid, ChatMessage message, bool invitePeer, Action<string> onDone)
+    public void Send(string uid, string peerUid, ChatMessage message, Action<string> onDone)
     {
         if (myUid == null || uid != myUid) { onDone?.Invoke("개인 메시지를 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
 
         string contents = message.Progress.ToString(CultureInfo.InvariantCulture) + ProgressSep + message.Text;
-        int gen = generation;
+        int gen = gate.Generation;
 
         BackendManager.Call(cb => Backend.Message.SendMessage(peerUid, contents, cb), bro =>
         {
-            if (gen != generation) { onDone?.Invoke("계정이 바뀌어 보내지 않았습니다."); return; }
+            if (!gate.IsCurrent(gen)) { onDone?.Invoke("계정이 바뀌어 보내지 않았습니다."); return; }
 
             if (bro == null || !bro.IsSuccess())
             {

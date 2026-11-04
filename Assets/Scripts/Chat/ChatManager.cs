@@ -164,6 +164,12 @@ public partial class ChatManager : MonoBehaviour
         if (this != null) onDone?.Invoke(error);
     };
 
+    /// <summary>IfAlive 의 인자 두 개짜리 — (uid, 오류) 같은 콜백용.</summary>
+    private Action<T1, T2> IfAlive<T1, T2>(Action<T1, T2> onDone) => (a, b) =>
+    {
+        if (this != null) onDone?.Invoke(a, b);
+    };
+
     // ───────────────────────────── 연결 ─────────────────────────────
 
     private void Update()
@@ -270,7 +276,7 @@ public partial class ChatManager : MonoBehaviour
             onDone?.Invoke(result);
         };
 
-        if (toUid != null) SendDirect(uid, toUid, message, done);
+        if (toUid != null) directService.Send(uid, toUid, message, done);
         else               service.Send(message, done);
     }
 

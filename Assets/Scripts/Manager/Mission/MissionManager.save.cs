@@ -14,11 +14,10 @@ public class MissionSaveData
 
 public partial class MissionManager
 {
-    // 기존 세이브 진입점에 연결 (예: SaveManager.Instance.Save())
+    // 미션 진행은 SaveData.missionData 에 함께 저장됩니다 (SaveManager 가 CaptureTo 로 모음)
     public void SaveNow()
     {
-        // TODO: 프로젝트의 실제 저장 호출로 교체
-        SaveManager.Instance?.Save();
+        if (SaveManager.Instance != null) SaveManager.Instance.Save();   // Unity 오브젝트라 ?. 대신 != null
     }
 
     public void CaptureTo(SaveData data)

@@ -354,8 +354,8 @@ public class BackendChatService : IChatService, IChatClientListener
         message = new ChatMessage
         {
             Id       = IdOf(m),
-            // uid 메타데이터가 없으면(다른 앱·콘솔 공지) 닉네임으로 대신 — 내 uid 와 겹치지 않게 접두사
-            Uid      = system ? "system" : !string.IsNullOrEmpty(uid) ? uid : "name:" + m.GamerName,
+            // uid 메타데이터가 없으면(다른 앱·콘솔 공지) 닉네임으로 대신 — 내 uid 와 겹치지 않게 접두사 (ChatMessage.HasPlayerUid)
+            Uid      = system ? ChatMessage.SystemUid : !string.IsNullOrEmpty(uid) ? uid : ChatMessage.NameOnlyPrefix + m.GamerName,
             Nickname = system ? "알림" : m.GamerName,
             Progress = int.TryParse(progress, NumberStyles.Integer, CultureInfo.InvariantCulture, out int p) ? p : 0,
             Text     = m.Message ?? string.Empty,

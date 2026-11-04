@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 친구 창 — 받은 친구 요청(수락/거절) / 친구 목록(메시지/삭제) / 보낸 요청(취소) / 차단한 유저(해제).
-/// 왼쪽 위 [차단 목록] 버튼으로 친구 목록 ↔ 차단 목록을 바꿔 봅니다. 버튼이 없는 옛 씬이면 차단한 유저를 친구 목록 아래에 붙입니다.
+/// 왼쪽 위 [차단 목록] 버튼으로 친구 목록 ↔ 차단 목록을 바꿔 봅니다.
 ///
 /// [붙이는 위치]  ChatCanvas (ChatPanel 과 같은 오브젝트 — 항상 켜져 있어야 Awake 가 돎). 창(root)은 ChatCanvas 바로 아래
 ///   (채팅 창 Panel 밖 — 채팅을 열지 않아도 열림). Tools/UI 굽기/채팅 탭·친구 창 이 컴포넌트를 붙이고 UI 를 만들어 칸을 채웁니다.
@@ -102,7 +102,7 @@ public class FriendPanel : MonoBehaviour
         confirmUid  = null;
         showBlocked = false;
         noticeUntil = float.NegativeInfinity;
-        // 서버(뒤끝)는 실시간 알림이 없어 열 때 최신 목록을 받음 (유니티 오브젝트라 ?. 대신 != null)
+        // 열 때 최신 목록을 받음 — 실시간 알림을 놓쳤어도 맞춰지게 (유니티 오브젝트라 ?. 대신 != null)
         ChatManager chat = ChatManager.Instance;
         if (chat != null) chat.RefreshFriends();
         Draw();
@@ -172,7 +172,6 @@ public class FriendPanel : MonoBehaviour
             Section(chat, FriendState.Incoming, "받은 친구 요청");
             Section(chat, FriendState.Friend,   $"친구 {friends}/{ChatManager.MAX_FRIENDS}");
             Section(chat, FriendState.Outgoing, "보낸 친구 요청");
-            if (blockListButton == null) BlockedSection(chat, "차단한 유저");   // 전환 버튼이 없는 옛 씬
         }
 
         bool nothingLoaded = showBlocked ? blockedCount == 0 : chat.Friendships.Count == 0;

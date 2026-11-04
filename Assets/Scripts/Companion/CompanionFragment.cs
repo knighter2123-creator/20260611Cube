@@ -71,8 +71,6 @@ public class CompanionFragment : MonoBehaviour
         return fragments.TryGetValue(data.id, out int count) ? count : 0;
     }
 
-    // 읽기 전용으로 내줍니다 — 바깥에서 고치면 OnFragmentChanged 가 안 나가 UI 가 어긋납니다.
-    public IReadOnlyDictionary<string, int> GetAllFragments() => fragments;
 
     private void SetFragment(string id, int count)
     {

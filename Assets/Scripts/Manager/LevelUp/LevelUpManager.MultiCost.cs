@@ -41,32 +41,4 @@ public partial class LevelUpManager
     public long GetUpgradeCostMultiple(StatType type, int times)
         => GetUpgradeCostMultiple(type, times, out _);
 
-    /// <summary>
-    /// 보유 골드로 최대 몇 번까지 강화할 수 있는지.
-    /// ("살 수 있는 만큼 구매" 버튼을 넣게 되면 이걸 쓰면 됩니다.)
-    /// </summary>
-    public int GetAffordableUpgradeCount(StatType type, long gold, int limit = MAX_UPGRADE_LEVEL)
-    {
-        if (!IsReady || gold <= 0 || limit <= 0) return 0;
-
-        int currentLv = GetUpgradeLevelValue(type);
-        int max       = ClampToRemaining(currentLv, limit);
-        if (max <= 0) return 0;
-
-        UpgradeConfig config = GetConfig(type);
-
-        int  count = 0;
-        long spent = 0L;
-
-        // "합이 gold 를 넘지 않는 최대 n" 은 하나씩 더해봐야 정확하게 구해집니다. (최대 5000회)
-        for (int i = 0; i < max; i++)
-        {
-            long next = spent + CalculateCost(config, currentLv + i);
-            if (next > gold) break;
-            spent = next;
-            count++;
-        }
-
-        return count;
-    }
 }

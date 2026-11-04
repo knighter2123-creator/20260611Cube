@@ -173,6 +173,7 @@ public class DailyDungeonManager : MonoBehaviour
 
         DailyDungeonBoss boss = Instantiate(prefab, spawnPos, Quaternion.identity);
         boss.InitForDungeon(ActiveData, ActiveLevel);   // ★ 반드시 호출 — 난이도 스탯 적용
+        HapticManager.PlayHeavy();                      // 보스 등장 진동
 
         GameLog.Info($"[DailyDungeonManager] 보스 스폰 — {prefab.name} / " +
                   $"{(ActiveData != null ? ActiveData.id : "(데이터 없음)")} Lv.{ActiveLevel}");

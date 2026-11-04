@@ -7,9 +7,9 @@ using UnityEngine;
 ///
 /// [탭이 남는 동안]  내가 [나가기] 를 누르거나 상대를 차단하기 전까지 대화방(탭)은 계속 남고, 메시지도 계속 오갑니다.
 ///   채팅 창을 닫는 것은 나가기가 아닙니다 — 닫아도 방은 그대로이고, 안 읽은 수가 미리보기 줄에 쌓입니다.
-/// [상대가 나가면]  탭은 내가 나갈 때까지 남지만 더 보낼 수 없습니다 (PeerLeft). 상대가 다시 열면 이어서 대화할 수 있습니다.
+///   나간 방은 그 뒤에 상대가 새 메시지를 보내면 다시 나타납니다 (뒤끝 쪽지는 상대가 나갔는지 알려 주지 않음).
 /// [받기]  대화방 목록(안 읽은 수 포함)은 채팅이 연결돼 있는 동안 항상 받고, 메시지는 보고 있는 방 하나만 받습니다 (WatchConversation).
-/// [안 읽은 수]  서버의 대화방 문서에 있어 기기를 바꿔도 같습니다. 그 탭을 보고 있으면 MarkRead 로 0 이 됩니다.
+/// [안 읽은 수]  BackendDirectService 가 이 기기에서 셉니다. 그 탭을 보고 있으면 MarkRead 로 0 이 됩니다.
 /// </summary>
 public partial class ChatManager
 {
@@ -18,7 +18,6 @@ public partial class ChatManager
         public string PeerUid;
         public string PeerName;
         public long   LastSentAt;   // 탭 정렬 기준
-        public bool   PeerLeft;     // 상대가 나감 — 더 보낼 수 없음
     }
 
     private IDirectService directService;
@@ -27,11 +26,6 @@ public partial class ChatManager
     private readonly Dictionary<string, DirectRoom> rooms   = new Dictionary<string, DirectRoom>();   // 서버의 내 대화방 (나간 방 포함)
     private readonly Dictionary<string, Conversation> opening = new Dictionary<string, Conversation>(); // 방을 여는 중 — 서버 목록에 들어오기 전에도 탭을 보여 줌
     private readonly HashSet<string> readRequested = new HashSet<string>();   // MarkRead 를 보냈고 아직 목록에 반영 안 됨
-
-    // 서버에 아직 없는 방을 만드는 중 — 서버가 만들었다고 답하기 전엔 메시지를 받지 않음.
-    //   보안 규칙이 메시지 읽기를 '서버에 있는 방 문서의 members' 로 검사하므로, 그 전에 받기 시작하면 권한 오류로 거절되고
-    //   개인 메시지 연결 전체가 끊깁니다. (rooms 목록은 내 쓰기를 서버 확인 전에 미리 보여 주므로 그것으로는 판단할 수 없음)
-    private readonly HashSet<string> creatingRooms = new HashSet<string>();
 
     private readonly MessageLog directMessages = new MessageLog();   // watchingPeer 와의 메시지
 
@@ -66,10 +60,6 @@ public partial class ChatManager
         return peerUid != null && conversationSet.Contains(peerUid);
     }
 
-    /// <summary>상대가 대화방을 나갔는가 (더 보낼 수 없음).</summary>
-    public bool PeerLeft(string peerUid)
-        => peerUid != null && rooms.TryGetValue(peerUid, out DirectRoom r) && r.PeerState == RoomState.Left;
-
     public int UnreadCount(string peerUid)
         => peerUid != null && !readRequested.Contains(peerUid) && rooms.TryGetValue(peerUid, out DirectRoom r) ? r.Unread : 0;
 
@@ -103,24 +93,19 @@ public partial class ChatManager
             PeerUid    = peerUid,
             PeerName   = peerName,
             LastSentAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            PeerLeft   = PeerLeft(peerUid),
         };
         MarkConversationsChanged();
 
-        if (!rooms.ContainsKey(peerUid)) creatingRooms.Add(peerUid);   // 나갔던 방은 서버에 있으므로 바로 받아도 됨
-
-        directService.Open(uid, PlayerProfile.DisplayName, peerUid, peerName, error =>
+        directService.Open(uid, peerUid, peerName, error =>
         {
-            if (this == null) return;
-            creatingRooms.Remove(peerUid);   // 성공이면 다음 프레임 ApplyWatch 가 메시지를 받기 시작
-            if (error == null) return;
+            if (this == null || error == null) return;
             if (opening.Remove(peerUid)) MarkConversationsChanged();
             onFailed?.Invoke(error);
         });
         return null;
     }
 
-    /// <summary>나가기 — 내 탭이 사라지고, 상대는 더 보낼 수 없게 됩니다. (채팅 창을 닫는 것과는 다름)</summary>
+    /// <summary>나가기 — 내 탭이 사라집니다. (채팅 창을 닫는 것과는 다름)</summary>
     public void LeaveConversation(string peerUid, Action<string> onDone)
     {
         if (peerUid == null)               { onDone?.Invoke(null); return; }
@@ -144,7 +129,7 @@ public partial class ChatManager
         if (watchedPeer == peerUid) return;
         watchedPeer = peerUid;
         ApplyWatch();
-        if (peerUid != null) RefreshDirect();   // 대화 탭을 열면 최신 쪽지부터 (실시간 리스너가 없는 서버)
+        if (peerUid != null) RefreshDirect();   // 대화 탭을 열면 최신 쪽지부터
     }
 
     /// <summary>그 상대와 주고받은 메시지 (보낸 시각 순). WatchConversation 으로 보고 있는 방만 채워져 있습니다.</summary>
@@ -165,15 +150,7 @@ public partial class ChatManager
         error = DirectUnavailableReason;
         if (error == null && IsBlocked(peerUid))        error = "차단한 유저에게는 메시지를 보낼 수 없습니다.";
         if (error == null && !HasConversation(peerUid)) error = "대화방이 없습니다. 다시 열어 주세요.";
-        if (error == null && PeerLeft(peerUid))         error = "상대방이 대화방을 나갔습니다.";
         return error != null;
-    }
-
-    private void SendDirect(string uid, string peerUid, ChatMessage message, Action<string> onDone)
-    {
-        // 상대가 아직 이 방에 들어온 적 없으면 이 메시지로 상대 탭이 생김
-        bool invite = !rooms.TryGetValue(peerUid, out DirectRoom room) || room.PeerState == RoomState.None;
-        directService.Send(uid, peerUid, message, invite, onDone);
     }
 
     // ───────────────────────────── 연결 ─────────────────────────────
@@ -183,7 +160,6 @@ public partial class ChatManager
         directService = service.Direct;
         directService.RoomsReceived    += OnRoomsReceived;
         directService.MessagesReceived += OnDirectMessagesReceived;
-        directService.MessagesRemoved  += OnDirectMessagesRemoved;
         directService.Failed           += OnDirectFailed;
     }
 
@@ -191,7 +167,6 @@ public partial class ChatManager
     {
         directService.RoomsReceived    -= OnRoomsReceived;
         directService.MessagesReceived -= OnDirectMessagesReceived;
-        directService.MessagesRemoved  -= OnDirectMessagesRemoved;
         directService.Failed           -= OnDirectFailed;
         directService.Disconnect();
     }
@@ -216,7 +191,7 @@ public partial class ChatManager
 
         ApplyWatch();
 
-        // 실시간 리스너가 없는 서버(뒤끝 쪽지)용 — 목록을 받은 뒤에만 주기적으로 다시 받음
+        // 알림을 놓쳤을 때를 위해 — 목록을 받은 뒤에만 주기적으로 다시 받음
         if (directLink.Key != null && roomsLoaded && Time.unscaledTime >= nextDirectPoll)
             RefreshDirect();
     }
@@ -249,8 +224,7 @@ public partial class ChatManager
     /// <summary>보고 싶은 방(watchedPeer)과 실제로 받는 방을 맞춤. 방이 바뀌면 이전 방의 메시지는 비움.</summary>
     private void ApplyWatch()
     {
-        string want = directLink.Key != null && HasConversation(watchedPeer) && !creatingRooms.Contains(watchedPeer)
-                    ? watchedPeer : null;
+        string want = directLink.Key != null && HasConversation(watchedPeer) ? watchedPeer : null;
         if (want == watchingPeer) return;
 
         if (watchingPeer != null) directService.Unwatch();
@@ -289,12 +263,6 @@ public partial class ChatManager
         if (directMessages.Add(received, directHistoryCount)) changed = true;
     }
 
-    private void OnDirectMessagesRemoved(string peerUid, IReadOnlyList<string> removed)
-    {
-        if (peerUid != watchingPeer) return;
-        if (directMessages.Remove(removed)) changed = true;
-    }
-
     private void MarkConversationsChanged()
     {
         conversationsDirty = true;
@@ -318,7 +286,6 @@ public partial class ChatManager
                 PeerUid    = r.PeerUid,
                 PeerName   = r.PeerName,
                 LastSentAt = r.LastSentAt,
-                PeerLeft   = r.PeerState == RoomState.Left,
             });
         }
 
@@ -337,7 +304,6 @@ public partial class ChatManager
         directLink.Reset();
         rooms.Clear();
         opening.Clear();
-        creatingRooms.Clear();
         readRequested.Clear();
         directMessages.Clear();
         roomsLoaded        = false;
