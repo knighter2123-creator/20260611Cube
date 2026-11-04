@@ -16,7 +16,7 @@ using UnityEngine.UI;
 ///   다른 방식으로 로그인됨 → 비활성          (이메일 버튼이 [시작하기]. 구글로 바꾸려면 로그아웃 후 로그인)
 ///
 /// [자동 로그인 ≠ 자동 시작]
-///   Refresh 는 버튼을 눌렀을 때만이 아니라 씬에 들어올 때·Firebase 준비 완료(자동 로그인)·다른 UI 의 로그인 때도 불립니다.
+///   Refresh 는 버튼을 눌렀을 때만이 아니라 씬에 들어올 때·로그인 확인 완료(자동 로그인)·다른 UI 의 로그인 때도 불립니다.
 ///   "로그인돼 있으면 시작" 으로 짜면 로그인 화면에 머무를 수 없으므로,
 ///   "이 버튼으로 방금 로그인했고 성공했다" (startAfterSignIn) 일 때만 자동으로 시작합니다.
 /// </summary>
@@ -25,7 +25,7 @@ public class GoogleLoginButtonUI : AuthStateUI
     [SerializeField] private Login_Name loginName;
 
     [SerializeField] private Button googleLoginButton;
-    [SerializeField] private TextMeshProUGUI userIdTMP;     // (선택/테스트용) Firebase UID
+    [SerializeField] private TextMeshProUGUI userIdTMP;     // (선택/테스트용) 뒤끝 UID (gamer inDate)
     [SerializeField] private TextMeshProUGUI userNameTMP;   // (선택/테스트용) 구글 표시 이름
 
     [Header("버튼 글자 (선택)")]

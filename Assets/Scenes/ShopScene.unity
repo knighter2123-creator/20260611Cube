@@ -119,6 +119,29 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!223 &33901246
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 33901235}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 1
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 11
+  m_TargetDisplay: 0
 --- !u!1 &33901235
 GameObject:
   m_ObjectHideFlags: 0
@@ -130,6 +153,7 @@ GameObject:
   - component: {fileID: 33901236}
   - component: {fileID: 33901238}
   - component: {fileID: 33901237}
+  - component: {fileID: 33901246}
   m_Layer: 5
   m_Name: Gem Image
   m_TagString: Untagged
@@ -1130,6 +1154,46 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 338623591}
   m_CullTransparentMesh: 1
+--- !u!223 &351370931
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 351370926}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 1
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 10
+  m_TargetDisplay: 0
+--- !u!114 &351370932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 351370926}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &351370926
 GameObject:
   m_ObjectHideFlags: 0
@@ -1142,6 +1206,8 @@ GameObject:
   - component: {fileID: 351370928}
   - component: {fileID: 351370927}
   - component: {fileID: 351370930}
+  - component: {fileID: 351370931}
+  - component: {fileID: 351370932}
   m_Layer: 5
   m_Name: Gacha Result Panel
   m_TagString: Untagged
@@ -1162,7 +1228,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.78431374}
+  m_Color: {r: 0, g: 0, b: 0, a: 0.78039217}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2921,10 +2987,8 @@ MonoBehaviour:
   cost1: 300
   cost10: 2700
   cost100: 27000
-  chanceNormal: 70
-  chanceRare: 15
-  chanceEpic: 10
-  chanceLegendary: 5
+  probabilityFileId: 20586
+  companionIdColumn: companionId
   poolAsset: {fileID: 11400000, guid: ff17476ef4ebb5d4d92622cfbc222faa, type: 2}
 --- !u!4 &958939914
 Transform:
@@ -3580,6 +3644,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!223 &1157675945
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1157675934}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 1
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 11
+  m_TargetDisplay: 0
 --- !u!1 &1157675934
 GameObject:
   m_ObjectHideFlags: 0
@@ -3592,6 +3679,7 @@ GameObject:
   - component: {fileID: 1157675938}
   - component: {fileID: 1157675937}
   - component: {fileID: 1157675936}
+  - component: {fileID: 1157675945}
   m_Layer: 5
   m_Name: Ticket Image
   m_TagString: Untagged
@@ -4273,6 +4361,29 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1510363627}
   m_CullTransparentMesh: 1
+--- !u!223 &1535449326
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1535449315}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 1
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 11
+  m_TargetDisplay: 0
 --- !u!1 &1535449315
 GameObject:
   m_ObjectHideFlags: 0
@@ -4284,6 +4395,7 @@ GameObject:
   - component: {fileID: 1535449316}
   - component: {fileID: 1535449318}
   - component: {fileID: 1535449317}
+  - component: {fileID: 1535449326}
   m_Layer: 5
   m_Name: Gold Image
   m_TagString: Untagged
@@ -4989,6 +5101,7 @@ MonoBehaviour:
     button: {fileID: 561885893}
     panel: {fileID: 225822183}
     selectedMark: {fileID: 1059603632}
+  defaultTabId: Gacha_UI
   defaultIndex: 2
 --- !u!1 &2130143259
 GameObject:
@@ -5065,17 +5178,6 @@ MonoBehaviour:
   m_Spacing: {x: 30, y: 10}
   m_Constraint: 1
   m_ConstraintCount: 8
---- !u!1660057539 &9223372036854775807
-SceneRoots:
-  m_ObjectHideFlags: 0
-  m_Roots:
-  - {fileID: 379888362}
-  - {fileID: 1123661380}
-  - {fileID: 448597128}
-  - {fileID: 393721127}
-  - {fileID: 159622883}
-  - {fileID: 958939914}
-  - {fileID: 286825861}
 --- !u!1 &7300000101
 GameObject:
   m_ObjectHideFlags: 0
@@ -5853,3 +5955,14 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7300000305}
   m_CullTransparentMesh: 1
+--- !u!1660057539 &9223372036854775807
+SceneRoots:
+  m_ObjectHideFlags: 0
+  m_Roots:
+  - {fileID: 379888362}
+  - {fileID: 1123661380}
+  - {fileID: 448597128}
+  - {fileID: 393721127}
+  - {fileID: 159622883}
+  - {fileID: 958939914}
+  - {fileID: 286825861}

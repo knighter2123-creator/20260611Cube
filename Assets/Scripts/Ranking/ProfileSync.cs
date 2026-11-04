@@ -28,8 +28,6 @@ public class ProfileSync : MonoBehaviour
 {
     public static ProfileSync Instance { get; private set; }
 
-    /// <summary>옛 Firestore 컬렉션 이름 — ServerAccountData 의 Firestore 경로만 씀 (LegacyFirestore 를 지울 때 함께 지움)</summary>
-    public const string COLLECTION = "profiles";
 
     [Tooltip("실패 시 다시 시도하기까지 기다리는 시간(초)")]
     [SerializeField] private float retryDelay = 30f;

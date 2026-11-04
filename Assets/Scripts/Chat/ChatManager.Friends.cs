@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 친구 — 요청을 보내고, 상대가 수락하면 양쪽 친구 창에 서로가 보입니다. 서버 구조는 FirestoreFriendService 주석 참고.
+/// 친구 — 요청을 보내고, 상대가 수락하면 양쪽 친구 창에 서로가 보입니다. 서버 구조는 BackendFriendService 주석 참고 (뒤끝 친구).
 ///
 /// [연결]  채팅이 연결된 신원(MyUid)으로 친구·차단 목록 리스너를 엽니다. 목록만 실패하면 채팅은 그대로 두고 retryDelay 뒤 다시 시도.
 /// [이름]  요청·수락 때 서로의 닉네임을 남깁니다. 내가 이름을 바꾸면 다음 목록 갱신 때 내 이름 칸을 고쳐 씁니다 (상대 화면에 반영).

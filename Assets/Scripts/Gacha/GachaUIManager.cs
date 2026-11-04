@@ -77,6 +77,11 @@ public class GachaUIManager : MonoBehaviour
 
         closeResultButton.onClick.AddListener(() => ShowGachaPanel());
 
+        // 결과 창은 자체 Canvas(Override Sorting)로 Tab bar 위에 그려집니다 (ShopScene).
+        //   배경 Image 가 터치를 받아야 뒤에 있는 Tab bar 버튼이 눌리지 않으므로, 씬에서 꺼져 있어도 켭니다.
+        if (resultPanel.TryGetComponent(out Graphic resultBackground)) resultBackground.raycastTarget = true;
+        else Debug.LogWarning("[GachaUIManager] 결과 창에 배경 Image 가 없어 뒤의 Tab bar 가 눌릴 수 있습니다.", this);
+
         ShowGachaPanel();
         RefreshCostTexts();   // OnEnable 시점엔 GachaSystem 이 아직 없을 수 있어 Start 에서 한 번 더
     }

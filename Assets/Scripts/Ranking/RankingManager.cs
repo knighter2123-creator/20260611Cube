@@ -37,8 +37,6 @@ public class RankingManager : MonoBehaviour
 {
     public static RankingManager Instance { get; private set; }
 
-    /// <summary>옛 Firestore 컬렉션 이름 — ServerAccountData 의 Firestore 경로만 씀 (LegacyFirestore 를 지울 때 함께 지움)</summary>
-    public const string COLLECTION = "rankings";
 
     [Header("뒤끝 리더보드 (클래스 주석 [뒤끝 콘솔 준비])")]
     [Tooltip("뒤끝 콘솔 > 리더보드 에서 만든 주간 유저 리더보드의 UUID")]
@@ -283,8 +281,7 @@ public class RankingManager : MonoBehaviour
         if (!SaveManager.Instance.IsGameplayStarted || !AuthManager.Instance.IsOnline) return false;
 
         // 클라우드 확인이 먼저 — 이 표시는 CloudSave 에게 "세이브 삭제로 새로 시작했다" 는 뜻이기도 함 (CloudSave 주석).
-        // TODO(5단계 C — 클라우드 세이브): 뒤끝 클라우드 세이브로 바꾸면 LegacyFirestore 조건을 지움
-        if (LegacyFirestore.Enabled && CloudSave.Instance != null && !CloudSave.Instance.IsCheckedFor(uid)) return false;
+        if (CloudSave.Instance != null && !CloudSave.Instance.IsCheckedFor(uid)) return false;
 
         if (StageRecord.HasRecord)
         {

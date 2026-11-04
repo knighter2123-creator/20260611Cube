@@ -14,7 +14,7 @@ using UnityEngine;
 ///
 /// [비동기 호출]  Call(cb => Backend.XXX(..., cb), bro => { ... })
 ///   뒤끝의 비동기 콜백은 메인 스레드가 아닌 곳에서 올 수 있어 Unity API(오브젝트, PlayerPrefs, UI)를 바로 쓰면 안 됩니다.
-///   Call 은 응답을 큐에 넣었다가 다음 Update 에서 메인 스레드로 넘겨 줍니다 (Firebase 의 ContinueWithOnMainThread 역할).
+///   Call 은 응답을 큐에 넣었다가 다음 Update 에서 메인 스레드로 넘겨 줍니다 (Task 의 ContinueWithOnMainThread 같은 역할).
 ///   호출하는 순간 예외가 나면 bro = null 로 옵니다 — 받는 쪽은 null 도 실패로 처리하세요 (IsNetworkError 참고).
 /// </summary>
 public class BackendManager : MonoBehaviour
@@ -60,9 +60,8 @@ public class BackendManager : MonoBehaviour
     {
         if (instance == this) instance = null;
     }
-    // ★ 뒤끝 가이드 실습(로그인 / 게임 정보) 코드를 여기(Start)에 두지 마세요 (예전 BackendConsoleTest 는 삭제됨).
-    //   여기에 두면 이 매니저는 게임이 켜질 때마다 자동으로 만들어지므로, 실제 게임에서도 매번
-    //   테스트 계정으로 로그인해 플레이어의 로그인 세션을 바꿔 버리고, 초기화도 AuthManager 와 겹쳐 두 번 돕니다.
+    // ★ 테스트 로그인 같은 코드를 여기(Start)에 두지 마세요 — 이 매니저는 게임이 켜질 때마다 자동으로 만들어지므로
+    //   실제 게임에서도 매번 플레이어의 로그인 세션을 바꿔 버리고, 초기화도 AuthManager 와 겹쳐 두 번 돕니다.
 
     private void Update()
     {

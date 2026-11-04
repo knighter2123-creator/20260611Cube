@@ -7,8 +7,7 @@ using System.Collections.Generic;
 /// [구현체]
 ///   BackendChatService   — 뒤끝챗(BackndChat SDK) 공개 채널 + 뒤끝 친구·쪽지 (기본)
 ///   LocalChatService     — 서버 없이 내 메시지만 보이는 테스트용
-///   FirestoreChatService — 옛 Firebase 서버 (뒤끝 이전 전, LegacyFirestore 가 켜져 있을 때만)
-///   → Realtime Database 등으로 바꾸려면 이 인터페이스를 구현한 클래스를 추가하고 ChatManager.CreateService 에 한 줄 추가하면 됩니다.
+///   → 다른 서버로 바꾸려면 이 인터페이스를 구현한 클래스를 추가하고 ChatManager.CreateService 에 한 줄 추가하면 됩니다.
 ///
 /// [약속]  모든 이벤트·콜백은 메인 스레드에서 호출합니다 (Unity API 를 바로 써도 되게).
 /// </summary>

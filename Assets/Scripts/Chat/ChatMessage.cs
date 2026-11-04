@@ -5,7 +5,7 @@
 public struct ChatMessage
 {
     public string Id;         // 서버 문서 ID (중복 제거용)
-    public string Uid;        // 보낸 사람 Firebase UID (내 메시지 강조용)
+    public string Uid;        // 보낸 사람 뒤끝 UID (내 메시지 강조용)
     public string Nickname;   // PlayerProfile.DisplayName
     public int    Progress;   // StageRecord.BestProgress → StageRecord.Format 으로 "2-3"
     public string Text;

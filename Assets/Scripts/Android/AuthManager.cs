@@ -12,7 +12,7 @@ using UnityEngine;
 ///   → 이 매니저는 DontDestroyOnLoad 로 씬을 넘어 살아남지만, 버튼은 씬과 함께 파괴된다.
 ///     UI 는 GoogleLoginButtonUI / EmailLoginUI 등이 맡고, 이 매니저의 상태를 읽어 갈 뿐이다.
 ///
-/// [Firebase 에서 옮겨 오며 지킨 것]  공개 API(IsReady / IsSignedIn / Uid / StateChanged / SignInWith... )는 그대로입니다.
+/// [예전 Firebase 버전에서 옮겨 오며 지킨 것]  공개 API(IsReady / IsSignedIn / Uid / StateChanged / SignInWith... )는 그대로입니다.
 ///   로그인 화면 UI, AccountSwitch, 계정별 세이브는 고치지 않아도 됩니다.
 ///   Uid 는 이제 뒤끝의 유저 inDate 입니다 (다른 유저를 가리키는 뒤끝 API — 친구, 랭킹 등 — 가 쓰는 값).
 ///

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 1:1 개인 메시지 — 두 사람 사이의 '대화방' 단위. 서버 구조는 FirestoreDirectService 주석 참고.
+/// 1:1 개인 메시지 — 두 사람 사이의 '대화방' 단위. 서버 구조는 BackendDirectService 주석 참고 (뒤끝 쪽지).
 ///
 /// [탭이 남는 동안]  내가 [나가기] 를 누르거나 상대를 차단하기 전까지 대화방(탭)은 계속 남고, 메시지도 계속 오갑니다.
 ///   채팅 창을 닫는 것은 나가기가 아닙니다 — 닫아도 방은 그대로이고, 안 읽은 수가 미리보기 줄에 쌓입니다.

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 /// <summary>
 /// 채팅 차단 — 차단한 사람의 전체 채팅을 내 화면에서 숨기고, 그 사람과의 대화방에서 나갑니다 (상대에게는 '나갔다' 로만 보임).
-/// 목록은 서버(chatBlocks/{내 UID})에 저장 — 같은 계정이면 어느 기기에서나 같습니다. 친구 목록과 함께 받습니다 (FirestoreFriendService).
+/// 목록은 아직 이 기기에만 저장됩니다 (BackendFriendService — 계정별 PlayerPrefs). 다른 기기에서는 차단 목록이 보이지 않습니다.
 /// </summary>
 public partial class ChatManager
 {

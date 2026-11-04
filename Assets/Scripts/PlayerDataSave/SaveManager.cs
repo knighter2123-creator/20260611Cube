@@ -35,7 +35,7 @@ using UnityEngine.SceneManagement;   // ★ [게임 시작 전 저장 차단] sc
 /// ★ [계정별 세이브] 이번에 바뀐 곳 (전부 "★ [계정별 세이브]" 로 표시)
 ///   한 기기에서 여러 계정(구글/이메일)으로 로그인해도 진행이 섞이지 않게, 세이브 파일을 계정마다 나눕니다.
 ///     게스트(로그인 안 함) → save.json            ← 예전 파일 이름 그대로 = 기존 데이터가 곧 게스트 데이터 (변환 불필요)
-///     계정 (Firebase UID)  → save_<UID>.json
+///     계정 (뒤끝 UID)  → save_<UID>.json
 ///   9.  ActiveAccountId — 지금 어느 계정의 파일을 쓰는가. PlayerPrefs 에 기억해 두어 앱을 다시 켜도 같은 파일을 바로 읽음
 ///   10. SavePath 가 ActiveAccountId 에 따라 바뀜 (경로 계산은 여전히 PathFor 한 곳)
 ///   11. SaveFileExists / TryMoveSaveFile / SetActiveAccount — 계정 전환(AccountSwitch)이 쓰는 도구
@@ -448,7 +448,7 @@ public class SaveManager : MonoBehaviour
     // ─────────────────────────────────────────────
 
     // 마지막으로 쓴 계정을 기억하는 PlayerPrefs 키.
-    // [왜 기억하나] SaveManager 는 Awake 에서 바로 세이브를 읽는데, 그때는 Firebase 가 아직 준비 전이라
+    // [왜 기억하나] SaveManager 는 Awake 에서 바로 세이브를 읽는데, 그때는 로그인 확인(AuthManager)이 아직 끝나기 전이라
     //   "지금 누가 로그인돼 있는지" 모릅니다. 지난번 계정을 기억해 두면, 평소처럼 같은 계정으로 다시 켠 경우
     //   처음부터 맞는 파일을 읽어서 계정 전환(매니저 재시작)이 일어나지 않습니다.
     private const string ACTIVE_ACCOUNT_PREF_KEY = "SAVE_ACTIVE_ACCOUNT_V1";
@@ -458,7 +458,7 @@ public class SaveManager : MonoBehaviour
     private static bool   activeAccountLoaded;   // PlayerPrefs 에서 한 번 읽었는가 (매번 읽지 않게)
 
     /// <summary>
-    /// 지금 세이브 파일의 주인. 빈 문자열("") = 게스트(로그인 안 함), 그 외 = Firebase UID.
+    /// 지금 세이브 파일의 주인. 빈 문자열("") = 게스트(로그인 안 함), 그 외 = 뒤끝 UID (gamer inDate).
     /// static 인 이유: 계정 전환·계정 삭제 때 SaveManager 자신이 파괴·재생성되는데, 새 SaveManager 가
     /// Awake 에서 "어느 파일을 읽을지" 알아야 하기 때문입니다 (IsSaveLocked 가 static 인 것과 같은 이유).
     /// </summary>
@@ -542,7 +542,7 @@ public class SaveManager : MonoBehaviour
     }
 
     /// <summary>
-    /// UID 를 파일 이름에 넣기 전에 안전한 글자만 남깁니다. (Firebase UID 는 보통 영문·숫자뿐이지만,
+    /// UID 를 파일 이름에 넣기 전에 안전한 글자만 남깁니다. (뒤끝 UID 에는 ":" "." 같은 글자가 들어 있고,
     /// 파일 이름에 쓸 수 없는 글자가 섞이면 저장이 조용히 실패하므로 방어)
     /// </summary>
     private static string SanitizeForFileName(string id)

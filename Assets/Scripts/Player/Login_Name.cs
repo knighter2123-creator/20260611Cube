@@ -26,7 +26,7 @@ public class Login_Name : MonoBehaviour
     [SerializeField] private Button startButton;
 
     [Header("계정 확인 대기")]
-    [Tooltip("시작을 눌렀을 때 로그인 상태(Firebase)가 아직 준비 전이면 최대 이만큼 기다립니다(초, 실제 시간).\n" +
+    [Tooltip("시작을 눌렀을 때 로그인 상태(AuthManager)가 아직 확인 전이면 최대 이만큼 기다립니다(초, 실제 시간).\n" +
              "보통 1초 안에 끝납니다. 넘으면(오프라인 등) 마지막으로 쓰던 계정 데이터로 시작합니다.")]
     [SerializeField] private float authWaitSeconds = 3f;
 
@@ -82,7 +82,7 @@ public class Login_Name : MonoBehaviour
 
     /// <summary>
     /// 지금 로그인한 계정의 세이브로 시작하도록 맞춘 뒤 씬을 옮깁니다.
-    /// 로그인 상태를 아직 모르면(Firebase 준비 전) 매 프레임 다시 물으며 최대 authWaitSeconds 만큼 기다립니다.
+    /// 로그인 상태를 아직 모르면(AuthManager 확인 전) 매 프레임 다시 물으며 최대 authWaitSeconds 만큼 기다립니다.
     ///   Proceed   → 시작
     ///   Rebooting → 계정 전환 재시작 중 — 씬을 옮기지 않음 (재시작 후 새 LoginScene 에서 자동으로 다시 들어옴)
     ///   NotReady  → 시간 초과(오프라인 등) — 마지막으로 쓰던 계정 그대로 시작 (게임이 막히지 않게)

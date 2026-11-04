@@ -35,17 +35,15 @@ public partial class ChatManager : MonoBehaviour
 {
     public static ChatManager Instance { get; private set; }
 
-    // ★ 값(숫자)이 씬에 저장됩니다 — 0 은 예전 Firestore 자리였고 지금은 뒤끝입니다 (씬에 0 으로 저장된 것이 그대로 뒤끝이 되게).
-    //   새 값은 맨 뒤에 추가하세요.
-    public enum Backend { Backnd = 0, Local = 1, Firestore = 2 }
+    // ★ 값(숫자)이 씬에 저장됩니다 — 새 값은 맨 뒤에 추가하세요. (2 는 지운 옛 Firestore 자리 — 다시 쓰지 마세요)
+    public enum Backend { Backnd = 0, Local = 1 }
 
     /// <summary>개인 메시지(쪽지) 한 통 최대 글자 수. 전체 채팅 길이는 뒤끝챗 콘솔에서 정합니다.</summary>
     public const int DIRECT_MAX_LENGTH = 60;
 
     private const string AccountPending = "계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.";
 
-    [Tooltip("Backnd = 뒤끝 서버 (전체 채팅 뒤끝챗 · 친구 · 쪽지), Local = 서버 없이 나에게만 보이는 테스트, " +
-             "Firestore = 옛 Firebase 서버 (LegacyFirestore 가 꺼져 있으면 Backnd 로 바뀜)")]
+    [Tooltip("Backnd = 뒤끝 서버 (전체 채팅 뒤끝챗 · 친구 · 쪽지), Local = 서버 없이 나에게만 보이는 테스트")]
     [SerializeField] private Backend backend = Backend.Backnd;
 
     [Tooltip("뒤끝챗 콘솔에서 만든 공개 채널 그룹 이름")]
@@ -96,9 +94,6 @@ public partial class ChatManager : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-
-        // 뒤끝으로 옮긴 뒤에는 Firestore 를 쓸 수 없음 (Firebase 로그인이 없음 — LegacyFirestore 주석)
-        if (!LegacyFirestore.Enabled && backend == Backend.Firestore) backend = Backend.Backnd;
 
         service = CreateService(backend, channelGroup, channelName);
         service.MessagesReceived += OnMessagesReceived;
@@ -158,9 +153,8 @@ public partial class ChatManager : MonoBehaviour
     {
         switch (backend)
         {
-            case Backend.Local:     return new LocalChatService();
-            case Backend.Firestore: return new FirestoreChatService();
-            default:                return new BackendChatService(group, name);   // 전체 채팅 뒤끝챗 + 친구 뒤끝 친구 + 개인 메시지 뒤끝 쪽지
+            case Backend.Local: return new LocalChatService();
+            default:            return new BackendChatService(group, name);   // 전체 채팅 뒤끝챗 + 친구 뒤끝 친구 + 개인 메시지 뒤끝 쪽지
         }
     }
 
