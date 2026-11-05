@@ -54,17 +54,35 @@ public class RankingPanel : MonoBehaviour
     [Tooltip("이 시간(초) 안에 다시 열면 서버에 다시 묻지 않고 이전 결과를 보여 줍니다.")]
     [SerializeField] private float refreshCooldown = 30f;
 
+    [Header("목록")]
+    [Tooltip("이 순위까지 글자를 강조 색(Row 템플릿의 RankingRow > topTextColor)으로 칠합니다. 0 이면 강조 안 함.")]
+    [SerializeField, Min(0)] private int topHighlight = 3;
+
+    [Header("글자 (실행 중에 코드가 넣는 값)")]
+    [SerializeField] private string loadingText = "불러오는 중...";
+    [SerializeField] private string emptyText   = "아직 등록된 기록이 없습니다.";
+    [SerializeField] private string noManagerText = "랭킹 시스템을 찾을 수 없습니다.";
+
+    [Header("맨 아래 내 순위 줄 — {rank} 순위, {name} 내 닉네임, {stage} 스테이지, {top} 목록 크기, {sep} 구분자")]
+    [Tooltip("가운뎃점(·)은 BMJUA 폰트에 없어 □ 로 보이므로 폰트에 있는 '|' 를 씁니다.")]
+    [SerializeField] private string separator = "  |  ";
+    [Tooltip("목록 안에 내가 있을 때 (또는 목록 밖이지만 이번 주 순위를 받아 왔을 때)")]
+    [SerializeField] private string myRankLine     = "내 순위  {rank}위{sep}{name}{sep}{stage}";
+    [Tooltip("목록 밖 — 이번 주 순위를 받아 오기 전")]
+    [SerializeField] private string outsideTopLine = "내 기록  {name}{sep}{stage}  ({top}위 밖)";
+    [Tooltip("로그인하지 않았을 때")]
+    [SerializeField] private string signedOutLine  = "{name}{sep}{stage}  (로그인하면 랭킹에 등록됩니다)";
+    [Tooltip("아직 클리어 기록이 없을 때")]
+    [SerializeField] private string noRecordLine   = "{name}{sep}스테이지를 클리어하면 랭킹에 등록됩니다";
+
     public TMP_FontAsset Font         => font;
     public int           SortingOrder => sortingOrder;
 
-    // 목록을 그릴 때 쓰는 색. UIBaker 도 같은 값으로 구워서 굽는 모양과 그리는 색이 어긋나지 않게 합니다
-    // (창 배경처럼 굽고 나면 바뀌지 않는 색은 UIBaker 에만 있음)
+    // 굽기 기본값 — UIBaker 가 Row 템플릿·MyRank 줄을 이 색으로 굽고, RankingRow 강조 색 칸의 기본값도 여기서 옵니다.
+    // 실제로 쓰는 색은 하이어라키의 Row 템플릿(평소 색)과 그 RankingRow 컴포넌트(강조 색)에서 고치세요.
     public static readonly Color RowColor    = new Color(1f, 1f, 1f, 0.04f);
     public static readonly Color MyRowColor  = new Color(1f, 0.85f, 0.2f, 0.25f);
     public static readonly Color GoldColor   = new Color(1f, 0.85f, 0.2f);
-
-    // 구분자. 가운뎃점(·)은 BMJUA 폰트에 없어서 □ 로 보이므로 폰트에 있는 '|' 를 씁니다.
-    private const string Sep = "  |  ";
 
     private readonly List<GameObject> rows = new List<GameObject>();
 
@@ -124,7 +142,7 @@ public class RankingPanel : MonoBehaviour
 
         if (RankingManager.Instance == null)
         {
-            ShowStatus("랭킹 시스템을 찾을 수 없습니다.");
+            ShowStatus(noManagerText);
             Debug.LogError("[RankingPanel] RankingManager 가 없습니다. LoginScene 의 ManagerRoot 하위에 두었는지 확인하세요.");
             return;
         }
@@ -132,7 +150,7 @@ public class RankingPanel : MonoBehaviour
         loading    = true;
         loadingUid = uid;
         ClearRows();
-        ShowStatus("불러오는 중...");
+        ShowStatus(loadingText);
 
         RankingManager.Instance.FetchTop((list, error) =>
         {
@@ -160,16 +178,16 @@ public class RankingPanel : MonoBehaviour
     private void Draw(List<RankingManager.Entry> list)
     {
         ClearRows();
-        ShowStatus(list.Count == 0 ? "아직 등록된 기록이 없습니다." : string.Empty);
+        ShowStatus(list.Count == 0 ? emptyText : string.Empty);
 
         string myUid = AuthManager.Instance != null ? AuthManager.Instance.Uid : null;
         foreach (RankingManager.Entry e in list)
         {
             RankingRow row = Instantiate(rowTemplate, content);
             row.gameObject.SetActive(true);
-            row.Set(e.Rank.ToString(), e.Nickname, StageRecord.Format(e.Progress),
-                    e.Uid == myUid ? MyRowColor : RowColor,
-                    e.Rank <= 3 ? GoldColor : Color.white);
+            // 다른 유저가 정한 닉네임 — 리치 텍스트로 해석하지 않게 감쌈 (채팅·친구 창과 같은 규칙)
+            row.Set(e.Rank.ToString(), ChatText.Plain(e.Nickname), StageRecord.Format(e.Progress),
+                    mine: e.Uid == myUid, top: e.Rank <= topHighlight);
             rows.Add(row.gameObject);
         }
 
@@ -184,7 +202,7 @@ public class RankingPanel : MonoBehaviour
 
         if (AuthManager.Instance == null || !AuthManager.Instance.IsSignedIn)
         {
-            myRankText.text = $"{myName}{Sep}{myStage}  (로그인하면 랭킹에 등록됩니다)";
+            myRankText.text = MyLine(signedOutLine, null, myName, myStage, 0);
             return;
         }
 
@@ -195,15 +213,13 @@ public class RankingPanel : MonoBehaviour
             {
                 if (e.Uid != myUid) continue;
                 // 서버 기록으로 표시 — 다른 기기에서 세운 기록이 이 기기 기록보다 높을 수 있음
-                myRankText.text = $"내 순위  {e.Rank}위{Sep}{myName}{Sep}{StageRecord.Format(e.Progress)}";
+                myRankText.text = MyLine(myRankLine, e.Rank, myName, StageRecord.Format(e.Progress), 0);
                 return;
             }
         }
 
         int top = RankingManager.Instance != null ? RankingManager.Instance.TopCount : 0;
-        myRankText.text = StageRecord.HasRecord
-            ? $"내 기록  {myName}{Sep}{myStage}  ({top}위 밖)"
-            : $"{myName}{Sep}스테이지를 클리어하면 랭킹에 등록됩니다";
+        myRankText.text = MyLine(StageRecord.HasRecord ? outsideTopLine : noRecordLine, null, myName, myStage, top);
 
         // 목록 밖이면 이번 주 내 순위를 따로 물어봄 (주간 랭킹이라 이번 주에 기록을 올려야 순위가 있음)
         if (list != null && StageRecord.HasRecord && RankingManager.Instance != null)
@@ -213,10 +229,19 @@ public class RankingPanel : MonoBehaviour
             {
                 if (this == null || !IsOpen || error != null || mine == null) return;
                 if (askedUid != CurrentUid) return;   // 기다리는 사이 계정이 바뀜
-                myRankText.text = $"내 순위  {mine.Value.Rank}위{Sep}{myName}{Sep}{StageRecord.Format(mine.Value.Progress)}";
+                myRankText.text = MyLine(myRankLine, mine.Value.Rank, myName, StageRecord.Format(mine.Value.Progress), top);
             });
         }
     }
+
+    /// <summary>내 순위 줄 문구의 {rank} {name} {stage} {top} {sep} 를 채웁니다 (닉네임은 마지막에 — 닉네임 속 '{sep}' 같은 글자가 바뀌지 않게).</summary>
+    private string MyLine(string template, int? rank, string name, string stage, int top)
+        => ChatText.Fill(template,
+                         "sep",   separator,
+                         "rank",  rank.HasValue ? rank.Value.ToString() : string.Empty,
+                         "stage", stage,
+                         "top",   top.ToString(),
+                         "name",  name);
 
     private void ShowStatus(string message)
     {

@@ -29,7 +29,7 @@ public class BackendNicknameService : INicknameService
             catch (Exception e)
             {
                 Debug.LogWarning($"[Nickname] 계정 정보 읽기 실패: {e.Message}");
-                onDone?.Invoke(null, "닉네임 정보를 읽지 못했습니다.");
+                onDone?.Invoke(null, GameMessages.Nickname.readFailed);
                 return;
             }
             onDone?.Invoke(nickname, null);
@@ -54,15 +54,15 @@ public class BackendNicknameService : INicknameService
         if (bro != null && bro.IsSuccess()) return NicknameResult.Success;
 
         if (BackendManager.IsNetworkError(bro))
-            return new NicknameResult(NicknameResultKind.Offline, "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            return new NicknameResult(NicknameResultKind.Offline, GameMessages.Common.offlineCheck);
 
         switch (bro.GetStatusCode())
         {
-            case "409": return new NicknameResult(NicknameResultKind.Duplicate, "이미 사용 중인 닉네임입니다.");
-            case "400": return new NicknameResult(NicknameResultKind.Invalid,   "사용할 수 없는 닉네임입니다.");
+            case "409": return new NicknameResult(NicknameResultKind.Duplicate, GameMessages.Nickname.duplicate);
+            case "400": return new NicknameResult(NicknameResultKind.Invalid,   GameMessages.Nickname.invalid);
             case "401":
-            case "403": return new NicknameResult(NicknameResultKind.Session,   "로그인이 만료되었습니다. 다시 로그인해 주세요.");
-            default:    return new NicknameResult(NicknameResultKind.Other,     $"닉네임을 정하지 못했습니다. ({bro.GetStatusCode()})");
+            case "403": return new NicknameResult(NicknameResultKind.Session,   GameMessages.Nickname.sessionExpired);
+            default:    return new NicknameResult(NicknameResultKind.Other,     ChatText.Fill(GameMessages.Nickname.failedCode, "code", bro.GetStatusCode()));
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -81,8 +82,71 @@ public partial class ChatPanel : MonoBehaviour
     [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
 
-    private const string DefaultPlaceholder = "메시지 입력";
-    private static string DirectPlaceholder => $"메시지 입력 (최대 {ChatManager.DIRECT_MAX_LENGTH}자)";
+    /// <summary>
+    /// 코드가 실행 중에 넣는 글자. {name} {max} {count} 같은 자리는 실행 중에 값으로 바뀝니다 (지워도 됨).
+    /// 모양(크기·위치·폰트·배경색)은 이 칸이 아니라 하이어라키의 오브젝트(ChatCanvas 프리팹)에서 직접 고치세요.
+    /// </summary>
+    [Serializable]
+    private class Texts
+    {
+        [Header("입력창 안내")]
+        public string placeholder       = "메시지 입력";
+        [Tooltip("{max} = 개인 메시지 최대 글자 수")]
+        public string directPlaceholder = "메시지 입력 (최대 {max}자)";
+
+        [Header("빈 채널")]
+        public string emptyPublic = "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!";
+        [Tooltip("{name} = 상대 닉네임")]
+        public string emptyDirect = "{name} 님에게 첫 메시지를 보내 보세요.";
+
+        [Header("미리보기 (창을 닫았을 때 한 줄)")]
+        public string previewLabel  = "채팅";
+        [Tooltip("{count} = 안 읽은 개인 메시지 수")]
+        public string previewUnread = "개인 메시지 {count}";
+        public string previewEmpty  = "눌러서 대화에 참여해 보세요!";
+
+        [Header("채널 탭 · 창 제목")]
+        public string publicTabName = "전체 채팅";
+        [Tooltip("{name} = 상대 닉네임")]
+        public string directTitle   = "{name} 님과 개인 채팅";
+        [Tooltip("탭 이름 뒤 안 읽은 수. {count} = 개수")]
+        public string tabUnread     = "({count})";
+
+        [Header("유저 메뉴 — 친구 버튼")]
+        public string menuAddFriend     = "친구 추가";
+        public string menuAlreadyFriend = "이미 친구입니다";
+        public string menuRequestSent   = "친구 요청 보냄";
+        public string menuAccept        = "친구 요청 수락";
+
+        [Header("알림 (창 아래 잠깐 뜨는 문구) — {name} = 상대 닉네임")]
+        public string noticeFriendRequested = "{name} 님에게 친구 요청을 보냈습니다.";
+        [Tooltip("상대가 먼저 요청해 둔 상태에서 [친구 요청 수락] 을 눌렀을 때")]
+        public string noticeFriendAccepted  = "{name} 님과 친구가 되었습니다.";
+        public string noticeBlocked         = "{name} 님의 채팅을 차단했습니다. 친구 창의 차단 목록에서 해제할 수 있습니다.";
+        [Tooltip("개인 채팅 [나가기] 를 눌렀을 때")]
+        public string noticeLeft            = "{name} 님과의 대화방에서 나갔습니다.";
+    }
+
+    /// <summary>메시지 줄·미리보기·탭 글자 색 (TMP 리치 텍스트로 칠함 — 템플릿 TMP 의 색 위에 덮어씀).</summary>
+    [Serializable]
+    private class Colors
+    {
+        [Tooltip("[2-3] 진행도 · 미리보기의 '채팅'")]
+        public Color progress = ChatText.ProgressColor;
+        public Color myName   = ChatText.MyNameColor;
+        public Color name     = ChatText.NameColor;
+        public Color body     = ChatText.BodyColor;
+        [Tooltip("안 읽은 수")]
+        public Color unread   = ChatText.UnreadColor;
+
+        [Tooltip("지금 보고 있는 탭의 배경색. 안 고른 탭은 Tab 템플릿(하이어라키)의 색 그대로입니다.")]
+        public Color tabSelected = TabSelectedColor;
+    }
+
+    [Header("글자 · 색 (실행 중에 코드가 넣는 값)")]
+    [SerializeField] private Texts  texts  = new Texts();
+    [SerializeField] private Colors colors = new Colors();
+
     private TMP_Text placeholderText;
 
     private readonly StringBuilder sb = new StringBuilder();
@@ -116,7 +180,7 @@ public partial class ChatPanel : MonoBehaviour
         input.characterLimit = 0;
         input.onSubmit.AddListener(_ => Submit());   // PC 엔터 / 모바일 키보드 완료
         placeholderText = input.placeholder as TMP_Text;
-        if (placeholderText != null) placeholderText.text = DefaultPlaceholder;
+        if (placeholderText != null) placeholderText.text = texts.placeholder;
 
         previewWidth = previewBar.sizeDelta.x;
         logLineTemplate.gameObject.SetActive(false);
@@ -311,8 +375,8 @@ public partial class ChatPanel : MonoBehaviour
     {
         if (reason != null) return reason;
         if (shown > 0)      return string.Empty;
-        return direct ? $"{ChatText.Plain(currentPeerName)} 님에게 첫 메시지를 보내 보세요."
-                      : "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!";
+        return direct ? ChatText.Fill(texts.emptyDirect, "name", ChatText.Plain(currentPeerName))
+                      : texts.emptyPublic;
     }
 
     private void SetInputState(bool usable, bool direct)
@@ -330,7 +394,8 @@ public partial class ChatPanel : MonoBehaviour
 
         if (placeholderText != null)
         {
-            string hint = direct ? DirectPlaceholder : DefaultPlaceholder;
+            string hint = direct ? ChatText.Fill(texts.directPlaceholder, "max", ChatManager.DIRECT_MAX_LENGTH.ToString())
+                                 : texts.placeholder;
             if (placeholderText.text != hint) placeholderText.text = hint;
         }
     }
@@ -411,7 +476,7 @@ public partial class ChatPanel : MonoBehaviour
 
         ChatManager chat = ChatManager.Instance;
         sb.Clear();
-        sb.AppendColored(ChatText.ProgressHex, "채팅").Append("  ");
+        if (!string.IsNullOrEmpty(texts.previewLabel)) sb.AppendColored(colors.progress, texts.previewLabel).Append("  ");
 
         if (chat == null)
         {
@@ -420,10 +485,10 @@ public partial class ChatPanel : MonoBehaviour
         else
         {
             int unread = chat.TotalUnread;
-            if (unread > 0) sb.AppendColored(ChatText.UnreadHex, $"개인 메시지 {unread}").Append("  ");
+            if (unread > 0) sb.AppendColored(colors.unread, ChatText.Fill(texts.previewUnread, "count", unread.ToString())).Append("  ");
 
             if (TryGetLastVisible(chat, out ChatMessage last)) AppendLine(sb, last, last.Uid == chat.MyUid);
-            else                                               sb.Append(chat.UnavailableReason ?? "눌러서 대화에 참여해 보세요!");
+            else                                               sb.Append(chat.UnavailableReason ?? texts.previewEmpty);
         }
 
         previewText.text = sb.ToString();
@@ -444,12 +509,12 @@ public partial class ChatPanel : MonoBehaviour
     }
 
     /// <summary>[2-3] 닉네임 : 내용</summary>
-    private static void AppendLine(StringBuilder sb, ChatMessage m, bool mine)
+    private void AppendLine(StringBuilder sb, ChatMessage m, bool mine)
     {
-        sb.AppendColored(ChatText.ProgressHex, $"[{StageRecord.Format(m.Progress)}]").Append(' ');
-        sb.AppendColored(mine ? ChatText.MyNameHex : ChatText.NameHex, ChatText.Plain(m.Nickname));
+        sb.AppendColored(colors.progress, $"[{StageRecord.Format(m.Progress)}]").Append(' ');
+        sb.AppendColored(mine ? colors.myName : colors.name, ChatText.Plain(m.Nickname));
         sb.Append(" : ");
-        sb.AppendColored(ChatText.BodyHex, ChatText.Plain(m.Text));
+        sb.AppendColored(colors.body, ChatText.Plain(m.Text));
     }
 
     private void ShowStatus(string message)

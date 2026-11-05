@@ -27,11 +27,12 @@ public partial class ChatPanel
     [Tooltip("개인 채팅 나가기. 개인 탭을 보는 동안에만 보입니다.")]
     [SerializeField] private Button leaveButton;
 
-    // 탭 색. UIBaker 도 같은 값으로 굽습니다.
+    // 탭 색 기본값 — UIBaker 가 Tab 템플릿을 TabColor 로 굽고, 고른 탭 색 칸(colors.tabSelected)의 기본값이 TabSelectedColor.
+    // 실제로 쓰는 색: 안 고른 탭 = Tab 템플릿(하이어라키)의 색, 고른 탭 = 인스펙터 colors.tabSelected
     public static readonly Color TabColor         = new Color(1f, 1f, 1f, 0.06f);
     public static readonly Color TabSelectedColor = new Color(0.30f, 0.55f, 0.95f, 0.9f);
 
-    private const string PublicTabName = "전체 채팅";
+    private Color tabNormalColor = TabColor;   // Tab 템플릿에서 읽어 둔 색 (AwakeTabs)
 
     private string currentPeer;       // 보고 있는 개인 채팅 상대 (null = 전체 채팅)
     private string currentPeerName;
@@ -57,7 +58,11 @@ public partial class ChatPanel
             leaveButton.onClick.AddListener(OnLeaveClicked);
             leaveButton.gameObject.SetActive(false);
         }
-        if (HasTabs) tabTemplate.gameObject.SetActive(false);
+        if (HasTabs)
+        {
+            if (tabTemplate.targetGraphic != null) tabNormalColor = tabTemplate.targetGraphic.color;
+            tabTemplate.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>그 상대와의 개인 채팅을 엽니다 (창이 닫혀 있으면 창도 엶). 유저 메뉴·친구 창에서 부릅니다.</summary>
@@ -105,7 +110,7 @@ public partial class ChatPanel
         chat.LeaveConversation(currentPeer, error =>
         {
             if (this == null) return;
-            ShowNotice(error ?? $"{ChatText.Plain(name)} 님과의 대화방에서 나갔습니다.");
+            ShowNotice(error ?? ChatText.Fill(texts.noticeLeft, "name", ChatText.Plain(name)));
         });
         SetChannel(null, null);
     }
@@ -122,7 +127,8 @@ public partial class ChatPanel
         if (HasTabs) SyncTabList(chat);
 
         if (titleText != null)
-            titleText.text = currentPeer == null ? PublicTabName : $"{ChatText.Plain(currentPeerName)} 님과 개인 채팅";
+            titleText.text = currentPeer == null ? texts.publicTabName
+                                                 : ChatText.Fill(texts.directTitle, "name", ChatText.Plain(currentPeerName));
 
         bool showLeave = currentPeer != null;
         if (leaveButton != null && leaveButton.gameObject.activeSelf != showLeave)
@@ -132,7 +138,7 @@ public partial class ChatPanel
     private void SyncTabList(ChatManager chat)
     {
         int count = 0;
-        SetTab(count++, null, PublicTabName, PublicTabName);
+        SetTab(count++, null, texts.publicTabName, texts.publicTabName);
 
         if (chat != null)
         {
@@ -142,7 +148,7 @@ public partial class ChatPanel
 
                 int unread = c.PeerUid == currentPeer ? 0 : chat.UnreadCount(c.PeerUid);
                 string label = ChatText.Plain(c.PeerName);
-                if (unread > 0) label += " " + ChatText.Colored(ChatText.UnreadHex, $"({unread})");
+                if (unread > 0) label += " " + ChatText.Colored(colors.unread, ChatText.Fill(texts.tabUnread, "count", unread.ToString()));
                 SetTab(count++, c.PeerUid, c.PeerName, label);
             }
         }
@@ -162,7 +168,7 @@ public partial class ChatPanel
         if (tab.Label != null && tab.Label.text != label) tab.Label.text = label;   // 같으면 메시 재생성 안 함
 
         Graphic background = tab.Button.targetGraphic;
-        if (background != null) background.color = peer == currentPeer ? TabSelectedColor : TabColor;
+        if (background != null) background.color = peer == currentPeer ? colors.tabSelected : tabNormalColor;
     }
 
     private Tab CreateTab()

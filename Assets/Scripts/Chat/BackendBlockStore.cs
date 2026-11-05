@@ -115,14 +115,14 @@ public sealed class BackendBlockStore
     /// <summary>차단(on) / 해제(!on). 서버에 저장되면 onDone(null), 실패면 onDone(오류 문구) — 목록은 그대로.</summary>
     public void Set(string peerUid, string peerName, bool on, Action<string> onDone)
     {
-        if (uid == null) { onDone?.Invoke("차단 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (uid == null) { onDone?.Invoke(GameMessages.Block.loading); return; }
         if (!loaded)
         {
             EnsureLoaded();
-            onDone?.Invoke("차단 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
+            onDone?.Invoke(GameMessages.Block.loading);
             return;
         }
-        if (writing) { onDone?.Invoke("차단 목록을 저장하는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (writing) { onDone?.Invoke(GameMessages.Block.saving); return; }
 
         var next = new Dictionary<string, string>(blocks);
         if (on) next[peerUid] = string.IsNullOrEmpty(peerName) ? "?" : peerName;
@@ -142,13 +142,13 @@ public sealed class BackendBlockStore
 
         Action<string> finish = error =>
         {
-            if (gen != generation) { onDone?.Invoke("계정이 바뀌어 처리하지 않았습니다."); return; }
+            if (gen != generation) { onDone?.Invoke(GameMessages.Common.accountChanged); return; }
             writing = false;
 
             if (error != null)
             {
                 Debug.LogWarning($"[Block] 차단 목록 저장 실패: {error}");
-                onDone?.Invoke("차단 목록을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                onDone?.Invoke(GameMessages.Block.saveFailed);
                 return;
             }
 

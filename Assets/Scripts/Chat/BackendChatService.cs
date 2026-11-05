@@ -80,11 +80,11 @@ public class BackendChatService : IChatService, IChatClientListener
         reason = null;
 
         AuthManager auth = AuthManager.Instance;
-        if (auth == null || !auth.IsReady)  { reason = "서버 연결 준비 중입니다."; return false; }
-        if (!auth.IsSignedIn)               { reason = "로그인하면 채팅을 할 수 있습니다."; return false; }
-        if (!auth.IsOnline)                 { reason = "서버에 연결할 수 없습니다. 잠시 후 다시 시도합니다."; return false; }
-        if (auth.Uid != Backend.UserInDate) { reason = "계정 정보를 확인하는 중입니다..."; return false; }
-        if (string.IsNullOrEmpty(auth.DisplayName)) { reason = "닉네임을 정하는 중입니다..."; return false; }   // 뒤끝챗은 닉네임이 있어야 접속됨
+        if (auth == null || !auth.IsReady)  { reason = GameMessages.Chat.serverPreparing; return false; }
+        if (!auth.IsSignedIn)               { reason = GameMessages.Chat.loginRequired; return false; }
+        if (!auth.IsOnline)                 { reason = GameMessages.Chat.offlineRetrying; return false; }
+        if (auth.Uid != Backend.UserInDate) { reason = GameMessages.Chat.accountChecking; return false; }
+        if (string.IsNullOrEmpty(auth.DisplayName)) { reason = GameMessages.Chat.nicknamePending; return false; }   // 뒤끝챗은 닉네임이 있어야 접속됨
 
         uid = auth.Uid;
         return true;
@@ -118,7 +118,7 @@ public class BackendChatService : IChatService, IChatClientListener
         {
             Debug.LogError($"[Chat] 뒤끝챗 연결 실패 — 뒤끝챗 설정(UUID)을 확인하세요: {e}");
             client = null;
-            Failed?.Invoke("채팅 서버에 연결할 수 없습니다.");
+            Failed?.Invoke(GameMessages.Chat.serverUnreachable);
             return;
         }
 
@@ -173,7 +173,7 @@ public class BackendChatService : IChatService, IChatClientListener
 
     public void Send(ChatMessage message, Action<string> onDone)
     {
-        if (client == null || joinedGroup == null) { onDone?.Invoke("채팅 채널에 들어가는 중입니다. 잠시 후 다시 보내 주세요."); return; }
+        if (client == null || joinedGroup == null) { onDone?.Invoke(GameMessages.Chat.joiningChannel); return; }
 
         try
         {
@@ -203,7 +203,7 @@ public class BackendChatService : IChatService, IChatClientListener
         catch (Exception e)
         {
             Debug.LogWarning($"[Chat] 보내기 실패: {e.Message}");
-            FinishPending("메시지를 보내지 못했습니다.");
+            FinishPending(GameMessages.Chat.sendFailed);
         }
     }
 
@@ -300,27 +300,29 @@ public class BackendChatService : IChatService, IChatClientListener
     {
         switch (error)
         {
-            case ERROR_MESSAGE.MESSAGE_FILTERED:   return "사용할 수 없는 단어가 들어 있습니다.";
-            case ERROR_MESSAGE.MESSAGE_SPAM:       return "너무 빨리 보내고 있습니다. 잠시 후 다시 보내 주세요.";
-            case ERROR_MESSAGE.MESSAGE_TOO_LONG:   return "메시지가 너무 깁니다.";
-            case ERROR_MESSAGE.MESSAGE_TOO_SHORT:  return "메시지를 입력해 주세요.";
+            case ERROR_MESSAGE.MESSAGE_FILTERED:   return GameMessages.Chat.filtered;
+            case ERROR_MESSAGE.MESSAGE_SPAM:       return GameMessages.Chat.tooFast;
+            case ERROR_MESSAGE.MESSAGE_TOO_LONG:   return GameMessages.Chat.tooLong;
+            case ERROR_MESSAGE.MESSAGE_TOO_SHORT:  return GameMessages.Chat.emptyMessage;
             case ERROR_MESSAGE.CHAT_BAN:
                 return param is ErrorMessageChatBanParam ban
-                    ? $"채팅이 제한되었습니다. ({FormatSeconds(ban.RemainSeconds)} 남음)"
-                    : "채팅이 제한되었습니다.";
-            case ERROR_MESSAGE.NOT_NICKNAME:       return "닉네임을 정한 뒤 채팅할 수 있습니다.";
-            case ERROR_MESSAGE.CHAT_SERVER_FULL:   return "채팅 서버가 가득 찼습니다.";
-            case ERROR_MESSAGE.CHANNEL_FULL:       return "채팅 채널이 가득 찼습니다.";
-            case ERROR_MESSAGE.DISABLED_SERVICE:   return "채팅 서비스가 꺼져 있습니다.";
-            case ERROR_MESSAGE.DISABLED_CHANNEL:   return "채팅 채널을 쓸 수 없습니다.";
-            case ERROR_MESSAGE.DUPLICATE_CONNECTION: return "다른 곳에서 같은 계정으로 채팅에 접속했습니다.";
-            case ERROR_MESSAGE.NOT_AUTHENTICATION: return "채팅 서버 인증에 실패했습니다.";
-            default:                               return $"채팅 오류 ({error})";
+                    ? ChatText.Fill(GameMessages.Chat.bannedRemain, "remain", FormatSeconds(ban.RemainSeconds))
+                    : GameMessages.Chat.banned;
+            case ERROR_MESSAGE.NOT_NICKNAME:       return GameMessages.Chat.notNickname;
+            case ERROR_MESSAGE.CHAT_SERVER_FULL:   return GameMessages.Chat.serverFull;
+            case ERROR_MESSAGE.CHANNEL_FULL:       return GameMessages.Chat.channelFull;
+            case ERROR_MESSAGE.DISABLED_SERVICE:   return GameMessages.Chat.disabledService;
+            case ERROR_MESSAGE.DISABLED_CHANNEL:   return GameMessages.Chat.disabledChannel;
+            case ERROR_MESSAGE.DUPLICATE_CONNECTION: return GameMessages.Chat.duplicateConnection;
+            case ERROR_MESSAGE.NOT_AUTHENTICATION: return GameMessages.Chat.authFailed;
+            default:                               return ChatText.Fill(GameMessages.Chat.unknownError, "error", error.ToString());
         }
     }
 
     private static string FormatSeconds(ulong s)
-        => s >= 3600 ? $"{s / 3600}시간 {s % 3600 / 60}분" : s >= 60 ? $"{s / 60}분" : $"{s}초";
+        => s >= 3600 ? ChatText.Fill(GameMessages.Chat.hoursMinutes, "h", (s / 3600).ToString(), "m", (s % 3600 / 60).ToString())
+         : s >= 60  ? ChatText.Fill(GameMessages.Chat.minutes, "m", (s / 60).ToString())
+                    : ChatText.Fill(GameMessages.Chat.seconds, "s", s.ToString());
 
     // 이 게임에서 쓰지 않는 콜백 — 입장·퇴장한 사람 목록, 번역, 귓속말(개인 메시지는 쪽지로)
     public void OnJoinChannelPlayer(string channelGroup, string channelName, ulong channelNumber, PlayerInfo player) { }
@@ -356,7 +358,7 @@ public class BackendChatService : IChatService, IChatClientListener
             Id       = IdOf(m),
             // uid 메타데이터가 없으면(다른 앱·콘솔 공지) 닉네임으로 대신 — 내 uid 와 겹치지 않게 접두사 (ChatMessage.HasPlayerUid)
             Uid      = system ? ChatMessage.SystemUid : !string.IsNullOrEmpty(uid) ? uid : ChatMessage.NameOnlyPrefix + m.GamerName,
-            Nickname = system ? "알림" : m.GamerName,
+            Nickname = system ? GameMessages.Chat.systemSender : m.GamerName,
             Progress = int.TryParse(progress, NumberStyles.Integer, CultureInfo.InvariantCulture, out int p) ? p : 0,
             Text     = m.Message ?? string.Empty,
             SentAt   = ParseTime(m.Time),

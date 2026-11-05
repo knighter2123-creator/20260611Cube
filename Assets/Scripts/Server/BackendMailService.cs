@@ -34,7 +34,7 @@ public class BackendMailService : IMailService
         {
             // 일부만 실패했으면 받은 만큼은 보여 줌. 전부 실패해야 실패
             onDone?.Invoke(failures == Types.Length ? null : all,
-                           failures == Types.Length ? "우편을 불러오지 못했습니다." : null);
+                           failures == Types.Length ? GameMessages.Mail.fetchFailed : null);
             return;
         }
 
@@ -66,7 +66,7 @@ public class BackendMailService : IMailService
     {
         if (!Enum.TryParse(mail.postType, out PostType type))
         {
-            onDone?.Invoke("알 수 없는 우편입니다.");
+            onDone?.Invoke(GameMessages.Mail.unknownPost);
             return;
         }
 
@@ -76,8 +76,8 @@ public class BackendMailService : IMailService
 
             Debug.LogWarning($"[Mail] 우편 받기 실패 ({mail.title}): {BackendManager.Describe(bro)}");
             onDone?.Invoke(BackendManager.IsNetworkError(bro)
-                ? "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요."
-                : bro.GetStatusCode() == "404" ? "이미 받았거나 기간이 지난 우편입니다." : "우편을 받지 못했습니다.");
+                ? GameMessages.Common.offlineCheck
+                : bro.GetStatusCode() == "404" ? GameMessages.Mail.gone : GameMessages.Mail.claimFailed);
         });
     }
 
@@ -89,7 +89,7 @@ public class BackendMailService : IMailService
         var mail = new MailItem
         {
             id         = $"{type}:{inDate}",
-            title      = BackendJson.Str(post, "title") ?? "우편",
+            title      = BackendJson.Str(post, "title") ?? GameMessages.Mail.defaultTitle,
             body       = BackendJson.Str(post, "content") ?? string.Empty,
             sentAt     = BackendJson.DateMs(post, "sentDate", BackendJson.DateMs(post, "inDate")),
             expiresAt  = BackendJson.DateMs(post, "expirationDate"),

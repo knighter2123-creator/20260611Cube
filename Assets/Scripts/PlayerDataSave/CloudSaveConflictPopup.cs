@@ -44,9 +44,24 @@ public class CloudSaveConflictPopup : MonoBehaviour
 
     public TMP_FontAsset Font => font;
 
-    // 버튼 글자는 확인 문구에서 되돌릴 때도 쓰므로 여기 두고, UIBaker 도 같은 값으로 굽습니다
+    // 굽기 기본값 — UIBaker 가 버튼을 이 글자로 굽고, 아래 버튼 글자 칸의 기본값도 여기서 옵니다
     public const string LocalButtonText = "이 기기 데이터 사용";
     public const string CloudButtonText = "클라우드 데이터 사용";
+
+    // 실행 중에 코드가 넣는 글자. 창의 제목·설명(Title/Desc)은 하이어라키에서 직접 고치세요.
+    [Header("버튼 글자 — 처음 / 한 번 누른 뒤(확인)")]
+    [SerializeField] private string localChoose  = LocalButtonText;
+    [SerializeField] private string cloudChoose  = CloudButtonText;
+    [SerializeField] private string localConfirm = "기기 데이터로 시작";
+    [SerializeField] private string cloudConfirm = "클라우드 데이터로 시작";
+
+    [Header("한 번 누른 뒤 아래 경고 문구 — 경고(색칠) + 안내")]
+    [Tooltip("[이 기기] 를 한 번 눌렀을 때")]
+    [SerializeField] private string localWarning = "클라우드 데이터가 이 기기 데이터로 덮어써집니다.";
+    [Tooltip("[클라우드] 를 한 번 눌렀을 때")]
+    [SerializeField] private string cloudWarning = "이 기기 데이터가 클라우드 데이터로 덮어써집니다.";
+    [SerializeField] private string confirmHint  = "한 번 더 누르면 확정합니다.";
+    [SerializeField] private Color  warningColor = new Color(1f, 128f / 255f, 128f / 255f);   // #FF8080
 
     private Action<bool> onChoose;     // true = 클라우드
     private int          armed = -1;   // 한 번 누른 쪽 (0 = 이 기기, 1 = 클라우드, -1 = 없음)
@@ -99,8 +114,8 @@ public class CloudSaveConflictPopup : MonoBehaviour
 
         localSummary.text = localText;
         cloudSummary.text = cloudText;
-        localLabel.text   = LocalButtonText;
-        cloudLabel.text   = CloudButtonText;
+        localLabel.text   = localChoose;
+        cloudLabel.text   = cloudChoose;
         noticeText.text   = string.Empty;
         panel.SetActive(true);
     }
@@ -113,11 +128,10 @@ public class CloudSaveConflictPopup : MonoBehaviour
         {
             // 첫 번째 누름 — 확인 문구로 바꾸기만 함
             armed = side;
-            localLabel.text = side == 0 ? "기기 데이터로 시작" : LocalButtonText;
-            cloudLabel.text = side == 1 ? "클라우드 데이터로 시작" : CloudButtonText;
-            noticeText.text = side == 0
-                ? "<color=#FF8080>클라우드 데이터가 이 기기 데이터로 덮어써집니다.</color> 한 번 더 누르면 확정합니다."
-                : "<color=#FF8080>이 기기 데이터가 클라우드 데이터로 덮어써집니다.</color> 한 번 더 누르면 확정합니다.";
+            localLabel.text = side == 0 ? localConfirm : localChoose;
+            cloudLabel.text = side == 1 ? cloudConfirm : cloudChoose;
+            string warning  = side == 0 ? localWarning : cloudWarning;
+            noticeText.text = $"<color=#{ColorUtility.ToHtmlStringRGBA(warningColor)}>{warning}</color> {confirmHint}";
             return;
         }
 

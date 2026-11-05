@@ -255,12 +255,12 @@ public static class Mailbox
         MailItem mail = queue.Dequeue();
         if (mail.hasUnknownReward)
         {
-            Fail("이 우편의 보상은 지금 버전에서 받을 수 없습니다. 게임을 업데이트해 주세요.");
+            Fail(GameMessages.Mail.needUpdate);
             return;
         }
         if (!CanUseServer(out string uid) || uid != serverUid)
         {
-            Fail("서버에 연결된 상태에서 받을 수 있습니다.");
+            Fail(GameMessages.Mail.needOnline);
             return;
         }
 
@@ -275,7 +275,7 @@ public static class Mailbox
             if (!ProfileSync.TryGetAccount(out string nowUid) || nowUid != uid || SaveManager.Instance == null)
             {
                 Debug.LogError($"[Mailbox] 우편을 받는 사이 계정이 바뀌어 지급하지 못했습니다: {mail.title}");
-                Fail("계정이 바뀌어 우편을 지급하지 못했습니다.");
+                Fail(GameMessages.Mail.accountChanged);
                 return;
             }
 

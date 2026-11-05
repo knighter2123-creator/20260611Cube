@@ -27,7 +27,7 @@ public class BackendFriendService : IFriendService
 
     // 한 번에 받는 목록 길이. 클라이언트 친구 제한(ChatManager.MAX_FRIENDS = 50)과 맞춤
     private const int    PAGE   = 50;
-    private const string NoName = "(이름 없음)";
+    private static string NoName => GameMessages.Friends.noName;
 
     private string myUid;
     private readonly RefreshGate gate = new RefreshGate();   // 받기 하나씩 + 이전 계정의 늦은 응답 버리기
@@ -46,7 +46,7 @@ public class BackendFriendService : IFriendService
     {
         Disconnect();
 
-        string reason = BackendSession.Problem(uid, "로그인하면 친구 기능을 쓸 수 있습니다.");
+        string reason = BackendSession.Problem(uid, GameMessages.Friends.loginRequired);
         if (reason != null) { Failed?.Invoke(reason); return; }
 
         myUid = uid;
@@ -106,7 +106,7 @@ public class BackendFriendService : IFriendService
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogWarning($"[Friends] {state} 목록 조회 실패: {BackendManager.Describe(bro)}");
-                next(BackendManager.IsNetworkError(bro) ? "서버에 연결할 수 없습니다." : "친구 목록을 불러오지 못했습니다.");
+                next(BackendManager.IsNetworkError(bro) ? GameMessages.Common.offline : GameMessages.Friends.listFailed);
                 return;
             }
 
@@ -149,10 +149,10 @@ public class BackendFriendService : IFriendService
     // ───────────────────────────── 요청 / 수락 / 삭제 ─────────────────────────────
 
     public void Request(string uid, string peerUid, string peerName, Action<string> onDone)
-        => Act(uid, cb => Backend.Friend.RequestFriend(peerUid, cb), "친구 요청", onDone);
+        => Act(uid, cb => Backend.Friend.RequestFriend(peerUid, cb), GameMessages.Friends.actionRequest, onDone);
 
     public void Accept(string uid, string peerUid, Action<string> onDone)
-        => Act(uid, cb => Backend.Friend.AcceptFriend(peerUid, cb), "친구 수락", onDone);
+        => Act(uid, cb => Backend.Friend.AcceptFriend(peerUid, cb), GameMessages.Friends.actionAccept, onDone);
 
     public void Remove(string uid, string peerUid, Action<string> onDone)
     {
@@ -160,27 +160,27 @@ public class BackendFriendService : IFriendService
 
         switch (f.State)
         {
-            case FriendState.Friend:   Act(uid, cb => Backend.Friend.BreakFriend(peerUid, cb),       "친구 삭제", onDone); break;
-            case FriendState.Incoming: Act(uid, cb => Backend.Friend.RejectFriend(peerUid, cb),      "요청 거절", onDone); break;
-            default:                   Act(uid, cb => Backend.Friend.RevokeSentRequest(peerUid, cb), "요청 취소", onDone); break;
+            case FriendState.Friend:   Act(uid, cb => Backend.Friend.BreakFriend(peerUid, cb),       GameMessages.Friends.actionRemove, onDone); break;
+            case FriendState.Incoming: Act(uid, cb => Backend.Friend.RejectFriend(peerUid, cb),      GameMessages.Friends.actionReject, onDone); break;
+            default:                   Act(uid, cb => Backend.Friend.RevokeSentRequest(peerUid, cb), GameMessages.Friends.actionRevoke, onDone); break;
         }
     }
 
     /// <summary>닉네임 → gamer inDate (Backend.Social.GetUserInfoByNickName). 닉네임은 정확히 같아야 합니다.</summary>
     public void FindUser(string nickname, Action<string, string> onDone)
     {
-        if (myUid == null) { onDone?.Invoke(null, "친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (myUid == null) { onDone?.Invoke(null, GameMessages.Friends.loadingRetry); return; }
 
         int gen = gate.Generation;
         BackendManager.Call(cb => Backend.Social.GetUserInfoByNickName(nickname, cb), bro =>
         {
-            if (!gate.IsCurrent(gen)) { onDone?.Invoke(null, "계정이 바뀌어 처리하지 않았습니다."); return; }
+            if (!gate.IsCurrent(gen)) { onDone?.Invoke(null, GameMessages.Common.accountChanged); return; }
 
-            if (bro != null && bro.GetStatusCode() == "404") { onDone?.Invoke(null, "그 닉네임의 유저가 없습니다."); return; }
+            if (bro != null && bro.GetStatusCode() == "404") { onDone?.Invoke(null, GameMessages.Friends.userNotFound); return; }
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogWarning($"[Friends] 닉네임 검색 실패: {BackendManager.Describe(bro)}");
-                onDone?.Invoke(null, BackendManager.IsNetworkError(bro) ? "서버에 연결할 수 없습니다." : "유저를 찾지 못했습니다.");
+                onDone?.Invoke(null, BackendManager.IsNetworkError(bro) ? GameMessages.Common.offline : GameMessages.Friends.searchFailed);
                 return;
             }
 
@@ -188,7 +188,7 @@ public class BackendFriendService : IFriendService
             try { inDate = BackendJson.Str(BackendJson.Get(bro.GetReturnValuetoJSON(), "row"), "inDate"); }
             catch (Exception e) { Debug.LogWarning($"[Friends] 닉네임 검색 응답을 읽지 못함: {e.Message}\n{bro}"); }
 
-            if (string.IsNullOrEmpty(inDate)) onDone?.Invoke(null, "그 닉네임의 유저가 없습니다.");
+            if (string.IsNullOrEmpty(inDate)) onDone?.Invoke(null, GameMessages.Friends.userNotFound);
             else                              onDone?.Invoke(inDate, null);
         });
     }
@@ -196,12 +196,12 @@ public class BackendFriendService : IFriendService
     /// <summary>서버 작업 하나 — 끝나면 목록을 다시 받아 양쪽 상태를 맞춥니다. onDone(오류 문구, 성공이면 null).</summary>
     private void Act(string uid, Action<Backend.BackendCallback> request, string what, Action<string> onDone)
     {
-        if (myUid == null || uid != myUid) { onDone?.Invoke("친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (myUid == null || uid != myUid) { onDone?.Invoke(GameMessages.Friends.loadingRetry); return; }
 
         int gen = gate.Generation;
         BackendManager.Call(request, bro =>
         {
-            if (!gate.IsCurrent(gen)) { onDone?.Invoke("계정이 바뀌어 처리하지 않았습니다."); return; }
+            if (!gate.IsCurrent(gen)) { onDone?.Invoke(GameMessages.Common.accountChanged); return; }
 
             string error = null;
             if (bro == null || !bro.IsSuccess())
@@ -217,14 +217,14 @@ public class BackendFriendService : IFriendService
 
     private static string ToMessage(BackendReturnObject bro, string what)
     {
-        if (BackendManager.IsNetworkError(bro)) return "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+        if (BackendManager.IsNetworkError(bro)) return GameMessages.Common.offlineRetry;
 
         switch (bro.GetStatusCode())
         {
-            case "409": return "이미 친구이거나 요청이 오간 상대입니다.";
-            case "404": return "상대를 찾을 수 없거나 요청이 이미 처리되었습니다.";
-            case "412": return "친구 수가 가득 찼습니다.";
-            default:    return $"{what}에 실패했습니다. ({bro.GetStatusCode()})";
+            case "409": return GameMessages.Friends.conflict;
+            case "404": return GameMessages.Friends.notFound;
+            case "412": return GameMessages.Friends.full;
+            default:    return ChatText.Fill(GameMessages.Friends.actionFailed, "action", what, "code", bro.GetStatusCode());
         }
     }
 
@@ -232,13 +232,13 @@ public class BackendFriendService : IFriendService
 
     public void Block(string uid, string peerUid, string peerName, Action<string> onDone)
     {
-        if (myUid == null || uid != myUid) { onDone?.Invoke("친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (myUid == null || uid != myUid) { onDone?.Invoke(GameMessages.Friends.loadingRetry); return; }
         blockStore.Set(peerUid, peerName ?? NoName, true, onDone);
     }
 
     public void Unblock(string uid, string peerUid, Action<string> onDone)
     {
-        if (myUid == null || uid != myUid) { onDone?.Invoke("친구 목록을 불러오는 중입니다. 잠시 후 다시 시도해 주세요."); return; }
+        if (myUid == null || uid != myUid) { onDone?.Invoke(GameMessages.Friends.loadingRetry); return; }
         blockStore.Set(peerUid, null, false, onDone);
     }
 }

@@ -22,9 +22,9 @@ public partial class ChatManager
     {
         if (FriendsUnavailableReason != null)       { onDone?.Invoke(FriendsUnavailableReason); return; }
         if (!TryGetSender(out string me))           { onDone?.Invoke(AccountPending); return; }
-        if (string.IsNullOrEmpty(uid) || uid == me) { onDone?.Invoke("차단할 수 없는 유저입니다."); return; }
+        if (string.IsNullOrEmpty(uid) || uid == me) { onDone?.Invoke(GameMessages.Block.invalid); return; }
         if (IsBlocked(uid))                         { onDone?.Invoke(null); return; }
-        if (blocked.Count >= MAX_BLOCKS)            { onDone?.Invoke($"최대 {MAX_BLOCKS}명까지 차단할 수 있습니다."); return; }
+        if (blocked.Count >= MAX_BLOCKS)            { onDone?.Invoke(ChatText.Fill(GameMessages.Block.max, "max", MAX_BLOCKS.ToString())); return; }
 
         // 서버 응답을 기다리지 않고 내 화면에서 바로 숨김 — 실패하면 되돌림 (성공이면 서비스가 같은 목록을 다시 보냄)
         SetBlockedLocally(uid, nickname, true);

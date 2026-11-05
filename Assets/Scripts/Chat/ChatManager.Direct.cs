@@ -43,8 +43,8 @@ public partial class ChatManager
         get
         {
             if (UnavailableReason != null) return UnavailableReason;
-            if (directLink.Key == null)    return directLink.FailReason ?? "개인 메시지 서버에 연결하는 중입니다...";
-            return roomsLoaded ? null : "대화 목록을 불러오는 중입니다...";
+            if (directLink.Key == null)    return directLink.FailReason ?? GameMessages.Direct.connecting;
+            return roomsLoaded ? null : GameMessages.Direct.roomsLoading;
         }
     }
 
@@ -83,8 +83,8 @@ public partial class ChatManager
     public string OpenConversation(string peerUid, string peerName, Action<string> onFailed)
     {
         if (DirectUnavailableReason != null)                         return DirectUnavailableReason;
-        if (string.IsNullOrEmpty(peerUid) || peerUid == messagesKey) return "나와는 대화할 수 없습니다.";
-        if (IsBlocked(peerUid))                                      return "차단한 유저와는 대화할 수 없습니다.";
+        if (string.IsNullOrEmpty(peerUid) || peerUid == messagesKey) return GameMessages.Direct.selfConversation;
+        if (IsBlocked(peerUid))                                      return GameMessages.Direct.blockedConversation;
         if (HasConversation(peerUid))                                return null;
         if (!TryGetSender(out string uid))                           return AccountPending;
 
@@ -148,8 +148,8 @@ public partial class ChatManager
     private bool CannotSendDirect(string peerUid, out string error)
     {
         error = DirectUnavailableReason;
-        if (error == null && IsBlocked(peerUid))        error = "차단한 유저에게는 메시지를 보낼 수 없습니다.";
-        if (error == null && !HasConversation(peerUid)) error = "대화방이 없습니다. 다시 열어 주세요.";
+        if (error == null && IsBlocked(peerUid))        error = GameMessages.Direct.blockedSend;
+        if (error == null && !HasConversation(peerUid)) error = GameMessages.Direct.noRoom;
         return error != null;
     }
 
@@ -238,7 +238,7 @@ public partial class ChatManager
     private void OnDirectFailed(string reason)
     {
         directService.Disconnect();
-        directLink.Failed($"{reason} 잠시 후 다시 연결합니다.", retryDelay);
+        directLink.Failed(ChatText.Fill(GameMessages.Chat.reconnecting, "reason", reason), retryDelay);
         watchingPeer = null;   // 다시 연결되면 보던 방을 다시 받음
         changed = true;
     }

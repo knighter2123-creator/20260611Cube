@@ -528,7 +528,7 @@ public class SaveManager : MonoBehaviour
         {
             if (File.Exists(to))
             {
-                error = "대상 계정의 세이브가 이미 있습니다.";
+                error = GameMessages.Account.targetSaveExists;
                 return false;
             }
             if (File.Exists(from)) File.Move(from, to);

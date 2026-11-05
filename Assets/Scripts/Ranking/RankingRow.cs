@@ -3,9 +3,13 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 랭킹 창의 한 줄 — 순위 / 닉네임 / 스테이지. 머리줄도 같은 모양을 씁니다.
-/// RankingPanel 이 목록을 그릴 때 rowTemplate 을 복제해 Set() 으로 채웁니다.
+/// 랭킹 창의 한 줄 — 순위 / 닉네임 / 스테이지. RankingPanel 이 목록을 그릴 때 rowTemplate 을 복제해 Set() 으로 채웁니다.
 /// (UI 는 Tools/UI 굽기/랭킹 창 메뉴가 만들고 아래 칸을 채웁니다 — UIBaker)
+///
+/// [색 고치기]  Row 템플릿(RankingCanvas > Window > Viewport > Content > Row)에서 고치면 모든 줄이 따라갑니다.
+///   평소 줄 — 하이어라키의 배경 Image 색 · 각 칸 TMP 글자 색 그대로
+///   내 줄   — 아래 myRowBackground 로 배경을 칠함
+///   상위 순위 — 아래 topTextColor 로 글자를 칠함 (몇 위까지인지는 RankingPanel 의 topHighlight, 기본 3)
 /// </summary>
 public class RankingRow : MonoBehaviour
 {
@@ -14,12 +18,34 @@ public class RankingRow : MonoBehaviour
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private TextMeshProUGUI stageText;
 
-    public void Set(string rank, string nickname, string stage, Color bg, Color textColor)
+    [Header("강조 색")]
+    [Tooltip("내 기록 줄의 배경색")]
+    [SerializeField] private Color myRowBackground = RankingPanel.MyRowColor;
+    [Tooltip("상위 순위 줄의 글자 색 (몇 위까지인지는 RankingPanel 의 Top Highlight)")]
+    [SerializeField] private Color topTextColor = RankingPanel.GoldColor;
+
+    // 하이어라키에서 정한 평소 색 — 처음 Set 할 때 읽어 둠 (복제본은 템플릿 색으로 태어남)
+    private bool  captured;
+    private Color normalBackground;
+    private Color normalRank, normalName, normalStage;
+
+    public void Set(string rank, string nickname, string stage, bool mine, bool top)
     {
-        if (background != null) background.color = bg;
-        SetCell(rankText,  rank,     textColor);
-        SetCell(nameText,  nickname, textColor);
-        SetCell(stageText, stage,    textColor);
+        Capture();
+        if (background != null) background.color = mine ? myRowBackground : normalBackground;
+        SetCell(rankText,  rank,     top ? topTextColor : normalRank);
+        SetCell(nameText,  nickname, top ? topTextColor : normalName);
+        SetCell(stageText, stage,    top ? topTextColor : normalStage);
+    }
+
+    private void Capture()
+    {
+        if (captured) return;
+        captured = true;
+        normalBackground = background != null ? background.color : Color.clear;
+        normalRank  = rankText  != null ? rankText.color  : Color.white;
+        normalName  = nameText  != null ? nameText.color  : Color.white;
+        normalStage = stageText != null ? stageText.color : Color.white;
     }
 
     private static void SetCell(TextMeshProUGUI t, string value, Color color)

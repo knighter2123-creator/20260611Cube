@@ -224,7 +224,7 @@ public class EmailLoginUI : AuthStateUI
         AuthManager auth = AuthManager.Instance;
         if (auth == null)
         {
-            SetText(messageText, "로그인 시스템을 찾을 수 없습니다.");
+            SetText(messageText, GameMessages.Auth.noAuthSystem);
             Debug.LogWarning("[EmailLoginUI] AuthManager 가 없습니다. ManagerRoot 하위에 추가했는지 확인하세요.");
             return;
         }
@@ -279,8 +279,8 @@ public class EmailLoginUI : AuthStateUI
         if (passwordInput != null) passwordInput.interactable = canUse;
 
         // 문구 우선순위: 진행 중 > 로그인됨 > (이번에 연 패널에서 시도한) 실패 사유 > 없음
-        if (a.SigningIn)     SetText(messageText, "처리 중…");
-        else if (a.SignedIn) SetText(messageText, "로그인되었습니다.");
+        if (a.SigningIn)     SetText(messageText, GameMessages.Auth.processing);
+        else if (a.SignedIn) SetText(messageText, GameMessages.Auth.signedIn);
         else if (a.Ready && attemptedSinceOpen && !string.IsNullOrEmpty(a.Auth.LastError))
                              SetText(messageText, a.Auth.LastError);
         else                 SetText(messageText, string.Empty);

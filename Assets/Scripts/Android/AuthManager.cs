@@ -92,8 +92,8 @@ public class AuthManager : MonoBehaviour
         get
         {
             if (IsSignedInWith(SignInMethod.Google)) return "Google";
-            if (IsSignedInWith(SignInMethod.Email))  return "이메일";
-            if (IsSignedInWith(SignInMethod.Guest))  return "게스트";
+            if (IsSignedInWith(SignInMethod.Email))  return GameMessages.Auth.methodEmail;
+            if (IsSignedInWith(SignInMethod.Guest))  return GameMessages.Auth.methodGuest;
             return string.Empty;
         }
     }
@@ -282,7 +282,7 @@ public class AuthManager : MonoBehaviour
         if (!IsGuest) return;
         if (!IsOnline)
         {
-            LastError = "구글 연동은 인터넷에 연결된 상태에서 할 수 있습니다.";
+            LastError = GameMessages.Auth.googleLinkNeedOnline;
             Notify();
             return;
         }
@@ -306,7 +306,7 @@ public class AuthManager : MonoBehaviour
         }
         if (!BackendManager.IsInitialized)
         {
-            LastError = "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.";
+            LastError = GameMessages.Common.offlineCheck;
             BackendManager.Initialize(null);   // 다음 시도를 위해 다시 초기화해 둠
             Notify();
             return;
@@ -392,7 +392,7 @@ public class AuthManager : MonoBehaviour
 
             if (bro == null || !bro.IsSuccess())
             {
-                string message = ToKoreanMessage(bro, "로그인");
+                string message = ToKoreanMessage(bro, GameMessages.Auth.actionLogin);
                 Debug.LogError($"[Auth] 뒤끝 구글 로그인 실패: {BackendManager.Describe(bro)}");
                 Fail(message);
                 return;
@@ -405,7 +405,7 @@ public class AuthManager : MonoBehaviour
                     Debug.LogWarning($"[Auth] 구글 이메일 기록 실패 (무시): {BackendManager.Describe(eb)}");
             });
 
-            OnSignedIn(SignInMethod.Google, googleEmail, bro.GetStatusCode() == "201" ? "가입" : "로그인");
+            OnSignedIn(SignInMethod.Google, googleEmail, bro.GetStatusCode() == "201" ? GameMessages.Auth.actionGoogleSignUp : GameMessages.Auth.actionLogin);
         });
     }
 
@@ -421,8 +421,8 @@ public class AuthManager : MonoBehaviour
             {
                 Debug.LogError($"[Auth] 게스트 → 구글 연동 실패: {BackendManager.Describe(bro)}");
                 Fail(bro != null && bro.GetStatusCode() == "409"
-                    ? "이미 다른 계정에 쓰이는 구글 계정입니다. 로그아웃한 뒤 그 구글 계정으로 로그인해 주세요."
-                    : ToKoreanMessage(bro, "구글 연동"));
+                    ? GameMessages.Auth.googleInUse
+                    : ToKoreanMessage(bro, GameMessages.Auth.actionGoogleLink));
                 return;
             }
 
@@ -436,7 +436,7 @@ public class AuthManager : MonoBehaviour
             if (!string.IsNullOrEmpty(nowUid) && nowUid != guestUid)
                 Debug.LogWarning($"[Auth] 연동 후 계정 값이 바뀌었습니다 ({Short(guestUid)} → {Short(nowUid)}). 새 값으로 이어 갑니다.");
 
-            OnSignedIn(SignInMethod.Google, googleEmail, "구글 연동");
+            OnSignedIn(SignInMethod.Google, googleEmail, GameMessages.Auth.actionGoogleLink);
         });
     }
 
@@ -453,7 +453,7 @@ public class AuthManager : MonoBehaviour
         if (!BackendManager.IsInitialized)
         {
             BackendManager.Initialize(null);   // 다음 시도를 위해 다시 초기화해 둠
-            Fail("서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            Fail(GameMessages.Common.offlineCheck);
             return;
         }
 
@@ -470,7 +470,7 @@ public class AuthManager : MonoBehaviour
 
             if (bro != null && bro.IsSuccess())
             {
-                OnSignedIn(SignInMethod.Guest, null, bro.GetStatusCode() == "201" ? "게스트 가입" : "게스트 로그인");
+                OnSignedIn(SignInMethod.Guest, null, bro.GetStatusCode() == "201" ? GameMessages.Auth.actionGuestSignUp : GameMessages.Auth.actionGuestLogin);
                 return;
             }
 
@@ -484,7 +484,7 @@ public class AuthManager : MonoBehaviour
             }
 
             Debug.LogWarning($"[Auth] 게스트 로그인 실패: {BackendManager.Describe(bro)}");
-            Fail(ToKoreanMessage(bro, "게스트 로그인"));
+            Fail(ToKoreanMessage(bro, GameMessages.Auth.actionGuestLogin));
         });
     }
 
@@ -530,7 +530,7 @@ public class AuthManager : MonoBehaviour
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogError($"[Auth] 이메일 회원가입 실패: {BackendManager.Describe(bro)}");
-                Fail(ToKoreanMessage(bro, "회원가입"));
+                Fail(ToKoreanMessage(bro, GameMessages.Auth.actionSignUp));
                 return;
             }
 
@@ -543,7 +543,7 @@ public class AuthManager : MonoBehaviour
 
             if (Backend.IsLogin)
             {
-                OnSignedIn(SignInMethod.Email, cleanEmail, "회원가입");
+                OnSignedIn(SignInMethod.Email, cleanEmail, GameMessages.Auth.actionSignUp);
                 return;
             }
 
@@ -551,8 +551,8 @@ public class AuthManager : MonoBehaviour
             BackendManager.Call(cb => Backend.BMember.CustomLogin(cleanEmail, password, cb), lb =>
             {
                 if (this == null) return;
-                if (lb != null && lb.IsSuccess()) OnSignedIn(SignInMethod.Email, cleanEmail, "회원가입");
-                else Fail("가입은 됐지만 로그인하지 못했습니다. 다시 로그인해 주세요.");
+                if (lb != null && lb.IsSuccess()) OnSignedIn(SignInMethod.Email, cleanEmail, GameMessages.Auth.actionSignUp);
+                else Fail(GameMessages.Auth.signUpThenLoginFailed);
             });
         });
     }
@@ -569,11 +569,11 @@ public class AuthManager : MonoBehaviour
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogError($"[Auth] 이메일 로그인 실패: {BackendManager.Describe(bro)}");
-                Fail(ToKoreanMessage(bro, "로그인"));
+                Fail(ToKoreanMessage(bro, GameMessages.Auth.actionLogin));
                 return;
             }
 
-            OnSignedIn(SignInMethod.Email, cleanEmail, "로그인");
+            OnSignedIn(SignInMethod.Email, cleanEmail, GameMessages.Auth.actionLogin);
         });
     }
 
@@ -585,30 +585,30 @@ public class AuthManager : MonoBehaviour
 
         if (!IsReady)
         {
-            Fail("아직 로그인 준비 중입니다. 잠시 후 다시 시도해 주세요.");
+            Fail(GameMessages.Auth.notReady);
             return false;
         }
         if (IsSigningIn || IsSignedIn) return false;
 
         if (cleanEmail.Length == 0)
         {
-            Fail("이메일을 입력해 주세요.");
+            Fail(GameMessages.Auth.enterEmail);
             return false;
         }
         if (!LooksLikeEmail(cleanEmail))
         {
-            Fail("이메일 형식이 올바르지 않습니다.");
+            Fail(GameMessages.Auth.badEmail);
             return false;
         }
         if (string.IsNullOrEmpty(password) || password.Length < MIN_PASSWORD_LENGTH)
         {
-            Fail($"비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다.");
+            Fail(ChatText.Fill(GameMessages.Auth.shortPassword, "min", MIN_PASSWORD_LENGTH.ToString()));
             return false;
         }
         if (!BackendManager.IsInitialized)
         {
             BackendManager.Initialize(null);   // 다음 시도를 위해 다시 초기화해 둠
-            Fail("서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            Fail(GameMessages.Common.offlineCheck);
             return false;
         }
 
@@ -633,21 +633,21 @@ public class AuthManager : MonoBehaviour
     /// </summary>
     private static string ToKoreanMessage(BackendReturnObject bro, string actionName)
     {
-        if (bro == null || bro.IsClientRequestFailError()) return "인터넷 연결을 확인해 주세요.";
-        if (bro.IsMaintenanceError())                        return "서버 점검 중입니다. 잠시 후 다시 시도해 주세요.";
+        if (bro == null || bro.IsClientRequestFailError()) return GameMessages.Auth.checkInternet;
+        if (bro.IsMaintenanceError())                        return GameMessages.Auth.maintenance;
         if (bro.IsTooManyRequestError() || bro.IsTooManyRequestByLocalError())
-                                                             return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
-        if (bro.IsDeviceBlockError())                        return "이 기기는 사용이 제한되었습니다.";
-        if (bro.IsServerError())                             return "서버 오류입니다. 잠시 후 다시 시도해 주세요.";
+                                                             return GameMessages.Auth.tooMany;
+        if (bro.IsDeviceBlockError())                        return GameMessages.Auth.deviceBlocked;
+        if (bro.IsServerError())                             return GameMessages.Auth.serverError;
 
         switch (bro.GetStatusCode())
         {
-            case "409": return "이미 가입된 이메일입니다. 로그인해 주세요.";
-            case "401": return "이메일 또는 비밀번호가 맞지 않습니다.";
-            case "403": return "사용이 중지된 계정입니다.";
-            case "410": return "탈퇴 처리 중인 계정입니다.";
-            case "400": return "입력 형식이 올바르지 않습니다.";
-            default:    return $"{actionName}에 실패했습니다. ({bro.GetStatusCode()} {bro.GetErrorCode()})";
+            case "409": return GameMessages.Auth.emailTaken;
+            case "401": return GameMessages.Auth.wrongPassword;
+            case "403": return GameMessages.Auth.suspended;
+            case "410": return GameMessages.Auth.withdrawing;
+            case "400": return GameMessages.Auth.badInput;
+            default:    return ChatText.Fill(GameMessages.Auth.actionFailedCode, "action", actionName, "code", $"{bro.GetStatusCode()} {bro.GetErrorCode()}");
         }
     }
 
@@ -665,7 +665,7 @@ public class AuthManager : MonoBehaviour
         {
             Debug.LogError($"[Auth] {actionName}은(는) 성공했는데 뒤끝 유저 inDate 가 없습니다.");
             ClearAccount();
-            Fail($"{actionName}에 실패했습니다.");
+            Fail(ChatText.Fill(GameMessages.Auth.actionFailed, "action", actionName));
             return;
         }
 
@@ -779,7 +779,7 @@ public class AuthManager : MonoBehaviour
     {
         if (!IsOnline)
         {
-            onDone?.Invoke(false, "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            onDone?.Invoke(false, GameMessages.Common.offlineCheck);
             return;
         }
 
@@ -791,8 +791,8 @@ public class AuthManager : MonoBehaviour
             {
                 Debug.LogWarning($"[Auth] 뒤끝 탈퇴 실패: {BackendManager.Describe(bro)}");
                 onDone?.Invoke(false, BackendManager.IsNetworkError(bro)
-                    ? "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요."
-                    : "계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                    ? GameMessages.Common.offlineCheck
+                    : GameMessages.Account.deleteFailed);
                 return;
             }
 

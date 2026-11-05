@@ -343,7 +343,7 @@ public class RankingManager : MonoBehaviour
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogError($"[Ranking] 조회 실패: {BackendManager.Describe(bro)}");
-                onDone?.Invoke(null, "랭킹을 불러오지 못했습니다.");
+                onDone?.Invoke(null, GameMessages.Ranking.fetchFailed);
                 return;
             }
 
@@ -370,7 +370,7 @@ public class RankingManager : MonoBehaviour
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogWarning($"[Ranking] 내 순위 조회 실패: {BackendManager.Describe(bro)}");
-                onDone?.Invoke(null, "내 순위를 불러오지 못했습니다.");
+                onDone?.Invoke(null, GameMessages.Ranking.mineFailed);
                 return;
             }
 
@@ -388,9 +388,9 @@ public class RankingManager : MonoBehaviour
     private bool CheckCanFetch(out string reason)
     {
         reason = null;
-        if (!IsConfigured)                                                   reason = "랭킹이 아직 준비되지 않았습니다.";
-        else if (AuthManager.Instance == null || !AuthManager.Instance.IsSignedIn) reason = "로그인하면 랭킹을 볼 수 있습니다.";
-        else if (!AuthManager.Instance.IsOnline)                              reason = "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+        if (!IsConfigured)                                                   reason = GameMessages.Ranking.notConfigured;
+        else if (AuthManager.Instance == null || !AuthManager.Instance.IsSignedIn) reason = GameMessages.Ranking.loginRequired;
+        else if (!AuthManager.Instance.IsOnline)                              reason = GameMessages.Ranking.offline;
         return reason == null;
     }
 

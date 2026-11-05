@@ -25,7 +25,11 @@ public partial class ChatPanel
     [SerializeField] private Button menuMessageButton;
     [SerializeField] private Button menuBlockButton;
 
-    private const float MenuGap = 16f;   // 누른 자리와 메뉴 상자 사이
+    [Tooltip("누른 자리와 메뉴 상자 사이 간격 (1920x1080 기준)")]
+    [SerializeField] private float menuGap = 16f;
+
+    // 메뉴 상자(Box)의 크기·색·버튼 배치·폰트는 하이어라키(ChatCanvas > Panel > UserMenu > Box)에서 직접 고치세요.
+    // 코드는 위치만 정합니다 (누른 자리 옆). 버튼 글자 중 '친구' 버튼은 관계에 따라 바뀌므로 인스펙터 texts.menu* 칸에서 고칩니다.
 
     private string menuUid;
     private string menuName;
@@ -65,27 +69,35 @@ public partial class ChatPanel
         menuUid = menuName = null;
     }
 
-    /// <summary>메뉴 상자를 누른 자리 오른쪽 아래에 둡니다 (화면 밖으로 나가면 반대쪽으로).</summary>
+    /// <summary>
+    /// 메뉴 상자를 누른 자리 오른쪽 아래에 둡니다 (화면 밖으로 나가면 반대쪽으로).
+    /// 하이어라키에서 정한 상자의 크기·pivot·scale 은 그대로 둡니다 — anchor 만 가운데로 모읍니다 (크기는 유지).
+    /// </summary>
     private void PlaceMenu(Vector2 screenPosition)
     {
         var area = (RectTransform)userMenuBox.parent;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(area, screenPosition, EventCamera(area), out Vector2 local)) return;
 
-        Rect    r    = area.rect;
-        Vector2 size = userMenuBox.rect.size;
+        Rect    r     = area.rect;
+        Vector2 rect  = userMenuBox.rect.size;                                 // 상자 자체 크기
+        Vector2 size  = Vector2.Scale(rect, (Vector2)userMenuBox.localScale);  // 부모 기준으로 보이는 크기
+        Vector2 pivot = userMenuBox.pivot;
 
         // 왼쪽 위 꼭짓점 기준 — 오른쪽·아래로 넘치면 손가락 반대쪽으로 뒤집음
-        float x = local.x + MenuGap;
-        float y = local.y - MenuGap;
-        if (x + size.x > r.xMax) x = local.x - MenuGap - size.x;
-        if (y - size.y < r.yMin) y = local.y + MenuGap + size.y;
+        float x = local.x + menuGap;
+        float y = local.y - menuGap;
+        if (x + size.x > r.xMax) x = local.x - menuGap - size.x;
+        if (y - size.y < r.yMin) y = local.y + menuGap + size.y;
         x = Mathf.Clamp(x, r.xMin, r.xMax - size.x);
         y = Mathf.Clamp(y, r.yMin + size.y, r.yMax);
 
+        // anchor 를 늘려 두었어도(Stretch) 크기가 바뀌지 않게 — 가운데 anchor 에서는 sizeDelta 가 곧 크기
         userMenuBox.anchorMin = userMenuBox.anchorMax = new Vector2(0.5f, 0.5f);
-        userMenuBox.pivot     = new Vector2(0f, 1f);
-        // area 의 pivot 이 가운데가 아니어도 맞게 — local 은 area pivot 기준, anchoredPosition 은 area 가운데 기준
-        userMenuBox.anchoredPosition = new Vector2(x, y) - r.center;
+        userMenuBox.sizeDelta = rect;
+
+        // 왼쪽 위 꼭짓점 → pivot 자리. area 의 pivot 이 가운데가 아니어도 맞게 (anchoredPosition 은 area 가운데 기준)
+        Vector2 pivotPos = new Vector2(x + size.x * pivot.x, y - size.y * (1f - pivot.y));
+        userMenuBox.anchoredPosition = pivotPos - r.center;
     }
 
     /// <summary>메뉴 글자를 지금 관계에 맞춤 (열려 있는 동안 목록이 바뀌어도 따라감).</summary>
@@ -113,15 +125,15 @@ public partial class ChatPanel
     /// <summary>친구 버튼 글자·활성 — 관계가 없으면 '친구 추가', 받은 요청이면 '수락', 그 외엔 누를 수 없음.</summary>
     private void FriendButtonState(ChatManager chat, bool blocked, out string label, out bool interactable)
     {
-        label        = "친구 추가";
+        label        = texts.menuAddFriend;
         interactable = !blocked;
         if (!chat.TryGetFriendship(menuUid, out Friendship f)) return;
 
         switch (f.State)
         {
-            case FriendState.Friend:   label = "이미 친구입니다"; interactable = false; break;
-            case FriendState.Outgoing: label = "친구 요청 보냄";  interactable = false; break;
-            case FriendState.Incoming: label = "친구 요청 수락";  break;
+            case FriendState.Friend:   label = texts.menuAlreadyFriend; interactable = false; break;
+            case FriendState.Outgoing: label = texts.menuRequestSent;   interactable = false; break;
+            case FriendState.Incoming: label = texts.menuAccept;        break;
         }
     }
 
@@ -132,7 +144,7 @@ public partial class ChatPanel
 
         bool accepting = chat.TryGetFriendship(menuUid, out Friendship f) && f.State == FriendState.Incoming;
         string name = ChatText.Plain(menuName);
-        string done = accepting ? $"{name} 님과 친구가 되었습니다." : $"{name} 님에게 친구 요청을 보냈습니다.";
+        string done = ChatText.Fill(accepting ? texts.noticeFriendAccepted : texts.noticeFriendRequested, "name", name);
 
         chat.RequestFriend(menuUid, menuName, error =>
         {
@@ -157,7 +169,7 @@ public partial class ChatPanel
         ChatManager chat = ChatManager.Instance;
         if (chat == null || menuUid == null) return;
 
-        string done = $"{ChatText.Plain(menuName)} 님의 채팅을 차단했습니다. 친구 창의 차단 목록에서 해제할 수 있습니다.";
+        string done = ChatText.Fill(texts.noticeBlocked, "name", ChatText.Plain(menuName));
         chat.Block(menuUid, menuName, error =>
         {
             if (this != null) ShowNotice(error ?? done);

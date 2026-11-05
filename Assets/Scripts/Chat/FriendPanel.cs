@@ -51,8 +51,63 @@ public class FriendPanel : MonoBehaviour
     [Tooltip("[삭제] 를 누른 뒤 이 시간(초) 안에 한 번 더 누르면 삭제")]
     [SerializeField] private float confirmSeconds = 3f;
 
-    private const string BlockHint  = "차단한 유저의 채팅은 내 화면에서만 보이지 않습니다. [해제] 를 누르면 다시 보입니다.";
-    private const string SearchHint = "상대의 닉네임을 정확히 입력하고 [친구 요청] 을 누르세요. 친구가 되면 [메시지] 로 대화할 수 있습니다.";
+    /// <summary>
+    /// 코드가 실행 중에 넣는 글자. {count} {max} 자리는 실행 중에 값으로 바뀝니다.
+    /// 창·줄의 모양(크기·위치·폰트·배경색)은 하이어라키(ChatCanvas > Friends)에서 직접 고치세요.
+    /// </summary>
+    [Serializable]
+    private class Texts
+    {
+        [Header("제목 · 전환 버튼")]
+        [Tooltip("비워 두면 하이어라키의 Title 글자를 그대로 씀")]
+        public string friendsTitle     = "";
+        public string blockedTitle     = "차단 목록";
+        [Tooltip("차단 목록을 보는 중일 때 전환 버튼 글자")]
+        public string toFriendList     = "친구 목록";
+        [Tooltip("친구 목록을 보는 중일 때 전환 버튼 글자. {count} = 차단한 수")]
+        public string toBlockList      = "차단 목록 {count}";
+
+        [Header("구역 제목")]
+        public string incomingHeader   = "받은 친구 요청";
+        [Tooltip("{count} = 친구 수, {max} = 최대")]
+        public string friendsHeader    = "친구 {count}/{max}";
+        public string outgoingHeader   = "보낸 친구 요청";
+        [Tooltip("{count} = 차단한 수, {max} = 최대")]
+        public string blockedHeader    = "차단한 유저 {count}/{max}";
+
+        [Header("줄 버튼")]
+        public string accept           = "수락";
+        public string decline          = "거절";
+        public string message          = "메시지";
+        public string remove           = "삭제";
+        [Tooltip("[삭제] 를 한 번 누른 뒤의 글자")]
+        public string removeConfirm    = "정말 삭제?";
+        public string cancelRequest    = "취소";
+        public string unblock          = "해제";
+
+        [Header("빈 목록 · 안내")]
+        public string noFriends        = "아직 친구가 없습니다.";
+        public string noBlocked        = "차단한 유저가 없습니다.";
+        [Tooltip("검색 칸이 있을 때 아래 안내 문구 (검색 칸이 없으면 하이어라키의 Notice 글자를 씀)")]
+        public string searchHint       = "상대의 닉네임을 정확히 입력하고 [친구 요청] 을 누르세요. 친구가 되면 [메시지] 로 대화할 수 있습니다.";
+        [Tooltip("차단 목록을 볼 때 아래 안내 문구")]
+        public string blockHint        = "차단한 유저의 채팅은 내 화면에서만 보이지 않습니다. [해제] 를 누르면 다시 보입니다.";
+
+        [Header("알림 (아래 안내 칸에 잠깐 뜨는 문구) — {name} = 상대 닉네임")]
+        [Tooltip("[수락] 또는 검색으로 요청했는데 상대가 이미 나에게 요청해 둔 경우")]
+        public string noticeAccepted   = "{name} 님과 친구가 되었습니다.";
+        [Tooltip("닉네임 검색으로 친구 요청을 보냈을 때")]
+        public string noticeRequested  = "{name} 님에게 친구 요청을 보냈습니다.";
+        public string noticeDeclined   = "친구 요청을 거절했습니다.";
+        public string noticeCanceled   = "친구 요청을 취소했습니다.";
+        public string noticeRemoved    = "{name} 님을 친구에서 삭제했습니다.";
+        public string noticeUnblocked  = "{name} 님의 차단을 해제했습니다.";
+    }
+
+    [Header("글자 · 색 (실행 중에 코드가 넣는 값)")]
+    [SerializeField] private Texts texts = new Texts();
+    [Tooltip("구역 제목 글자 색 (받은 친구 요청 / 친구 n/50 ...)")]
+    [SerializeField] private Color headerColor = ChatText.ProgressColor;
 
     private bool searching;   // 검색·요청 중 — 연타 방지
 
@@ -82,8 +137,9 @@ public class FriendPanel : MonoBehaviour
         AddListenerButton();
 
         // 검색 칸이 있으면 안내 문구도 그에 맞춤 (굽기 때 넣은 문구는 '채팅에서 누르기' 안내)
-        hint         = searchInput != null ? SearchHint : noticeText != null ? noticeText.text : null;
-        friendsTitle = titleText  != null ? titleText.text  : null;
+        hint         = searchInput != null ? texts.searchHint : noticeText != null ? noticeText.text : null;
+        friendsTitle = !string.IsNullOrEmpty(texts.friendsTitle) ? texts.friendsTitle
+                     : titleText != null ? titleText.text : null;
         headerTemplate.gameObject.SetActive(false);
         rowTemplate.gameObject.SetActive(false);
         root.SetActive(false);
@@ -121,7 +177,7 @@ public class FriendPanel : MonoBehaviour
         Draw();
     }
 
-    private string CurrentHint => showBlocked ? BlockHint : hint;
+    private string CurrentHint => showBlocked ? texts.blockHint : hint;
 
     public void Close()
     {
@@ -158,8 +214,9 @@ public class FriendPanel : MonoBehaviour
         drawnReason  = chat != null ? chat.FriendsUnavailableReason : null;
 
         int blockedCount = chat != null ? chat.BlockedUsers.Count : 0;
-        if (titleText      != null) titleText.text      = showBlocked ? "차단 목록" : friendsTitle;
-        if (blockListLabel != null) blockListLabel.text = showBlocked ? "친구 목록" : $"차단 목록 {blockedCount}";
+        if (titleText      != null) titleText.text      = showBlocked ? texts.blockedTitle : friendsTitle;
+        if (blockListLabel != null) blockListLabel.text = showBlocked ? texts.toFriendList
+                                                                      : ChatText.Fill(texts.toBlockList, "count", blockedCount.ToString());
 
         if (chat == null)
         {
@@ -169,19 +226,19 @@ public class FriendPanel : MonoBehaviour
 
         if (showBlocked)
         {
-            BlockedSection(chat, $"차단한 유저 {blockedCount}/{ChatManager.MAX_BLOCKS}");
+            BlockedSection(chat, ChatText.Fill(texts.blockedHeader, "count", blockedCount.ToString(), "max", ChatManager.MAX_BLOCKS.ToString()));
         }
         else
         {
             int friends = chat.CountFriends(FriendState.Friend);
-            Section(chat, FriendState.Incoming, "받은 친구 요청");
-            Section(chat, FriendState.Friend,   $"친구 {friends}/{ChatManager.MAX_FRIENDS}");
-            Section(chat, FriendState.Outgoing, "보낸 친구 요청");
+            Section(chat, FriendState.Incoming, texts.incomingHeader);
+            Section(chat, FriendState.Friend,   ChatText.Fill(texts.friendsHeader, "count", friends.ToString(), "max", ChatManager.MAX_FRIENDS.ToString()));
+            Section(chat, FriendState.Outgoing, texts.outgoingHeader);
         }
 
         bool nothingLoaded = showBlocked ? blockedCount == 0 : chat.Friendships.Count == 0;
         if (drawnReason != null && nothingLoaded) ShowStatus(drawnReason);
-        else if (rows.Count == 0) ShowStatus(showBlocked ? "차단한 유저가 없습니다." : "아직 친구가 없습니다.");
+        else if (rows.Count == 0) ShowStatus(showBlocked ? texts.noBlocked : texts.noFriends);
         else ShowStatus(string.Empty);
     }
 
@@ -195,7 +252,7 @@ public class FriendPanel : MonoBehaviour
         foreach (KeyValuePair<string, string> pair in sorted)
         {
             string uid = pair.Key, name = pair.Value;
-            Row(name, null, null, "해제", () => chat.Unblock(uid, Result($"{ChatText.Plain(name)} 님의 차단을 해제했습니다.")));
+            Row(name, null, null, texts.unblock, () => chat.Unblock(uid, Result(Named(texts.noticeUnblocked, name))));
         }
     }
 
@@ -211,17 +268,17 @@ public class FriendPanel : MonoBehaviour
             switch (state)
             {
                 case FriendState.Incoming:
-                    Row(name, "수락", () => chat.AcceptFriend(uid, Result($"{ChatText.Plain(name)} 님과 친구가 되었습니다.")),
-                              "거절", () => chat.RemoveFriend(uid, Result("친구 요청을 거절했습니다.")));
+                    Row(name, texts.accept,  () => chat.AcceptFriend(uid, Result(Named(texts.noticeAccepted, name))),
+                              texts.decline, () => chat.RemoveFriend(uid, Result(texts.noticeDeclined)));
                     break;
 
                 case FriendState.Friend:
-                    Row(name, "메시지", () => OpenDirect(uid, name),
-                              confirmUid == uid ? "정말 삭제?" : "삭제", () => OnRemoveFriend(chat, uid, name));
+                    Row(name, texts.message, () => OpenDirect(uid, name),
+                              confirmUid == uid ? texts.removeConfirm : texts.remove, () => OnRemoveFriend(chat, uid, name));
                     break;
 
                 case FriendState.Outgoing:
-                    Row(name, null, null, "취소", () => chat.RemoveFriend(uid, Result("친구 요청을 취소했습니다.")));
+                    Row(name, null, null, texts.cancelRequest, () => chat.RemoveFriend(uid, Result(texts.noticeCanceled)));
                     break;
             }
         }
@@ -250,7 +307,7 @@ public class FriendPanel : MonoBehaviour
             if (error == null)
             {
                 searchInput.text = string.Empty;
-                Notice(accepting ? $"{ChatText.Plain(name)} 님과 친구가 되었습니다." : $"{ChatText.Plain(name)} 님에게 친구 요청을 보냈습니다.");
+                Notice(Named(accepting ? texts.noticeAccepted : texts.noticeRequested, name));
             }
             else Notice(error);
         });
@@ -273,7 +330,7 @@ public class FriendPanel : MonoBehaviour
         }
 
         confirmUid = null;
-        chat.RemoveFriend(uid, Result($"{ChatText.Plain(name)} 님을 친구에서 삭제했습니다."));
+        chat.RemoveFriend(uid, Result(Named(texts.noticeRemoved, name)));
         Draw();
     }
 
@@ -282,6 +339,9 @@ public class FriendPanel : MonoBehaviour
         Close();
         if (chatPanel != null) chatPanel.OpenDirect(uid, name);
     }
+
+    /// <summary>알림 문구의 {name} 을 닉네임으로 (다른 사람이 정한 글자라 리치 텍스트로 해석하지 않게 감쌈).</summary>
+    private static string Named(string template, string name) => ChatText.Fill(template, "name", ChatText.Plain(name));
 
     /// <summary>서버 작업이 끝나면 실패 문구, 성공이면 done 을 알림으로 보여 주는 콜백.</summary>
     private Action<string> Result(string done) => error =>
@@ -294,7 +354,7 @@ public class FriendPanel : MonoBehaviour
     {
         TextMeshProUGUI h = Instantiate(headerTemplate, content);
         h.gameObject.SetActive(true);
-        h.text = ChatText.Colored(ChatText.ProgressHex, title);
+        h.text = ChatText.Colored(headerColor, title);
         rows.Add(h.gameObject);
     }
 

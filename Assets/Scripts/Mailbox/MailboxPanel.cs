@@ -38,9 +38,14 @@ public class MailboxPanel : MonoBehaviour
     [SerializeField] private TMP_FontAsset font;
     [SerializeField] private int sortingOrder = 500;
 
+    [Header("글자 (실행 중에 코드가 넣는 값)")]
+    [SerializeField] private string loadingText = "우편을 불러오는 중...";
+    [SerializeField] private string emptyText   = "받은 우편이 없습니다.";
+
     public TMP_FontAsset Font         => font;
     public int           SortingOrder => sortingOrder;
 
+    // UIBaker 가 Row 템플릿을 구울 때만 쓰는 색 — 구운 뒤에는 하이어라키의 Row 템플릿에서 직접 고치세요
     public static readonly Color RowColor    = new Color(1f, 1f, 1f, 0.04f);
     public static readonly Color RewardColor = new Color(1f, 0.85f, 0.2f);
 
@@ -106,7 +111,7 @@ public class MailboxPanel : MonoBehaviour
         // 받기 실패 사유가 있으면 그것을, 없으면 빈 우편함 안내
         bool empty = mails.Count == 0;
         string status = !string.IsNullOrEmpty(Mailbox.LastError) ? Mailbox.LastError
-                      : empty ? (Mailbox.IsRefreshing ? "우편을 불러오는 중..." : "받은 우편이 없습니다.")
+                      : empty ? (Mailbox.IsRefreshing ? loadingText : emptyText)
                       : string.Empty;
         statusText.text = status;
         statusText.gameObject.SetActive(status.Length > 0);

@@ -44,13 +44,13 @@ public static class ServerAccountData
         AuthManager auth = AuthManager.Instance;
         if (auth == null || !auth.IsReady)
         {
-            onDone?.Invoke(false, "서버에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.");
+            onDone?.Invoke(false, GameMessages.Common.offlineCheck);
             return;
         }
         if (!auth.IsSignedIn || auth.Uid != owner)
         {
             // 본인으로 로그인해야만 지울 수 있음
-            onDone?.Invoke(false, "로그인 정보가 맞지 않아 서버 기록을 지울 수 없습니다. 다시 로그인해 주세요.");
+            onDone?.Invoke(false, GameMessages.Account.serverDataMismatch);
             return;
         }
 

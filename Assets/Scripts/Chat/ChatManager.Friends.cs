@@ -13,7 +13,7 @@ public partial class ChatManager
     /// <summary>친구 + 보낸 요청 최대 수. 서버 규칙으로는 막지 않는 클라이언트 제한입니다.</summary>
     public const int MAX_FRIENDS = 50;
 
-    private const string FriendsLoading = "친구 목록을 불러오는 중입니다...";
+    private static string FriendsLoading => GameMessages.Friends.loading;
 
     /// <summary>
     /// 받은 요청 · 수락을 알아채기 위해 목록을 다시 받는 간격(초).
@@ -114,7 +114,7 @@ public partial class ChatManager
     private void OnFriendsFailed(string reason)
     {
         friendService.Disconnect();
-        friendsLink.Failed($"{reason} 잠시 후 다시 시도합니다.", retryDelay);
+        friendsLink.Failed(ChatText.Fill(GameMessages.Friends.retrying, "reason", reason), retryDelay);
         FriendsVersion++;
         changed = true;
     }
@@ -167,13 +167,13 @@ public partial class ChatManager
         {
             switch (f.State)
             {
-                case FriendState.Friend:   onDone?.Invoke("이미 친구입니다."); return;
-                case FriendState.Outgoing: onDone?.Invoke("이미 친구 요청을 보냈습니다."); return;
+                case FriendState.Friend:   onDone?.Invoke(GameMessages.Friends.alreadyFriend); return;
+                case FriendState.Outgoing: onDone?.Invoke(GameMessages.Friends.alreadyRequested); return;
                 case FriendState.Incoming: AcceptFriend(peerUid, onDone); return;
             }
         }
 
-        if (IsBlocked(peerUid))                { onDone?.Invoke("차단한 유저에게는 친구 요청을 보낼 수 없습니다."); return; }
+        if (IsBlocked(peerUid))                { onDone?.Invoke(GameMessages.Friends.blockedRequest); return; }
         if (FriendLimitReached(out error))     { onDone?.Invoke(error); return; }
 
         friendService.Request(uid, peerUid, peerName, IfAlive(onDone));
@@ -186,8 +186,8 @@ public partial class ChatManager
     public void RequestFriendByName(string nickname, Action<string> onDone)
     {
         string name = (nickname ?? string.Empty).Trim();
-        if (name.Length == 0)                    { onDone?.Invoke("닉네임을 입력해 주세요."); return; }
-        if (name == PlayerProfile.DisplayName)   { onDone?.Invoke("나에게는 친구 요청을 보낼 수 없습니다."); return; }
+        if (name.Length == 0)                    { onDone?.Invoke(GameMessages.Friends.enterNickname); return; }
+        if (name == PlayerProfile.DisplayName)   { onDone?.Invoke(GameMessages.Friends.selfRequest); return; }
         if (FriendsUnavailableReason != null)    { onDone?.Invoke(FriendsUnavailableReason); return; }
 
         friendService.FindUser(name, IfAlive<string, string>((uid, error) =>
@@ -202,7 +202,7 @@ public partial class ChatManager
         if (!CanEditFriends(peerUid, out string uid, out string error)) { onDone?.Invoke(error); return; }
 
         bool incoming = TryGetFriendship(peerUid, out Friendship f) && f.State == FriendState.Incoming;
-        if (!incoming)                         { onDone?.Invoke("받은 친구 요청이 없습니다."); return; }
+        if (!incoming)                         { onDone?.Invoke(GameMessages.Friends.noIncoming); return; }
         if (FriendLimitReached(out error))     { onDone?.Invoke(error); return; }
 
         friendService.Accept(uid, peerUid, IfAlive(onDone));
@@ -224,7 +224,7 @@ public partial class ChatManager
         if (error != null) return false;
 
         if (!TryGetSender(out uid))                          { error = AccountPending; return false; }
-        if (string.IsNullOrEmpty(peerUid) || peerUid == uid) { error = "나에게는 친구 요청을 보낼 수 없습니다."; return false; }
+        if (string.IsNullOrEmpty(peerUid) || peerUid == uid) { error = GameMessages.Friends.selfRequest; return false; }
         return true;
     }
 
@@ -232,7 +232,7 @@ public partial class ChatManager
     private bool FriendLimitReached(out string error)
     {
         bool full = CountFriends(FriendState.Friend) + CountFriends(FriendState.Outgoing) >= MAX_FRIENDS;
-        error = full ? $"친구는 요청 중인 사람을 포함해 최대 {MAX_FRIENDS}명까지입니다." : null;
+        error = full ? ChatText.Fill(GameMessages.Friends.maxFriends, "max", MAX_FRIENDS.ToString()) : null;
         return full;
     }
 }

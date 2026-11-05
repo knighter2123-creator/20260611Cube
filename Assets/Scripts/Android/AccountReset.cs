@@ -96,7 +96,7 @@ public class AccountReset : MonoBehaviour
         {
             // 파일이 그대로 남아 있으므로 게임을 그대로 계속하면 됩니다. 잠금만 풀어 줍니다.
             CancelRestart();
-            error = "데이터를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+            error = GameMessages.Account.dataDeleteFailed;
             Debug.LogError($"[AccountReset] 세이브 파일 삭제 실패로 초기화를 중단합니다: {fileError}");
             return false;
         }
@@ -149,13 +149,13 @@ public class AccountReset : MonoBehaviour
 
         if (IsRunning)
         {
-            error = "이미 초기화가 진행 중입니다.";
+            error = GameMessages.Account.resetRunning;
             return false;
         }
 
         if (!Application.CanStreamedLevelBeLoaded(loginSceneName))
         {
-            error = "로그인 화면을 찾을 수 없습니다.";
+            error = GameMessages.Account.noLoginScene;
             Debug.LogError($"[AccountReset] '{loginSceneName}' 씬을 로드할 수 없어 {reason}을(를) 하지 않습니다. " +
                            "Build Settings 의 Scenes In Build 에 들어 있는지 확인하세요. 아무것도 바꾸지 않았습니다.");
             return false;

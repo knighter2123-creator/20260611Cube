@@ -11,8 +11,8 @@ public static class BackendSession
     {
         AuthManager auth = AuthManager.Instance;
         if (auth == null || !auth.IsSignedIn)                       return signInPrompt;
-        if (!auth.IsOnline)                                         return "서버에 연결할 수 없습니다.";
-        if (string.IsNullOrEmpty(uid) || uid != Backend.UserInDate) return "계정 정보를 확인하는 중입니다.";
+        if (!auth.IsOnline)                                         return GameMessages.Common.offline;
+        if (string.IsNullOrEmpty(uid) || uid != Backend.UserInDate) return GameMessages.Common.accountChecking;
         return null;
     }
 }

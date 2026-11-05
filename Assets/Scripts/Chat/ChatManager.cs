@@ -41,7 +41,7 @@ public partial class ChatManager : MonoBehaviour
     /// <summary>개인 메시지(쪽지) 한 통 최대 글자 수. 전체 채팅 길이는 뒤끝챗 콘솔에서 정합니다.</summary>
     public const int DIRECT_MAX_LENGTH = 60;
 
-    private const string AccountPending = "계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.";
+    private static string AccountPending => GameMessages.Common.accountPending;
 
     [Tooltip("Backnd = 뒤끝 서버 (전체 채팅 뒤끝챗 · 친구 · 쪽지), Local = 서버 없이 나에게만 보이는 테스트")]
     [SerializeField] private Backend backend = Backend.Backnd;
@@ -204,7 +204,7 @@ public partial class ChatManager : MonoBehaviour
         UpdateRealtime();
 
         if (reason == null && chatLink.Key == null)
-            reason = chatLink.FailReason ?? "채팅 서버에 연결하는 중입니다...";
+            reason = chatLink.FailReason ?? GameMessages.Chat.connecting;
 
         if (reason != UnavailableReason)
         {
@@ -230,7 +230,7 @@ public partial class ChatManager : MonoBehaviour
     {
         // 목록은 남겨 둠 — 다시 연결되면 Id 로 겹치는 것만 걸러서 이어 붙임
         service.Disconnect();
-        chatLink.Failed($"{reason} 잠시 후 다시 연결합니다.", retryDelay);
+        chatLink.Failed(ChatText.Fill(GameMessages.Chat.reconnecting, "reason", reason), retryDelay);
         changed = true;
     }
 
@@ -288,13 +288,13 @@ public partial class ChatManager : MonoBehaviour
 
         if (UnavailableReason != null)                    return UnavailableReason;
         if (direct && CannotSendDirect(toUid, out string directError)) return directError;
-        if (text.Length == 0)                             return "메시지를 입력해 주세요.";
-        if (sending)                                      return "보내는 중입니다. 잠시 후 다시 보내 주세요.";
+        if (text.Length == 0)                             return GameMessages.Chat.emptyMessage;
+        if (sending)                                      return GameMessages.Chat.sending;
         // 전체 채팅의 길이·도배는 뒤끝챗 콘솔 설정으로 서버가 막음 — 여기서는 개인 메시지만 검사
-        if (direct && text.Length > DIRECT_MAX_LENGTH)    return $"개인 메시지는 {DIRECT_MAX_LENGTH}자까지 보낼 수 있습니다.";
-        if (direct && Time.unscaledTime < nextSendTime)   return "너무 빨리 보내고 있습니다. 잠시 후 다시 보내 주세요.";
-        if (!TryGetSender(out uid))                       return "계정 정보를 확인하는 중입니다. 잠시 후 다시 보내 주세요.";
-        if (direct && toUid == uid)                       return "나에게는 개인 메시지를 보낼 수 없습니다.";
+        if (direct && text.Length > DIRECT_MAX_LENGTH)    return ChatText.Fill(GameMessages.Chat.directTooLong, "max", DIRECT_MAX_LENGTH.ToString());
+        if (direct && Time.unscaledTime < nextSendTime)   return GameMessages.Chat.tooFast;
+        if (!TryGetSender(out uid))                       return GameMessages.Chat.accountPendingSend;
+        if (direct && toUid == uid)                       return GameMessages.Chat.selfDirect;
         return null;
     }
 

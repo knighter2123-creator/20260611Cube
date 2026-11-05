@@ -13,7 +13,10 @@ public class OpenMailboxButton : MonoBehaviour
     [Tooltip("버튼 글자 (비워 두면 개수 표시 안 함)")]
     [SerializeField] private TextMeshProUGUI label;
 
-    private const string Text = "우편";
+    [Tooltip("버튼 글자. 받지 않은 우편이 있으면 뒤에 개수가 붙습니다.")]
+    [SerializeField] private string text = "우편";
+    [Tooltip("받지 않은 우편 개수 색")]
+    [SerializeField] private Color countColor = ChatText.UnreadColor;
 
     private int shownCount = -1;
 
@@ -33,6 +36,6 @@ public class OpenMailboxButton : MonoBehaviour
         if (count == shownCount) return;
 
         shownCount = count;
-        label.text = count > 0 ? $"{Text} {ChatText.Colored(ChatText.UnreadHex, count.ToString())}" : Text;
+        label.text = count > 0 ? $"{text} {ChatText.Colored(countColor, count.ToString())}" : text;
     }
 }

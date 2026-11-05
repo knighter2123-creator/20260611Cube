@@ -225,9 +225,9 @@ public class ProfileSync : MonoBehaviour
     {
         error = null;
         if (AuthManager.Instance == null || !AuthManager.Instance.IsOnline)
-            error = "닉네임은 인터넷에 연결된 상태에서 정할 수 있습니다.";
+            error = GameMessages.Nickname.needOnline;
         else if (!IsPulledFor(uid) || busy)
-            error = "닉네임 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.";
+            error = GameMessages.Nickname.checking;
         return error == null;
     }
 
