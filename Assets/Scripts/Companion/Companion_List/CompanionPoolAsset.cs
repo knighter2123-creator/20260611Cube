@@ -58,13 +58,13 @@ public class CompanionPoolAsset : ScriptableObject
     }
 
     /// <summary>
-    /// 해당 등급의 풀. 가챠가 뽑을 때 씁니다.
+    /// 해당 등급의 풀. 진화 대상 찾기(FindEvolution)가 씁니다.
+    /// (가챠 확률은 여기서 정하지 않습니다 — 뒤끝 확률 차트가 정하고, 이 에셋은 뽑힌 companionId 를 동료로 바꿀 때만 씀)
     ///
     /// ★ 반환 타입이 List 가 아니라 IReadOnlyList 인 이유
     ///   List 를 그대로 내주면 받는 쪽이 .Add / .Clear 로 에셋 내용을 바꿀 수 있습니다.
     ///   ScriptableObject 는 에디터 플레이 중에 바뀐 내용이 '에셋 파일에 그대로 남기' 때문에
     ///   실수 한 번이 영구적인 데이터 손상이 됩니다. 읽기 전용으로 막아 둡니다.
-    ///   (Count 와 [i] 는 그대로 쓸 수 있어서 가챠 코드는 거의 안 바뀝니다)
     /// </summary>
     public IReadOnlyList<CompanionData> GetPool(CompanionGrade grade)
     {
@@ -99,8 +99,9 @@ public class CompanionPoolAsset : ScriptableObject
     /// 인스펙터에서 값을 바꿀 때마다 에디터가 부릅니다. (빌드에는 포함되지 않음)
     ///
     /// ★ 등급 칸과 동료의 grade 가 다르면 경고합니다.
-    ///   가챠는 '칸' 기준으로 확률을 매기고, 도감은 동료의 'grade' 로 표시합니다.
-    ///   둘이 다르면 "전설이라고 적혀 있는데 일반 확률로 나오는" 동료가 생깁니다.
+    ///   진화는 '칸' 기준으로 바로 위 등급을 찾고, 도감·조각 수는 동료의 'grade' 를 씁니다.
+    ///   둘이 다르면 진화 대상이 엉뚱하게 잡히거나 진화가 안 되는 동료가 생깁니다.
+    ///   (가챠 확률은 이 에셋이 아니라 뒤끝 확률 차트의 percent 열이 정합니다)
     /// </summary>
     private void OnValidate()
     {
@@ -116,7 +117,7 @@ public class CompanionPoolAsset : ScriptableObject
         CheckDuplicateEntry();
     }
 
-    // 같은 동료를 두 번 넣으면 가챠에서 그 동료만 확률이 두 배가 됩니다 (가챠는 칸 단위로 뽑음).
+    // 같은 동료를 두 번 넣으면 도감(All())에 두 번 나올 수 있습니다 (확률에는 영향 없음 — 확률은 뒤끝 차트가 정함).
     // 리스트 칸을 복제(Ctrl+D)하다 생기기 쉬운 실수라 알려 줍니다.
     private void CheckDuplicateEntry()
     {
@@ -126,7 +127,7 @@ public class CompanionPoolAsset : ScriptableObject
             if (d == null) continue;
             if (!seen.Add(d))
                 Debug.LogWarning($"[CompanionPool] '{d.companionName}' 이(가) 풀에 두 번 이상 들어 있습니다. " +
-                                 "가챠에서 이 동료만 더 자주 나옵니다.", this);
+                                 "도감에 두 번 보이니 하나를 지우세요.", this);
         }
     }
 

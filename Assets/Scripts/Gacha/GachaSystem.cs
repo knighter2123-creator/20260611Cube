@@ -26,10 +26,10 @@ public class GachaSystem : MonoBehaviour
     [Header("뒤끝 확률 차트")]
     [Tooltip("뒤끝 콘솔 > 차트 관리에서 분류 percent 로 올린 동료 뽑기 차트의 파일 ID.\n" +
              "차트를 다시 올리면 파일 ID 가 바뀌므로 여기도 바꿔야 합니다.")]
-    [SerializeField] private string probabilityFileId = "20586";
+    [SerializeField] private string probabilityFileId = "";
 
     [Tooltip("차트에서 동료를 가리키는 열 이름 (CompanionData.id 와 같은 값)")]
-    [SerializeField] private string companionIdColumn = "companionId";
+    [SerializeField] private string companionIdColumn = "";
 
     // 가챠에서 나오는 동료 목록. 도감(CompanionCodexUI)도 같은 에셋을 봅니다.
     [Header("동료 풀 에셋 — 도감과 공유")]
