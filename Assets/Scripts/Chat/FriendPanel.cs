@@ -4,29 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 친구 창 — 받은 친구 요청(수락/거절) / 친구 목록(메시지/삭제) / 보낸 요청(취소) / 차단한 유저(해제).
-/// 왼쪽 위 [차단 목록] 버튼으로 친구 목록 ↔ 차단 목록을 바꿔 봅니다.
-///
-/// [붙이는 위치]  ChatCanvas (ChatPanel 과 같은 오브젝트 — 항상 켜져 있어야 Awake 가 돎). 창(root)은 ChatCanvas 바로 아래
-///   (채팅 창 Panel 밖 — 채팅을 열지 않아도 열림). Tools/UI 굽기/채팅 탭·친구 창 이 컴포넌트를 붙이고 UI 를 만들어 칸을 채웁니다.
-///   랭킹 버튼 옆의 [친구] 버튼(OpenFriendsButton)으로 엽니다.
-///
-///   Friends                  ← root (꺼 둠)
-///     Dim (Button)           ← 누르면 닫힘
-///     Window
-///       Title / BlockList (Button + TMP) / Close (Button)
-///       Viewport (ScrollRect)
-///         Content            ← content
-///           Header (꺼 둠)    ← headerTemplate. 구역 제목
-///           Row (꺼 둠)       ← rowTemplate (FriendRow)
-///         Status             ← statusText
-///       Notice               ← noticeText. 평소엔 안내 문구, 실패·완료 문구를 잠깐 보여 줌
-///
-/// [데이터]  ChatManager.Friendships / BlockedUsers 를 그리기만 합니다. ChatManager.FriendsVersion 이 바뀔 때만 다시 그립니다
-///   (Changed 는 채팅 메시지마다 오므로 그것으로 다시 그리지 않음).
-/// [삭제]  친구 [삭제] 는 한 번 더 눌러야 지워집니다 (confirmSeconds 안에) — 잘못 눌러 지우지 않게.
-/// </summary>
+
 public class FriendPanel : MonoBehaviour
 {
     [Header("UI (Tools/UI 굽기/채팅 탭·친구 창 이 채움)")]

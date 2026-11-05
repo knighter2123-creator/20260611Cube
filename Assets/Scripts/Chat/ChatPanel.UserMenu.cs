@@ -2,17 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 다른 유저의 채팅 줄을 한 번 누르면 뜨는 메뉴 — 친구 추가 / 개인 메시지 / 채팅 차단.
-/// 누른 자리 옆에 뜨고, 바깥(Dim)을 누르면 닫힙니다. 내 메시지는 눌러도 뜨지 않습니다.
-/// 채팅 차단을 누르면 그 사람의 메시지가 바로 사라집니다 (내 화면에서만 — 다른 사람에게는 그대로 보임).
-///
-/// [씬 구성]  Tools/UI 굽기/채팅 탭·친구 창 이 Panel 아래에 만듭니다.
-///   UserMenu                 ← userMenu (꺼 둠)
-///     Dim (Button)           ← userMenuDim. 투명에 가까운 전체 화면 — 누르면 닫힘
-///     Box                    ← userMenuBox. 누른 자리로 옮겨짐
-///       Title / Friend / Message / Block (Button + TMP)
-/// </summary>
+
 public partial class ChatPanel
 {
     [Header("유저 메뉴 (Tools/UI 굽기/채팅 탭·친구 창 이 채움)")]

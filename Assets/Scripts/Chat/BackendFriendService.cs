@@ -4,21 +4,7 @@ using BackEnd;
 using LitJson;
 using UnityEngine;
 
-/// <summary>
-/// 친구 — 뒤끝 친구 기능(Backend.Friend)으로 친구 · 받은 요청 · 보낸 요청을 주고받습니다.
-///
-/// [신원]  myUid = 뒤끝 유저 inDate (= AuthManager.Uid). 다른 유저를 가리키는 값도 모두 gamer inDate 입니다.
-///   지금 뒤끝 세션(Backend.UserInDate)이 그 계정이 아니면 연결하지 않습니다 — 다른 계정의 친구가 섞여 보이지 않게.
-///
-/// [목록]  세 목록(친구 / 받은 요청 / 보낸 요청)을 차례로 받아 한 번에 보냅니다 (뒤끝 호출 3회).
-///   연결할 때, 요청·수락·삭제 뒤, ChatManager 가 부르는 Refresh (친구 창을 열 때 · 친구 실시간 알림(BackendNotify) · 일정 간격) 에 다시 받습니다.
-///
-/// [삭제]  관계 상태에 따라 다른 API — 친구 BreakFriend / 받은 요청 RejectFriend / 보낸 요청 RevokeSentRequest.
-/// [이름]  닉네임은 뒤끝이 목록에 매번 최신 값을 실어 주므로 따로 맞출 일이 없습니다.
-///
-/// [차단]  뒤끝 게임 정보 테이블 BLOCK_DATA 에 계정마다 저장합니다 (BackendBlockStore — 콘솔 준비는 그 주석 참고).
-/// [약속]  IFriendService 와 같음 — 모든 이벤트·콜백은 메인 스레드 (BackendManager.Call).
-/// </summary>
+
 public class BackendFriendService : IFriendService
 {
     public event Action<IReadOnlyList<Friendship>>         Received;

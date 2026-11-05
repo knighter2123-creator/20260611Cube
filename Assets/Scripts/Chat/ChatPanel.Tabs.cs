@@ -3,19 +3,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 채팅 창 왼쪽 채널 탭 — 맨 위 "전체 채팅", 그 아래 개인 채팅 상대 닉네임 (최근 대화 순, 안 읽은 수 표시).
-/// 탭을 누르면 그 채널의 메시지를 보여 주고, 보내는 메시지도 그 채널로 갑니다.
-/// 개인 탭을 보는 동안에는 오른쪽 위 [나가기] 가 보입니다 — 누르면 바로 대화방에서 나가고 탭이 사라집니다.
-///
-/// [씬 구성]  Tools/UI 굽기/채팅 탭·친구 창 이 만듭니다.
-///   Window
-///     Sidebar
-///       Tabs (ScrollRect)
-///         TabList (VerticalLayoutGroup)   ← tabList
-///           Tab (Button, 꺼 둠)            ← tabTemplate. 첫 자식 TMP 가 이름
-///     Leave (Button)                      ← leaveButton
-/// </summary>
 public partial class ChatPanel
 {
     [Header("채널 탭 (Tools/UI 굽기/채팅 탭·친구 창 이 채움)")]

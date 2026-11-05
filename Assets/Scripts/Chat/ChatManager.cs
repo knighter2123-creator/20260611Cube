@@ -2,35 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 전체 채팅 — 접속한 모두가 같은 채널에서 이야기합니다.
-///
-/// [붙이는 위치]
-///   로그인 씬의 ManagerRoot 하위. RankingManager 와 같은 DontDestroyOnLoad 싱글턴이다.
-///
-/// [하는 일]  연결 관리 / 최근 메시지 보관 / 보내기 전 검사(길이·도배).
-/// [안 하는 일]  서버 통신 — IChatService 구현체가 함.  UI — ChatPanel 이 Changed 를 받아 그림.
-///
-/// [서버]  뒤끝 (BackendChatService) — 전체 채팅은 뒤끝챗, 친구는 뒤끝 친구, 개인 메시지는 뒤끝 쪽지.
-/// [언제 연결하는가]  서비스가 "나" 의 ID 를 줄 수 있게 되면 (IChatService.TryGetIdentity).
-///   뒤끝은 로그인(온라인) + 닉네임이 정해진 계정의 UID(gamer inDate). 로그인 전에는 채팅을 쓸 수 없습니다.
-///   ID 가 바뀌면(로그인·로그아웃·계정 전환) 끊고 목록을 비운 뒤 다시 연결합니다.
-///   패널이 닫혀 있어도 연결을 유지합니다 → 미리보기 한 줄이 계속 갱신되고, 열자마자 대화가 보입니다.
-///
-/// [보내는 값]  닉네임 = PlayerProfile.DisplayName, 진행도 = StageRecord.BestProgress (랭킹과 같은 값)
-///   로그인 유저는 ProfileSync.TryGetAccount 가 통과할 때만 보냄 — 계정 전환 중 다른(게스트) 세이브의 이름·기록으로 말하지 않게.
-///   게스트는 게스트 세이브의 이름(없으면 "익명1234")으로 바로 보냅니다.
-///
-/// [길이·도배 제한]  전체 채팅은 뒤끝챗 콘솔 설정(금칙어·도배·최대 길이·저장 기간)만 따릅니다 — 클라이언트는 검사하지 않고,
-///   서버가 거절하면 BackendChatService 가 오류 문구(MESSAGE_SPAM / MESSAGE_TOO_LONG 등)로 알려 줍니다.
-///   개인 메시지(뒤끝 쪽지)에는 콘솔 채팅 설정이 적용되지 않으므로 DIRECT_MAX_LENGTH · sendCooldown 으로 클라이언트에서 막습니다.
-///
-/// [나눠 둔 파일]
-///   ChatManager.Direct.cs  — 1:1 개인 메시지 (대화방, 나가기, 안 읽은 수)
-///   ChatManager.Friends.cs — 친구 요청·수락·삭제
-///   ChatManager.Block.cs   — 채팅 차단 (서버에 저장 — 같은 계정이면 어느 기기에서나 같음)
-///   모두 같은 신원(MyUid)·같은 Changed 이벤트를 씁니다. 채팅이 연결되면 함께 연결하고, 계정이 바뀌면 함께 비웁니다 (ResetAccountState).
-/// </summary>
+
 public partial class ChatManager : MonoBehaviour
 {
     public static ChatManager Instance { get; private set; }

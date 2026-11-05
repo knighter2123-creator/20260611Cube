@@ -6,48 +6,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 전체 채팅 창 — [진행도] 닉네임 : 내용 목록 + 입력창.
-///
-/// [붙이는 위치]
-///   StageScene 의 ChatCanvas (씬 최상위 캔버스). 창·미리보기 UI 는 씬에 배치된 오브젝트를 아래 칸에 연결해서 씁니다.
-///   ChatCanvas 를 씬 최상위에 두는 이유는 RankingPanel.Build 주석 참고 (다른 캔버스 안에 넣으면 sortingOrder·CanvasScaler 가 무시됨).
-///   여는 버튼에는 OpenChatButton 을 붙이고 이 컴포넌트(ChatCanvas)를 연결하세요.
-///
-/// [씬 구성]
-///   ChatCanvas (Canvas 500)            ← 이 컴포넌트. 항상 켜 둠
-///     Panel                            ← panel. 열고 닫을 때 켜고 끔
-///       Dim (Button)                   ← 누르면 닫힘
-///       Window
-///         Title / Close (Button)
-///         Viewport (ScrollRect, RectMask2D)
-///           Log (VerticalLayoutGroup, ContentSizeFitter)  ← ScrollRect.content
-///             LogLine (꺼 둠)           ← logLineTemplate. 메시지 한 줄의 모양 — 복제해서 씀
-///           Status                     ← 연결 중 / 메시지 없음
-///         Notice                       ← 보내기 실패 문구
-///         Input (TMP_InputField) / Send (Button)
-///   ChatPreviewCanvas (Canvas 100)
-///     Preview (Image)                  ← previewBar. 창이 닫혀 있을 때 마지막 메시지 한 줄
-///       Text
-///   버튼 클릭·입력 제출은 Awake 에서 코드로 연결합니다 (씬의 OnClick 칸은 비워 둠).
-///
-/// [미리보기]  창이 닫혀 있는 동안 마지막 메시지 한 줄을 띄웁니다. 보여 주기만 하고 터치는 아래 UI 로 통과시킵니다
-///   (미리보기 캔버스가 위에 있어 오프라인 보상·스탯 강화 버튼을 가리지 않게). 창은 OpenChatButton 으로만 엽니다.
-///   OpenChatButton 이 이 패널을 연결하고 있으면 그 버튼 오른쪽에 붙어 따라다닙니다 (버튼이 꺼지면 함께 숨음).
-///   버튼이 없으면 씬에 배치한 위치 그대로입니다. 미리보기 폭은 씬에서 정한 폭이 최대입니다.
-///
-/// [데이터]  ChatManager.Messages 를 그리기만 합니다. ChatManager.Changed 를 받아 미리보기와(열려 있으면) 창을 다시 그립니다.
-///
-/// [줄 풀링]  메시지 한 줄 = LogLine 복제본 하나. 메시지 Id 별로 줄을 기억해서
-///   새 메시지만 글자를 채우고(TMP 메시 재생성), 이미 있는 줄은 순서만 맞춥니다. 밀려난 줄은 꺼서 다시 씁니다.
-///   복제본은 처음 몇 초 동안 프레임마다 조금씩 미리 만들어 둡니다 — 창을 처음 열 때 50줄을 한 번에 만들지 않게.
-///
-/// [나눠 둔 파일]
-///   ChatPanel.Tabs.cs     — 왼쪽 채널 탭 (전체 채팅 / 닉네임별 개인 채팅) + 개인 채팅 [나가기]
-///   ChatPanel.UserMenu.cs — 다른 유저의 메시지를 누르면 뜨는 메뉴 (친구 추가 / 개인 메시지 / 채팅 차단)
-///   탭·메뉴·친구 창 UI 는 StageScene 을 열고 Tools/UI 굽기/채팅 탭·친구 창 메뉴로 만듭니다 (UIBaker).
-///   굽지 않았으면(칸이 비어 있으면) 예전처럼 전체 채팅만 보입니다.
-/// </summary>
 public partial class ChatPanel : MonoBehaviour
 {
     [Header("창")]

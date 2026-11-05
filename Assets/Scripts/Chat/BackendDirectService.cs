@@ -5,25 +5,7 @@ using BackEnd;
 using LitJson;
 using UnityEngine;
 
-/// <summary>
-/// 1:1 개인 메시지 — 뒤끝 쪽지(Backend.Message)로 주고받습니다.
-///
-/// [대화방]  뒤끝에는 '대화방' 이 없고 받은 쪽지함 / 보낸 쪽지함만 있습니다.
-///   두 쪽지함을 받아 상대(gamer inDate)별로 묶어 대화방처럼 보여 줍니다.
-///   이 기기에서 연 방 · 나간 방은 PlayerPrefs 에 계정별로 기억합니다 (나간 방은 그 뒤에 새 쪽지가 오면 다시 보임).
-///   상대가 나갔는지는 뒤끝이 알려 주지 않아, 나가도 상대는 계속 보낼 수 있습니다.
-///
-/// [받기]  Refresh 때 두 쪽지함을 다시 받습니다 (뒤끝 호출 2회).
-///   ChatManager 가 연결할 때 · 보낸 뒤 · 쪽지 실시간 알림(BackendNotify) · 일정 간격으로 부릅니다.
-///
-/// [안 읽은 수]  이 기기에서 마지막으로 읽은 쪽지 시각을 계정·상대별로 기억해 셉니다 (서버 '읽음' 표시는 쓰지 않음 —
-///   쪽지마다 따로 불러야 해서 호출이 많아짐). 다른 기기에서 읽은 것은 이 기기에선 안 읽은 것으로 보일 수 있습니다.
-///
-/// [진행도]  쪽지 내용 앞에 "진행도|" 를 붙여 보내고, 받을 때 떼어 냅니다 (채팅 줄의 [2-3] 표시용).
-///
-/// ⚠ 뒤끝 콘솔의 쪽지 설정(보관 개수 · 보관 기간)을 넘은 옛 쪽지는 서버에서 지워져 대화에서도 사라집니다.
-/// [약속]  IDirectService 와 같음 — 모든 이벤트·콜백은 메인 스레드 (BackendManager.Call).
-/// </summary>
+
 public class BackendDirectService : IDirectService
 {
     public event Action<IReadOnlyList<DirectRoom>>          RoomsReceived;

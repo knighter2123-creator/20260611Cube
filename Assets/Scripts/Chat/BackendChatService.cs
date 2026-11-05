@@ -5,27 +5,7 @@ using BackEnd;
 using BackndChat;
 using UnityEngine;
 
-/// <summary>
-/// 전체 채팅 — 뒤끝챗(BackndChat SDK)의 공개 채널 하나에서 모두가 이야기합니다.
-/// 친구는 BackendFriendService(뒤끝 친구), 개인 메시지는 BackendDirectService(뒤끝 쪽지)가 맡습니다.
-///
-/// [뒤끝 콘솔 준비]
-///   1) 뒤끝챗 > 채널 관리에서 공개(일반) 채널 그룹을 만듭니다 — 이름을 ChatManager 인스펙터 channelGroup 에 (기본 "global").
-///   2) 유니티 메뉴의 뒤끝챗 설정 창에 뒤끝챗 UUID 를 넣습니다 (BackndChat SDK 가 Backend.GetBackndChatSettings 로 읽음).
-///   3) 뒤끝 닉네임이 있어야 합니다 (없으면 NOT_NICKNAME) — ProfileSync 가 정한 뒤 연결합니다 (TryGetIdentity).
-///
-/// [보내는 사람 정보]  뒤끝챗 메시지에는 닉네임(GamerName)과 '보낸 사람 메타데이터' 가 실립니다.
-///   메타데이터에 uid(뒤끝 gamer inDate) · progress(StageRecord.BestProgress) 를 넣어 두고, 받을 때 꺼내
-///   ChatMessage.Uid / Progress 로 씁니다 (내 메시지 강조 · 차단 · 친구 요청이 uid 로 동작하도록).
-///
-/// [연결 흐름]  Connect → ChatClient 생성 → 채널 입장 요청(SendJoinOpenChannel) → OnJoinChannel 에서 최근 메시지 전달.
-///   입장 응답이 joinTimeout 안에 없으면 다시 요청합니다. 연결 수준 오류(인증·중복 접속·서비스 꺼짐)는 Failed.
-///
-/// [보내기 결과]  뒤끝챗은 보낸 결과를 따로 주지 않아서, 내 메시지가 채널로 돌아오면 성공 · 그 전에 OnError 가 오면 실패로 봅니다.
-///   sendTimeout 안에 둘 다 없으면 성공으로 칩니다 (채팅 입력이 영영 잠기지 않게).
-///
-/// [약속]  IChatService 와 같음 — 모든 이벤트·콜백은 메인 스레드. ChatClient 콜백은 Tick(=ChatClient.Update) 안에서 옵니다.
-/// </summary>
+
 public class BackendChatService : IChatService, IChatClientListener
 {
     public event Action<IReadOnlyList<ChatMessage>> MessagesReceived;

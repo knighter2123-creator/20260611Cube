@@ -4,26 +4,7 @@ using System.Text;
 using BackEnd;
 using UnityEngine;
 
-/// <summary>
-/// 채팅 차단 목록 — 뒤끝 게임 정보 테이블에 계정마다 한 행으로 저장합니다 (같은 계정이면 어느 기기에서나 같음).
-/// BackendFriendService 가 만들어 씁니다.
-///
-/// [뒤끝 콘솔 준비]  게임 정보 관리 > 테이블 생성
-///   테이블 이름 TABLE ("BLOCK_DATA"), 공개 여부 '비공개' (다른 유저가 내 차단 목록을 읽지 못하게).
-///   스키마를 정의한다면 컬럼 COLUMN ("blocks") 을 string 으로. 정의하지 않아도 됩니다.
-///   테이블이 없으면 불러오기·저장이 실패합니다 → 오류 로그를 남기고, 차단하기를 누르면 실패 문구가 뜹니다.
-///
-/// [저장 형식]  blocks = "uid|Base64(닉네임),uid|Base64(닉네임),..."  (비었으면 "-")
-///   닉네임을 Base64 로 두는 이유: 따옴표 등 특수 문자가 들어가도 JSON 이스케이프가 생기지 않게
-///   (뒤끝 SDK 의 내장 JSON 검사가 문자열 안의 \" 를 거부한 적이 있음 — CloudSave 주석). uid(gamer inDate) 에는 | , 가 없습니다.
-///
-/// [흐름]
-///   Open      — 이 기기의 캐시(PlayerPrefs)를 먼저 보여 주고 서버에서 받아 옴. 받은 것이 원본 (캐시를 덮어씀).
-///               서버에 행이 아직 없고 캐시에 예전 차단 목록이 있으면 그것으로 행을 만듦 (기기에만 있던 목록 옮기기).
-///   Set       — 서버에 먼저 저장하고, 성공하면 목록·캐시를 바꿈. 저장 중에는 다음 변경을 막음 (한 번에 하나).
-///   처음 받기에 실패하면 캐시로 계속 보여 주고, 다음 친구 목록 갱신 때 다시 받습니다 (EnsureLoaded).
-/// [약속]  모든 콜백·이벤트는 메인 스레드 (BackendManager.Call).
-/// </summary>
+
 public sealed class BackendBlockStore
 {
     public const string TABLE  = "BLOCK_DATA";

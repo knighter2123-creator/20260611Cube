@@ -2,15 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 1:1 개인 메시지 — 두 사람 사이의 '대화방' 단위. 서버 구조는 BackendDirectService 주석 참고 (뒤끝 쪽지).
-///
-/// [탭이 남는 동안]  내가 [나가기] 를 누르거나 상대를 차단하기 전까지 대화방(탭)은 계속 남고, 메시지도 계속 오갑니다.
-///   채팅 창을 닫는 것은 나가기가 아닙니다 — 닫아도 방은 그대로이고, 안 읽은 수가 미리보기 줄에 쌓입니다.
-///   나간 방은 그 뒤에 상대가 새 메시지를 보내면 다시 나타납니다 (뒤끝 쪽지는 상대가 나갔는지 알려 주지 않음).
-/// [받기]  대화방 목록(안 읽은 수 포함)은 채팅이 연결돼 있는 동안 항상 받고, 메시지는 보고 있는 방 하나만 받습니다 (WatchConversation).
-/// [안 읽은 수]  BackendDirectService 가 이 기기에서 셉니다. 그 탭을 보고 있으면 MarkRead 로 0 이 됩니다.
-/// </summary>
+
 public partial class ChatManager
 {
     public struct Conversation
