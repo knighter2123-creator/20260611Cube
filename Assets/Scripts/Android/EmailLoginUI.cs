@@ -81,6 +81,7 @@ public class EmailLoginUI : AuthStateUI
         else if (transform.IsChildOf(emailPanel.transform))
             Debug.LogError("[EmailLoginUI] 이 스크립트가 이메일 패널 안에 붙어 있습니다. 패널이 꺼지면 같이 꺼져서 " +
                            "[이메일로 로그인] 버튼이 동작하지 않습니다. 패널 밖의 항상 켜진 오브젝트로 옮겨 주세요.", this);
+       
 
         // 인스펙터 설정을 깜빡해도 비밀번호가 보이지 않게 코드에서 Password 로 고정
         if (passwordInput != null)
@@ -111,6 +112,8 @@ public class EmailLoginUI : AuthStateUI
         if (onStartGame.GetPersistentEventCount() == 0)
             Debug.LogWarning("[EmailLoginUI] onStartGame 이 비어 있습니다. 로그인 후 게임이 시작되지 않습니다.", this);
     }
+
+   
 
     private void OnDestroy()
     {

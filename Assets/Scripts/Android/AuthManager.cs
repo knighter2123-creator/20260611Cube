@@ -23,6 +23,10 @@ public class AuthManager : MonoBehaviour
     [Tooltip("오프라인으로 시작했을 때 다시 로그인을 시도하는 간격(초)")]
     [SerializeField] private float reconnectInterval = 30f;
 
+    [Tooltip("(임시 진단) 이메일 로그인 실패 시 서버 메시지·보낸 아이디·비밀번호 글자 수를 화면 문구에 덧붙임.\n" +
+             "PC 연결 없이 기기에서 원인 확인용 — 원인 찾으면 끄거나 코드 삭제.")]
+    [SerializeField] private bool showLoginDiagnostics = true;
+
     // ─────────────── 외부에서 읽는 상태 ───────────────
     /// <summary>시작할 때의 확인(뒤끝 초기화 + 자동 로그인 시도)을 마쳤는가. 실패·오프라인이어도 확인을 마치면 true.</summary>
     public bool IsReady     { get; private set; }
@@ -341,7 +345,8 @@ public class AuthManager : MonoBehaviour
 
         if (task.IsFaulted)
         {
-            LogGoogleSignInError(task.Exception);
+            string err = LogGoogleSignInError(task.Exception);
+            if (err != null) ShowDiagnostic($"[1단계 구글 계정] {err}");
             SetSigningIn(false);
             return;
         }
@@ -350,6 +355,7 @@ public class AuthManager : MonoBehaviour
         if (string.IsNullOrEmpty(idToken))
         {
             Debug.LogError("[Auth] ID 토큰이 비어 있습니다. 웹 클라이언트 ID 설정을 확인하세요.");
+            ShowDiagnostic("[1단계 구글 계정] ID 토큰 없음 — 웹 클라이언트 ID 확인");
             SetSigningIn(false);
             return;
         }
@@ -370,6 +376,7 @@ public class AuthManager : MonoBehaviour
             {
                 string message = ToKoreanMessage(bro, GameMessages.Auth.actionLogin);
                 Debug.LogError($"[Auth] 뒤끝 구글 로그인 실패: {BackendManager.Describe(bro)}");
+                ShowDiagnostic($"[2단계 뒤끝] {BackendManager.Describe(bro)}");
                 Fail(message);
                 return;
             }
@@ -396,6 +403,7 @@ public class AuthManager : MonoBehaviour
             if (bro == null || !bro.IsSuccess())
             {
                 Debug.LogError($"[Auth] 게스트 → 구글 연동 실패: {BackendManager.Describe(bro)}");
+                ShowDiagnostic($"[2단계 뒤끝 연동] {BackendManager.Describe(bro)}");
                 Fail(bro != null && bro.GetStatusCode() == "409"
                     ? GameMessages.Auth.googleInUse
                     : ToKoreanMessage(bro, GameMessages.Auth.actionGoogleLink));
@@ -461,14 +469,16 @@ public class AuthManager : MonoBehaviour
     }
 
     /// <summary>구글 로그인 실패는 대부분 '설정' 문제 — DeveloperError(10) → SHA-1 / 웹 클라이언트 ID / 패키지명.</summary>
-    private static void LogGoogleSignInError(AggregateException ex)
+    /// <returns>진단용 요약 (취소면 null)</returns>
+    private static string LogGoogleSignInError(AggregateException ex)
     {
         if (ex == null)
         {
             Debug.LogError("[Auth] 구글 로그인 실패 (예외 정보 없음)");
-            return;
+            return "예외 정보 없음";
         }
 
+        string summary = null;
         foreach (Exception e in ex.Flatten().InnerExceptions)
         {
             if (e is GoogleSignIn.SignInException signInError)
@@ -476,13 +486,37 @@ public class AuthManager : MonoBehaviour
                 if (signInError.Status == GoogleSignInStatusCode.Canceled)
                     GameLog.Info("[Auth] 사용자가 구글 로그인을 취소했습니다.");
                 else
+                {
                     Debug.LogError($"[Auth] 구글 로그인 실패: {signInError.Status} / {signInError.Message}");
+                    summary ??= $"{signInError.Status}({(int)signInError.Status}) {signInError.Message}";
+                }
             }
             else
             {
                 Debug.LogError($"[Auth] 구글 로그인 실패: {e}");
+                summary ??= $"{e.GetType().Name}: {e.Message}";
             }
         }
+        return summary;
+    }
+
+    /// <summary>(임시 진단) 안드로이드 기기 화면에 토스트로 표시 — 로그인 화면에 구글 실패 문구 칸이 없어서.</summary>
+    private void ShowDiagnostic(string message)
+    {
+        if (!showLoginDiagnostics || string.IsNullOrEmpty(message)) return;
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            using var player   = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            var activity       = player.GetStatic<AndroidJavaObject>("currentActivity");
+            activity.Call("runOnUiThread", new AndroidJavaRunnable(() =>
+            {
+                using var toast = new AndroidJavaClass("android.widget.Toast");
+                toast.CallStatic<AndroidJavaObject>("makeText", activity, message, 1 /* LENGTH_LONG */).Call("show");
+            }));
+        }
+        catch (Exception e) { Debug.LogWarning($"[Auth] 진단 토스트 실패: {e.Message}"); }
+#endif
     }
 
     // ───────────────────────────── 이메일 로그인 ─────────────────────────────
@@ -538,8 +572,11 @@ public class AuthManager : MonoBehaviour
 
             if (bro == null || !bro.IsSuccess())
             {
-                Debug.LogError($"[Auth] 이메일 로그인 실패: {BackendManager.Describe(bro)}");
-                Fail(ToKoreanMessage(bro, GameMessages.Auth.actionLogin));
+                // 401 은 아이디 없음/비밀번호 틀림이 같은 코드 — 메시지(bad customId / bad customPassword 등)와 입력 길이로 구분
+                string diag = $"{BackendManager.Describe(bro)} (아이디='{cleanEmail}', 비밀번호 길이={password.Length})";
+                Debug.LogError($"[Auth] 이메일 로그인 실패: {diag}");
+                string shown = ToKoreanMessage(bro, GameMessages.Auth.actionLogin);
+                Fail(showLoginDiagnostics ? $"{shown}\n<size=60%>{diag}</size>" : shown);
                 return;
             }
 
@@ -836,6 +873,8 @@ public class AuthManager : MonoBehaviour
 
     private void Fail(string message)
     {
+        // 입력 검사·미초기화 실패도 기기 로그(logcat)에 남김 — 화면 문구가 안 보일 때 원인 추적용
+        Debug.LogWarning($"[Auth] 실패: {message} (뒤끝 초기화={BackendManager.IsInitialized}, 초기화 오류={BackendManager.InitError ?? "-"})");
         LastError = message;
         SetSigningIn(false);
     }
