@@ -29,6 +29,9 @@ public partial class GameSettingManager
     // 서버 기록(랭킹·닉네임) 삭제를 기다리는 중 — 이 동안 팝업을 닫거나 다시 누를 수 없음
     private bool serverDeleteInProgress;
 
+    // 서버 데이터 삭제(탈퇴)는 끝났는데 로컬 지우기가 실패한 상태 — 재시도 때 서버 단계를 건너뜀 (탈퇴 후엔 본인 로그인 확인을 통과할 수 없어서)
+    private bool serverDataDeleted;
+
     /// <summary>확인 팝업이 떠 있는가. OnEscape 가 "팝업만 닫기" 를 판단할 때 쓴다.</summary>
     private bool IsDeleteConfirmOpen => deleteConfirmPopup != null && deleteConfirmPopup.activeSelf;
 
@@ -105,6 +108,13 @@ public partial class GameSettingManager
         SetDeleteButtonsInteractable(false);
         SetDeleteStatus("삭제 중...");
 
+        // 서버 쪽은 이미 지웠고 로컬만 실패했던 재시도 — 탈퇴로 로그아웃돼 서버 삭제는 다시 할 수 없으므로 로컬만
+        if (serverDataDeleted)
+        {
+            WipeLocalAndRestart();
+            return;
+        }
+
         // ⓪ 서버 데이터 삭제를 로컬보다 먼저(실패 가능) — 실패하면 로컬도 안 지움, 게스트면 바로 성공
         serverDeleteInProgress = true;
         ServerAccountData.DeleteForCurrentAccount((ok, serverError) =>
@@ -119,6 +129,7 @@ public partial class GameSettingManager
                 return;
             }
 
+            serverDataDeleted = true;
             WipeLocalAndRestart();
         });
     }
@@ -129,10 +140,7 @@ public partial class GameSettingManager
         // ① 로컬 지우기 (실패하면 게임은 그대로 계속)
         if (!AccountReset.TryWipe(LOGIN_SCENE, out string error))
         {
-            // 서버 기록은 이미 지워졌는데 로컬은 그대로 → 계속 플레이하므로 서버에 다시 올림
-            RankingManager.Instance?.RequestUpload();
-            ProfileSync.Instance?.RequestPush();
-
+            // 서버 계정은 이미 탈퇴(로그아웃)돼 다시 올릴 곳이 없음 — [삭제]를 다시 누르면 로컬 지우기만 재시도 (serverDataDeleted)
             SetDeleteStatus(error);
             SetDeleteButtonsInteractable(true);
             return;

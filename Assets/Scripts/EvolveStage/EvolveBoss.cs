@@ -89,6 +89,5 @@ public class EvolveBoss : Enemy
         EvolveStageManager.Instance?.ReportBossKill();
     }
 
-    // Die() 는 override 안 함 (부모가 전부 처리)
-    // ⚠ ReportKill → 씬 전환이 사망 연출보다 먼저라 연출이 잘릴 수 있음 — Use Death Effect 해제 또는 전환 지연
+    // Die() 는 override 안 함 (부모가 전부 처리) — 씬 전환은 EvolveStageManager 가 사망 연출이 끝날 때까지 미룸
 }

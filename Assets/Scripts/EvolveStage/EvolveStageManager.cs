@@ -32,7 +32,15 @@ public partial class EvolveStageManager : MonoBehaviour
 
     public EvolveStageData ActiveData { get; private set; }
 
+    [Header("클리어 후 복귀")]
+    [Tooltip("보스 사망 연출이 끝날 때까지 기다리는 최대 시간(초, 실제 시간). 연출이 끝나면(보스가 사라지면) 바로 복귀합니다.")]
+    [SerializeField] private float maxDeathWait = 3f;
+
+    [Tooltip("사망 연출이 끝난 뒤 복귀 전 여유(초, 실제 시간)")]
+    [SerializeField] private float returnPadding = 0.3f;
+
     private bool stageOver = false;
+    private EvolveBoss spawnedBoss;   // 사망 연출이 끝났는지(=오브젝트가 사라졌는지) 보려고 기억
 
     void Awake()
     {
@@ -82,6 +90,7 @@ public partial class EvolveStageManager : MonoBehaviour
             : (bossSpawnPoint != null ? bossSpawnPoint.position : Vector3.zero);
 
         EvolveBoss boss = Instantiate(prefab, spawnPos, Quaternion.identity);
+        spawnedBoss = boss;
         HapticManager.PlayHeavy();   // 보스 등장 진동
 
         // 스탯 초기화 필수 (안 부르면 원본 체력 그대로), 일반 스테이지 배율은 적용 안 함 — 난이도는 티어 데이터만
@@ -118,7 +127,22 @@ public partial class EvolveStageManager : MonoBehaviour
                              "LoginScene의 Managers 루트에 추가했는지 확인하세요.");
 
         OnStageClear?.Invoke();
-        GameLog.Info("[EvolveStageManager] 진화 스테이지 클리어 → 원래 스테이지로 복귀");
+        GameLog.Info("[EvolveStageManager] 진화 스테이지 클리어 → 사망 연출 후 원래 스테이지로 복귀");
+
+        // 바로 복귀하면 이 호출 뒤에 시작되는 사망 연출이 씬과 함께 잘림 → 보스가 사라질 때까지(최대 maxDeathWait) 기다렸다가 복귀
+        StartCoroutine(ReturnAfterBossDeath());
+    }
+
+    /// <summary>보스 사망 연출이 끝나길(풀 출신이 아니라 연출 끝에 Destroy 됨) 실제 시간으로 기다린 뒤 복귀 — timeScale 0 이어도 maxDeathWait 뒤엔 반드시 복귀.</summary>
+    private System.Collections.IEnumerator ReturnAfterBossDeath()
+    {
+        float deadline = Time.unscaledTime + Mathf.Max(0f, maxDeathWait);
+        while (spawnedBoss != null && Time.unscaledTime < deadline)
+            yield return null;
+
+        float padEnd = Time.unscaledTime + Mathf.Max(0f, returnPadding);
+        while (Time.unscaledTime < padEnd)
+            yield return null;
 
         ReturnToStage();
     }

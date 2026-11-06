@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>오브젝트 풀(총알 전용 + 프리팹별 범용): 만들어 두고 껐다 켜며 재사용 — Instantiate/Destroy 와 GC 로 인한 프레임 드랍을 막으려고, 예열은 여러 프레임에 나눠서.</summary>
 public class ObjectPoolManager : MonoBehaviour
@@ -33,11 +34,64 @@ public class ObjectPoolManager : MonoBehaviour
         Instance = this;
     }
 
+    void OnEnable()
+    {
+        SceneManager.sceneUnloaded += OnSceneUnloaded;
+    }
+
     // 꺼지면 예열 코루틴이 멈추므로 표시를 비움 (남기면 그 프리팹은 다시 예열 안 됨)
     void OnDisable()
     {
+        SceneManager.sceneUnloaded -= OnSceneUnloaded;
         prewarming.Clear();
         LogUsage();
+    }
+
+    // ── 대기 중 표시 · 파괴된 인스턴스 정리 ──
+
+    // 지금 큐에 들어 있는(대기 중인) 인스턴스 — 같은 오브젝트를 두 번 Return 해 큐에 중복으로 들어가는 것을 막음 (중복이면 한 오브젝트를 두 곳에서 동시에 씀)
+    private readonly HashSet<GameObject> idle = new HashSet<GameObject>();
+    private readonly List<GameObject> purgeBuffer = new List<GameObject>();
+
+    private void EnqueueIdle(Queue<GameObject> queue, GameObject obj)
+    {
+        idle.Add(obj);
+        queue.Enqueue(obj);
+    }
+
+    /// <summary>이미 대기 중인 오브젝트를 또 반환하려는가 — 맞으면 경고하고 true (반환을 무시).</summary>
+    private bool IsAlreadyReturned(GameObject obj)
+    {
+        if (!idle.Contains(obj)) return false;
+        Debug.LogWarning($"[ObjectPool] '{obj.name}' 를 두 번 반환했습니다 — 두 번째는 무시합니다 (반환 경로가 두 군데인지 확인).", obj);
+        return true;
+    }
+
+    // 씬이 내려가면 씬에 있던 풀 인스턴스가 파괴됨 → 출생 기록·대기 표시·큐에서 빼서 계속 쌓이지 않게 (씬 전환당 한 번이라 비용 무시)
+    private void OnSceneUnloaded(Scene scene) => PurgeDestroyed();
+
+    private void PurgeDestroyed()
+    {
+        purgeBuffer.Clear();
+        foreach (GameObject key in instanceToPrefab.Keys)
+            if (key == null) purgeBuffer.Add(key);
+        for (int i = 0; i < purgeBuffer.Count; i++) instanceToPrefab.Remove(purgeBuffer[i]);
+        purgeBuffer.Clear();
+
+        idle.RemoveWhere(o => o == null);
+
+        CompactQueue(pool);
+        foreach (Queue<GameObject> q in prefabPools.Values) CompactQueue(q);
+    }
+
+    private static void CompactQueue(Queue<GameObject> queue)
+    {
+        int n = queue.Count;
+        for (int i = 0; i < n; i++)
+        {
+            GameObject o = queue.Dequeue();
+            if (o != null) queue.Enqueue(o);
+        }
     }
 
     // ── 사용량 기록 — 예열 개수를 '최대 동시 사용'에 맞추려고 씬 종료 때 로그 (전투 중 생성 > 0 이면 예열 부족, 만든 수 > 최대 사용이면 줄여도 됨) ──
@@ -89,7 +143,7 @@ public class ObjectPoolManager : MonoBehaviour
         while (made < initialPoolSize)
         {
             for (int i = 0; i < perFrame && made < initialPoolSize; i++, made++)
-                pool.Enqueue(CreateBullet());
+                EnqueueIdle(pool, CreateBullet());
             yield return null;
         }
         bulletPrewarmDone = true;
@@ -131,6 +185,7 @@ public class ObjectPoolManager : MonoBehaviour
         while (pool.Count > 0)
         {
             GameObject obj = pool.Dequeue();
+            idle.Remove(obj);
             if (obj == null) continue;
             TrackTake(bulletUsage, pool.Count);
             return obj;
@@ -148,11 +203,12 @@ public class ObjectPoolManager : MonoBehaviour
     {
         // ★ 파괴된 오브젝트를 다시 큐에 넣으면 쓰레기가 계속 누적됩니다.
         if (obj == null) return;
+        if (IsAlreadyReturned(obj)) return;
 
         obj.SetActive(false);
         // 부모를 null로 해제 — 씬 루트에 보관해 좌표 오염 방지
         obj.transform.SetParent(null);
-        pool.Enqueue(obj);
+        EnqueueIdle(pool, obj);
     }
 
     // ── 프리팹별 범용 풀 (Enemy / Boss 등) ──
@@ -179,7 +235,9 @@ public class ObjectPoolManager : MonoBehaviour
         while (queue.Count > 0)
         {
             obj = queue.Dequeue();
+            idle.Remove(obj);
             if (obj != null) break;
+            instanceToPrefab.Remove(obj);   // 파괴된 인스턴스의 출생 기록도 정리
             obj = null;
         }
 
@@ -200,6 +258,7 @@ public class ObjectPoolManager : MonoBehaviour
     public void Return(GameObject obj)
     {
         if (obj == null) return;
+        if (IsAlreadyReturned(obj)) return;
 
         obj.SetActive(false);
         obj.transform.SetParent(null);
@@ -214,7 +273,7 @@ public class ObjectPoolManager : MonoBehaviour
         if (!prefabPools.TryGetValue(prefab, out var queue))
             prefabPools[prefab] = queue = new Queue<GameObject>();
 
-        queue.Enqueue(obj);
+        EnqueueIdle(queue, obj);
     }
 
     /// <summary>첫 스폰 렉 방지 예열 — 대기 중인 수를 빼고 부족분만 채움 (여러 번 불러도 불어나지 않음).</summary>
@@ -227,7 +286,7 @@ public class ObjectPoolManager : MonoBehaviour
 
         int need = count - queue.Count;   // ★ 부족분만 계산
         for (int i = 0; i < need; i++)
-            queue.Enqueue(CreatePooled(prefab));
+            EnqueueIdle(queue, CreatePooled(prefab));
     }
 
     /// <summary>범용 풀의 인스턴스를 만드는 유일한 곳 — 출생 기록(instanceToPrefab)과 사용량 집계를 빠뜨리지 않게.</summary>
@@ -268,7 +327,7 @@ public class ObjectPoolManager : MonoBehaviour
         {
             yield return null;
             for (int i = 0; i < perFrame && made < need; i++, made++)
-                queue.Enqueue(CreatePooled(prefab));
+                EnqueueIdle(queue, CreatePooled(prefab));
         }
 
         prewarming.Remove(prefab);

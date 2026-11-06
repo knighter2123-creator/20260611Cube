@@ -95,6 +95,9 @@ public class SceneLoader : MonoBehaviour
     // ── 내부 유틸 ─────────────────────────────────
     private void LoadScene(string sceneName)
     {
+        // 미룬 저장(스테이지 클리어 등)은 떠나기 전에 확정 — 새 씬에서 매니저가 ApplyFrom 전일 때 저장되지 않게
+        if (SaveManager.Instance != null) SaveManager.Instance.FlushPendingSave();
+
         Time.timeScale = 1f;
         SceneManager.LoadScene(sceneName);
     }

@@ -64,9 +64,36 @@ public class SaveManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
+    // ── 미룬 저장 ───────────────────────────────────
+    [Tooltip("RequestSave 후 실제로 저장할 때까지 기다리는 시간(초, 실제 시간) — 스테이지 클리어처럼 다른 일이 몰린 프레임을 피함")]
+    [SerializeField] private float deferredSaveDelay = 1f;
+
+    private float pendingSaveAt = -1f;   // 미룬 저장 예정 시각 (음수 = 없음)
+
+    /// <summary>잠시 뒤 저장 — 클리어 프레임의 연출·증강·랭킹 처리와 JSON 직렬화·파일 쓰기가 겹쳐 튀지 않게 미루고, 그사이 요청은 한 번으로 합침.</summary>
+    // ⚠ 씬을 옮기기 전에는 FlushPendingSave (SceneLoader 가 함) — 안 하면 새 씬 매니저가 ApplyFrom 전일 때 저장될 수 있음
+    public void RequestSave()
+    {
+        if (pendingSaveAt < 0f) pendingSaveAt = Time.unscaledTime + deferredSaveDelay;
+    }
+
+    /// <summary>미룬 저장이 있으면 지금 저장.</summary>
+    public void FlushPendingSave()
+    {
+        if (pendingSaveAt >= 0f) Save();
+    }
+
+    void Update()
+    {
+        if (pendingSaveAt >= 0f && Time.unscaledTime >= pendingSaveAt) Save();
+    }
+
     // ── 저장 ───────────────────────────────────────
     public void Save()
     {
+        pendingSaveAt = -1f;   // 지금 저장하면 미룬 저장은 필요 없음
+
+
         // 잠금 중이면 CaptureTo 전에 막음 (파괴 중인 매니저를 건드리지 않게)
         if (IsSaveLocked)
         {

@@ -60,15 +60,32 @@ public static class Mailbox
                            : serverMails.FindAll(s => !box.mails.Exists(m => m.id == s.id));
     }
 
-    /// <summary>아직 받지 않은 우편 수 (버튼 개수 표시).</summary>
+    /// <summary>아직 받지 않은 우편 수 (버튼 개수 표시) — 버튼이 자주 물어서 리스트·람다 할당 없이 직접 셈 (CurrentServerMails 와 같은 규칙).</summary>
     public static int Count
     {
         get
         {
             MailboxSaveData box = Data;
-            int local = box != null ? box.mails.FindAll(m => !m.claimed).Count : 0;
-            return local + CurrentServerMails().Count;
+            int count = 0;
+
+            if (box != null)
+                for (int i = 0; i < box.mails.Count; i++)
+                    if (box.mails[i] != null && !box.mails[i].claimed) count++;
+
+            if (serverMails.Count == 0) return count;
+            if (!ProfileSync.TryGetAccount(out string uid) || uid != serverUid) return count;
+
+            for (int i = 0; i < serverMails.Count; i++)
+                if (box == null || !HasLocalId(box.mails, serverMails[i].id)) count++;
+            return count;
         }
+    }
+
+    private static bool HasLocalId(List<MailItem> mails, string id)
+    {
+        for (int i = 0; i < mails.Count; i++)
+            if (mails[i] != null && mails[i].id == id) return true;
+        return false;
     }
 
     /// <summary>로컬 + 서버 우편 — 안 받은 것 먼저, 그 안에서 최신 순. 목록을 고치지 마세요.</summary>

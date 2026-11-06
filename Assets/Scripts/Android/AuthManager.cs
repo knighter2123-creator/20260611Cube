@@ -81,6 +81,10 @@ public class AuthManager : MonoBehaviour
     private float        nextReconnectTime;
     private bool         reconnecting;
 
+    // 계정 세대 — 로그아웃·탈퇴·새 로그인 때 올림. 요청 시작 때 값을 기억해 두고, 응답이 왔을 때 달라졌으면 그 응답은 버림
+    // (재연결 중 로그아웃하면 uid 가 null 이라 '같은 계정인가' 비교를 통과해 늦게 온 토큰 로그인이 다시 로그인시키던 문제)
+    private int          accountGeneration;
+
     // 마지막 계정 — 앱을 다시 켰을 때 자동 로그인 · 오프라인 로그인에 씀 (세이브 파일과 별개)
     private const string PREF_UID    = "auth.backend.uid";
     private const string PREF_METHOD = "auth.backend.method";   // "google" / "email"
@@ -128,10 +132,11 @@ public class AuthManager : MonoBehaviour
 
         nextReconnectTime = Time.unscaledTime + reconnectInterval;
         reconnecting = true;
+        int generation = accountGeneration;
         BackendManager.Initialize(ok =>
         {
             if (this == null) return;
-            if (!ok) { reconnecting = false; return; }
+            if (!ok || generation != accountGeneration) { reconnecting = false; return; }   // 그사이 로그아웃·계정 변경
             TryTokenLogin(startup: false);
         });
     }
@@ -170,10 +175,21 @@ public class AuthManager : MonoBehaviour
 
     private void TryTokenLogin(bool startup)
     {
+        int generation = accountGeneration;
         BackendManager.Call(cb => Backend.BMember.LoginWithTheBackendToken(cb), bro =>
         {
             if (this == null) return;
             reconnecting = false;
+
+            // 기다리는 사이 로그아웃·다른 로그인이 있었음 → 이 결과는 버림 (성공이었으면 SDK 세션도 다시 끊음)
+            if (generation != accountGeneration)
+            {
+                GameLog.Info("[Auth] 재연결 응답이 로그아웃·계정 변경 뒤에 도착해 무시합니다.");
+                if (bro != null && bro.IsSuccess() && !IsSignedIn)
+                    BackendManager.Call(cb => Backend.BMember.Logout(cb), _ => { });
+                if (startup) FinishStartup(null);
+                return;
+            }
 
             if (bro != null && bro.IsSuccess())
             {
@@ -606,6 +622,7 @@ public class AuthManager : MonoBehaviour
 
     private void OnSignedIn(SignInMethod how, string knownEmail, string actionName)
     {
+        accountGeneration++;   // 이전 계정 기준으로 시작된 재연결 응답은 무효
         uid       = CurrentBackendUid();
         email     = knownEmail;
         method    = how;
@@ -729,7 +746,8 @@ public class AuthManager : MonoBehaviour
 
         BackendManager.Call(cb => Backend.BMember.WithdrawAccount(cb), bro =>
         {
-            if (this == null) return;
+            // this == null(매니저 파괴)이어도 끝까지 진행 — 여기서 그냥 돌아가면 onDone 이 안 불려 ServerAccountData.IsDeleting 이 영영 true 로 남아 업로드가 막힘
+            // (아래 정리는 C# 필드·PlayerPrefs·static 만 써서 파괴된 컴포넌트에서도 안전)
 
             if (bro == null || !bro.IsSuccess())
             {
@@ -740,13 +758,23 @@ public class AuthManager : MonoBehaviour
                 return;
             }
 
-            GameLog.Info($"[Auth] 뒤끝 탈퇴 완료: {Short(uid)}");
-            // 게스트였으면 기기에 저장된 게스트 ID 도 지움 — 남기면 다음 '게스트로 시작' 이 지운 계정에 로그인하려 함
-            if (IsGuest) Backend.BMember.DeleteGuestInfo();
-            ClearAccount();
-            SignOutGoogle();
-            Notify();
-            onDone?.Invoke(true, null);
+            try
+            {
+                GameLog.Info($"[Auth] 뒤끝 탈퇴 완료: {Short(uid)}");
+                // 게스트였으면 기기에 저장된 게스트 ID 도 지움 — 남기면 다음 '게스트로 시작' 이 지운 계정에 로그인하려 함
+                if (IsGuest) Backend.BMember.DeleteGuestInfo();
+                ClearAccount();
+                SignOutGoogle();
+                Notify();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Auth] 탈퇴 후 정리 중 예외 (탈퇴 자체는 완료): {e.Message}");
+            }
+            finally
+            {
+                onDone?.Invoke(true, null);   // 정리에서 예외가 나도 호출 쪽 상태(IsDeleting)는 반드시 풀림
+            }
         });
     }
 
@@ -791,6 +819,8 @@ public class AuthManager : MonoBehaviour
 
     private void ClearAccount()
     {
+        accountGeneration++;   // 로그아웃 전에 시작된 재연결 응답이 늦게 와도 다시 로그인시키지 않게
+        reconnecting = false;
         uid       = null;
         email     = null;
         nickname  = null;

@@ -22,15 +22,28 @@ public class QuitConfirmController : MonoBehaviour
             Debug.LogError("[QuitConfirm] quitPanel이 연결되지 않았습니다.");
     }
 
+    // 등록한 GameManager — 해제도 같은 인스턴스에서 (Instance 가 바뀌어도 누수 없게)
+    private GameManager boundGm;
+
     // 등록/해제는 OnEnable/OnDisable 짝으로 (씬 언로드 때 자동 정리)
-    private void OnEnable()
-    {
-        GameManager.Instance?.RegisterEscapeHandler(OnEscape);
-    }
+    private void OnEnable() => TryRegister();
+
+    // Start 에서 한 번 더 — OnEnable 이 GameManager.Awake 보다 먼저 돌면 Instance 가 아직 없음
+    private void Start() => TryRegister();
 
     private void OnDisable()
     {
-        GameManager.Instance?.UnregisterEscapeHandler(OnEscape);
+        if (boundGm != null) boundGm.UnregisterEscapeHandler(OnEscape);
+        boundGm = null;
+    }
+
+    private void TryRegister()
+    {
+        if (boundGm != null) return;
+        GameManager gm = GameManager.Instance;
+        if (gm == null) return;
+        gm.RegisterEscapeHandler(OnEscape);
+        boundGm = gm;
     }
 
     /// <summary>GameManager 가 Escape 때 호출 — true = 내가 처리함(다른 핸들러로 안 넘김).</summary>
@@ -40,6 +53,8 @@ public class QuitConfirmController : MonoBehaviour
 
         // 로딩 중엔 소비만 (false 면 다른 핸들러가 반응할 수 있음)
         if (blockInput) return true;
+
+        if (quitPanel == null) return false;   // 연결 누락 — Awake 에서 이미 에러로 알림, 다른 핸들러에 넘김
 
         if (quitPanel.activeSelf)
             CloseQuitPanel();   // 열려 있으면 Escape = "아니오"
@@ -60,6 +75,7 @@ public class QuitConfirmController : MonoBehaviour
     /// <summary>"아니오" 버튼 OnClick에 연결.</summary>
     public void CloseQuitPanel()
     {
+        if (quitPanel == null) return;
         quitPanel.SetActive(false);
         GameLog.Info("[QuitConfirm] 종료 취소");
     }

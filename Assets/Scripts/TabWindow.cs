@@ -409,7 +409,7 @@ public class TabWindow : MonoBehaviour
         if (hiddenForPlacement)
         {
             hiddenForPlacement = false;
-            boundPlacement?.CancelPlacement();
+            if (boundPlacement != null) boundPlacement.CancelPlacement();   // ?. 는 파괴된 컨트롤러를 못 걸러 MissingReferenceException
         }
         else if (!IsOpen)
         {

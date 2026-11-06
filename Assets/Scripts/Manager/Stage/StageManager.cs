@@ -130,7 +130,10 @@ public partial class StageManager : MonoBehaviour
             // ★ 보스 출현 알림
             ShowBossNotice();
 
-            EnemyRespawn.Instance.SpawnBoss();
+            if (EnemyRespawn.Instance != null)
+                EnemyRespawn.Instance.SpawnBoss();
+            else
+                Debug.LogError("[StageManager] EnemyRespawn.Instance 가 없어 보스를 소환하지 못했습니다. 씬에 EnemyRespawn 이 있는지 확인하세요.");
         }
     }
 
@@ -175,7 +178,8 @@ public partial class StageManager : MonoBehaviour
 
         GameLog.Info($"[StageManager] 다음 스테이지: {currentWorld}-{currentStage} / 스탯 배율: {currentStatMult:F4}");
 
-        SaveManager.Instance?.Save();
+        // 저장은 잠시 뒤로 미룸 — 이 프레임엔 클리어 연출·증강·랭킹이 몰려 있어 동기 직렬화·파일 쓰기까지 겹치면 튐
+        if (SaveManager.Instance != null) SaveManager.Instance.RequestSave();
         StartCoroutine(NextStageDelayed());
     }
 

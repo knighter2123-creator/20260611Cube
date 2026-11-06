@@ -15,7 +15,12 @@ public class OpenMailboxButton : MonoBehaviour
     [Tooltip("받지 않은 우편 개수 색")]
     [SerializeField] private Color countColor = ChatText.UnreadColor;
 
-    private int shownCount = -1;
+    [Tooltip("우편 이벤트가 없어도 개수를 다시 세는 간격(초, 실제 시간) — 계정 전환·세이브 교체처럼 이벤트 없이 바뀌는 경우 대비")]
+    [SerializeField] private float recheckInterval = 1f;
+
+    private int   shownCount = -1;
+    private bool  dirty = true;      // Mailbox.OnChanged 가 오면 다음 Update 에서 바로 다시 셈
+    private float nextCheckTime;
 
     private void Awake()
     {
@@ -25,9 +30,24 @@ public class OpenMailboxButton : MonoBehaviour
         });
     }
 
+    private void OnEnable()
+    {
+        Mailbox.OnChanged += MarkDirty;
+        dirty = true;
+    }
+
+    private void OnDisable() => Mailbox.OnChanged -= MarkDirty;
+
+    private void MarkDirty() => dirty = true;
+
+    // 매 프레임 세지 않고 이벤트가 오거나 recheckInterval 마다만 셈 (예전엔 매 프레임 리스트 할당으로 GC)
     private void Update()
     {
         if (label == null) return;
+        if (!dirty && Time.unscaledTime < nextCheckTime) return;
+
+        dirty = false;
+        nextCheckTime = Time.unscaledTime + Mathf.Max(0.1f, recheckInterval);
 
         int count = Mailbox.Count;
         if (count == shownCount) return;

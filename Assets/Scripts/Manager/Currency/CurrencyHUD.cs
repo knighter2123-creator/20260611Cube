@@ -10,10 +10,16 @@ public class CurrencyHUD : MonoBehaviour
     private CurrencyManager bound;   // 실제로 구독한 대상
     private bool reportedMissing;    // 에러 로그는 1회만
 
+    private bool started;            // Start 를 지났는가 — 그 전의 실패는 Awake 순서 문제일 수 있어 에러로 보지 않음
+
     private void OnEnable() => TryBind();
 
     // Start 에서 한 번 더 — 모든 Awake 가 끝난 뒤라 매니저가 있으면 반드시 잡힘
-    private void Start() => TryBind();
+    private void Start()
+    {
+        started = true;
+        TryBind();
+    }
 
     private void OnDisable() => Unbind();
 
@@ -24,7 +30,7 @@ public class CurrencyHUD : MonoBehaviour
         var cm = CurrencyManager.Instance;
         if (cm == null)
         {
-            if (!reportedMissing)
+            if (started && !reportedMissing)
             {
                 reportedMissing = true;
                 Debug.LogError("[CurrencyHUD] CurrencyManager.Instance 가 없습니다. " +

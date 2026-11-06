@@ -153,7 +153,7 @@ public partial class AugmentSelectUI : MonoBehaviour
         StopIntro();
         StopTimer();
 
-        if (pauseGame) Time.timeScale = savedTimeScale;
+        if (pauseGame) RestoreTimeScale();
 
         if (canvas != null)
         {
@@ -165,12 +165,19 @@ public partial class AugmentSelectUI : MonoBehaviour
     /// <summary>열린 채 씬이 바뀌거나 꺼져도 timeScale 0 이 남아 게임이 멈추지 않게 복구하는 안전장치.</summary>
     private void OnDisable()
     {
-        if (isOpen && pauseGame) Time.timeScale = savedTimeScale;
+        if (isOpen && pauseGame) RestoreTimeScale();
         isOpen = false;
 
         // 꺼지면 코루틴은 유니티가 조용히 멈춥니다. 핸들만 비워 다음 Show 에서 꼬이지 않게 합니다.
         introRoutine = null;
         timerRoutine = null;
+    }
+
+    /// <summary>닫을 때 지금의 배속으로 복원 — 열 때 기억한 값으로 되돌리면 열려 있는 동안 바꾼 배속이 사라짐 (매니저가 없을 때만 기억한 값).</summary>
+    private void RestoreTimeScale()
+    {
+        if (GameSpeedManager.Instance != null) GameSpeedManager.Instance.ReapplySpeed();
+        else Time.timeScale = savedTimeScale;
     }
 
     private void StopTimer()

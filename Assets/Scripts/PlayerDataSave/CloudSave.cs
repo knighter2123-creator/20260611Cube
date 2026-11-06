@@ -78,6 +78,7 @@ public class CloudSave : MonoBehaviour
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        FireIdleWaiters();   // 기다리던 쪽이 영영 멈추지 않게
     }
 
     /// <summary>이 계정의 클라우드 확인을 마쳤는가. RankingManager 가 세이브 삭제 표시를 먼저 지우지 않게 기다릴 때 씁니다.</summary>
@@ -85,6 +86,35 @@ public class CloudSave : MonoBehaviour
 
     /// <summary>올리는 중인가. 계정 삭제(ServerAccountData)가 지운 문서를 이 올리기가 되살리지 않게 기다릴 때 씁니다.</summary>
     public bool IsUploading => uploading;
+
+    // 올리기가 끝나길 기다리는 콜백 (ServerAccountData) — 응답이 영영 안 와도 idleWaitDeadline 에 강제로 부름
+    private Action idleWaiters;
+    private float  idleWaitDeadline;
+
+    /// <summary>진행 중인 올리기가 끝나면(없으면 바로) onIdle — 최대 timeoutSeconds(실제 시간) 기다림, 이 컴포넌트가 파괴돼도 부름.</summary>
+    public void WhenUploadIdle(Action onIdle, float timeoutSeconds = 10f)
+    {
+        if (onIdle == null) return;
+        if (!uploading) { onIdle(); return; }
+
+        float deadline = Time.unscaledTime + Mathf.Max(0f, timeoutSeconds);
+        idleWaitDeadline = idleWaiters == null ? deadline : Mathf.Min(idleWaitDeadline, deadline);
+        idleWaiters += onIdle;
+    }
+
+    /// <summary>올리기 종료(성공·실패·중단 공통) — uploading 을 내리고 기다리던 쪽을 깨움.</summary>
+    private void EndUpload()
+    {
+        uploading = false;
+        FireIdleWaiters();
+    }
+
+    private void FireIdleWaiters()
+    {
+        Action waiters = idleWaiters;
+        idleWaiters = null;
+        waiters?.Invoke();
+    }
 
     // ───────────────────────────── 게임 시작 전 확인 ─────────────────────────────
 
@@ -322,6 +352,13 @@ public class CloudSave : MonoBehaviour
 
     private void Update()
     {
+        // 올리기 응답이 너무 늦으면 기다리던 쪽(계정 삭제)을 먼저 보내 줌
+        if (idleWaiters != null && Time.unscaledTime >= idleWaitDeadline)
+        {
+            Debug.LogWarning("[CloudSave] 올리기 응답을 기다리다 시간 초과 — 기다리던 작업을 계속 진행합니다.");
+            FireIdleWaiters();
+        }
+
         if (checking)
         {
             if (Time.unscaledTime >= fetchDeadline)
@@ -405,17 +442,18 @@ public class CloudSave : MonoBehaviour
             if (remote.Exists && remote.SavedAt != baseAt && remote.SavedAt != savedAt)
             {
                 // 다른 기기가 그사이 올림 — 덮어쓰지 않고, 이번 실행에서는 더 올리지 않음 → 다음 실행의 확인(⑦)에서 플레이어가 고름
-                uploading   = false;
                 checkedUid  = null;
                 deferredUid = uid;
                 Debug.LogWarning("[CloudSave] 다른 기기가 먼저 클라우드에 저장해 덮어쓰지 않았습니다. 다음 실행 때 어느 쪽을 쓸지 묻습니다.");
+                EndUpload();
                 return;
             }
 
             // 기다리는 사이 계정이 바뀌었으면 올리지 않음 (새 계정 클라우드를 덮어쓰게 됨)
+            // (계정 삭제 중이면 TryGetAccount 가 false 라 여기서 멈춤 — 지울 문서를 다시 올리지 않음)
             if (!IsBackendAccount(uid) || !ProfileSync.TryGetAccount(out string midUid) || midUid != uid)
             {
-                uploading = false;
+                EndUpload();
                 return;
             }
 
@@ -434,13 +472,12 @@ public class CloudSave : MonoBehaviour
                     return;
                 }
 
-                uploading = false;
-
                 // 기다리는 사이 계정이 바뀌었으면 그 SaveManager 에 표시하지 않음
                 if (ProfileSync.TryGetAccount(out string nowUid) && nowUid == uid)
                     SaveManager.Instance.MarkCloudSynced(savedAt);
 
                 GameLog.Info($"[CloudSave] 올리기 완료 ({payload.world}-{payload.stage}, Lv.{payload.level})");
+                EndUpload();   // 표시까지 끝낸 뒤 기다리던 쪽을 깨움
             });
         });
     }
@@ -460,9 +497,9 @@ public class CloudSave : MonoBehaviour
     private void FailUpload(string json, long savedAt)
     {
         Debug.LogWarning($"[CloudSave] 올리기 실패 — {retryDelay}초 뒤 재시도");
-        uploading   = false;
         RestorePending(json, savedAt);
         nextTryTime = Time.unscaledTime + retryDelay;
+        EndUpload();
     }
 
     /// <summary>올리기 실패 — 그사이 더 새로 저장된 게 없으면 방금 것을 다시 올릴 대상으로 되돌림</summary>
