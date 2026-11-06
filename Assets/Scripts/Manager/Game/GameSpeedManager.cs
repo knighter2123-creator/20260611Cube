@@ -1,9 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 게임 배속을 관리합니다. (1x → 2x → 3x → 1x 순환)
-/// Time.timeScale을 직접 조정하므로 별도 연동 없이 모든 오브젝트에 적용됩니다.
-/// </summary>
+/// <summary>게임 배속 관리(1x → 2x → 3x 순환) — Time.timeScale 을 직접 바꿔 별도 연동 없이 모든 오브젝트에 적용.</summary>
 public class GameSpeedManager : MonoBehaviour
 {
     public static GameSpeedManager Instance { get; private set; }

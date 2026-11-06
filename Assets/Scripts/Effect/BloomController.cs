@@ -2,20 +2,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-/// <summary>
-/// URP Volume 의 Bloom 을 코드로 제어합니다.
-///
-/// 세 가지 축으로 동작합니다.
-///  1) 유저 강도(슬라이더) : 0~1 값. 0이면 꺼짐. PlayerPrefs 저장
-///  2) 유저 on/off(토글)   : 끄면 무슨 일이 있어도 안 켜짐. PlayerPrefs 저장
-///  3) 연출 요청           : PulseFor(초) / Push()-Pop() 으로 "지금 블룸이 필요하다"고 요청
-///
-/// ★ 설정 패널에서 쓰는 법
-///   패널을 열 때  BloomController.Instance?.Push();
-///   패널을 닫을 때 BloomController.Instance?.Pop();
-///   이렇게 하면 패널이 열려 있는 동안 블룸이 계속 켜져 있어서
-///   슬라이더와 토글의 결과가 눈에 보입니다. (아래 SetUserEnabled 주석 참고)
-/// </summary>
+/// <summary>URP Bloom 제어: 유저 강도(0~1, 0=꺼짐)·유저 on/off(끄면 절대 안 켜짐)를 PlayerPrefs 에 저장하고, 연출은 PulseFor(초)·Push/Pop 참조 카운트로 '지금 필요'를 요청.</summary>
+// 설정 패널: 열 때 Push, 닫을 때 Pop — 열린 동안 블룸이 켜져 있어야 슬라이더 결과가 보임
 [DisallowMultipleComponent]
 public class BloomController : MonoBehaviour
 {
@@ -74,10 +62,7 @@ public class BloomController : MonoBehaviour
     private float holdUntil;
     private bool  ready;
 
-    // ★ 추가 — Resolve() 가 계산해낸 기본값을 담는 런타임 전용 변수.
-    //   기존 코드는 [SerializeField] defaultIntensity01 에 직접 대입했는데,
-    //   직렬화 필드를 런타임에 덮어쓰면 "인스펙터에 보이는 값"과
-    //   "실제로 쓰인 값"이 달라져 나중에 추적이 어려워집니다.
+    // Resolve() 가 계산한 기본값(런타임 전용) — 직렬화 필드를 덮어쓰면 인스펙터 값과 실제 값이 달라져서
     private float resolvedDefault01;
 
     private float nextResolveRetry;   // Resolve 재시도 간격 제어
@@ -121,14 +106,7 @@ public class BloomController : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    /// <summary>
-    /// Volume / Bloom / 카메라를 잡는다.
-    ///
-    /// verbose 를 나눈 이유 — 이 함수는 실패하면 Update 에서 1초마다 다시 불립니다.
-    /// 실패 사유를 매번 찍으면 콘솔이 같은 줄로 도배돼 정작 봐야 할 로그가 묻힙니다.
-    /// 사유는 처음 한 번만 알리고, 이후에는 조용히 재시도합니다.
-    /// (조용한 실패는 나쁘지만, 같은 실패를 60번 외치는 것도 나쁩니다)
-    /// </summary>
+    /// <summary>Volume·Bloom·카메라를 잡음 — 실패하면 1초마다 재시도하므로 사유는 처음 한 번만 로그 (verbose, 도배 방지).</summary>
     private void Resolve(bool verbose)
     {
         ready = false;
@@ -223,18 +201,7 @@ public class BloomController : MonoBehaviour
     {
         userEnabled = PlayerPrefs.GetInt(PrefsEnabledKey, 1) == 1;
 
-        // ★ 여기가 실제 버그였습니다.
-        //
-        //   기존 코드는 PlayerPrefs 의 기본값으로 defaultIntensity01 을 그대로 넘겼습니다.
-        //   그런데 그 값은 Resolve() 가 성공해야만 채워집니다.
-        //   Volume 을 못 찾거나 Profile 이 비어 Resolve() 가 도중에 return 하면
-        //   defaultIntensity01 은 0 인 채로 남고, 저장값이 없는 첫 실행에서
-        //       userScale = 0
-        //   이 됩니다. 그러면 UserEnabled 가 (userScale > 0.001) 조건에서 막혀 false 가 되고,
-        //   체크박스는 영원히 꺼진 상태로 뜨며 눌러도 화면이 그대로입니다.
-        //
-        //   "설정이 안 먹는다"의 원인이 설정 쪽이 아니라 Volume 연결 쪽에 있었던 셈입니다.
-        //   0 으로 무너지지 않도록 최후의 기본값을 둡니다.
+        // 최후의 기본값 — Resolve 가 실패하면 기본 강도가 0 이라 첫 실행에 userScale=0 → 블룸이 영영 꺼진 채로 굳음
         float def = resolvedDefault01 > 0f ? resolvedDefault01
                   : defaultIntensity01 > 0f ? defaultIntensity01
                   : FallbackDefault01;
@@ -246,9 +213,7 @@ public class BloomController : MonoBehaviour
                       $"기본값 {def:0.00}, ready {ready}", this);
     }
 
-    // ─────────────────────────────────────────────
-    // 슬라이더 / 토글
-    // ─────────────────────────────────────────────
+    // ── 슬라이더 / 토글 ──
 
     /// <summary>UI Slider 의 On Value Changed 에 그대로 연결하세요. (Min 0 / Max 1)</summary>
     public void OnSliderChanged(float value01) => SetUserIntensity01(value01);
@@ -284,20 +249,7 @@ public class BloomController : MonoBehaviour
         LogState("강도 변경");
     }
 
-    /// <summary>
-    /// 블룸 사용 여부. 끄면 어떤 요청이 와도 켜지지 않습니다.
-    ///
-    /// ★ 토글을 켰는데 화면이 그대로인 것처럼 보이는 이유
-    ///   켜는 순간 PulseFor(previewSeconds) 로 1.5초만 켰다가 다시 꺼집니다.
-    ///   블룸은 원래 "레벨업 같은 순간에만 켜지는" 연출이라 그게 설계대로입니다.
-    ///
-    ///   그래서 설정 화면에서 확인하려면 패널이 열려 있는 동안 계속 켜둬야 합니다.
-    ///   GameSettingsManager 의 Open() 에 Push(), Close() 에 Pop() 을 넣으세요.
-    ///
-    ///   그리고 하나 더 — Screen Space Overlay 캔버스는 포스트 프로세싱을 타지 않습니다.
-    ///   패널 UI 자체는 무슨 짓을 해도 빛나지 않으므로,
-    ///   뒤쪽 게임 화면에 HDR 로 빛나는 것이 없으면 여전히 변화가 안 보입니다.
-    /// </summary>
+    /// <summary>블룸 사용 여부(끄면 어떤 요청에도 안 켜짐) — 켜면 1.5초 미리보기만 (설정 창은 Push/Pop 으로 유지, Overlay 캔버스 UI 는 포스트 프로세싱을 안 타 빛나지 않음).</summary>
     public void SetUserEnabled(bool on, bool save = true)
     {
         userEnabled = on;
@@ -314,17 +266,12 @@ public class BloomController : MonoBehaviour
         LogState("토글 변경");
     }
 
-    /// <summary>
-    /// 토글 초기 상태를 저장된 설정으로 맞추고 리스너를 겁니다.
-    /// (이 메서드로 연결했다면 인스펙터의 On Value Changed 항목은 비워두세요)
-    /// </summary>
+    /// <summary>토글을 저장된 설정으로 맞추고 리스너 등록 (⚠ 인스펙터 On Value Changed 는 비울 것).</summary>
     public void BindToggle(UnityEngine.UI.Toggle toggle)
     {
         if (toggle == null) return;
 
-        // ★ 기존에는 userEnabled(순수 토글값)로 맞췄습니다.
-        //   화면에는 UserEnabled(토글 ON && 강도 > 0)가 반영돼야
-        //   "강도 0인데 체크는 켜져 있는" 모순된 상태가 생기지 않습니다.
+        // UserEnabled(토글 ON && 강도 > 0)로 맞춤 — '강도 0 인데 체크는 켜짐' 모순 방지
         toggle.SetIsOnWithoutNotify(UserEnabled);
         toggle.onValueChanged.AddListener(OnToggleChanged);
     }
@@ -347,20 +294,14 @@ public class BloomController : MonoBehaviour
         slider.onValueChanged.AddListener(OnSliderChanged);
     }
 
-    /// <summary>
-    /// ★ 추가 — BindSlider 의 짝.
-    ///   원래 없어서 호출부(GameSettingsManager)가 OnSliderChanged 를 직접 떼어내야 했습니다.
-    ///   등록하는 쪽이 해제도 제공하는 게 맞습니다.
-    /// </summary>
+    /// <summary>BindSlider 의 짝 — 등록하는 쪽이 해제도 제공.</summary>
     public void UnbindSlider(UnityEngine.UI.Slider slider)
     {
         if (slider == null) return;
         slider.onValueChanged.RemoveListener(OnSliderChanged);
     }
 
-    // ─────────────────────────────────────────────
-    // 연출 요청
-    // ─────────────────────────────────────────────
+    // ── 연출 요청 ──
 
     /// <summary>지정한 시간(초) 동안 블룸을 켭니다. 중첩 호출 시 더 늦은 마감 시각으로 연장됩니다.</summary>
     public void PulseFor(float seconds)
@@ -388,14 +329,7 @@ public class BloomController : MonoBehaviour
     {
         if (!ready)
         {
-            // ★ 추가 — Volume 을 못 잡았으면 주기적으로 다시 시도합니다.
-            //
-            //   원래는 Awake 에서 한 번 실패하면 그 씬 내내 죽은 상태였습니다.
-            //   Volume 이 Additive 로 늦게 로드되거나 Camera.main 태그가 늦게 붙는 경우가 있어서,
-            //   한 번의 실패로 기능 전체를 포기하지 않게 합니다.
-            //
-            //   1초에 한 번뿐이고 성공하면 멈추므로 비용은 무시해도 됩니다.
-            //   (FindObjectsByType 은 비싸지만, 그건 '매 프레임 돌 때' 이야기입니다)
+            // Volume 을 못 잡았으면 1초마다 재시도 (늦게 로드되는 경우 대비, 성공하면 멈춰 비용 무시 가능)
             if (Now >= nextResolveRetry)
             {
                 nextResolveRetry = Now + 1f;
@@ -432,15 +366,7 @@ public class BloomController : MonoBehaviour
         bloom.active = on;
         bloom.intensity.value = current;
 
-        // ★ [프레임 드랍 수정] 포스트 프로세싱 on/off 는 '연출마다' 가 아니라 '유저 설정' 을 따릅니다.
-        //
-        //   예전에는 블룸이 켜지고 꺼질 때마다(= 레벨업 연출마다 두 번) renderPostProcessing 을 뒤집었습니다.
-        //   URP 는 이 값이 바뀌면 포스트 프로세싱용 렌더 타깃을 새로 할당하고 렌더 경로를 다시 구성하므로,
-        //   그 프레임이 눈에 띄게 멈칫합니다. 방치형이라 레벨업이 잦아 '주기적으로 끊기는' 증상이 됐습니다.
-        //
-        //   이제 블룸이 꺼진 동안에는 bloom.active = false 로 블룸 패스만 건너뛰고(위 줄),
-        //   카메라의 포스트 프로세싱은 유저가 설정에서 블룸을 끈 경우에만 내립니다.
-        //   값이 실제로 바뀔 때만 대입해 매 프레임 같은 값을 다시 쓰지도 않습니다.
+        // 카메라 포스트 프로세싱은 연출마다가 아닌 유저 설정만 따름 (토글하면 URP 가 렌더 타깃을 재할당해 멈칫), 연출 중 끄기는 bloom.active 로, 값이 바뀔 때만 대입
         if (togglePostProcessing && cameraData != null)
         {
             bool wantPost = UserEnabled;   // 설정에서 블룸을 끄면(토글 off 또는 강도 0) 패스 자체를 끔
@@ -459,14 +385,9 @@ public class BloomController : MonoBehaviour
                   (ready ? "" : "  ← Volume 을 못 잡아 화면에는 반영되지 않습니다"), this);
     }
 
-    // ─────────────────────────────────────────────
-    // 진단
-    // ─────────────────────────────────────────────
+    // ── 진단 ──
 
-    /// <summary>
-    /// 블룸이 안 보일 때 원인을 한 번에 확인합니다.
-    /// 인스펙터에서 컴포넌트 우클릭 → "블룸 진단" 으로도 실행할 수 있습니다.
-    /// </summary>
+    /// <summary>블룸이 안 보일 때 원인 진단 (우클릭 → "블룸 진단").</summary>
     [ContextMenu("블룸 진단")]
     public void Diagnose()
     {
@@ -533,8 +454,7 @@ public class BloomController : MonoBehaviour
             sb.AppendLine($"✅ Bloom 오버라이드 확보");
             sb.AppendLine($"   active            : {bloom.active}");
             sb.AppendLine($"   intensity(현재)   : {bloom.intensity.value:0.###}");
-            // threshold 도 intensity 와 같은 이유로 null 일 수 있다.
-            // 진단 함수가 예외를 던지면 진단을 못 하므로 여기서도 반드시 확인한다.
+            // threshold 도 null 일 수 있어 확인 (진단 함수가 예외를 던지면 진단 불가)
             if (bloom.threshold == null)
                 sb.AppendLine("   ⚠️ threshold 파라미터가 null 입니다. 프로파일에서 Bloom 을 제거 후 다시 추가하세요.");
             else

@@ -18,12 +18,9 @@ public class SkillExplosion : ActiveSkill
         float radius = GetExplosionRadius(GradeOf(caster));
 
         PlayEffect(target.transform.position);
-        // ※ 이펙트 크기는 반경과 따로 놉니다. 전설 반경을 크게 늘렸다면 이펙트가 작아 보일 수 있습니다
-        //   (셋업 문서 '나중에 확장할 거리' 참고).
+        // ⚠ 이펙트 크기는 반경과 별개 (반경을 크게 늘리면 이펙트가 작아 보일 수 있음)
 
-        // ★ [프레임 드랍 수정] OverlapCircleAll 은 부를 때마다 새 배열을 만듭니다(GC).
-        //   결과 목록을 재사용하는 OverlapCircle(…, List) 로 바꿨습니다.
-        //   필터는 OverlapCircleAll 의 기본 동작(기본 레이어 · 트리거 포함 여부는 프로젝트 설정)과 똑같이 맞췄습니다.
+        // 결과 List 를 재사용하는 OverlapCircle (OverlapCircleAll 은 매번 배열 할당), 필터는 기본 동작과 동일
         HitFilter.useTriggers = Physics2D.queriesHitTriggers;
         Physics2D.OverlapCircle(target.transform.position, radius, HitFilter, HitBuffer);
 

@@ -4,20 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 튜토리얼 진행 담당. MainScene 에 두는 "씬 오브젝트"다. (ManagerRoot / DontDestroyOnLoad 아님)
-///
-/// ★ 왜 ManagerRoot 에 안 두나?
-///   튜토리얼은 MainScene 의 HUD 버튼·플레이어 타워를 직접 가리켜야 합니다.
-///   DDOL 매니저가 씬 오브젝트를 참조하면 씬을 다시 로드할 때 참조가 끊깁니다.
-///   (BloomController 를 Effect Manager 에 둔 것과 같은 이유)
-///
-/// 흐름
-///   Start → (신규 유저면) 1프레임 뒤 Begin → timeScale 0 → 단계 진행 → Finish/Skip
-///        → 완료 기록 → GameSpeedManager 배속 복원
-///
-/// 강조(구멍 뚫린 어두운 화면 + 흰 테두리) 계산은 TutorialManager.Highlight.cs 에 있다.
-/// </summary>
+/// <summary>튜토리얼 진행(MainScene 씬 오브젝트 — HUD·타워를 직접 참조해야 해서 DDOL 아님) — 신규 유저면 1프레임 뒤 Begin → timeScale 0 → 단계 진행 → 완료 기록 → 배속 복원 (강조 계산은 .Highlight).</summary>
 public partial class TutorialManager : MonoBehaviour
 {
     public static TutorialManager Instance { get; private set; }
@@ -76,9 +63,7 @@ public partial class TutorialManager : MonoBehaviour
 
     private void OnDisable()
     {
-        // 튜토리얼 도중 씬을 떠나는 경우 (정상 흐름에선 오버레이가 막고 있어 거의 없음).
-        // 씬을 떠나는 길이므로 GameSettingManager.OnDisable 과 같은 규칙으로 1f 고정.
-        // 완료 기록(MarkDone)은 하지 않는다 → 끝까지 못 봤으니 다음에 다시 뜰 수 있게.
+        // 도중에 씬을 떠나면 timeScale 1 고정, 완료 기록은 안 함 (다음에 다시 뜨게)
         if (running)
         {
             running = false;
@@ -93,9 +78,7 @@ public partial class TutorialManager : MonoBehaviour
         refsOk = ValidateReferences();
         if (!refsOk) return;
 
-        // ★ GetComponent 결과에 ?? 를 쓰면 안 됩니다.
-        //   에디터에서 없는 컴포넌트를 GetComponent 하면 "가짜 null" 객체가 와서 ?? 가 통과해 버립니다.
-        //   TryGetComponent 는 그런 문제가 없습니다.
+        // TryGetComponent 사용 (GetComponent 결과의 '가짜 null' 은 ?? 를 통과함)
         if (!overlayRoot.TryGetComponent(out group))
             group = overlayRoot.gameObject.AddComponent<CanvasGroup>();
 
@@ -120,30 +103,15 @@ public partial class TutorialManager : MonoBehaviour
         skipButton.onClick.AddListener(Skip);
     }
 
-    /// <summary>
-    /// ★ 왜 바로 Begin 하지 않고 한 프레임 기다리나?
-    ///   GameSettingManager.Start() 가 RestoreGameSpeed() 로 timeScale 을 다시 올립니다.
-    ///   Start 끼리의 실행 순서는 보장이 없어서, 같은 프레임에 0 으로 내려도 덮어써질 수 있습니다.
-    ///   한 프레임 뒤에는 모든 Start 가 끝나 있고, HUD 레이아웃도 계산돼 있어 위치가 정확합니다.
-    /// </summary>
+    /// <summary>한 프레임 뒤 Begin — 다른 Start 의 배속 복원이 timeScale 0 을 덮어쓰지 않고 HUD 레이아웃도 계산된 뒤라서.</summary>
     private IEnumerator BeginNextFrame()
     {
         yield return null;
         Begin();
     }
 
-    /// <summary>
-    /// ★ 추가 — Message Box 에 TMP 텍스트 자체를 연결한 경우의 보정.
-    ///
-    ///   박스 위치는 messageBox.rect(사각형 크기)로 계산하는데,
-    ///   TMP 는 글자가 사각형보다 길어도 사각형 밖으로 넘쳐서 그대로 그려집니다(Overflow).
-    ///   그러면 코드는 "작은 박스"를 화면 안에 넣었다고 생각하지만
-    ///   실제 글자는 위아래로 삐져나가 화면 끝에서 잘리거나 테두리를 덮습니다.
-    ///
-    ///   ContentSizeFitter(세로 = Preferred Size)를 붙이면 사각형 높이가 글자 줄 수에 맞춰져
-    ///   "계산에 쓰는 크기 = 눈에 보이는 크기"가 됩니다.
-    ///   (배경 이미지가 있는 패널 구조라면 패널 쪽에 LayoutGroup + ContentSizeFitter 를 직접 다세요)
-    /// </summary>
+    /// <summary>Message Box 가 TMP 자체면 ContentSizeFitter(세로 Preferred) 부착 — 글자가 rect 밖으로 넘쳐 위치 계산과 보이는 크기가 달라지는 것 방지.</summary>
+    // ⚠ 배경 패널 구조라면 패널에 LayoutGroup + ContentSizeFitter 를 직접 달 것
     private void EnsureMessageBoxFitsText()
     {
         if (!messageBox.TryGetComponent(out TMP_Text _)) return;            // 박스가 텍스트가 아니면 건드리지 않음
@@ -183,9 +151,7 @@ public partial class TutorialManager : MonoBehaviour
         return ok;
     }
 
-    // ─────────────────────────────────────────────
-    // 시작 / 진행 / 종료
-    // ─────────────────────────────────────────────
+    // ── 시작 / 진행 / 종료 ──
 
     /// <summary>튜토리얼 시작. 자동 팝업과 설정 패널의 '튜토리얼' 버튼이 모두 이걸 부른다.</summary>
     public void Begin()
@@ -234,8 +200,7 @@ public partial class TutorialManager : MonoBehaviour
 
         TutorialProgress.MarkDone();   // 끝까지 봤든 스킵했든 "1회 노출"은 끝
 
-        // Finish 는 ESC 핸들러 안(Skip)에서도 불립니다. 순회 도중 목록에서 빼도 괜찮은 이유:
-        // GameManager.UpdateEscape 가 "역순 for문"으로 돌기 때문 (foreach 였다면 예외가 났을 것).
+        // ESC 핸들러 안에서 불려도 해제 안전 (UpdateEscape 가 역순 for 로 순회)
         UnregisterEscape();
 
         group.blocksRaycasts = false;  // 페이드아웃 중에도 바로 HUD 를 누를 수 있게
@@ -247,12 +212,7 @@ public partial class TutorialManager : MonoBehaviour
         fadeRoutine = StartCoroutine(Fade(group.alpha, 0f, () => overlayRoot.gameObject.SetActive(false)));
     }
 
-    /// <summary>
-    /// ★ 요청은 "1f 로 복구"지만, 1f 고정 대신 GameSpeedManager 의 배속을 복원합니다.
-    ///   1배속 유저는 결과가 똑같이 1f 이고,
-    ///   2/3배속 유저가 설정에서 튜토리얼을 다시 봤을 때 1배속으로 떨어지는 문제를 막습니다.
-    ///   (GameSettingManager.RestoreGameSpeed 와 같은 규칙)
-    /// </summary>
+    /// <summary>1f 고정 대신 저장된 배속 복원 (2/3배속 유저가 튜토리얼 재시청 후 1배속으로 떨어지지 않게).</summary>
     private void RestoreGameSpeed()
     {
         if (GameSpeedManager.Instance != null)
@@ -325,9 +285,7 @@ public partial class TutorialManager : MonoBehaviour
         fadeRoutine = null;
     }
 
-    // ─────────────────────────────────────────────
-    // 뒤로가기(ESC) — 튜토리얼 중엔 스킵으로 처리
-    // ─────────────────────────────────────────────
+    // ── 뒤로가기(ESC) — 튜토리얼 중엔 스킵으로 처리 ──
 
     private void RegisterEscape()
     {
@@ -350,9 +308,7 @@ public partial class TutorialManager : MonoBehaviour
         return true;
     }
 
-    // ─────────────────────────────────────────────
-    // 기본 단계 채우기 (문구는 인스펙터에서 자유롭게 수정)
-    // ─────────────────────────────────────────────
+    // ── 기본 단계 채우기 (문구는 인스펙터에서 자유롭게 수정) ──
 
     // Reset 은 컴포넌트를 처음 붙이거나 ⋮ → Reset 을 눌렀을 때 에디터에서 호출됩니다.
     private void Reset() => FillDefaultSteps();

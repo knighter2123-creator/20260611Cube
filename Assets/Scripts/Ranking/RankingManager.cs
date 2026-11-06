@@ -5,34 +5,10 @@ using BackEnd.Leaderboard;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-/// <summary>
-/// 주간 스테이지 랭킹 — 뒤끝 유저 리더보드(SDK 5.4.0+, 옛 '랭킹' 대체)에 내 기록을 올리고, 상위 기록을 받아 옵니다.
-///
-/// [붙이는 위치]
-///   로그인 씬의 ManagerRoot 하위. 다른 매니저들과 같은 DontDestroyOnLoad 싱글턴이다.
-///   우편함 동기화(MailboxSync)도 Awake 에서 같은 오브젝트에 붙입니다.
-///
-/// [뒤끝 콘솔 준비] — 인스펙터의 leaderboardUuid / tableName / column 과 맞춰야 합니다.
-///   1) 게임 정보 관리 > 테이블 생성: tableName (기본 "RANK_DATA"), 컬럼 column (기본 "progress", int)
-///      + 스테이지 정보 컬럼 world(int) / stage(int) / clearedAt(dateTime) — 스키마 정의 테이블일 때만 직접 추가
-///   2) 리더보드 > 유저 리더보드 생성: 위 테이블·컬럼, 내림차순, 초기화 주기 '주간' (가능하면 월요일 06:00)
-///   3) 같은 리더보드의 보상 설정 — 순위 구간별 우편 보상 (아이템 차트 형식은 BackendMailService 주석)
-///   4) 생성된 리더보드 UUID 를 leaderboardUuid 에 넣기
-///
-/// [점수]  StageRecord.BestProgress (누적 클리어 수, 1-1 = 1). 기록은 누적이지만 랭킹은 매주 비워지므로,
-///   그 주에 한 번이라도 올린 사람만 이번 주 랭킹·보상에 들어갑니다. 그래서 주차가 바뀌면 다시 올립니다.
-///
-/// [언제 올리는가]  "올려야 함(dirty)" 표시만 해 두고 Update 에서 조건이 맞을 때 한 번에 올립니다.
-///   - 최고 기록 갱신 (StageRecord.OnImproved) / 로그인 상태 변화 / 앱 시작 직후 1회 / 랭킹 주차가 바뀜
-///   조건: 로그인(온라인) + 게임 씬 진입(세이브 적용 후) + 깬 스테이지가 1개 이상
-///   테이블 값이 이 기기보다 높으면(다른 기기에서 더 멀리 감) 그 값을 유지합니다.
-///
-/// [세이브 삭제 후 랭킹 초기화]  세이브를 지운 계정(SaveManager.IsRankingResetPending)이 아직 1-1 이면
-///   테이블의 내 기록을 0 으로 내립니다 — 안 내리면 "테이블 값이 더 높으면 유지" 때문에 예전 기록이 다시 올라갑니다.
-///   (이번 주 랭킹에 이미 올라간 줄은 다음 초기화 때 사라집니다)
-///
-/// ⚠ 기록은 클라이언트가 올리는 값을 그대로 믿습니다.
-/// </summary>
+/// <summary>주간 스테이지 랭킹: 기록이 바뀌면 dirty 표시 → uploadDelay 뒤 Update 에서 뒤끝 유저 리더보드에 BestProgress 를 올림 (주간 초기화라 주차가 바뀌면 다시 올림).</summary>
+// [붙이는 위치] 로그인 씬 ManagerRoot 하위 DontDestroyOnLoad 싱글턴 (MailboxSync 도 Awake 에서 같이 붙임)
+// [뒤끝 콘솔 준비] ① 테이블 RANK_DATA: progress(int) + world/stage(int)·clearedAt(dateTime) ② 유저 리더보드: 내림차순·주간 초기화(월 06:00) ③ 순위 보상 우편 ④ UUID → leaderboardUuid
+// ⚠ 테이블 값이 더 높으면 유지(다른 기기 기록 보호) → 세이브 삭제 후 1-1 이면 테이블을 0 으로 내려야 예전 기록이 안 살아남 / 클라이언트 값을 그대로 믿음
 public class RankingManager : MonoBehaviour
 {
     public static RankingManager Instance { get; private set; }
@@ -47,25 +23,14 @@ public class RankingManager : MonoBehaviour
     [Tooltip("점수 컬럼 (int) — StageRecord.BestProgress 를 넣음")]
     [SerializeField] private string column = "progress";
 
-    /// <summary>
-    /// RANK_DATA 에 점수와 함께 넣는 스테이지 정보 컬럼 (랭킹 정렬에는 안 씀 — 콘솔·다른 기능에서 읽기 쉽게).
-    /// 테이블이 '스키마 정의' 방식이면 콘솔에 이 컬럼들도 만들어야 합니다 (world/stage int, clearedAt dateTime).
-    /// </summary>
+    /// <summary>점수와 함께 넣는 스테이지 정보 컬럼 — 정렬엔 안 쓰고 콘솔에서 읽기 쉽게 (스키마 테이블이면 콘솔에도 만들 것).</summary>
     public const string COL_WORLD      = "world";
     public const string COL_STAGE      = "stage";
     public const string COL_CLEARED_AT = "clearedAt";
 
-    /// <summary>
-    /// RANK_DATA 한 행에 들어갈 스테이지 데이터. progress 기준으로 world/stage 를 계산합니다.
-    /// clearedAt 은 UTC unix ms 로 받아 콘솔 스키마의 DateTime 형식과 똑같은 문자열(CLEARED_AT_FORMAT)로 넣습니다.
-    ///   ⚠ 뒤끝 5.11.5+ 는 스키마 DateTime 컬럼에 '설정한 형식과 정확히 같은' 문자열만 받음 — ISO("…T…Z")도
-    ///     형식이 다르면 400 "bad time dataType". 콘솔에서 형식을 바꾸면 CLEARED_AT_FORMAT 도 같이 바꿀 것.
-    ///   ⚠ DateTime 을 Param 에 직접 넣지 말 것 — GameData.Insert/Update 는 Param.GetValue() 의 원본 값을 LitJson 으로
-    ///     직렬화해서 "11/03/2026 06:00:00" 이 됨 (GetJson() 만 ISO 로 바꿔 줌)
-    ///   시각은 UTC 기준으로 넣습니다 (콘솔에 보이는 값도 UTC — 한국 시간은 +9시간).
-    /// 0 이하(기록 없음)면 clearedAt 은 보내지 않습니다 — dateTime 컬럼에 1970년을 넣지 않게.
-    /// 다시 읽을 때는 BackendJson.DateMs(row, COL_CLEARED_AT).
-    /// </summary>
+    /// <summary>RANK_DATA 한 행 Param: progress 로 world/stage 를 계산하고, clearedAt 은 UTC 문자열로 (0 이하면 1970년이 안 들어가게 생략).</summary>
+    // ⚠ 스키마 DateTime 컬럼은 콘솔 형식과 똑같은 문자열만 받음(아니면 400 bad time dataType) → 형식 바꾸면 CLEARED_AT_FORMAT 도 변경
+    // ⚠ DateTime 을 Param 에 직접 넣지 말 것 — "11/03/2026 06:00:00" 으로 직렬화됨. 읽을 때는 BackendJson.DateMs
     public static Param BuildStageParam(string scoreColumn, int progress, long clearedAtMs)
     {
         StageRecord.Split(progress, out int world, out int stage);
@@ -91,6 +56,12 @@ public class RankingManager : MonoBehaviour
     [Tooltip("업로드 실패 시 다시 시도하기까지 기다리는 시간(초)")]
     [SerializeField] private float retryDelay = 30f;
 
+    [Tooltip("올릴 일이 생긴 뒤 실제로 올리기까지 기다리는 시간(초). 스테이지 전환 프레임과 겹치지 않게 하고, 그 사이 바뀐 기록은 한 번에 올림")]
+    [SerializeField] private float uploadDelay = 3f;
+
+    [Tooltip("랭킹 주차가 바뀌었는지 확인하는 간격(초) — 매 프레임 확인할 필요 없음")]
+    [SerializeField] private float weekCheckInterval = 30f;
+
     public int TopCount => topCount;
 
     /// <summary>랭킹 한 줄.</summary>
@@ -107,6 +78,9 @@ public class RankingManager : MonoBehaviour
     private bool   uploading;
     private bool   resetting;
     private float  nextTryTime;
+    private float  dirtyAt = float.NegativeInfinity;   // dirty 가 처음 켜진 시각 — 앱 시작 직후 1회는 기다리지 않음
+    private float  nextWeekCheckTime;
+    private int    currentWeek = int.MinValue;          // weekCheckInterval 마다 갱신하는 RankingWeek.Current
     private bool   warnedNoUuid;
 
     private string rowUid;          // rowInDate 가 어느 계정 것인가
@@ -147,9 +121,15 @@ public class RankingManager : MonoBehaviour
     }
 
     /// <summary>다음 기회에 내 기록을 다시 올리게 합니다.</summary>
-    public void RequestUpload() => dirty = true;
+    public void RequestUpload() => MarkDirty();
 
-    private void MarkDirty() => dirty = true;
+    /// <summary>올릴 일이 생겼음. 실제 업로드는 처음 표시한 때로부터 uploadDelay 뒤 (그 사이 표시는 한 번으로 합쳐짐).</summary>
+    private void MarkDirty()
+    {
+        if (dirty) return;
+        dirty   = true;
+        dirtyAt = Time.unscaledTime;
+    }
 
     private bool IsConfigured
     {
@@ -172,13 +152,25 @@ public class RankingManager : MonoBehaviour
         if (uploading || resetting || Time.unscaledTime < nextTryTime) return;
         if (!IsConfigured) return;
 
-        if (TryResetAfterSaveDelete()) return;   // 초기화가 먼저 — 그 전에 올리면 예전 기록이 유지됨
+        // 초기화가 먼저(먼저 올리면 예전 기록 유지) — IsRankingResetPending 은 캐시라 매 프레임 불러도 가벼움
+        if (TryResetAfterSaveDelete()) return;
+
+        // 주차는 weekCheckInterval 마다만 다시 계산
+        float now = Time.unscaledTime;
+        if (now >= nextWeekCheckTime)
+        {
+            nextWeekCheckTime = now + weekCheckInterval;
+            currentWeek       = RankingWeek.Current;
+        }
 
         if (!CanUpload(out string uid)) return;
 
         // 이번 주에 아직 안 올렸으면 올림 (주간 랭킹은 매주 비워짐)
-        if (uid != uploadedUid || RankingWeek.Current != uploadedWeek) dirty = true;
+        if (uid != uploadedUid || currentWeek != uploadedWeek) MarkDirty();
         if (!dirty) return;
+
+        // 스테이지 전환 직후 같은 바쁜 프레임을 피해 조금 기다렸다가 올림
+        if (now - dirtyAt < uploadDelay) return;
 
         Upload(uid);
     }
@@ -219,7 +211,7 @@ public class RankingManager : MonoBehaviour
     private void Upload(string uid)
     {
         int progress = StageRecord.BestProgress;
-        int week     = RankingWeek.Current;
+        int week     = currentWeek = RankingWeek.Current;   // 올리는 순간의 주차 (주기 확인 값이 늦어서 한 번 더 올리지 않게)
 
         dirty     = false;   // 올리는 도중 또 바뀌면 다시 true → 끝난 뒤 한 번 더 올림
         uploading = true;
@@ -232,8 +224,7 @@ public class RankingManager : MonoBehaviour
             // 다른 기기에서 더 멀리 갔으면 그 기록을 유지 (진행도는 기기마다 따로일 수 있음 — 클라우드 세이브 전까지)
             int score = Mathf.Max(progress, tableProgress);
 
-            // 이 기기 기록이 이기면 스테이지 정보까지 통째로 갱신.
-            // 테이블 쪽이 더 높으면 그 행의 world/stage/clearedAt 은 이미 그 기록 기준이므로 점수만 다시 보냄.
+            // 이 기기 기록이 이기면 스테이지 정보까지 갱신, 테이블이 높으면 행의 world/stage 가 이미 맞으므로 점수만 보냄
             Param param;
             if (score == progress)
             {
@@ -327,10 +318,7 @@ public class RankingManager : MonoBehaviour
 
     // ───────────────────────────── 조회 ─────────────────────────────
 
-    /// <summary>
-    /// 이번 주 상위 topCount 명. 결과는 메인 스레드에서 onDone(목록, 오류 문구) 로 옵니다.
-    /// 성공이면 오류 문구가 null, 실패면 목록이 null.
-    /// </summary>
+    /// <summary>이번 주 상위 topCount 명을 메인 스레드에서 onDone(목록, 오류 문구)로 — 성공이면 오류가 null, 실패면 목록이 null.</summary>
     public void FetchTop(Action<List<Entry>, string> onDone)
     {
         if (!CheckCanFetch(out string reason)) { onDone?.Invoke(null, reason); return; }

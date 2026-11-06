@@ -2,20 +2,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// LoginScene 의 로그아웃 버튼 — 씬 오브젝트 (ManagerRoot 에 넣지 않는다).
-///
-/// [동작]
-///   로그인돼 있을 때만 보임 → 누르면 AuthManager.SignOut()
-///     → 구글·이메일 어느 방식이든 로그아웃 (뒤끝 + 구글 계정 선택 상태)
-///     → 앱 종료 X, 씬 이동 X — 로그인 화면에 그대로 남아 바로 다시 로그인할 수 있음
-///   화면 갱신은 다른 로그인 UI 와 같은 규칙(AuthStateUI). 그래서 로그아웃하면
-///   구글 버튼은 [Google 로그인] 으로, [이메일로 로그인] 은 다시 패널 열기로 자동으로 돌아갑니다.
-///
-/// ⚠ 이 스크립트는 로그아웃 버튼 "밖" 의 항상 켜진 오브젝트에 붙이세요 (EmailLoginUI 와 같은 이유).
-///   버튼 오브젝트 자신에 붙이면, 로그아웃 후 버튼을 숨기는 순간 이 스크립트도 꺼져서(OnDisable → 구독 해제)
-///   다시 로그인해도 버튼이 영영 안 나타납니다.
-/// </summary>
+/// <summary>LoginScene 로그아웃 버튼: 로그인돼 있을 때만 보이고 누르면 AuthManager.SignOut (씬 이동 없이 바로 다시 로그인 가능), 화면은 AuthStateUI 규칙으로 갱신.</summary>
+// ⚠ 버튼 '밖'의 항상 켜진 오브젝트에 붙일 것 — 버튼 자신에 붙이면 숨길 때 같이 꺼져 구독이 풀리고 다시 안 나타남
 public class LogoutButtonUI : AuthStateUI
 {
     [SerializeField] private Button logoutButton;

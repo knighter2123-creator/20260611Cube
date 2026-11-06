@@ -1,8 +1,7 @@
 using TMPro;
 using UnityEngine;
 
-// 진화 스테이지 제한시간 partial.
-// 2분 안에 보스를 못 잡으면 실패 → 보상 없이 원래 스테이지로 복귀.
+// 진화 스테이지 제한시간 partial — 2분 안에 못 잡으면 보상 없이 원래 스테이지로 복귀
 public partial class EvolveStageManager
 {
     [Header("제한시간")]

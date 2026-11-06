@@ -3,53 +3,28 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-// ══════════════════════════════════════════════════════════
-//  탭 페이지 계약
-// ══════════════════════════════════════════════════════════
+// ── 탭 페이지 계약 ──
 
-/// <summary>
-/// 탭 창 안에 들어가는 페이지가 구현하는 계약.
-///
-/// ★ OnEnable/OnDisable 로도 대부분 되지만, 훅을 따로 두는 이유가 있습니다.
-///   콘텐츠를 SetActive 로 켜고 끄지 않는 페이지(예: CanvasGroup 페이드만 쓰는 경우)도
-///   있고, "창은 열려 있는데 다른 탭이 선택된 상태"를 페이지가 알아야 할 때가 있습니다.
-///   OnEnable 은 "오브젝트가 켜졌다"이고 OnTabShow 는 "지금 사용자가 나를 보고 있다"입니다.
-/// </summary>
+/// <summary>탭 페이지 계약 — OnEnable(켜짐)과 달리 OnTabShow 는 '지금 사용자가 보고 있다' (SetActive 를 안 쓰는 페이지도 알 수 있게).</summary>
 public interface ITabPage
 {
     void OnTabShow();
     void OnTabHide();
 }
 
-/// <summary>
-/// 가이드 퀘스트가 "공격력 강화 항목을 보여줘" 라고 지목할 수 있는 페이지.
-/// (지금은 UpgradeUI 만 구현합니다)
-/// </summary>
+/// <summary>가이드 퀘스트가 특정 스탯 강화 항목을 지목할 수 있는 페이지 (지금은 UpgradeUI 만).</summary>
 public interface IStatFocusTarget
 {
     void FocusStat(LevelUpManager.StatType type);
 }
 
-// ══════════════════════════════════════════════════════════
-//  탭 창 본체
-// ══════════════════════════════════════════════════════════
+// ── 탭 창 본체 ──
 
-/// <summary>
-/// 강화 / 스탯 등을 탭으로 전환하는 단일 창.
-///
-/// ★ 이 컴포넌트는 창 '밖'의 항상 켜져 있는 오브젝트에 붙입니다.
-///   (SettingsPanel / PlayerStatusCodeUI 와 같은 규칙입니다.
-///    창 안에 붙이면 창이 꺼진 동안 이 스크립트도 꺼져서 '여는 동작' 자체가 불가능해집니다)
-///
-/// 책임 분배:
-///   - 여는 책임      → TabWindow (항상 켜져 있음)
-///   - 그리는 책임    → 각 탭 페이지 (보일 때만 살아 있음)
-/// </summary>
+/// <summary>강화·스탯 등을 탭으로 전환하는 단일 창 — 여는 책임은 항상 켜진 TabWindow, 그리는 책임은 보일 때만 살아 있는 각 페이지 (마지막 탭은 id 로 기억).</summary>
+// ⚠ 창 '밖'의 항상 켜진 오브젝트에 붙일 것 — 창 안이면 꺼진 동안 스크립트도 꺼져 열 수 없음
 public class TabWindow : MonoBehaviour
 {
-    // ══════════════════════════════════════════════
-    //  [직렬화] 탭 1개
-    // ══════════════════════════════════════════════
+    // ── [직렬화] 탭 1개 ──
     [Serializable]
     public struct TabEntry
     {
@@ -75,9 +50,7 @@ public class TabWindow : MonoBehaviour
         public bool dontRememberAsLastTab;
     }
 
-    // ══════════════════════════════════════════════
-    //  인스펙터
-    // ══════════════════════════════════════════════
+    // ── 인스펙터 ──
     [Header("창")]
     [Tooltip("★ 이 컴포넌트가 붙은 오브젝트와 달라야 합니다 (같으면 자기 자신을 꺼버림)")]
     [SerializeField] private GameObject windowRoot;
@@ -112,14 +85,7 @@ public class TabWindow : MonoBehaviour
     [SerializeField] private Color tabSelectedColor = new Color(0.35f, 0.62f, 1f);
     [SerializeField] private Color tabNormalColor   = Color.white;
 
-    // ★ 재화(골드/젬) 표시는 이 스크립트가 하지 않습니다.
-    //   그 일은 이미 CurrencyHUD 가 하고 있고, 여기서도 하면 같은 텍스트에 두 스크립트가
-    //   각자 다른 포맷으로 써넣게 됩니다. 한 번의 골드 변화에 두 리스너가 순서대로 돌고
-    //   '나중에 구독한 쪽'이 이기는데, 그 순서는 씬 구성에 따라 갈립니다.
-    //
-    //   창 상단에 재화를 띄우려면 그 오브젝트에 CurrencyHUD 를 하나 더 붙이세요.
-    //   창이 열릴 때 OnEnable 로 구독하고 닫힐 때 OnDisable 로 해제하므로 그대로 맞아떨어집니다.
-    //   "재화를 그리는 코드"는 프로젝트에 한 곳만 있어야 합니다.
+    // 재화 표시는 하지 않음 — 창에 띄우려면 CurrencyHUD 를 붙일 것 (두 스크립트가 같은 텍스트에 쓰면 구독 순서에 따라 엇갈림)
 
     [Header("동료 배치 연동")]
     [Tooltip("동료 배치 모드가 시작되면 창을 잠시 숨기고, 끝나면 되살립니다.\n" +
@@ -130,15 +96,11 @@ public class TabWindow : MonoBehaviour
     [Tooltip("가이드 퀘스트가 '스탯 강화'를 지목했을 때 열 탭의 id (보통 upgrade)")]
     [SerializeField] private string upgradeTabId = "upgrade";
 
-    // ══════════════════════════════════════════════
-    //  내부 상태
-    // ══════════════════════════════════════════════
+    // ── 내부 상태 ──
     private int currentTab = -1;
     private const string LastTabPrefKey = "TabWindow.LastTab";
 
-    // ★ bool 플래그가 아니라 '구독한 인스턴스'를 들고 비교합니다.
-    //   이 프로젝트의 매니저들은 씬 왕복 중 파괴 후 재생성되는 경우가 있어서,
-    //   bool 로 관리하면 옛 인스턴스를 붙잡은 채 새 매니저의 이벤트를 영영 못 받습니다.
+    // 구독한 인스턴스를 기억해 비교 (bool 이면 재생성된 매니저의 이벤트를 영영 못 받음)
     private GuideQuestManager           boundGuide;
     private CompanionPlacementController boundPlacement;
 
@@ -153,8 +115,7 @@ public class TabWindow : MonoBehaviour
 
     public bool IsOpen => windowRoot != null && windowRoot.activeSelf;
 
-    // ★ 창 위에 겹쳐 그려지는 HUD(예: SynergyHUD)가 창이 열린 동안 탭을 양보할 수 있게 알립니다.
-    //   창 안의 버튼을 눌렀는데 그 자리에 있던 HUD 가 탭을 가져가는 일을 막습니다.
+    // 열린 창 목록 — 창 위에 겹친 HUD(SynergyHUD 등)가 열린 동안 탭을 양보하게
     private static readonly System.Collections.Generic.HashSet<TabWindow> openWindows =
         new System.Collections.Generic.HashSet<TabWindow>();
 
@@ -172,9 +133,7 @@ public class TabWindow : MonoBehaviour
         AnyOpenChanged = null;
     }
 
-    // ══════════════════════════════════════════════
-    //  Unity 생명주기
-    // ══════════════════════════════════════════════
+    // ── Unity 생명주기 ──
     private void Awake()
     {
         if (tabs == null) tabs = new TabEntry[0];
@@ -186,8 +145,7 @@ public class TabWindow : MonoBehaviour
             windowRoot = null;
         }
 
-        // ★ windowRoot 가 비어 있으면 IsOpen 이 영원히 false 라, 창은 안 열리는데
-        //   버튼은 멀쩡히 눌리고 에러도 안 납니다. 연결을 빠뜨렸을 때 조용히 넘어가지 않게 막습니다.
+        // windowRoot 가 비면 창이 조용히 안 열리므로 에러로 알림
         if (windowRoot == null)
             Debug.LogError("[TabWindow] Window Root 가 연결되지 않았습니다. 창을 열고 닫을 수 없습니다.", this);
 
@@ -210,16 +168,7 @@ public class TabWindow : MonoBehaviour
                          "두 장을 모두 넣거나 둘 다 비워주세요. 지금은 아이콘 교체를 하지 않습니다.", this);
     }
 
-    /// <summary>
-    /// 창을 '여는 버튼의 자식' 으로 두면 두 가지가 걸립니다.
-    ///
-    ///   ① 닫을 수 없게 됩니다 — 창이 버튼을 덮으면 그 버튼이 더 이상 눌리지 않습니다.
-    ///      자식은 부모 위에 그려지고, 창의 Image 가 Raycast Target 이면 클릭을 전부 가져갑니다.
-    ///   ② 다른 HUD 뒤에 그려집니다 — UI 그리는 순서는 하이어라키 순서입니다.
-    ///      작은 버튼의 자식인 전체 화면 창은, 그 버튼보다 아래에 있는 형제 HUD 들에 덮입니다.
-    ///
-    /// 그리고 버튼이 Layout Group 안에 있으면 버튼 크기가 바뀔 때 창의 RectTransform 도 끌려다닙니다.
-    /// </summary>
+    /// <summary>창이 여는 버튼의 자식이면 경고 — 창이 버튼을 덮어 다시 못 누르고, 하이어라키 순서상 다른 HUD 에 덮임.</summary>
     private void WarnIfWindowIsChildOfOpenButton()
     {
         if (windowRoot == null || openButton == null) return;
@@ -251,15 +200,11 @@ public class TabWindow : MonoBehaviour
         if (windowRoot != null) windowRoot.SetActive(false);
         RefreshOpenState();
 
-        // 모든 탭 내용도 꺼 둡니다.
-        // ★ 이걸 빼먹으면 씬에 켜둔 채 저장한 탭이 창 뒤에 겹쳐 보입니다.
+        // 모든 탭 내용도 꺼 둠 (켜 둔 채 저장한 탭이 겹쳐 보이지 않게)
         for (int i = 0; i < tabs.Length; i++)
             if (tabs[i].contentRoot != null) tabs[i].contentRoot.SetActive(false);
 
-        // ★ 씬 전환으로 넘어온 "강화 UI 열기" 예약 소비.
-        //   원래 UpgradeUI.Start() 가 하던 일인데, 이제 UpgradeUI 는 탭 안에서
-        //   꺼진 채로 시작하므로 Start 가 아예 돌지 않습니다.
-        //   "여는 책임"은 항상 켜져 있는 이쪽이 가져가는 게 맞습니다.
+        // 씬 전환으로 넘어온 "강화 UI 열기" 예약 소비 (꺼진 채 시작하는 UpgradeUI 는 Start 가 안 돌아서 여기서)
         var gq = GuideQuestManager.Instance;
         if (gq != null && gq.TryConsumeStatFocus(out LevelUpManager.StatType type))
             FocusStatUpgrade(type);
@@ -267,8 +212,7 @@ public class TabWindow : MonoBehaviour
 
     private void OnEnable()
     {
-        // ★ 꺼졌다 켜지는 사이에 '배치 때문에 숨김' 상태가 남아 있을 수 있습니다.
-        //   그대로 두면 나중에 엉뚱한 배치가 끝날 때 창이 혼자 열립니다.
+        // 남은 '배치 때문에 숨김' 상태 초기화 (안 하면 나중 배치가 끝날 때 창이 혼자 열림)
         hiddenForPlacement = false;
 
         RegisterListeners();
@@ -290,9 +234,7 @@ public class TabWindow : MonoBehaviour
         if (openWindows.Remove(this)) AnyOpenChanged?.Invoke();
     }
 
-    // ══════════════════════════════════════════════
-    //  버튼 리스너
-    // ══════════════════════════════════════════════
+    // ── 버튼 리스너 ──
     private void RegisterListeners()
     {
         openAction   = Open;
@@ -300,11 +242,7 @@ public class TabWindow : MonoBehaviour
         dimmedAction = Close;
         toggleAction = Toggle;
 
-        // ★ Open 과 Close 에 '같은 버튼'을 넣은 경우
-        //   그대로 각각 등록하면 한 번의 클릭에 onClick 이 두 리스너를 연달아 실행합니다.
-        //   Open() → Close() 순서로 돌아 창이 열리자마자 닫히고, 화면에는 아무것도 안 보입니다.
-        //   에러도 안 나서 "버튼이 안 눌린다"고 오해하기 딱 좋은 조합이라 코드로 흡수합니다.
-        //   같은 버튼을 넣었다는 건 '토글' 의도이므로 Toggle 하나만 답니다.
+        // Open·Close 가 같은 버튼이면 Toggle 하나만 등록 (각각 달면 한 클릭에 열리자마자 닫힘)
         boundAsToggle = openButton != null && openButton == closeButton;
 
         if (boundAsToggle)
@@ -332,8 +270,7 @@ public class TabWindow : MonoBehaviour
 
     private void UnregisterListeners()
     {
-        // ★ RemoveAllListeners 는 다른 스크립트가 붙인 리스너까지 날립니다. 등록한 것만 정확히 뗍니다.
-        //   등록할 때와 같은 방식(토글이었는지 아닌지)으로 떼야 리스너가 남지 않습니다.
+        // 등록한 것만 등록 때와 같은 방식(토글 여부)으로 뗌 (RemoveAllListeners 는 남의 리스너까지 지움)
         if (boundAsToggle)
         {
             if (openButton != null && toggleAction != null) openButton.onClick.RemoveListener(toggleAction);
@@ -358,9 +295,7 @@ public class TabWindow : MonoBehaviour
         }
     }
 
-    // ══════════════════════════════════════════════
-    //  매니저 구독
-    // ══════════════════════════════════════════════
+    // ── 매니저 구독 ──
     private void TryBindManagers()
     {
         var gq = GuideQuestManager.Instance;
@@ -373,8 +308,7 @@ public class TabWindow : MonoBehaviour
             if (boundGuide != null) boundGuide.OnFocusStatUpgrade += FocusStatUpgrade;
         }
 
-        // ★ 배치 컨트롤러는 씬에 속해 있어 씬을 넘나들면 통째로 교체됩니다.
-        //   매니저들과 같은 방식으로 인스턴스를 비교해 갈아탑니다.
+        // 배치 컨트롤러는 씬마다 교체되므로 인스턴스 비교로 갈아탐
         var pc = CompanionPlacementController.Instance;
         if (pc != boundPlacement)
         {
@@ -395,12 +329,7 @@ public class TabWindow : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// ★ 가장 흔하게 걸릴 셋업 실수를 코드로 잡아냅니다.
-    ///   배치 컨트롤러가 창 '안'에 있으면, 배치를 시작하는 순간 창이 숨겨지면서
-    ///   컨트롤러도 같이 꺼집니다. Update() 가 멈추니 맵을 아무리 눌러도 배치가 되지 않고,
-    ///   에러도 로그도 하나 안 나옵니다. (안내 문구 hintText 도 같이 사라집니다)
-    /// </summary>
+    /// <summary>배치 컨트롤러가 창 안에 있으면 에러 — 배치 시작 때 창과 함께 꺼져 조용히 배치가 안 됨.</summary>
     private void WarnIfPlacementControllerIsInsideWindow()
     {
         if (windowRoot == null || boundPlacement == null) return;
@@ -426,24 +355,17 @@ public class TabWindow : MonoBehaviour
         boundPlacement = null;
     }
 
-    // ══════════════════════════════════════════════
-    //  동료 배치 중 잠시 비켜주기
-    // ══════════════════════════════════════════════
+    // ── 동료 배치 중 잠시 비켜주기 ──
     private void HandlePlacementBegan()
     {
         if (!hideWhileCompanionPlacing) return;
         if (!IsOpen || windowRoot == null) return;
 
-        // ★ 여기서 Close() 를 부르면 안 됩니다.
-        //   Close() 는 현재 탭에 OnTabHide 를 알리고, 동료 탭의 OnTabHide 는
-        //   CancelPlacement() 를 호출합니다. 그러면 방금 시작한 배치가 즉시 취소되고,
-        //   그 취소가 다시 '배치 종료' 를 쏴서 창이 되살아납니다 — 배치가 영원히 불가능해집니다.
-        //   지금 필요한 건 '잠깐 비켜주기' 뿐이므로 오브젝트만 끕니다.
+        // ⚠ Close() 금지 — 동료 탭 OnTabHide 가 배치를 취소해 창이 되살아나는 무한 반복, 오브젝트만 끔
         windowRoot.SetActive(false);
         hiddenForPlacement = true;
 
-        // ★ 창이 안 보이는 동안에는 버튼도 '열기' 모양이어야 합니다.
-        //   안 그러면 화면에 창이 없는데 버튼만 '접기(▼)' 로 남아 유저가 혼란스러워집니다.
+        // 안 보이는 동안 버튼도 '열기' 모양으로
         RefreshOpenState();
     }
 
@@ -461,28 +383,13 @@ public class TabWindow : MonoBehaviour
         RefreshOpenState();
     }
 
-    // ══════════════════════════════════════════════
-    //  열기 / 닫기
-    // ══════════════════════════════════════════════
+    // ── 열기 / 닫기 ──
     public void Open()
     {
-        // ★ 구독을 먼저 맞춥니다.
-        //   아래에서 boundPlacement 를 보는데, 씬이 막 로드된 프레임이라면 아직 null 일 수 있습니다.
-        //   그 상태로 지나가면 배치 모드가 살아 있는 채 창이 열려 화면이 덮입니다.
+        // 구독부터 맞춤 (씬 로드 직후 프레임엔 boundPlacement 가 아직 null 일 수 있음)
         TryBindManagers();
 
-        // ★ 배치 모드 중에 창을 열면 화면이 다시 덮여 배치 탭이 UI 에 막힙니다.
-        //   진입 버튼(화살표)은 창이 숨은 동안에도 HUD 에 그대로 보이므로 실제로 눌릴 수 있습니다.
-        //   창을 여는 쪽이 이긴다 — 배치를 취소하고 엽니다.
-        //
-        //   ★ hiddenForPlacement 를 먼저 내리는 이유: 그대로 두면 CancelPlacement 가 쏘는
-        //     OnPlacementEnded 가 창을 한 번 되살리고, 이어서 Open() 이 또 한 번 그립니다.
-        //     동료 탭이 열려 있었다면 목록을 두 번 통째로 다시 만들게 됩니다.
-        //
-        //   ★ hiddenForPlacement 는 배치 여부와 관계없이 무조건 내립니다.
-        //     창을 여는 순간 '배치 때문에 숨긴 상태'는 더 이상 아닙니다.
-        //     배치 도중 컨트롤러가 파괴되면 OnPlacementEnded 가 영영 안 오는데,
-        //     그때 이 플래그가 true 로 남아 있으면 다음 배치가 끝날 때 창이 혼자 열립니다.
+        // 배치 중에 열면 여는 쪽이 이김 — 배치 취소 후 열기. 플래그를 먼저 무조건 내려야 취소 이벤트가 창을 두 번 그리거나 나중에 혼자 열지 않음
         hiddenForPlacement = false;
 
         if (boundPlacement != null && boundPlacement.IsPlacing)
@@ -490,9 +397,7 @@ public class TabWindow : MonoBehaviour
 
         if (windowRoot != null) windowRoot.SetActive(true);
 
-        // ★ 열 때마다 현재 탭을 다시 보여줍니다.
-        //   ShowTab 안에서 OnTabShow 가 불리므로, 닫혀 있는 동안 놓친 갱신이 여기서 따라잡힙니다.
-        //   "이벤트 하나를 놓쳐도 거짓 정보가 화면까지 도달하지 못하게" 하는 이중 안전장치입니다.
+        // 열 때마다 현재 탭을 다시 보여 줘 닫혀 있는 동안 놓친 갱신을 따라잡음
         ShowTab(currentTab, force: true);
 
         RefreshOpenState();
@@ -500,12 +405,7 @@ public class TabWindow : MonoBehaviour
 
     public void Close()
     {
-        // ★ 배치 때문에 숨겨둔 상태에서 닫기가 들어오면(설정 버튼, 상점 버튼 등)
-        //   배치 모드를 먼저 정리해야 합니다. 안 그러면 창은 닫혔는데 미리보기와
-        //   "배치할 위치를 탭하세요" 안내만 화면에 남고, 맵을 누르면 동료가 배치됩니다.
-        //
-        //   순서가 중요합니다. hiddenForPlacement 를 먼저 내려야
-        //   CancelPlacement 가 쏘는 OnPlacementEnded 가 창을 되살리지 않습니다.
+        // 배치로 숨긴 상태에서 닫으면 배치도 취소 (안 하면 안내·미리보기만 남음) — 플래그를 먼저 내려야 창이 되살아나지 않음
         if (hiddenForPlacement)
         {
             hiddenForPlacement = false;
@@ -513,20 +413,14 @@ public class TabWindow : MonoBehaviour
         }
         else if (!IsOpen)
         {
-            // 이미 닫혀 있으면 OnTabHide 를 또 보내지 않습니다.
-            // (동료 탭의 OnTabHide 는 CancelPlacement 를 부르므로, 중복 호출이 엉뚱한 취소를 만듭니다)
+            // 이미 닫혀 있으면 OnTabHide 를 또 보내지 않음 (동료 탭은 중복 호출 때 엉뚱한 취소)
             return;
         }
 
         // 대칭을 맞춰 현재 탭에 먼저 알린 뒤 끕니다.
         GetPage(currentTab)?.OnTabHide();
 
-        // ★ 현재 탭의 내용도 같이 꺼야 합니다.
-        //   창만 끄면 contentRoot 는 activeSelf = true 로 남습니다. 그러면 다음에
-        //   '다른 탭'으로 창을 열 때 ShowTab 이 그 탭을 아직 보이는 중이라고 판단해
-        //   OnTabHide 를 한 번 더 보냅니다. OnTabShow 없이 OnTabHide 만 두 번 오는 셈이죠.
-        //   지금 페이지들은 여러 번 불려도 탈이 없지만, 계약이 깨지면 나중에 추가하는
-        //   페이지가 조용히 어긋납니다. 여기서 상태를 정확히 맞춰 둡니다.
+        // 탭 내용도 끔 — 남겨 두면 다른 탭으로 열 때 OnTabHide 가 한 번 더 와서 Show/Hide 짝이 깨짐
         if (currentTab >= 0 && currentTab < tabs.Length && tabs[currentTab].contentRoot != null)
             tabs[currentTab].contentRoot.SetActive(false);
 
@@ -541,9 +435,7 @@ public class TabWindow : MonoBehaviour
         else        Open();
     }
 
-    // ══════════════════════════════════════════════
-    //  탭 전환
-    // ══════════════════════════════════════════════
+    // ── 탭 전환 ──
     public void ShowTab(int index) => ShowTab(index, force: false);
 
     private void ShowTab(int index, bool force)
@@ -558,9 +450,7 @@ public class TabWindow : MonoBehaviour
             bool on = (i == index);
             var  t  = tabs[i];
 
-            // ★ 끌 때는 "알리고 → 끈다", 켤 때는 "켜고 → 알린다" 순서입니다.
-            //   켜기 전에 OnTabShow 를 부르면 페이지의 OnEnable(구독/초기화)이 아직 안 돌아서
-            //   갱신이 빈 상태로 한 번 지나갑니다.
+            // 끌 때 '알리고 → 끄기', 켤 때 '켜고 → 알리기' (먼저 알리면 OnEnable 전이라 빈 갱신)
             if (!on)
             {
                 if (t.contentRoot != null && t.contentRoot.activeSelf)
@@ -579,21 +469,12 @@ public class TabWindow : MonoBehaviour
 
         currentTab = index;
 
-        // ★ 인덱스가 아니라 id 를 저장합니다.
-        //   인덱스로 저장하면 나중에 탭 순서를 바꾸거나 중간에 하나 끼워 넣는 순간
-        //   유저가 마지막에 본 탭과 다른 탭이 열립니다.
+        // 인덱스가 아닌 id 로 기억 (탭 순서를 바꿔도 같은 탭이 열리게)
         if (rememberLastTab && !tabs[index].dontRememberAsLastTab && !string.IsNullOrEmpty(tabs[index].id))
             PlayerPrefs.SetString(LastTabPrefKey, tabs[index].id);
     }
 
-    /// <summary>
-    /// id 로 탭을 엽니다. 없으면 아무 일도 하지 않습니다.
-    ///
-    /// ★ 창이 닫혀 있으면 창까지 엽니다.
-    ///   예전에는 탭 내용만 켜고 창은 닫힌 채로 두어서, 밖에서 이 함수를 부르면
-    ///   "아무 일도 안 일어난 것처럼" 보였습니다. 이름이 '탭을 연다'인데
-    ///   화면에 아무것도 안 뜨는 건 함수가 거짓말을 하는 겁니다.
-    /// </summary>
+    /// <summary>id 로 탭 열기(없으면 무시) — 창이 닫혀 있으면 창까지 엶.</summary>
     public void ShowTab(string id)
     {
         int i = IndexOfTab(id);
@@ -622,8 +503,7 @@ public class TabWindow : MonoBehaviour
         int fallback = Mathf.Clamp(defaultTabIndex, 0, Mathf.Max(0, tabs.Length - 1));
         if (!rememberLastTab) return fallback;
 
-        // ★ 기본값으로 null 을 넘기지 않습니다. PlayerPrefs 는 네이티브로 문자열을 넘기는 API라
-        //   null 기본값은 플랫폼에 따라 동작이 갈립니다. 빈 문자열이 안전합니다.
+        // 기본값은 null 대신 빈 문자열 (네이티브 API 라 null 은 플랫폼마다 동작이 다름)
         string savedId = PlayerPrefs.GetString(LastTabPrefKey, string.Empty);
         int    i       = IndexOfTab(savedId);
         return i >= 0 ? i : fallback;
@@ -633,8 +513,7 @@ public class TabWindow : MonoBehaviour
     {
         if (index < 0 || index >= tabs.Length) return null;
 
-        // ★ 인스펙터는 인터페이스 타입 필드를 직렬화하지 못합니다.
-        //   그래서 MonoBehaviour 로 받아 여기서 캐스팅합니다. 아니면 null 이 돌아올 뿐 터지지 않습니다.
+        // 인스펙터가 인터페이스 필드를 직렬화 못 해 MonoBehaviour 로 받아 캐스팅 (아니면 null)
         return tabs[index].page as ITabPage;
     }
 
@@ -647,25 +526,12 @@ public class TabWindow : MonoBehaviour
         if (changed) AnyOpenChanged?.Invoke();
     }
 
-    /// <summary>
-    /// 창 상태에 맞춰 진입 버튼 아이콘을 바꾼다. (▲ 펼치기 ↔ ▼ 접기)
-    ///
-    /// ★ overrideSprite 가 아니라 sprite 를 바꾸는 이유
-    ///   Button 의 Transition 이 Sprite Swap 이면, 버튼은 상태가 바뀔 때마다
-    ///   내부적으로 overrideSprite 를 건드립니다. 평상시(Normal)에는 overrideSprite 를
-    ///   null 로 되돌리고 원래 sprite 를 보여주죠.
-    ///   그래서 우리가 sprite 를 바꾸면 그 그림이 '기본 모습'으로 남고,
-    ///   눌림/하이라이트 연출은 버튼이 알아서 얹습니다. 둘이 싸우지 않습니다.
-    ///   반대로 overrideSprite 를 우리가 칠하면 버튼이 다음 상태 변화에서 지워버립니다.
-    ///
-    ///   같은 이유로 탭 버튼 색은 ColorBlock 을 바꿨습니다 — '기본 모습'을 바꾸는 게 핵심입니다.
-    /// </summary>
+    /// <summary>창 상태에 맞춰 진입 버튼 아이콘 교체(▲ ↔ ▼) — overrideSprite 는 Sprite Swap 이 지워 버리므로 기본 sprite 를 바꿈.</summary>
     private void RefreshOpenButtonIcon()
     {
         if (iconWhenClosed == null || iconWhenOpened == null) return;
 
-        // 지정한 Image 가 없으면 버튼이 색을 칠하는 그래픽을 그대로 씁니다.
-        // (Target Graphic 이 Image 가 아닐 수도 있으므로 as 로 안전하게 받습니다)
+        // 지정 Image 가 없으면 버튼 Target Graphic (Image 가 아닐 수 있어 as)
         Image icon = openButtonIcon != null
             ? openButtonIcon
             : (openButton != null ? openButton.targetGraphic as Image : null);
@@ -687,17 +553,14 @@ public class TabWindow : MonoBehaviour
 
         if (t.button == null) return;
 
-        // ★ targetGraphic.color 를 직접 칠하면 Button 의 Color Tint 트랜지션이 곧바로 덮어씁니다.
-        //   ColorBlock 자체를 바꿔야 유지됩니다.
+        // targetGraphic.color 는 Color Tint 가 덮으므로 ColorBlock 을 바꿈
         var cb = t.button.colors;
         cb.normalColor   = isSelected ? tabSelectedColor : tabNormalColor;
         cb.selectedColor = cb.normalColor;
         t.button.colors  = cb;
     }
 
-    // ══════════════════════════════════════════════
-    //  가이드 퀘스트
-    // ══════════════════════════════════════════════
+    // ── 가이드 퀘스트 ──
     private void FocusStatUpgrade(LevelUpManager.StatType type)
     {
         int i = IndexOfTab(upgradeTabId);
@@ -708,9 +571,7 @@ public class TabWindow : MonoBehaviour
             return;
         }
 
-        // ★ 탭을 먼저 정하고 엽니다. 순서를 반대로 하면
-        //   Open() 이 '직전에 보던 탭'을 한 번 전부 그린 뒤 곧바로 강화 탭으로 넘어갑니다.
-        //   직전 탭이 동료 목록이면 리스트를 통째로 만들었다가 그대로 버리게 됩니다.
+        // 탭을 먼저 정하고 엶 (반대면 직전 탭을 한 번 다 그렸다 버림)
         currentTab = i;
         Open();     // 내부에서 ShowTab(currentTab, force: true) 수행
 

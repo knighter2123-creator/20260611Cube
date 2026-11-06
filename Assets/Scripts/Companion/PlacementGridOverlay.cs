@@ -2,16 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
-/// <summary>
-/// 동료 배치 격자 — 배치 모드 동안 배치 가능한 칸마다 네모 테두리를 띄웁니다.
-///   빈 칸 = emptyColor(초록), 이미 동료가 있는 칸 = occupiedColor(빨강)
-///
-/// [붙이는 위치] CompanionPlacementController 와 같은 오브젝트 (항상 켜져 있는 곳).
-///   배치 시작/종료 이벤트만 구독하므로 배치 컨트롤러 코드는 건드리지 않습니다.
-///
-/// 칸 목록은 CompanionManager 의 배치 타일맵(Build Tilemap)에 칠해진 타일을 그대로 씁니다.
-/// 타일을 새로 칠하면 다음 배치 때 자동으로 반영됩니다.
-/// </summary>
+/// <summary>배치 모드 동안 배치 타일맵의 칸마다 테두리 표시(빈 칸 초록, 점유 빨강) — 배치 시작/종료 이벤트만 구독, 타일을 새로 칠하면 자동 반영.</summary>
+// [붙이는 위치] CompanionPlacementController 와 같은 오브젝트
 public class PlacementGridOverlay : MonoBehaviour
 {
     [Header("격자 칸")]

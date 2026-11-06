@@ -3,20 +3,9 @@ using System.Collections.Concurrent;
 using BackEnd;
 using UnityEngine;
 
-/// <summary>
-/// 뒤끝 공용 도우미 — ① 초기화를 한 곳에서 한 번만  ② 비동기 응답을 메인 스레드로 넘김.
-///
-/// [붙이는 위치]  따로 붙이지 않습니다. 게임이 시작될 때(첫 씬 로드 전) 스스로 [BackendManager] 오브젝트를 만들고
-///   DontDestroyOnLoad 로 끝까지 살아 있습니다. 씬에 직접 붙여 두어도 중복은 스스로 지웁니다.
-///
-/// [초기화]  Initialize(onDone) — AuthManager 가 부릅니다. 이미 끝났으면 바로 onDone(true).
-///   키는 Assets/TheBackend/Resources/TheBackendSettings (뒤끝 메뉴 > Edit Settings) 에서 넣습니다.
-///
-/// [비동기 호출]  Call(cb => Backend.XXX(..., cb), bro => { ... })
-///   뒤끝의 비동기 콜백은 메인 스레드가 아닌 곳에서 올 수 있어 Unity API(오브젝트, PlayerPrefs, UI)를 바로 쓰면 안 됩니다.
-///   Call 은 응답을 큐에 넣었다가 다음 Update 에서 메인 스레드로 넘겨 줍니다 (Task 의 ContinueWithOnMainThread 같은 역할).
-///   호출하는 순간 예외가 나면 bro = null 로 옵니다 — 받는 쪽은 null 도 실패로 처리하세요 (IsNetworkError 참고).
-/// </summary>
+/// <summary>뒤끝 공용 도우미: 초기화를 한 번만 하고, 다른 스레드에서 오는 비동기 응답을 큐에 넣어 다음 Update 에 메인 스레드로 넘김 (Unity API 를 안전하게 쓰려고).</summary>
+// [붙이는 위치] 붙이지 않음 — 첫 씬 로드 전 스스로 [BackendManager] 를 만들어 DontDestroyOnLoad / 키는 TheBackendSettings(뒤끝 메뉴 > Edit Settings)
+// ⚠ 호출 중 예외가 나면 bro = null 로 옴 → 받는 쪽은 null 도 실패로 처리
 public class BackendManager : MonoBehaviour
 {
     private static BackendManager instance;
@@ -60,8 +49,7 @@ public class BackendManager : MonoBehaviour
     {
         if (instance == this) instance = null;
     }
-    // ★ 테스트 로그인 같은 코드를 여기(Start)에 두지 마세요 — 이 매니저는 게임이 켜질 때마다 자동으로 만들어지므로
-    //   실제 게임에서도 매번 플레이어의 로그인 세션을 바꿔 버리고, 초기화도 AuthManager 와 겹쳐 두 번 돕니다.
+    // ⚠ 테스트 로그인 코드를 Start 에 두지 말 것 — 매번 자동 생성되므로 실제 게임에서도 세션을 바꾸고 초기화가 AuthManager 와 겹침
 
     private void Update()
     {
@@ -132,10 +120,7 @@ public class BackendManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 결과 타입이 BackendReturnObject 의 하위 타입인 비동기 호출용 (예: 리더보드 → BackendUserLeaderboardReturnObject).
-    /// 람다로는 T 를 추론할 수 없으니 Call&lt;T&gt;(...) 처럼 타입을 적어 주세요.
-    /// </summary>
+    /// <summary>결과가 BackendReturnObject 하위 타입인 호출용(예: 리더보드) — 람다로는 추론이 안 되니 Call&lt;T&gt; 로 타입을 적을 것.</summary>
     public static void Call<T>(Action<Backend.BackendCallback<T>> request, Action<T> onDone) where T : BackendReturnObject
     {
         try
@@ -149,9 +134,7 @@ public class BackendManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 서버에 닿지 못한 실패인가 (오프라인 · 서버 오류 · 점검 · 요청 과다). true 면 "계정 문제" 가 아니라 나중에 다시 해 볼 일입니다.
-    /// </summary>
+    /// <summary>서버에 닿지 못한 실패인가(오프라인·서버 오류·점검·요청 과다) — true 면 계정 문제가 아니라 나중에 재시도할 일.</summary>
     public static bool IsNetworkError(BackendReturnObject bro)
     {
         return bro == null

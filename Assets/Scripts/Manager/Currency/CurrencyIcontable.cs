@@ -2,11 +2,7 @@ using UnityEngine;
 
 namespace Manager.currency
 {
-    /// <summary>
-    /// 재화 종류 → 아이콘 스프라이트 매핑.
-    /// 상품 카드가 자기 CostType에 맞는 아이콘을 골라 표시할 때 사용.
-    /// Create → Shop → Currency Icon Table 로 에셋 1개 생성 후 스프라이트 연결.
-    /// </summary>
+    /// <summary>재화 종류 → 아이콘 매핑(상품 카드 비용 아이콘용) — Create → Shop → Currency Icon Table 로 에셋 1개 생성.</summary>
     [CreateAssetMenu(fileName = "CurrencyIconTable", menuName = "Shop/Currency Icon Table")]
     public class CurrencyIconTable : ScriptableObject
     {

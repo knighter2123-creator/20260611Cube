@@ -1,9 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 플레이어 탄환. LaunchVolley() 로 타겟 방향을 중심으로 여러 발을 부채꼴로 동시에 쏩니다 (1발이면 count = 1).
-/// (예전 1발 전용 Launch() 는 모든 호출부가 LaunchVolley 로 옮겨 가 지웠습니다)
-/// </summary>
+/// <summary>플레이어 탄환(풀링): LaunchVolley 로 타겟 방향 중심 부채꼴 다발 발사, 맞히거나 lifeTime 이 지나면 풀로 반환.</summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class Bullet : MonoBehaviour
 {
@@ -37,13 +34,9 @@ public class Bullet : MonoBehaviour
         if (rb != null) rb.linearVelocity = Vector2.zero;
     }
 
-    // ══════════════════════════════════════════════════════════════
-    //  발사
-    // ══════════════════════════════════════════════════════════════
+    // ── 발사 ──
 
-    /// <summary>
-    /// 타겟 방향을 중심으로 count발을 부채꼴로 동시에 발사합니다.
-    /// </summary>
+    /// <summary>타겟 방향 중심으로 count 발을 부채꼴 동시 발사.</summary>
     /// <param name="count">동시 발사체 수 (1 이상)</param>
     /// <param name="spreadAngle">발사체 사이의 각도 간격(도). count가 1이면 무시됩니다.</param>
     public static void LaunchVolley(Enemy target, Transform firePoint, PlayerStat stat,
@@ -57,30 +50,13 @@ public class Bullet : MonoBehaviour
 
         count = Mathf.Max(1, count);
 
-        // ★ 공격력 레이어 ─────────────────────────────────────────────────
-        // 공격력은 세 겹의 곱으로 결정되고, **그 곱셈은 전부 PlayerStat 안에서** 끝납니다.
-        //     baseDamage    강화로 올리는 순수 기본값 (세이브에 저장되는 유일한 값)
-        //   × 증강 배율      AugmentManager.Attack
-        //   × 각성 영구 버프  PlayerBuffManager.DamageMultiplier
-        //   = stat.FinalDamage
-        //
-        // ★ [수정] 예전에는 여기서 PlayerBuffManager 를 직접 한 번 더 곱했습니다.
-        //   그 결과 FinalDamage 에는 각성 버프가 빠져 있었고, 같은 값을 보여주는
-        //   스탯창은 각성해도 숫자가 안 움직였습니다 — 표시와 실제가 달랐던 거죠.
-        //
-        //   이제 곱하는 지점이 PlayerStat 한 곳뿐이라 **이중 적용이 구조적으로 불가능**합니다.
-        //   여기에 buffMult 를 다시 넣으면 대미지가 두 번 곱해지니 절대 되돌리지 마세요.
-        //
-        // 각성의 '발사체/연사'는 이 곱셈 레이어에 끼어들지 않습니다.
-        // 데미지를 키우는 게 아니라 '발사 횟수'를 늘리는 별개의 축이라서,
-        // 기존 레이어를 전혀 건드리지 않고 위에 얹을 수 있습니다.
-        // ────────────────────────────────────────────────────────────────
+        // 공격력 = baseDamage × 증강 × 각성 버프, 곱셈은 전부 stat.FinalDamage 안에서 (스탯창과 같은 값) — ⚠ 여기서 버프를 다시 곱하면 이중 적용
         float buffedDamage = stat.FinalDamage;
 
         Vector2 spawnPos = (Vector2)firePoint.position;
         Vector2 toTarget = (Vector2)target.transform.position - spawnPos;
 
-        // 플레이어와 적이 정확히 겹치면 normalized가 (0,0)이 되어 총알이 제자리에 섭니다.
+        // 정확히 겹치면 normalized 가 (0,0) 이라 총알이 제자리에 서므로 기본 방향
         Vector2 baseDir   = toTarget.sqrMagnitude > 0.0001f ? toTarget.normalized : Vector2.right;
         float   baseAngle = Mathf.Atan2(baseDir.y, baseDir.x) * Mathf.Rad2Deg;
 
@@ -91,35 +67,7 @@ public class Bullet : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// i번째 발사체의 각도 오프셋을 계산합니다.
-    ///
-    /// ═══ 왜 '가운데 정조준'을 반드시 남기는가? (중요) ═══════════════════
-    ///
-    /// 처음엔 좌우 대칭으로 균등 분배하는 게 자연스러워 보입니다.
-    ///     2발 → [-s/2, +s/2]
-    ///     3발 → [-s,  0,  +s]
-    ///
-    /// 그런데 짝수 발일 때 **가운데가 비어버립니다.** 각도 12도, 사거리 10 기준으로
-    /// 각 발이 중심에서 약 1.05 유닛씩 벗어나는데, 적 콜라이더가 그보다 작으면
-    /// **두 발 다 빗나갑니다.** "발사체 +1 보상을 받았는데 보스 DPS가 오히려 0이 되는"
-    /// 최악의 상황이 나옵니다.
-    ///
-    /// 그래서 0번은 항상 정조준(0도)으로 두고, 나머지를 좌우로 번갈아 붙입니다.
-    ///     1발 → [0]
-    ///     2발 → [0, +s]
-    ///     3발 → [0, +s, -s]
-    ///     4발 → [0, +s, -s, +2s]
-    ///
-    /// 짝수 발일 때 좌우가 살짝 비대칭해 보이지만, 그 대가로
-    /// **단일 타겟 DPS가 발사체 수에 정확히 비례**합니다. 밸런스를 잡을 때
-    /// "예측 가능한 숫자"가 "보기 좋은 모양"보다 훨씬 중요합니다.
-    ///
-    /// ★ 일반화하면: 보상은 어떤 상황에서도 최소한 손해가 되면 안 됩니다.
-    ///   플레이어가 "이거 받고 나서 더 약해진 것 같은데?"라고 느끼는 순간
-    ///   성장 시스템 전체의 신뢰가 무너집니다.
-    /// ══════════════════════════════════════════════════════════════════
-    /// </summary>
+    /// <summary>i번째 발사체 각도 오프셋 [0, +s, -s, +2s…] — 0번은 항상 정조준 (대칭 분배면 짝수 발일 때 가운데가 비어 작은 적에게 전부 빗나감).</summary>
     private static float FanOffset(int index, float spreadAngle)
     {
         if (index == 0) return 0f;          // 0번은 언제나 정조준
@@ -133,24 +81,7 @@ public class Bullet : MonoBehaviour
     /// <summary>총알 1발을 풀에서 꺼내 지정한 각도로 쏩니다.</summary>
     private static void SpawnOne(Vector2 spawnPos, float angleDeg, float buffedDamage, PlayerStat stat)
     {
-        // ★ 크리티컬은 '발사체마다' 따로 굴립니다.
-        //   한 번 굴려서 전부 크리 / 전부 논크리로 하면 데미지가 크게 출렁입니다.
-        //   발마다 굴리면 표본이 늘어 기대값에 수렴해서 체감이 훨씬 안정적이에요.
-        //   (각성 후에 크리 확률 스탯의 가치가 오히려 올라가는 효과도 있습니다)
-        //
-        // ★ stat.Critical 이 아니라 stat.FinalCritical 을 씁니다. (이번에 고친 부분)
-        //
-        //   PlayerStat 에는 두 값이 있습니다.
-        //     Critical       — 강화로 올린 순수 확률
-        //     FinalCritical  — Min(Critical + 증강 보너스, 100) ← 스탯창이 보여주는 값
-        //
-        //   지금은 치명타 확률 증강 카드가 없어서 두 값이 완전히 같습니다.
-        //   하지만 PlayerStat 주석대로 나중에 그 카드를 추가하면,
-        //   스탯창에는 오른 확률이 뜨는데 실제 발사는 옛 값으로 굴립니다.
-        //
-        //   "화면에 보이는 수치와 실제 동작이 다른 것은 가장 나쁜 종류의 버그"라고
-        //   PlayerStat 에 직접 적어두셨죠. 지금 바꿔두면 그 버그가 태어나지 않습니다.
-        //   (오늘 기준으로는 동작이 100% 동일하므로 위험이 없는 변경입니다)
+        // 치명타는 발사체마다 따로 굴림(대미지 출렁임 감소), 확률은 스탯창과 같은 FinalCritical (증강 보너스 포함)
         bool  isCritical  = Random.Range(0f, 100f) < stat.FinalCritical;
         float finalDamage = isCritical
             ? buffedDamage * stat.FinalCriticalMultiplier
@@ -158,11 +89,7 @@ public class Bullet : MonoBehaviour
 
         GameObject bulletObj = ObjectPoolManager.Instance.GetBulletInactive();
 
-        // ★ 파괴된 인스턴스 방어.
-        //   유니티에서 Destroy된 오브젝트는 C#의 진짜 null이 아니지만
-        //   == null 비교는 true가 나옵니다. 이 검사가 없으면 아래 TryGetComponent에서
-        //   MissingReferenceException이 터집니다.
-        //   (근본 해결은 ObjectPoolManager.GetBulletInactive 쪽 — 별도 파일 참고)
+        // 파괴된 인스턴스 방어 (Unity == null 이 걸러 줌, 없으면 TryGetComponent 에서 MissingReferenceException)
         if (bulletObj == null) return;
 
         if (!bulletObj.TryGetComponent(out Bullet bullet))
@@ -172,8 +99,7 @@ public class Bullet : MonoBehaviour
             return;
         }
 
-        // 각도 → 방향 벡터.
-        // (부채꼴이라 타겟 좌표를 다시 쓰면 안 되고, 반드시 각도로 계산해야 합니다)
+        // 각도 → 방향 벡터 (부채꼴이라 타겟 좌표가 아닌 각도로 계산)
         float   rad = angleDeg * Mathf.Deg2Rad;
         Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
 
@@ -184,9 +110,7 @@ public class Bullet : MonoBehaviour
         bullet.Init(dir, finalDamage, isCritical);
     }
 
-    // ══════════════════════════════════════════════════════════════
-    //  인스턴스 동작
-    // ══════════════════════════════════════════════════════════════
+    // ── 인스턴스 동작 ──
 
     public void Init(Vector2 dir, float dmg, bool crit = false)
     {
@@ -207,10 +131,7 @@ public class Bullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        // ★ 한 발이 한 적만 맞히게 합니다.
-        //   적 두 마리가 겹쳐 있으면 같은 물리 스텝에 OnTriggerEnter2D 가 연달아 불립니다.
-        //   첫 적에서 풀로 반환(비활성화)해도 그 스텝에 이미 잡힌 접촉은 계속 전달될 수 있어서,
-        //   이 가드가 없으면 총알 한 발이 겹친 적 모두에게 피해를 줍니다(의도치 않은 관통).
+        // 한 발 = 한 적 — 겹친 적은 같은 물리 스텝에 연달아 불려 반환 뒤에도 맞는 관통이 생김
         if (isReturned) return;
 
         if (!other.TryGetComponent(out Enemy target)) return;

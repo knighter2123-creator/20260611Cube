@@ -1,14 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;   // 클릭/터치 감지(IPointerClickHandler)
-/// <summary>
-/// MainScene 네임플레이트. 이름 표시 + (선택) 클릭 시 닉네임 팝업 열기.
-///
-/// 자동 팝업(NicknamePrompt)을 '나중에' 로 닫은 유저도 언제든 이름을 정할 수 있도록
-/// 클릭하면 NicknameChangePanel.Open() 을 부릅니다. 패널이 이름 유무를 보고
-/// '최초 설정(무료)' / '변경(보석)' 을 스스로 고르므로 여기서는 Open() 만 부릅니다.
-/// namePanel 을 비워 두면 표시만 합니다.
-/// </summary>
+/// <summary>MainScene 네임플레이트: 이름(없으면 익명) 표시 + 클릭 시 닉네임 패널 Open (모드는 패널이 정함, namePanel 이 비면 표시만).</summary>
 public class PlayerName : MonoBehaviour, IPointerClickHandler
 {
     [Header("닉네임 표시")]
@@ -49,8 +42,7 @@ public class PlayerName : MonoBehaviour, IPointerClickHandler
     {
         if (nickNameText == null) return;
 
-        // 변수 이름을 name 으로 하면 MonoBehaviour 의 name(오브젝트 이름)과 헷갈리므로 다른 이름 사용
-        // 이름이 없으면(특정 스테이지 전 신규 유저의 정상 상태) "익명1234" 같은 익명 이름
+        // 이름이 없으면 익명 이름 (변수명은 MonoBehaviour.name 과 헷갈리지 않게)
         string displayName = PlayerProfile.DisplayName;
         try
         {
@@ -58,8 +50,7 @@ public class PlayerName : MonoBehaviour, IPointerClickHandler
         }
         catch (System.FormatException)
         {
-            // format 에 "{" 만 있거나 "{1}" 처럼 잘못 적으면 string.Format 이 예외를 던집니다.
-            // 인스펙터 오타 하나로 화면 갱신이 멈추지 않게 이름만 표시하고 경고를 남깁니다.
+            // 잘못된 format(인스펙터 오타)이면 예외로 갱신이 멈추지 않게 이름만 표시하고 경고
             nickNameText.text = displayName;
             Debug.LogWarning($"[PlayerName] format 문자열이 잘못됐습니다: '{format}' (예: \"유저 : {{0}}\")", this);
         }

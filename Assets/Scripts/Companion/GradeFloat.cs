@@ -4,25 +4,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-/// <summary>
-/// 스킬 수치 하나를 '동료 등급별'로 다르게 줄 수 있게 해 주는 칸. (신규)
-///
-/// ★ 사용 방식
-///   스킬 에셋에는 원래 있던 숫자(예: damage = 20)가 그대로 남습니다. 그 숫자가 '일반 등급 값'입니다.
-///   그 옆에 이 칸(damageByGrade)을 두고,
-///     - 체크 끔  → 모든 등급이 원래 숫자를 씀 (지금과 완전히 같음)
-///     - 체크 켬  → 희귀 / 영웅 / 전설은 여기에 적은 값을 씀. 일반은 여전히 원래 숫자
-///
-/// ★ 왜 원래 float 필드(damage)를 이 타입으로 '바꾸지' 않았나
-///   유니티는 필드 타입이 바뀌면 저장돼 있던 값을 읽지 못해 기본값으로 초기화합니다.
-///   (int → long 으로 바꿨다가 세이브 값이 0 이 됐던 것과 같은 함정)
-///   damage 를 GradeFloat 로 바꾸면 모든 스킬 에셋의 피해 값이 조용히 날아갑니다.
-///   그래서 원래 필드는 그대로 두고, 등급별 값만 '옆에 추가'했습니다.
-///
-/// ★ 왜 struct 가 아니라 class 인가
-///   OnValidate 에서 FillIfEmpty() 로 안의 값을 고쳐 써야 하는데,
-///   struct 는 복사본이 넘어가서 원본이 안 바뀌는 실수를 하기 쉽습니다. class 는 참조라 안전합니다.
-/// </summary>
+/// <summary>스킬 수치 하나를 등급별로 다르게 주는 칸 — 체크 끔: 모든 등급이 원래 숫자(일반 값), 켬: 희귀/영웅/전설은 여기 값 (원래 필드 타입을 바꾸면 에셋 값이 날아가 옆에 추가, OnValidate 수정을 위해 class).</summary>
 [Serializable]
 public class GradeFloat
 {
@@ -32,10 +14,7 @@ public class GradeFloat
     public float epic;
     public float legendary;
 
-    /// <summary>
-    /// 등급에 맞는 값을 돌려줍니다.
-    /// normalValue = 스킬 에셋의 원래 숫자(일반 등급 값).
-    /// </summary>
+    /// <summary>등급에 맞는 값 (normalValue = 에셋의 원래 숫자 = 일반 값).</summary>
     public float Get(float normalValue, CompanionGrade grade)
     {
         if (!enabled) return normalValue;
@@ -49,11 +28,7 @@ public class GradeFloat
         }
     }
 
-    /// <summary>
-    /// [에디터 편의] 체크를 막 켰는데 세 칸이 전부 0 이면 일반 값으로 채워 줍니다.
-    /// 체크하는 순간 '전설 피해 0' 이 되어 테스트 중 동료가 갑자기 약해지는 걸 막습니다.
-    /// (세 칸 중 하나라도 값을 넣었다면 건드리지 않습니다)
-    /// </summary>
+    /// <summary>[에디터] 체크를 막 켰는데 세 칸이 모두 0 이면 일반 값으로 채움 (켜는 순간 0 이 되어 약해지지 않게).</summary>
     public void FillIfEmpty(float normalValue)
     {
         if (!enabled) return;
@@ -62,25 +37,13 @@ public class GradeFloat
         rare = epic = legendary = normalValue;
     }
 
-    /// <summary>
-    /// [에디터 점검용] 체크가 켜져 있는데 0 인 칸이 있는지.
-    /// 쿨타임·독 간격처럼 '0 이면 거의 확실히 실수' 인 값에서 경고를 띄우는 데 씁니다.
-    /// (예: 영웅 칸만 비워두면 영웅 동료 쿨타임이 하한 0.1초가 되어 스킬을 난사합니다)
-    /// </summary>
+    /// <summary>[에디터 점검] 켜져 있는데 0 인 칸이 있는가 — 쿨타임 등 0 이면 실수인 값 경고용 (빈 칸이면 하한 0.1초로 스킬 난사).</summary>
     public bool HasZeroSlot()
         => enabled && (rare == 0f || epic == 0f || legendary == 0f);
 }
 
 #if UNITY_EDITOR
-/// <summary>
-/// 인스펙터에서 GradeFloat 를 한 줄로 그려 줍니다. (선택 — 이 부분을 지워도 동작은 같고, 접이식으로 보일 뿐)
-///
-///   Damage By Grade   [✓]  희귀 [30]  영웅 [45]  전설 [70]
-///
-/// ★ #if UNITY_EDITOR 로 감싼 이유
-///   UnityEditor 네임스페이스는 빌드에 포함되지 않습니다. 감싸지 않으면 모바일 빌드가 컴파일 에러로 실패합니다.
-///   (보통은 Editor 폴더에 따로 두지만, 파일 하나로 끝내려고 여기에 같이 넣었습니다)
-/// </summary>
+/// <summary>GradeFloat 를 인스펙터 한 줄로 그림(선택, 지워도 동작 동일) — UnityEditor 는 빌드에 없어 #if UNITY_EDITOR 로 감쌈.</summary>
 [CustomPropertyDrawer(typeof(GradeFloat))]
 public class GradeFloatDrawer : PropertyDrawer
 {

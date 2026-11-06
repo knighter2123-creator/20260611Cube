@@ -5,27 +5,9 @@ using UnityEngine.Events;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-/// <summary>
-/// LoginScene 의 이메일 로그인 / 회원가입 UI — 씬 오브젝트 (ManagerRoot 에 넣지 않는다).
-///
-/// 구조는 GoogleLoginButtonUI 와 같습니다 (AuthStateUI).
-///   - 버튼을 누르면 AuthManager 에 부탁만 하고 (SignInWithEmail / SignUpWithEmail)
-///   - 화면 갱신은 AuthManager.StateChanged 를 받아 상태(IsSigningIn, IsSignedIn, LastError)를 읽어서 함
-///   - 로그인에 성공하면 onStartGame (인스펙터에서 Login_Name.StartGame 연결) 으로 게임 시작
-///
-///     로그인 화면  [Google 로그인] [게스트로 시작하기] [이메일로 로그인]
-///                                                        └─ 누르면 ▼
-///     이메일 패널  ┌ 이메일 / 비밀번호 / [로그인] [회원가입] / 메시지 / [닫기] ┐
-///
-/// [이메일로 로그인] 버튼의 세 가지 모습
-///   로그인 전              → 누르면 이메일 패널이 열림
-///   이메일로 로그인됨      → [시작하기] — 패널 없이 바로 게임 시작
-///   다른 방식으로 로그인됨 → 비활성 (구글 버튼이 [시작하기]. 이메일로 바꾸려면 로그아웃 후 로그인)
-///
-///   ⚠ 이 스크립트는 패널 "밖" 의 항상 켜진 오브젝트에 붙이세요 (Login_Name 과 같은 규칙).
-///     패널에 붙이면, 패널이 꺼진 채 시작할 때 Awake/OnEnable 이 불리지 않아
-///     [이메일로 로그인] 버튼에 리스너가 걸리지 않고 → 눌러도 아무 반응이 없습니다.
-/// </summary>
+/// <summary>LoginScene 이메일 로그인/가입 UI: 버튼은 AuthManager 에 요청만 하고 화면은 StateChanged 로 갱신, 방금 이 UI 로 로그인 성공하면 onStartGame(Login_Name.StartGame) 호출.</summary>
+// [이메일로 로그인] 버튼: 로그인 전 = 패널 열기 / 이메일로 로그인됨 = [시작하기] / 다른 방식 = 비활성
+// ⚠ 패널 '밖'의 항상 켜진 오브젝트에 붙일 것 — 패널에 붙이면 꺼진 채 시작할 때 Awake 가 안 불려 버튼이 반응하지 않음
 public class EmailLoginUI : AuthStateUI
 {
     [Header("패널")]
@@ -71,9 +53,7 @@ public class EmailLoginUI : AuthStateUI
     // 이 UI 로 방금 로그인을 시작했는가 — 자동 로그인(앱 재실행)과 구분해서, 방금 누른 경우만 게임을 자동 시작
     private bool startAfterSignIn;
 
-    // 패널을 연 뒤 한 번이라도 시도했는가.
-    // AuthManager.LastError 는 지난 시도의 실패 문구를 계속 들고 있어서, 패널을 닫았다 다시 열면
-    // 아무것도 안 했는데 "비밀번호가 맞지 않습니다" 가 떠 있게 됩니다. 이번에 연 패널에서 시도한 뒤에만 보여 줍니다.
+    // 이번에 연 패널에서 시도했는가 — LastError 가 지난 실패 문구를 들고 있어 다시 열었을 때 바로 뜨지 않게
     private bool attemptedSinceOpen;
 
     // 출시 빌드 + 테스트 전용 설정이라 이 UI 를 쓰지 않는 상태
@@ -88,9 +68,7 @@ public class EmailLoginUI : AuthStateUI
         // 패널은 처음에 항상 닫힌 상태로 시작
         if (emailPanel != null) emailPanel.SetActive(false);
 
-        // 테스트 전용이면 출시 빌드에서 [이메일로 로그인] 버튼만 콕 집어 숨깁니다.
-        // (이 스크립트가 붙은 오브젝트를 끄면 같은 부모의 구글·게스트 버튼까지 사라질 수 있음)
-        // Debug.isDebugBuild: 에디터 / Development Build 에서 true, 출시 빌드에서 false.
+        // 테스트 전용이면 출시 빌드(isDebugBuild=false)에서 버튼만 숨김 — 오브젝트째 끄면 같은 부모의 다른 버튼까지 사라질 수 있음
         if (developmentBuildOnly && !Debug.isDebugBuild)
         {
             disabledForRelease = true;
@@ -104,8 +82,7 @@ public class EmailLoginUI : AuthStateUI
             Debug.LogError("[EmailLoginUI] 이 스크립트가 이메일 패널 안에 붙어 있습니다. 패널이 꺼지면 같이 꺼져서 " +
                            "[이메일로 로그인] 버튼이 동작하지 않습니다. 패널 밖의 항상 켜진 오브젝트로 옮겨 주세요.", this);
 
-        // 비밀번호 칸은 코드에서 한 번 더 '가림' 으로 고정합니다.
-        // 인스펙터에서 Content Type 을 Password 로 바꾸는 걸 깜빡하면 비밀번호가 화면에 그대로 보이기 때문입니다.
+        // 인스펙터 설정을 깜빡해도 비밀번호가 보이지 않게 코드에서 Password 로 고정
         if (passwordInput != null)
         {
             passwordInput.contentType = TMP_InputField.ContentType.Password;
@@ -118,8 +95,7 @@ public class EmailLoginUI : AuthStateUI
             emailInput.onSubmit.AddListener(OnEmailSubmit);         // 키보드 '완료' → 비밀번호 칸으로
         }
 
-        // 버튼 글자를 연결하지 않았으면 버튼 안의 TMP 를 찾아 씁니다.
-        // 씬에 적어 둔 글자는 그대로 '로그인 전' 글자로 두고, 이메일 로그인 상태에서만 [시작하기] 로 바꿉니다.
+        // 글자 칸이 비면 버튼 안 TMP 를 찾아 씬 글자를 '로그인 전' 글자로 사용
         if (openButtonLabel == null && openButton != null)
         {
             openButtonLabel = openButton.GetComponentInChildren<TMP_Text>(true);
@@ -148,10 +124,7 @@ public class EmailLoginUI : AuthStateUI
 
     // ───────────────────────────── [이메일로 로그인] 버튼 ─────────────────────────────
 
-    /// <summary>
-    /// 이메일로 로그인된 상태면 [시작하기] — 바로 게임 시작.
-    /// 로그인 전이면 패널을 엽니다. (다른 방식으로 로그인된 상태면 Refresh 가 버튼을 막아 둡니다)
-    /// </summary>
+    /// <summary>이메일로 로그인돼 있으면 바로 게임 시작, 로그인 전이면 패널 열기.</summary>
     private void OnClickOpen()
     {
         AuthManager auth = AuthManager.Instance;

@@ -1,18 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 지속시간이 있는 임시 배율 카드들의 공통 부모.
-///
-/// abstract 이므로 이 클래스로는 에셋을 만들 수 없습니다.
-/// 자식인 AugmentSpawnRate / AugmentDefenseDown 으로 만드세요.
-///
-/// [왜 '배율'로 다루는가]
-/// 값을 직접 빼면(방어력 -50) 적이 강해질수록 효과가 무의미해지고,
-/// 방어력이 음수가 되는 사고도 생깁니다.
-/// 배율(×0.5)로 다루면 어느 구간에서든 체감이 일정하고 음수 걱정이 없습니다.
-/// 프로젝트의 TargetMove 가 baseSpeed × spawnSpeedMult × slowMultiplier 로
-/// 배율 레이어를 쌓는 것과 똑같은 방식입니다.
-/// </summary>
+/// <summary>지속시간 있는 임시 배율 카드 부모(에셋은 자식으로, 저장 안 함) — 고정값을 빼면 후반에 무의미하고 음수가 될 수 있어 배율(×0.5)로 다룸.</summary>
 public abstract class AugmentTempBuff : AugmentCard
 {
     [Header("효과")]

@@ -2,17 +2,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 
-/// <summary>
-/// FF14 스타일 레벨업 연출.
-/// 발밑에서 황금빛 광주가 솟구치고 → 링이 퍼지며 → "LEVEL UP!" 텍스트가 팝인합니다.
-///
-/// 스프라이트/프리팹을 전혀 준비할 필요가 없습니다. 모든 텍스처를 런타임에 생성하고
-/// Custom/2D/SpriteAdditiveHDR 셰이더로 HDR 가산 합성해서 Bloom 이 반응하게 만듭니다.
-///
-/// 사용법 :
-///   LevelUpEffect.Instance.Play(newLevel);          // 씬에 하나 배치해두고 호출
-///   LevelUpEffect.Instance.PlayAt(player, newLevel); // 대상 지정
-/// </summary>
+/// <summary>레벨업 연출(황금 광주 → 링 → "LEVEL UP!" 팝인) — 텍스처를 런타임에 생성하고 HDR 가산 셰이더로 Bloom 이 반응, Play(level)/PlayAt(target, level).</summary>
 [DisallowMultipleComponent]
 public partial class LevelUpEffect : MonoBehaviour
 {
@@ -155,9 +145,7 @@ public partial class LevelUpEffect : MonoBehaviour
     /// <summary>지금이 '시작 직후 억제 구간'인가</summary>
     private bool IsSuppressed => Time.unscaledTime < suppressUntil;
 
-    // ─────────────────────────────────────────────
-    // 생명주기
-    // ─────────────────────────────────────────────
+    // ── 생명주기 ──
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -176,13 +164,7 @@ public partial class LevelUpEffect : MonoBehaviour
         TryBind();
     }
 
-    /// <summary>
-    /// ★ [프레임 드랍 수정] 연출 오브젝트를 씬 시작 때 미리 만들어 둡니다.
-    ///   EnsureBuilt 는 텍스처 5장을 픽셀 단위로 계산(링 256×256 등 약 10만 픽셀)하고
-    ///   Shader.Find · 머티리얼 20여 개 · TMP 라벨까지 만듭니다. 예전에는 '첫 레벨업 순간' 에 이걸 해서
-    ///   전투 도중 한 번 크게 멈칫했습니다. 씬 로딩 직후로 옮기면 로딩 화면 뒤에 묻힙니다.
-    ///   (EnsureBuilt 는 한 번만 돌므로 Play 에서 다시 불려도 비용이 없습니다)
-    /// </summary>
+    /// <summary>연출 오브젝트를 씬 시작 때 미리 생성 — 텍스처 계산·머티리얼·TMP 생성이 첫 레벨업 순간에 몰려 멈칫하던 비용을 로딩 뒤로 숨김.</summary>
     private void Start() => EnsureBuilt();
 
     private void Update()
@@ -190,8 +172,7 @@ public partial class LevelUpEffect : MonoBehaviour
         // LevelUpManager 가 나중에 만들어지는 구조여도 붙을 때까지 재시도
         if (autoBindLevelUpManager && boundManager == null) TryBind();
 
-        // ★ 억제 구간 동안은 연출 없이 현재 레벨만 계속 따라갑니다.
-        //   세이브 로드가 언제 끝나든(스탯이 나중에 주입돼도) 기준값이 복원된 레벨로 맞춰집니다.
+        // 억제 구간엔 연출 없이 레벨만 따라감 (로드가 언제 끝나도 기준값이 복원 레벨로)
         if (boundManager != null && IsSuppressed)
             lastKnownLevel = boundManager.CurrentLevel;
     }
@@ -209,9 +190,7 @@ public partial class LevelUpEffect : MonoBehaviour
         if (flash != null && flash.transform.parent != root) Destroy(flash.gameObject);
     }
 
-    // ─────────────────────────────────────────────
-    // LevelUpManager 자동 연결
-    // ─────────────────────────────────────────────
+    // ── LevelUpManager 자동 연결 ──
     private void TryBind()
     {
         if (!autoBindLevelUpManager) return;
@@ -223,10 +202,7 @@ public partial class LevelUpEffect : MonoBehaviour
         lastKnownLevel = boundManager.CurrentLevel;
     }
 
-    /// <summary>
-    /// 세이브 로드가 끝난 직후 직접 호출하면, 시간 창에 의존하지 않고 기준 레벨을 확정할 수 있습니다.
-    /// 예) SaveManager 로드 완료 지점에서 LevelUpEffect.Instance?.SyncLevelBaseline();
-    /// </summary>
+    /// <summary>로드 직후 호출하면 시간 창 없이 기준 레벨을 확정.</summary>
     public void SyncLevelBaseline()
     {
         if (boundManager == null) TryBind();
@@ -244,8 +220,7 @@ public partial class LevelUpEffect : MonoBehaviour
 
     private void HandleLevelUp(int newLevel)
     {
-        // ★ 시작 직후 억제 구간 : 세이브 로드로 Lv.1 → Lv.15 가 복원되는 것을
-        //   레벨업으로 오인하지 않도록, 기준값만 올리고 연출은 건너뜁니다.
+        // 시작 직후 억제 구간 — 로드로 레벨이 복원되는 걸 레벨업으로 오인하지 않게 기준값만 올림
         if (IsSuppressed)
         {
             lastKnownLevel = Mathf.Max(lastKnownLevel, newLevel);
@@ -273,9 +248,7 @@ public partial class LevelUpEffect : MonoBehaviour
         Play(newLevel);
     }
 
-    // ─────────────────────────────────────────────
-    // 재생
-    // ─────────────────────────────────────────────
+    // ── 재생 ──
 
     /// <summary>기본 대상 위치에서 레벨업 연출을 재생합니다.</summary>
     public void Play(int newLevel) => PlayAt(target != null ? target : transform, newLevel);
@@ -346,10 +319,7 @@ public partial class LevelUpEffect : MonoBehaviour
         playing = null;
     }
 
-    /// <summary>
-    /// 효과음 재생. 원래는 audioSource/levelUpSfx 가 비어 있으면 조용히 아무 일도 안 해서
-    /// "왜 소리가 안 나지"를 알 방법이 없었습니다. 실패 원인을 명시합니다.
-    /// </summary>
+    /// <summary>효과음 재생 — 소스·클립이 비면 원인을 경고 (조용히 무음이면 원인을 못 찾음).</summary>
     private void PlaySfx()
     {
         if (levelUpSfx == null)
@@ -650,9 +620,7 @@ public partial class LevelUpEffect : MonoBehaviour
         return 1f + c3 * p * p * p + c1 * p * p;
     }
 
-    // ─────────────────────────────────────────────
-    // 오브젝트 생성 (최초 1회)
-    // ─────────────────────────────────────────────
+    // ── 오브젝트 생성 (최초 1회) ──
     private void EnsureBuilt()
     {
         if (built) return;

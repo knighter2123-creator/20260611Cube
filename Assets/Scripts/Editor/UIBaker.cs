@@ -6,22 +6,9 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>
-/// 창 UI 를 '처음 한 번' 만들어 프리팹(Assets/Prefabs/UI)으로 저장하고, 컴포넌트의 인스펙터 칸을 채우는 메뉴.
-///
-/// ★ UI 를 고칠 때는 이 메뉴를 다시 누르지 말고, 프리팹(또는 씬의 프리팹 인스턴스)을 하이어라키에서 직접 고치세요.
-///   이 메뉴들은 이미 있는 창을 지우거나 덮어쓰지 않습니다 — 있으면 안내만 하고 멈춥니다.
-///   (예전에는 다시 구우면 지우고 새로 만들어서 손으로 고친 내용이 사라졌습니다)
-///
-///   Tools/UI 굽기/열린 씬의 창을 프리팹으로 저장 — 예전에 씬에 구워 둔 창을 프리팹으로 바꿈 (씬마다 한 번)
-///   Tools/UI 굽기/랭킹 창            — StageScene (RankingPanel)                     → RankingCanvas.prefab
-///   Tools/UI 굽기/저장 데이터 선택 팝업 — LoginScene (CloudSaveConflictPopup)           → CloudSaveConflictCanvas.prefab
-///   Tools/UI 굽기/채팅 탭·친구 창      — StageScene (ChatPanel 탭·유저 메뉴 + FriendPanel) → ChatCanvas.prefab (+ 랭킹 옆 친구 버튼은 씬에)
-///   Tools/UI 굽기/친구 창 - 닉네임 검색 칸 — 친구 창에 검색 칸이 없을 때만 더함 (ChatCanvas 프리팹에도 반영)
-///   Tools/UI 굽기/우편함              — StageScene (MailboxPanel)                     → MailboxCanvas.prefab (+ 우편 버튼은 씬에)
-///   Tools/UI 굽기/설정 창 - 효과음·배경음 슬라이더 — 게임 씬마다 (GameSettingManager) — 설정 창에 직접 (프리팹 아님)
-/// 실행한 뒤 씬을 저장하세요.
-/// </summary>
+/// <summary>창 UI 를 '처음 한 번' 만들어 Assets/Prefabs/UI 프리팹으로 저장하고 인스펙터 칸을 채우는 Tools/UI 굽기 메뉴 — 이미 있으면 덮지 않고 안내만 (손으로 고친 UI 보호), 실행 후 씬 저장.</summary>
+// 메뉴: 랭킹 창·우편함·채팅 탭·친구 창(StageScene) / 저장 데이터 선택 팝업(LoginScene) / 친구 검색 칸 / 설정 창 효과음·배경음 슬라이더 / 열린 씬의 창을 프리팹으로 저장
+// ⚠ UI 를 고칠 땐 메뉴를 다시 누르지 말고 프리팹을 하이어라키에서 직접 수정
 public static class UIBaker
 {
     // 굽고 나면 런타임 코드가 바꾸지 않는 값 — 여기에만 둡니다 (목록 줄 색처럼 런타임도 쓰는 값은 각 컴포넌트에)
@@ -534,10 +521,7 @@ public static class UIBaker
     private const float FriendSearchHeight = 90f;
     private const float FriendListTopWithSearch = -230f;
 
-    /// <summary>
-    /// 이미 만든 친구 창에 '닉네임 검색 칸' 만 더합니다 — 검색 칸이 없을 때만 (있으면 지우거나 바꾸지 않음).
-    /// ChatCanvas 가 프리팹이면 더한 칸과 바뀐 값을 프리팹에도 반영합니다 (다른 수정 사항은 건드리지 않음).
-    /// </summary>
+    /// <summary>친구 창에 닉네임 검색 칸이 없을 때만 더함 (프리팹이면 그 변경만 프리팹에도 반영).</summary>
     [MenuItem("Tools/UI 굽기/친구 창 - 닉네임 검색 칸 (StageScene)")]
     private static void BakeFriendSearch()
     {
@@ -556,10 +540,7 @@ public static class UIBaker
         Finish(friends.gameObject.scene, friends.gameObject, "친구 창 닉네임 검색 칸", prefabNote);
     }
 
-    /// <summary>
-    /// 검색 칸이 없으면 만들고, 프리팹 인스턴스면 프리팹에 반영합니다. 만들었으면 true.
-    /// 이미 있으면 false + error (안내 문구). 프리팹으로 저장(SaveAllAsPrefabs)하기 전에도 부릅니다.
-    /// </summary>
+    /// <summary>검색 칸이 없으면 만들고 프리팹에 반영해 true, 이미 있으면 false + 안내 (프리팹 저장 전에도 호출).</summary>
     private static bool TryAddFriendSearch(FriendPanel friends, out string error, out string prefabNote)
     {
         error = null;
@@ -667,10 +648,7 @@ public static class UIBaker
         return input;
     }
 
-    /// <summary>
-    /// 랭킹 버튼을 복제해 친구 버튼을 만듭니다 (같은 모양·크기). 위치는 랭킹 버튼 + (랭킹 버튼 − 같은 줄 왼쪽 이웃 버튼) 간격.
-    /// 같은 줄에 이웃이 없으면 버튼 폭 + 16.
-    /// </summary>
+    /// <summary>랭킹 버튼을 복제해 오른쪽에 친구 버튼 생성 (간격 = 왼쪽 이웃과의 간격, 없으면 폭 + 16).</summary>
     private static GameObject FriendsButtonFrom(OpenRankingButton ranking, FriendPanel friends)
     {
         GameObject go = CloneButtonRightOf(ranking, "Open Friends Button", "친구", out TextMeshProUGUI label);
@@ -685,10 +663,7 @@ public static class UIBaker
         return go;
     }
 
-    /// <summary>
-    /// 여는 버튼(source)을 복제해 그 오른쪽에 둡니다 (같은 모양·크기). 간격은 source − 같은 줄 왼쪽 이웃 버튼,
-    /// 이웃이 없으면 버튼 폭 + 16. 복제본에서 source 의 여는 컴포넌트와 OnClick 은 지웁니다 — 새 컴포넌트는 부른 쪽이 붙임.
-    /// </summary>
+    /// <summary>버튼(source)을 복제해 오른쪽에 둠(간격 규칙 동일) — 복제본의 여는 컴포넌트·OnClick 은 지우고 새 컴포넌트는 부른 쪽이 붙임.</summary>
     private static GameObject CloneButtonRightOf(Component source, string name, string text, out TextMeshProUGUI label)
     {
         var srcRt = (RectTransform)source.transform;
@@ -945,11 +920,7 @@ public static class UIBaker
         return content;
     }
 
-    // ═════════════════════════════ 설정 창 — 효과음·배경음 슬라이더 ═════════════════════════════
-    //
-    // 설정 창(Setting Panel)은 게임 씬마다(StageScene · DailyDungeonScene · EvolveScene) 따로 있어 씬마다 한 번씩 실행합니다.
-    // 블룸 슬라이더 줄(라벨 + 슬라이더)을 복제해 모양을 맞추고, 비어 있는 창 왼쪽에 두 줄로 둡니다.
-    //   창 1600×780 기준: 가운데 버튼 열(폭 350)과 겹치지 않게 라벨 폭만 250 으로 줄임.
+    // ── 설정 창 효과음·배경음 슬라이더 — 게임 씬마다 한 번, 블룸 슬라이더 줄을 복제해 창 왼쪽에 두 줄 (가운데 버튼 열과 안 겹치게 라벨 폭 250) ──
 
     private const float SoundLabelRight = 270f;   // 창 왼쪽 끝 → 라벨 오른쪽 끝 (라벨 피벗이 오른쪽 — 블룸 줄과 같음)
     private const float SoundLabelWidth = 250f;   // "효과음" (글자 50) 이 들어가는 폭
@@ -1047,9 +1018,7 @@ public static class UIBaker
 
     // ═════════════════════════════ 공용 ═════════════════════════════
 
-    /// <summary>
-    /// 이미 있으면 안내하고 true (부른 쪽은 멈춤). 지우거나 덮어쓰지 않습니다 — 손으로 고친 UI 를 지키기 위해.
-    /// </summary>
+    /// <summary>이미 있으면 안내하고 true(부른 쪽은 멈춤) — 손으로 고친 UI 를 지키려고 지우거나 덮지 않음.</summary>
     private static bool AlreadyExists(GameObject existing, string what)
     {
         if (existing == null) return false;
@@ -1065,10 +1034,7 @@ public static class UIBaker
 
     private const string PrefabFolder = "Assets/Prefabs/UI";
 
-    /// <summary>
-    /// 씬 오브젝트를 Assets/Prefabs/UI 에 프리팹으로 저장하고 씬의 것을 그 프리팹 인스턴스로 바꿉니다. 결과 한 줄 (이미 프리팹이면 그 안내).
-    /// 창 밖 씬 오브젝트를 가리키는 칸은 프리팹 파일에는 빈칸으로, 씬의 인스턴스에는 그대로(오버라이드) 남습니다.
-    /// </summary>
+    /// <summary>씬 오브젝트를 프리팹으로 저장하고 인스턴스로 교체(결과 한 줄) — 창 밖을 가리키는 칸은 프리팹엔 빈칸, 씬 인스턴스엔 오버라이드로 남음.</summary>
     private static string SaveAsPrefab(GameObject root, string fileName)
     {
         if (root == null) return null;
@@ -1093,11 +1059,7 @@ public static class UIBaker
         }
     }
 
-    /// <summary>
-    /// 예전에 씬에 구워 둔 창들을 프리팹으로 바꿉니다 (열린 씬 전부). 이미 프리팹인 것은 건너뜁니다.
-    /// 친구 창에 닉네임 검색 칸이 없으면 먼저 더한 뒤 저장합니다.
-    /// StageScene 과 LoginScene 에서 각각 한 번씩 실행하고 씬을 저장하세요.
-    /// </summary>
+    /// <summary>열린 씬에 구워 둔 창들을 프리팹으로 (이미 프리팹이면 건너뜀, 검색 칸이 없으면 먼저 더함) — StageScene·LoginScene 에서 한 번씩 실행 후 저장.</summary>
     [MenuItem("Tools/UI 굽기/열린 씬의 창을 프리팹으로 저장")]
     private static void SaveAllAsPrefabs()
     {

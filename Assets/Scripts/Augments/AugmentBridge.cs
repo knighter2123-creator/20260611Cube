@@ -1,20 +1,9 @@
 using UnityEngine;
 
-/// <summary>
-/// ★ 증강 시스템 ↔ 기존 게임 코드를 잇는 유일한 지점입니다.
-///
-/// [왜 이렇게 분리하나 — 어댑터 패턴]
-/// 증강 카드가 CurrencyManager.Instance.AddGold(...) 를 직접 부르게 만들면,
-/// 나중에 재화 시스템 이름이 바뀔 때 카드 스크립트를 전부 뒤져야 합니다.
-/// 중간에 이 파일 하나를 두면 바꿀 곳이 여기 한 군데뿐입니다.
-///
-/// static 클래스라 씬에 오브젝트를 만들 필요가 없습니다.
-/// </summary>
+/// <summary>증강 시스템 ↔ 게임 코드의 유일한 연결점(재화·경험치 지급, 스테이지 배율) — 게임 쪽 이름이 바뀌어도 카드 대신 여기만 고치게 (static 이라 씬 오브젝트 불필요).</summary>
 public static class AugmentBridge
 {
-    // ─────────────────────────────────────────────────────────
-    //  1) 재화 지급
-    // ─────────────────────────────────────────────────────────
+    // ── 1) 재화 지급 ──
 
     public static void AddGold(double amount)
     {
@@ -35,23 +24,14 @@ public static class AugmentBridge
 
     public static void AddExp(double amount)
     {
-        // Enemy.GrantRewards() 가 쓰는 경로와 똑같이 맞췄습니다.
-        // LevelUpManager 안에서 레벨업 연출(LevelUpEffect)까지 처리될 겁니다.
-        //
-        // '?.' 대신 '!= null' 을 쓰는 이유: LevelUpManager 는 MonoBehaviour 입니다.
-        // '?.' 는 C# 의 진짜 null 만 걸러서, 유니티가 파괴한 오브젝트(가짜 null)는 그대로 통과시킵니다.
+        // Enemy.GrantRewards 와 같은 경로(레벨업 연출 포함) — MonoBehaviour 라 ?. 대신 != null (파괴 검사)
         var lm = LevelUpManager.Instance;
         if (lm != null) lm.AddExp(ToSafeInt(amount));
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  2) 현재 스테이지 배율
-    // ─────────────────────────────────────────────────────────
+    // ── 2) 현재 스테이지 배율 ──
 
-    /// <summary>
-    /// StageManager 의 누적 난이도 배율(1.5^n). 적 체력·보상에 곱해지는 그 값입니다.
-    /// 보상 카드가 이걸 곱해 쓰기 때문에, 100스테이지에서도 "골드 지급" 카드가 쓸모 있습니다.
-    /// </summary>
+    /// <summary>적 체력·보상에 곱하는 누적 난이도 배율(1.5^n) — 보상 카드가 곱해 써서 후반에도 쓸모 있게.</summary>
     public static double GetStageMultiplier()
     {
         var sm = StageManager.Instance;   // 한 번만 읽어 두면 검사와 사용 사이에 값이 달라질 일이 없습니다
@@ -59,37 +39,12 @@ public static class AugmentBridge
         return sm.CurrentStatMult;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  유틸 — 정수 오버플로 방어
-    // ─────────────────────────────────────────────────────────
+    // ── 유틸 — 정수 오버플로 방어 ──
 
-    /// <summary>
-    /// "지금 보유량에 더해도 int 를 넘지 않는 최대치"로 잘라냅니다.
-    ///
-    /// 【왜 단순 Clamp 로는 부족한가】
-    /// CurrencyManager 의 골드·보석은 int 이고, 내부 계산은 이렇습니다.
-    ///
-    ///     gold = Mathf.Max(0, gold + amount);
-    ///
-    /// int + int 는 최대값(약 21억)을 넘으면 조용히 음수로 뒤집힙니다(오버플로).
-    /// 예) gold = 20억, amount = 20억  →  합계가 음수  →  Mathf.Max(0, 음수) = 0
-    ///     즉 골드를 얻었는데 전 재산이 0이 됩니다. 보석은 Max 도 없어서 음수로 남고요.
-    ///
-    /// 이 게임은 배율이 1.5^n 으로 자라기 때문에 도달 가능한 범위입니다.
-    /// (55스테이지쯤 배율이 이미 int 한계를 넘습니다)
-    /// 그래서 amount 만 자르는 게 아니라 "현재 보유량까지 고려해서" 잘라야 안전합니다.
-    ///
-    /// ※ 근본 해결은 재화 타입을 long 이나 double 로 바꾸는 것입니다.
-    ///   Enemy.GrantRewards() 도 Mathf.RoundToInt 로 같은 한계를 갖고 있으니,
-    ///   후반 밸런싱을 할 때 한 번에 정리하는 걸 권합니다.
-    ///   그때까지는 이 함수가 "최소한 손해는 안 보게" 막아줍니다.
-    /// </summary>
+    /// <summary>보유량에 더해도 int 를 넘지 않는 만큼으로 자름 — 배율 1.5^n 이라 55스테이지쯤 int 를 넘어서 (근본 해결은 재화를 long/double 로).</summary>
     private static int ClampToHeadroom(double amount, int current)
     {
-        // ★ 버그 수정: NaN(숫자 아님) 방어.
-        //   스테이지 배율이 double 범위를 넘어 Infinity 가 된 상태에서 stageScale = 0 이면
-        //   Infinity × 0 = NaN 이 됩니다. NaN 은 어떤 비교(<=, >=)도 false 라서 아래 검사를 전부 빠져나가고,
-        //   (int)NaN 은 int.MinValue(약 -21억)가 되어 AddGold 에 들어가면 골드가 0 이 됩니다.
+        // NaN 방어 — 배율 Infinity × 0 = NaN 은 모든 비교를 빠져나가고 (int)NaN = int.MinValue 라 골드가 0 이 됨
         if (double.IsNaN(amount) || amount <= 0d) return 0;
 
         int headroom = int.MaxValue - Mathf.Max(0, current);

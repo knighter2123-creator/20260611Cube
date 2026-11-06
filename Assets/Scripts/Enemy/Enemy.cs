@@ -3,30 +3,7 @@ using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
 
-/// <summary>
-/// 모든 적의 공통 기반 클래스.
-///
-/// ─── 템플릿 메서드 패턴 (학습 포인트) ──────────────────────────────────
-///
-/// Die()가 하는 일은 7가지입니다:
-///
-///   ① isDead 플래그 세우기        ② Active 목록에서 빼기
-///   ③ 콜라이더 끄기               ④ 회색 이펙트 정리
-///   ⑤ 디버프 정리 / HP바 제거     ⑥ 보상 지급 + 처치 보고
-///   ⑦ 사망 연출 후 풀에 반환
-///
-/// 이 중 자식 클래스마다 다른 건 ⑥ 하나뿐입니다. 그래서 "뼈대(Die)는 부모가
-/// 고정해두고, 달라지는 부분만 구멍(virtual)을 뚫어준다" — 이게 템플릿 메서드 패턴입니다.
-/// 자식은 구멍만 채우면 되고, 나중에 Die()에 ⑧번 단계를 추가해도
-/// 모든 자식이 자동으로 혜택을 봅니다.
-///
-/// 자식이 채울 수 있는 구멍:
-///   · OnResetForSpawn()      — 풀에서 꺼낼 때 자식 전용 상태 초기화
-///   · ApplyStatMultiplier()  — 스탯 계산 (누적 *= 금지, 원본 기준 대입 =)
-///   · GrantRewards()         — 처치 보상
-///   · ReportKill()           — 처치 보고
-/// ────────────────────────────────────────────────────────────────────────
-/// </summary>
+/// <summary>모든 적의 기반 클래스 — Die()의 7단계 뼈대는 고정하고 자식은 훅(OnResetForSpawn·ApplyStatMultiplier·GrantRewards·ReportKill)만 채우는 템플릿 메서드 패턴.</summary>
 public partial class Enemy : MonoBehaviour, ITakeDamage
 {
     // ── 활성 적 목록 (Player.FindTarget / StageManager.NextStage용) ──
@@ -60,8 +37,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     private EnemyDeathAnimator deathAnimator;
     private bool returnedToPool;      // 이중 반환 방지
 
-    // Profiler 의 CPU Hierarchy 에 이 이름으로 보입니다 (Deep Profile 없이도). 검색창에 "Enemy.Die" 를 치면 됩니다.
-    //   멈춘 프레임에서 이 항목들이 작다면 스크립트가 아니라 렌더링(셰이더 첫 사용 등) 쪽 문제입니다.
+    // Profiler 마커 — "Enemy.Die" 검색, 멈춘 프레임에서 작다면 렌더링 쪽 문제
     private static readonly ProfilerMarker DieMarker     = new ProfilerMarker("Enemy.Die");
     private static readonly ProfilerMarker CleanupMarker = new ProfilerMarker("Enemy.Die.Cleanup");
     private static readonly ProfilerMarker RewardMarker  = new ProfilerMarker("Enemy.Die.Rewards");
@@ -111,11 +87,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
     /// <summary>훅 — 자식이 추가한 상태를 초기화. 기본은 아무것도 안 함.</summary>
     protected virtual void OnResetForSpawn() { }
 
-    /// <summary>
-    /// 원본 기준값에서 매번 새로 계산합니다.
-    ///   maxHealth *= mult 로 두면 풀 재사용 시 체력이 무한히 불어납니다.
-    ///   (자식 클래스에서 override할 때도 "누적(*=)이 아니라 대입(=)" 원칙을 지키세요)
-    /// </summary>
+    /// <summary>원본 기준값에서 매번 대입 계산 (*= 면 풀 재사용 때 체력이 무한히 불어남, override 도 동일 원칙).</summary>
     public virtual void ApplyStatMultiplier(float mult)
     {
         statMult      = mult;
@@ -142,9 +114,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         currentHealth = Mathf.Max(currentHealth - finalDamage, 0f);
         RefreshHpBar();
 
-        // ★ ?. 대신 != null — DamageTextPool 은 씬 오브젝트이고 OnDestroy 에서 Instance 를 비우지 않습니다.
-        //   씬이 바뀌어 파괴된 뒤에도 Instance 에 '파괴된 객체' 가 남는데, ?. 는 그걸 null 로 보지 않아
-        //   ShowDamage 안에서 MissingReferenceException 이 납니다. (유니티식 == null 은 파괴됨도 걸러냄)
+        // ?. 대신 != null — 파괴된 Instance 가 남을 수 있고 ?. 는 이를 못 걸러 MissingReferenceException
         DamageTextPool damageText = DamageTextPool.Instance;
         if (damageText != null)
         {
@@ -157,11 +127,7 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
             Die();
     }
 
-    /// <summary>
-    /// 사망 처리의 "뼈대". 자식은 override할 수 없습니다(virtual 아님).
-    /// 달라지는 부분은 GrantRewards() / ReportKill() 훅으로만 바꾸세요.
-    /// 그래야 콜라이더 정리·풀 반환 같은 필수 단계를 빠뜨리지 않습니다.
-    /// </summary>
+    /// <summary>사망 처리 뼈대(virtual 아님) — 바꿀 부분은 훅으로만, 콜라이더 정리·풀 반환 같은 필수 단계 누락 방지.</summary>
     protected void Die()
     {
         if (isDead) return;
@@ -198,36 +164,22 @@ public partial class Enemy : MonoBehaviour, ITakeDamage
         }
     }
 
-    /// <summary>
-    /// 훅 ①: 처치 보상 지급. 잡몹은 골드 + 경험치.
-    /// 보스는 이걸 override해서 보석·추가 배율을 주면 됩니다.
-    /// </summary>
+    /// <summary>훅 ①: 처치 보상 — 잡몹은 골드+경험치, 보스는 override.</summary>
     protected virtual void GrantRewards()
     {
         CurrencyManager.Instance?.AddGold(Mathf.RoundToInt(rewardGold * statMult));
         LevelUpManager.Instance?.AddExp((long)Math.Round(rewardExp * expMult));
     }
 
-    /// <summary>
-    /// 훅 ②: 처치 사실을 각 매니저에 보고.
-    /// 잡몹은 StageManager.ReportEnemyKill(킬 카운트 증가),
-    /// 보스는 ReportBossKill(스테이지 클리어)로 갈라집니다.
-    ///
-    /// ※ StageManager.ReportEnemyKill 내부에서 GuideQuest를 호출하므로
-    ///   여기서 GuideQuestManager를 직접 부르면 2중 카운트됩니다.
-    /// </summary>
+    /// <summary>훅 ②: 처치 보고 — 잡몹은 ReportEnemyKill, 보스는 ReportBossKill.</summary>
+    // ⚠ ReportEnemyKill 이 GuideQuest 를 부르므로 여기서 직접 부르면 2중 카운트
     protected virtual void ReportKill()
     {
         StageManager.Instance?.ReportEnemyKill();
         MissionManager.Instance?.ReportEnemyKill();
     }
     
-    /// <summary>
-    /// Destroy 대신 풀로 반환.
-    ///
-    /// ※ 풀에서 나온 오브젝트가 아니면(직접 Instantiate된 진화 보스 등)
-    ///   ObjectPoolManager.Return이 알아서 Destroy해 줍니다.
-    /// </summary>
+    /// <summary>Destroy 대신 풀로 반환 (풀 출신이 아니면 Return 이 Destroy).</summary>
     protected void ReturnToPool()
     {
         if (returnedToPool) return;   // 연출 콜백 + 강제 비활성화가 겹쳐도 한 번만

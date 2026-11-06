@@ -23,19 +23,12 @@ public readonly struct NicknameResult
     public static readonly NicknameResult Success = new NicknameResult(NicknameResultKind.Ok, string.Empty);
 }
 
-/// <summary>
-/// 닉네임 서버 — 지금 로그인한 계정의 닉네임을 읽고 정합니다.
-/// 모든 콜백은 메인 스레드에서 옵니다. 구현: BackendNicknameService(뒤끝), LocalNicknameService(서버 없는 시험용).
-/// 고르는 곳은 ServerServices 한 곳입니다.
-/// </summary>
+/// <summary>로그인 계정 닉네임 읽기·정하기 인터페이스 — 콜백은 메인 스레드, 구현(뒤끝/Local)은 ServerServices 에서 고름.</summary>
 public interface INicknameService
 {
     /// <summary>서버에 저장된 내 닉네임. onDone(닉네임 — 없으면 "", 실패 문구 — 성공이면 null)</summary>
     void FetchMine(Action<string, string> onDone);
 
-    /// <summary>
-    /// 내 닉네임을 정합니다. hasServerName = 서버에 이미 내 닉네임이 있는가 (처음 등록 / 변경 구분).
-    /// 규칙 검사(길이·글자)는 부르는 쪽(PlayerProfile.Validate)이 먼저 합니다 — 서버는 중복·금칙어를 봅니다.
-    /// </summary>
+    /// <summary>내 닉네임을 정함(hasServerName 으로 등록/변경 구분) — 길이·글자 검사는 PlayerProfile.Validate 가 먼저, 서버는 중복·금칙어만.</summary>
     void Set(string nickname, bool hasServerName, Action<NicknameResult> onDone);
 }

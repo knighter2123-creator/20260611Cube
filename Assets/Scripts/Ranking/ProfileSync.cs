@@ -1,29 +1,10 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// 닉네임 서버 동기화 — 같은 계정으로 다른 기기에서 로그인해도 같은 닉네임이 나오게 합니다. 서버는 ServerServices.Nickname (뒤끝).
-///
-/// [붙이는 위치]
-///   로그인 씬의 ManagerRoot 하위. 다른 매니저들과 같은 DontDestroyOnLoad 싱글턴이다.
-///
-/// [규칙 — 로그인 계정의 닉네임은 서버가 기준]
-///   뒤끝 닉네임은 서버 전체에서 중복될 수 없습니다. 그래서 로그인 계정은 이름을 "서버에 먼저 등록 → 성공하면 이 기기에 적용" 합니다
-///   (PlayerProfile.RequestRegister / RequestChangeName → SetNameOnServer). 오프라인에서는 이름을 정할 수 없습니다.
-///   게스트는 서버가 없으므로 예전처럼 이 기기에만 저장합니다.
-///
-/// [흐름]
-///   1) 로그인 + 세이브 주인이 그 계정 + 온라인이 되면 서버 닉네임을 한 번 받아 옴 (Pull)
-///      - 서버에 이름이 있음 → 이 기기에 적용 (다른 기기에서 바꾼 이름, 보석 없음)
-///      - 서버에 이름이 없고 이 기기에 이름이 있음 (게스트 때 정한 이름) → 서버에 올림 (Push)
-///   2) 올릴 때 다른 유저가 이미 쓰는 이름이면, 이 기기 이름을 지워 '최초 설정(무료)' 을 다시 하게 합니다
-///      (NicknamePrompt 가 다시 물어봄). 이름을 두 개로 갈라 두지 않기 위해서입니다.
-///   익명 이름("익명1234")은 표시용이라 더 이상 서버에 올리지 않습니다 — 기기마다 다를 수 있습니다.
-///
-/// [★ 세이브 주인 확인]
-///   SaveManager 는 계정마다 다른 세이브 파일을 씁니다. 로그인 직후 계정 전환(AccountSwitch)이 끝나기 전에는
-///   "로그인한 계정" 과 "지금 읽고 있는 세이브" 가 다를 수 있어서, 둘이 같아질 때까지 기다립니다 (TryGetAccount).
-/// </summary>
+/// <summary>닉네임 서버 동기화: 로그인 시 서버 이름을 받아(Pull) 서버가 기준으로 적용하고, 서버에 없으면 게스트 때 정한 이름을 올림(Push) — 기기가 달라도 같은 이름.</summary>
+// [붙이는 위치] 로그인 씬 ManagerRoot 하위 DontDestroyOnLoad 싱글턴
+// 뒤끝 닉네임은 전체 중복 불가 → 로그인 계정은 '서버 등록 성공 후 기기 적용', 올릴 때 중복이면 기기 이름을 지워 무료 최초 설정을 다시 하게 함 (게스트는 기기에만 저장)
+// ★ 계정 전환 직후엔 로그인 계정 ≠ 읽고 있는 세이브일 수 있어 둘이 같아질 때까지 기다림 (TryGetAccount)
 public class ProfileSync : MonoBehaviour
 {
     public static ProfileSync Instance { get; private set; }
@@ -217,10 +198,7 @@ public class ProfileSync : MonoBehaviour
 
     // ───────────────────────────── 이름 정하기 (PlayerProfile 전용) ─────────────────────────────
 
-    /// <summary>
-    /// 지금 계정에서 이름을 정할 수 있는가. 안 되면 유저에게 보여 줄 문구.
-    /// (PlayerProfile.RequestRegister / RequestChangeName 이 서버에 묻기 전에 확인)
-    /// </summary>
+    /// <summary>이름을 정할 수 있는가 (온라인 + 서버 이름을 받아 온 뒤) — 안 되면 유저에게 보여 줄 문구를 error 로.</summary>
     public bool CanSetName(string uid, out string error)
     {
         error = null;

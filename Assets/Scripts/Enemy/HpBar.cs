@@ -3,15 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 적 HP 바 관리자 (Canvas 위). 적 위치를 따라 HP 바를 옮깁니다.
-///
-/// ★ HP 바도 풀링합니다.
-///   예전에는 스폰마다 Instantiate, 사망마다 Destroy 를 해서
-///   ① UI 오브젝트 생성 비용 ② Canvas 재구성(rebuild) ③ Destroy 가 남긴 GC 가
-///   스폰 순간마다 겹쳐 프레임이 튀었습니다. 적은 ObjectPoolManager 로 풀링하면서
-///   HP 바만 빠져 있었던 것 — 이제 꺼서 보관했다가 다시 씁니다.
-/// </summary>
+/// <summary>적 HP 바 관리자(Canvas) — 적 위치를 따라가며 바는 풀링(생성·rebuild·GC 가 스폰마다 프레임을 튀게 해서).</summary>
 public class HpBar : MonoBehaviour
 {
     [SerializeField] GameObject _monsterHPbar;
@@ -30,9 +22,7 @@ public class HpBar : MonoBehaviour
     [SerializeField] Camera        mainCamera;
     RectTransform canvasRect;
 
-    // ★ [프레임 드랍 수정] 예전에는 씬이 켜지는 프레임에 12개를 한꺼번에 만들었습니다.
-    //   총알·데미지 텍스트 예열과 같은 프레임에 겹쳐 시작 직후 크게 멈칫했으므로 프레임마다 나눠 만듭니다.
-    //   그사이 적이 나오면 RegisterEnemy 가 부족분을 하나씩 만들어 줍니다.
+    // 예열을 프레임마다 나눠 생성 (다른 예열과 겹쳐 시작 직후 멈칫), 그사이 부족분은 RegisterEnemy 가 채움
     IEnumerator Start()
     {
         canvasRect = GetComponent<RectTransform>();

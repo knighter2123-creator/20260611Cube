@@ -2,12 +2,7 @@ using System;
 using BackEnd;
 using LitJson;
 
-/// <summary>
-/// 뒤끝 '게임 정보' 테이블에서 "내 행" 을 다루는 비동기 도우미. 모든 콜백은 메인 스레드 (BackendManager.Call).
-/// 뒤끝 콘솔 가이드의 GetMyData / Insert / UpdateV2 를 그대로 감싼 것입니다.
-///
-/// 한 계정이 한 테이블에 행을 하나만 둔다고 가정합니다 (랭킹 기록, 차단 목록 등).
-/// </summary>
+/// <summary>뒤끝 게임 정보 테이블의 '내 행'(계정당 한 행 가정) 읽기·삽입·수정 도우미 — GetMyData/Insert/UpdateV2 를 감싸 콜백을 메인 스레드로.</summary>
 public static class BackendTable
 {
     /// <summary>내 행. onDone(행 — FlattenRows 를 거친 값, 없으면 null / 실패 문구 — 성공이면 null)</summary>

@@ -2,25 +2,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 코드로 UI를 만들 때 반복되는 잡일을 모아둔 도구 상자.
-///
-/// [왜 따로 뺐나]
-/// CreateImage / CreateText / Stretch 같은 함수는 '증강'과 아무 상관이 없는 범용 코드입니다.
-/// 도메인(증강)과 무관한 부분을 밖으로 빼면 두 가지가 좋아집니다.
-///   1) AugmentSelectUI 가 "증강 창은 이렇게 생겼다" 만 이야기하게 되어 읽기 쉬워집니다
-///   2) 다음에 다른 팝업(설정창, 보상창)을 코드로 만들 때 그대로 재사용할 수 있습니다
-///
-/// 판단 기준은 간단합니다 — **"이 함수가 '증강'이라는 단어를 몰라도 되는가?"**
-/// 몰라도 된다면 밖으로 뺄 후보입니다.
-///
-/// static 클래스라 인스턴스를 만들지 않고 바로 씁니다.
-/// </summary>
+/// <summary>코드로 UI 를 만들 때의 범용 도구(이미지·텍스트·배치·LayoutGroup·둥근 스프라이트·이징) — 증강과 무관한 잡일을 빼서 선택창은 모양만 말하고 다른 팝업에서도 재사용.</summary>
 public static class AugmentUIFactory
 {
-    // ─────────────────────────────────────────────────────────
-    //  오브젝트 생성
-    // ─────────────────────────────────────────────────────────
+    // ── 오브젝트 생성 ──
 
     /// <summary>Image 를 가진 자식 오브젝트를 만듭니다. sprite 를 주면 9슬라이스로 설정됩니다.</summary>
     public static Image CreateImage(string name, Transform parent, Sprite sprite, Color color)
@@ -65,9 +50,7 @@ public static class AugmentUIFactory
         return go.GetComponent<RectTransform>();
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  배치
-    // ─────────────────────────────────────────────────────────
+    // ── 배치 ──
 
     /// <summary>부모를 꽉 채우도록 늘립니다. padding 만큼 안쪽으로 들어갑니다.</summary>
     public static void Stretch(RectTransform rt, float padding = 0f)
@@ -137,12 +120,7 @@ public static class AugmentUIFactory
         return g;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  절차적 스프라이트
-    // ─────────────────────────────────────────────────────────
-    //
-    // 이미지 에셋 없이 둥근 사각형/원을 코드로 그립니다.
-    // 최초 1회만 만들고 static 에 담아 모든 UI 가 공유합니다.
+    // ── 절차적 스프라이트 — 에셋 없이 둥근 사각형/원을 그려 최초 1회만 만들고 static 으로 공유 ──
 
     private static Sprite roundedSprite;
     private static Sprite circleSprite;
@@ -176,8 +154,7 @@ public static class AugmentUIFactory
         {
             for (int x = 0; x < size; x++)
             {
-                // 각 픽셀이 모서리 원 바깥으로 얼마나 벗어났는지를 재서 알파를 정합니다.
-                // 경계에서 부드럽게 깎아내면 계단 현상(에일리어싱)이 줄어듭니다.
+                // 모서리 원 밖으로 벗어난 거리로 알파 결정 — 경계를 부드럽게 깎아 계단 현상 감소
                 float dx = Mathf.Max(0f, Mathf.Max(r - (x + 0.5f), (x + 0.5f) - (size - r)));
                 float dy = Mathf.Max(0f, Mathf.Max(r - (y + 0.5f), (y + 0.5f) - (size - r)));
                 float d  = Mathf.Sqrt(dx * dx + dy * dy);
@@ -196,9 +173,7 @@ public static class AugmentUIFactory
                              new Vector4(radius, radius, radius, radius));
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  이징 (연출용 곡선)
-    // ─────────────────────────────────────────────────────────
+    // ── 이징 (연출용 곡선) ──
 
     /// <summary>목표를 살짝 넘었다가 돌아오는 곡선. '툭' 튀어나오는 느낌을 줍니다.</summary>
     public static float EaseOutBack(float x)

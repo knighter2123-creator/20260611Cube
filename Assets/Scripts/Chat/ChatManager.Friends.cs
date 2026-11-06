@@ -2,12 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 친구 — 요청을 보내고, 상대가 수락하면 양쪽 친구 창에 서로가 보입니다. 서버 구조는 BackendFriendService 주석 참고 (뒤끝 친구).
-///
-/// [연결]  채팅이 연결된 신원(MyUid)으로 친구·차단 목록을 받습니다. 목록만 실패하면 채팅은 그대로 두고 retryDelay 뒤 다시 시도.
-/// [이름]  상대 닉네임은 서버가 목록마다 최신 값을 줍니다.
-/// </summary>
+/// <summary>친구(뒤끝 친구): 요청 → 상대 수락 시 양쪽에 보임 — 채팅 신원으로 친구·차단 목록을 받고, 목록만 실패하면 채팅은 두고 retryDelay 뒤 재시도.</summary>
 public partial class ChatManager
 {
     /// <summary>친구 + 보낸 요청 최대 수. 서버 규칙으로는 막지 않는 클라이언트 제한입니다.</summary>
@@ -15,11 +10,7 @@ public partial class ChatManager
 
     private static string FriendsLoading => GameMessages.Friends.loading;
 
-    /// <summary>
-    /// 받은 요청 · 수락을 알아채기 위해 목록을 다시 받는 간격(초).
-    /// 친구 창을 열 때 · 친구 실시간 알림(BackendNotify)을 받을 때도 바로 다시 받습니다 (RefreshFriends).
-    /// 알림이 연결돼 있으면 놓쳤을 때의 대비일 뿐이라 길게. 뒤끝 호출 수 = 3회 / 간격.
-    /// </summary>
+    /// <summary>친구 목록 재수신 간격 — 창을 열 때·실시간 알림 때도 바로 받고, 알림 연결 시엔 놓침 대비라 길게 (뒤끝 호출 3회/간격).</summary>
     private static float FriendsPollSeconds => BackendNotify.IsConnected ? 300f : 120f;
     private float nextFriendsPoll;
 
@@ -155,10 +146,7 @@ public partial class ChatManager
 
     // ───────────────────────────── 요청 / 수락 / 삭제 ─────────────────────────────
 
-    /// <summary>
-    /// 친구 요청을 보냅니다. 상대가 이미 나에게 요청했으면 그 요청을 수락합니다.
-    /// 결과는 onDone(오류 문구) — 성공이면 null.
-    /// </summary>
+    /// <summary>친구 요청(상대가 이미 요청했으면 수락) — onDone(오류 문구, 성공이면 null).</summary>
     public void RequestFriend(string peerUid, string peerName, Action<string> onDone)
     {
         if (!CanEditFriends(peerUid, out string uid, out string error)) { onDone?.Invoke(error); return; }
@@ -179,10 +167,7 @@ public partial class ChatManager
         friendService.Request(uid, peerUid, peerName, IfAlive(onDone));
     }
 
-    /// <summary>
-    /// 닉네임으로 유저를 찾아 친구 요청을 보냅니다 (친구 창의 검색 칸). 닉네임은 정확히 같아야 합니다.
-    /// 그 사람이 이미 나에게 요청했으면 수락합니다 (RequestFriend 와 같음). 결과는 onDone(오류 문구) — 성공이면 null.
-    /// </summary>
+    /// <summary>정확한 닉네임으로 찾아 친구 요청(검색 칸, 이미 요청받았으면 수락) — onDone(오류 문구, 성공이면 null).</summary>
     public void RequestFriendByName(string nickname, Action<string> onDone)
     {
         string name = (nickname ?? string.Empty).Trim();

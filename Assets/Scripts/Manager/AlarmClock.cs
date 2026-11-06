@@ -3,24 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// 플레이 시간 알림. 게임 시작 후 5분마다 "게임 플레이 시간 N분이 지났습니다." 팝업을 띄우고 10초 뒤 사라진다.
-///
-/// [붙이는 위치]
-///   로그인 씬의 ManagerRoot 하위. 다른 매니저들과 같은 DontDestroyOnLoad 싱글턴이다.
-///   (DontDestroyOnLoad 는 ManagerRoot 가 담당 — 여기서 부르지 않는다)
-///
-/// [언제부터 세는가]
-///   SaveManager.IsGameplayStarted 가 true 가 된 순간(로그인/로딩이 아닌 게임 씬에 처음 들어간 순간)부터.
-///
-/// [플레이어가 끌 수 없음]
-///   설정 토글이 없고, 팝업은 클릭을 받지 않는다(blocksRaycasts = false). 그래서 닫을 수도 없고,
-///   팝업 아래 버튼 조작도 막지 않는다. 10초가 지나면 저절로 사라진다.
-///
-/// [팝업 UI]
-///   씬마다 배치할 필요가 없도록 자기 자식으로 Overlay 캔버스를 코드에서 만든다.
-///   씬이 바뀌어도(가챠/상점 등) 같이 살아남고, sortingOrder 가 높아 다른 UI 위에 뜬다.
-/// </summary>
+/// <summary>플레이 시간 알림: 게임 씬 진입부터 실제 시간으로 세어 5분마다 "플레이 시간 N분" 팝업을 10초간 표시 — 끌 수 없고 클릭도 막지 않음, 팝업 캔버스는 코드로 만들어 씬과 무관하게 살아남음.</summary>
+// [붙이는 위치] 로그인 씬 ManagerRoot 하위 (DontDestroyOnLoad 는 ManagerRoot 담당)
 public class AlarmClock : MonoBehaviour
 {
     public static AlarmClock Instance { get; private set; }
@@ -71,9 +55,7 @@ public class AlarmClock : MonoBehaviour
     {
         if (!IsGameplayStarted()) return;
 
-        // ★ unscaled — 배속 버튼(timeScale)이나 일시정지에 영향받지 않는 "실제 플레이 시간".
-        //   앱이 백그라운드에서 돌아온 첫 프레임은 delta 가 수 분짜리로 튈 수 있어 1초로 자른다.
-        //   (백그라운드에 있던 시간은 플레이 시간으로 치지 않는다)
+        // unscaled 실제 시간 — 백그라운드에서 돌아온 프레임은 delta 가 튀므로 1초로 자름 (백그라운드 시간은 제외)
         elapsed += Mathf.Min(Time.unscaledDeltaTime, 1f);
 
         if (elapsed >= (notifiedCount + 1) * intervalSeconds)

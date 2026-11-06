@@ -2,10 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 우편함을 여는 버튼 (StageScene 의 랭킹·친구 버튼 옆). 받지 않은 우편이 있으면 글자 옆에 개수를 붙입니다.
-/// Tools/UI 굽기/우편함 이 옆 버튼을 복제해 만들고 칸을 채웁니다.
-/// </summary>
+/// <summary>우편함 열기 버튼 — 안 받은 우편 수가 바뀔 때만 글자 옆 개수를 갱신 (Tools/UI 굽기/우편함 이 만듦).</summary>
 [RequireComponent(typeof(Button))]
 public class OpenMailboxButton : MonoBehaviour
 {

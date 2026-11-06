@@ -1,13 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 등장할 수 있는 카드 목록과 추첨 규칙을 담는 에셋.
-///
-/// [왜 매니저가 아니라 별도 에셋인가]
-/// "1~3월드용 풀", "4월드부터 풀" 처럼 구간별로 다른 카드 세트를 쓰고 싶을 때
-/// 에셋만 갈아끼우면 됩니다. 코드 수정이 필요 없습니다.
-/// </summary>
+/// <summary>등장 카드 목록 + 가중치 추첨 규칙(카드 weight × 등급 배수 × 월드 보정) 에셋 — 구간별 카드 세트를 에셋 교체만으로 바꾸려고 매니저와 분리.</summary>
 [CreateAssetMenu(menuName = "Game/Augment/카드 풀", fileName = "AugmentPool")]
 public class AugmentPool : ScriptableObject
 {
@@ -35,9 +29,7 @@ public class AugmentPool : ScriptableObject
         return null;
     }
 
-    /// <summary>
-    /// 서로 다른 카드 count 장을 가중치 추첨으로 뽑습니다.
-    /// </summary>
+    /// <summary>서로 다른 카드 count 장을 가중치 추첨 (최대 스택 카드 제외, 후보가 모자라면 있는 만큼 + 원인 경고).</summary>
     /// <param name="count">뽑을 장수 (보통 3)</param>
     /// <param name="stackOf">해당 카드가 지금 몇 스택인지 알려주는 함수. maxStack 초과 방지용</param>
     /// <param name="world">현재 월드. 등급 상승 보정에 사용</param>
@@ -45,9 +37,7 @@ public class AugmentPool : ScriptableObject
     {
         // [작동 순서] 0) 입력 방어 → 1) 후보 추리기 → 2) 장수 결정 → 3) 가중치 추첨 반복
 
-        // 0) 입력 방어
-        //    new List<T>(음수) 는 ArgumentOutOfRangeException 을 던지므로 먼저 거릅니다.
-        //    stackOf 를 안 넘기면 "모든 카드 0 스택" 으로 간주합니다 (영구 카드 확인에서 NullReference 방지).
+        // 0) 입력 방어 — 음수 count 는 new List 가 예외, stackOf 가 없으면 모두 0 스택으로 간주
         if (count <= 0) return new List<AugmentCard>();
         stackOf ??= _ => 0;   // ??= : 왼쪽이 null 일 때만 오른쪽을 대입 (System.Func 는 유니티 오브젝트가 아니라 안전)
 
@@ -72,9 +62,7 @@ public class AugmentPool : ScriptableObject
                 continue;   // 이미 꽉 찬 카드는 안 나오게
             }
 
-            // 후보 자격은 "뽑힐 가능성이 있는가" — 개별 weight 가 아니라 최종 가중치로 거릅니다.
-            // 등급 배수가 0 이면 최종 가중치가 0 이 되어, 후보에 넣어도 절대 안 뽑히고
-            // "3장을 요청했는데 2장만 나오는" 증상이 됩니다.
+            // 최종 가중치로 거름 — 등급 배수 0 인 카드를 후보에 넣으면 안 뽑혀서 장수가 모자람
             float w = GetWeight(c, world);
             if (w <= 0f) { zeroWeight++; continue; }
 
@@ -85,9 +73,7 @@ public class AugmentPool : ScriptableObject
         // 2) 후보가 뽑을 장수보다 적으면 있는 만큼만 (게임이 멈추면 안 되니까)
         int pick = Mathf.Min(count, candidates.Count);
 
-        // ★ 왜 모자란지 알려줍니다.
-        //   조용히 넘어가면 "카드가 두 장만 나오는데 이유를 모르겠는" 상황이 됩니다.
-        //   실패했을 때 원인을 남기는 건 방어 코드의 기본입니다.
+        // 모자란 원인을 경고로 남김 (조용하면 왜 두 장만 나오는지 모름)
         if (pick < count)
         {
             Debug.LogWarning(
@@ -97,24 +83,16 @@ public class AugmentPool : ScriptableObject
                 $"  → Cards 목록에 빈 칸이 있는지, weight 와 등급 배수가 0은 아닌지 확인하세요.");
         }
 
-        // 3) 가중치 추첨을 pick 번 반복.
-        //    한 번 뽑은 카드는 후보에서 빼서 같은 카드가 두 장 뜨는 걸 막습니다.
+        // 3) 가중치 추첨을 pick 번 — 뽑은 카드는 후보에서 빼서 중복 방지
         for (int n = 0; n < pick; n++)
         {
-            // 총합을 매번 새로 더합니다.
-            // 예전에는 처음에 한 번 더한 뒤 뽑을 때마다 빼 나갔는데(total -= w),
-            // float 뺄셈은 오차가 쌓여서 남은 실제 합과 조금씩 어긋납니다.
-            // 후보가 몇십 장이라 다시 더해도 비용은 무시할 만하고, 결과는 항상 정확합니다.
-            // ("누적하지 않고 매번 다시 계산" — AugmentManager.RecalculatePermanent 와 같은 원칙)
+            // 총합을 매번 새로 더함 (total -= w 누적은 float 오차가 쌓임, 후보가 적어 비용 무시 가능)
             float total = 0f;
             for (int i = 0; i < weights.Count; i++) total += weights[i];
 
             if (total <= 0f) break;
 
-            // [가중치 추첨의 원리]
-            // 0 ~ total 사이 난수를 하나 뽑고, 후보들의 무게를 앞에서부터 빼나가다가
-            // 0 이하가 되는 순간의 후보가 당첨입니다.
-            // 무게가 큰 후보일수록 '구간'이 넓어서 더 자주 걸립니다.
+            // 0~total 난수에서 무게를 앞에서부터 빼다가 0 이하가 되는 후보가 당첨 (무거울수록 구간이 넓음)
             float r = Random.Range(0f, total);
             int chosen = weights.Count - 1;   // 부동소수점 오차 대비 기본값
 
@@ -146,24 +124,16 @@ public class AugmentPool : ScriptableObject
             default:                      rarityMul = commonMultiplier;    rarityStep = 0; break;
         }
 
-        // 월드가 오를수록 고등급 가중치를 서서히 올립니다.
-        // 1월드에서는 보정 0, 5월드 Epic 이면 ×(1 + 0.08×2×4) = ×1.64
+        // 월드가 오를수록 고등급 가중치 상승 (1월드 0, 5월드 Epic = ×(1 + 0.08×2×4) = ×1.64)
         if (rarityStep > 0 && rarityBoostPerWorld > 0f)
             rarityMul *= 1f + rarityBoostPerWorld * rarityStep * Mathf.Max(0, world - 1);
 
         return Mathf.Max(0f, card.Weight * rarityMul);
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  진단
-    // ─────────────────────────────────────────────────────────
+    // ── 진단 ──
 
-    /// <summary>
-    /// 지금 이 풀에서 각 카드가 실제로 몇 %의 확률로 뽑히는지 출력합니다.
-    /// 에셋 인스펙터 우클릭 → "1월드 기준 등장 확률 확인".
-    ///
-    /// 카드가 요청한 장수만큼 안 나오거나 특정 카드가 안 보일 때 여기부터 보세요.
-    /// </summary>
+    /// <summary>각 카드의 실제 등장 확률(1월드 기준) 출력 — 에셋 우클릭, 장수가 모자라거나 특정 카드가 안 보일 때.</summary>
     [ContextMenu("1월드 기준 등장 확률 확인")]
     private void DumpChances()
     {

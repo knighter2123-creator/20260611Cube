@@ -3,33 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 증강 시스템의 중앙 허브 — 코어.
-///
-/// 이 클래스는 partial 로 세 파일에 나뉘어 있습니다.
-///   AugmentManager.cs        ← 지금 이 파일. 싱글턴 / 등장 조건 / 영구 스택
-///   AugmentManager.Buffs.cs  ← 지속시간이 있는 임시 버프
-///   AugmentManager.Save.cs   ← 저장 / 복구
-///
-/// 프로젝트의 StageManager.cs + StageManager.Save.cs,
-/// Enemy.cs + Enemy.Debuffs.cs 와 같은 나누기 방식입니다.
-///
-/// [다른 스크립트가 쓰는 방법 — 이게 전부입니다]
-///   float dmg     = baseDamage * AugmentManager.Attack;
-///   float critMul = baseCritMultiplier + AugmentManager.CritDamage;
-///   float def     = enemyDefence * AugmentManager.EnemyDefense;
-///   float delay   = respawnDelay * AugmentManager.SpawnDelay;
-///
-/// 전부 static 프로퍼티라 매니저가 씬에 없어도 NullReference 없이
-/// 기본값(1 또는 0)이 돌아옵니다. 그래서 기존 코드를 안전하게 고칠 수 있습니다.
-/// </summary>
+/// <summary>증강 허브(코어): 트리거 스테이지 클리어 시 카드를 뽑아 선택창을 띄우고, 영구 스택으로 배율을 계산해 static 접근자(Attack·CritDamage·EnemyDefense·SpawnDelay)로 제공 — 매니저가 없어도 기본값(1/0)이라 안전.</summary>
+// partial 구성: 이 파일(싱글턴·등장 조건·영구 스택) / .Buffs.cs(임시 버프) / .Save.cs(저장·복구)
+// 사용 예: dmg = baseDamage * AugmentManager.Attack, def = enemyDefence * AugmentManager.EnemyDefense
 public partial class AugmentManager : MonoBehaviour
 {
     public static AugmentManager Instance { get; private set; }
 
-    // ─────────────────────────────────────────────────────────
-    //  인스펙터 설정
-    // ─────────────────────────────────────────────────────────
+    // ── 인스펙터 설정 ──
     [Header("연결")]
     [SerializeField] private AugmentPool     pool;
     [SerializeField] private AugmentSelectUI ui;
@@ -50,15 +31,12 @@ public partial class AugmentManager : MonoBehaviour
     [Header("디버그")]
     [SerializeField] private bool logEnabled = true;
 
-    // ─────────────────────────────────────────────────────────
-    //  런타임 상태
-    // ─────────────────────────────────────────────────────────
+    // ── 런타임 상태 ──
 
     /// <summary>영구 카드 ID → 몇 번 골랐는지</summary>
     private readonly Dictionary<string, int> permanentStacks = new Dictionary<string, int>();
 
-    // 계산된 영구 배율. 매 프레임 다시 계산하지 않고 변할 때만 갱신합니다.
-    // (방치형은 매 프레임 비용이 곧 배터리입니다)
+    // 계산된 영구 배율 — 변할 때만 갱신 (매 프레임 비용 = 배터리)
     private float attackMultiplier = 1f;
     private float critDamageBonus  = 0f;
 
@@ -68,9 +46,7 @@ public partial class AugmentManager : MonoBehaviour
     /// <summary>증강 값이 바뀔 때마다 호출됩니다. UI 갱신 등에 연결하세요.</summary>
     public event Action OnChanged;
 
-    // ─────────────────────────────────────────────────────────
-    //  외부에서 쓰는 static 접근자 (매니저가 없어도 안전)
-    // ─────────────────────────────────────────────────────────
+    // ── 외부에서 쓰는 static 접근자 (매니저가 없어도 안전) ──
     public static float Attack       => Instance != null ? Instance.attackMultiplier : 1f;
     public static float CritDamage   => Instance != null ? Instance.critDamageBonus  : 0f;
     public static float SpawnDelay   => Instance != null ? Instance.spawnDelayMul    : 1f;   // Buffs.cs
@@ -80,28 +56,9 @@ public partial class AugmentManager : MonoBehaviour
     public float AttackMultiplier => attackMultiplier;
     public float CritDamageBonus  => critDamageBonus;
 
-    // ─────────────────────────────────────────────────────────
-    //  라이프사이클
-    //
-    //  [작동 순서 — 한 판의 흐름]
-    //   Awake      : 싱글턴 등록 → UI 찾기 → 저장된 스택 Load → 영구 배율 계산
-    //   Update     : 임시 버프 만료 검사 (Buffs.cs)
-    //   스테이지 클리어 (StageManager → OnStageCleared)
-    //              : '이번 스테이지 동안' 버프 정리 → 트리거 스테이지면 openDelay 뒤 Open
-    //   Open       : 풀에서 카드 추첨 → UI.Show (게임 일시정지)
-    //   카드 선택   : UI 가 창을 닫고 timeScale 복구 → OnCardChosen → card.Apply
-    //              → 영구 카드면 배율 재계산 + Save
-    // ─────────────────────────────────────────────────────────
+    // ── 라이프사이클 ── Awake: Load → 배율 계산 / Update: 임시 버프 만료 / 클리어: 스테이지 버프 정리 → 트리거면 Open → 선택 시 Apply(+영구면 재계산·Save)
 
-    /// <summary>
-    /// ─── 도메인 리로드를 끈 에디터 대비 (학습 포인트) ─────────────────────────
-    /// Project Settings → Editor → Enter Play Mode Options 에서 "Reload Domain" 을 끄면
-    /// 플레이를 다시 시작해도 static 변수가 지난 플레이 값을 그대로 들고 있습니다.
-    /// Instance 는 OnDestroy 에서 지우지만, 플레이 중 에러로 OnDestroy 가 안 불린 경우까지 대비해
-    /// 플레이 시작 시 가장 먼저 도는 SubsystemRegistration 에서 비웁니다.
-    /// (GachaTicket.ResetStatics 와 같은 방식. 도메인 리로드가 켜져 있으면 영향 없음)
-    /// ───────────────────────────────────────────────────────────────────────
-    /// </summary>
+    /// <summary>Reload Domain 을 끈 에디터에서 지난 플레이의 static 이 남지 않게 플레이 시작 시 비움.</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -132,13 +89,9 @@ public partial class AugmentManager : MonoBehaviour
         TickTempBuffs();         // → Buffs.cs
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  스테이지 연동 — StageManager 가 부르는 함수
-    // ─────────────────────────────────────────────────────────
+    // ── 스테이지 연동 — StageManager 가 부르는 함수 ──
 
-    /// <summary>
-    /// 스테이지를 하나 클리어했을 때 호출하세요. 조건에 맞으면 카드 선택창이 뜹니다.
-    /// </summary>
+    /// <summary>스테이지 클리어 때 호출 — 스테이지 한정 버프를 정리하고 트리거 스테이지면 openDelay 뒤 카드 선택창.</summary>
     /// <param name="world">방금 클리어한 월드 번호</param>
     /// <param name="stage">방금 클리어한 스테이지 번호 (1~10)</param>
     public void OnStageCleared(int world, int stage)
@@ -173,16 +126,7 @@ public partial class AugmentManager : MonoBehaviour
 
     private IEnumerator OpenAfterDelay(float delay)
     {
-        // WaitForSecondsRealtime 을 쓰는 이유:
-        // 다른 연출이 timeScale 을 건드리고 있어도 대기 시간이 늘어지지 않게 하기 위해서입니다.
-        //
-        // ─── 왜 Unity 6 의 Awaitable 이 아니라 코루틴인가 (학습 포인트) ────────────
-        // Awaitable.WaitForSecondsAsync 는 scaled 시간(timeScale 영향)으로만 기다립니다.
-        // 여기서는 'unscaled' 대기가 필요한데, 코루틴의 WaitForSecondsRealtime 이 정확히 그 일을 합니다.
-        // 또 코루틴은 이 오브젝트가 파괴되면 자동으로 멈춰서, 파괴된 매니저가 Open 을 부를 걱정이 없습니다.
-        // 새 기능이 항상 정답은 아닙니다 — 씬 이동처럼 "끝날 때까지 기다리기" 는 Awaitable(ShopSceneLoader),
-        // 이렇게 "실시간으로 몇 초" 는 코루틴이 더 단순합니다.
-        // ───────────────────────────────────────────────────────────────────────
+        // 실시간 대기(timeScale 영향 없음) — Awaitable.WaitForSecondsAsync 는 scaled 라 코루틴 사용, 파괴되면 자동으로 멈춤
         yield return new WaitForSecondsRealtime(delay);
         Open();
     }
@@ -202,8 +146,7 @@ public partial class AugmentManager : MonoBehaviour
             return;
         }
 
-        // 화면에 보이는 장수와 실제로 뽑은 장수가 다르면 UI 쪽 문제입니다.
-        // 이 로그가 있으면 "코드가 몇 장을 준 건지"를 즉시 구분할 수 있습니다.
+        // 화면 장수와 다르면 UI 문제 — 코드가 몇 장 줬는지 구분용 로그
         if (logEnabled)
             GameLog.Info($"[Augment] 카드 {picks.Count}장 표시 (요청 {cardCount}장) — {currentWorld}-{currentStage}");
 
@@ -217,10 +160,7 @@ public partial class AugmentManager : MonoBehaviour
 
         card.Apply(this, isRestore: false);
 
-        // 영구 카드였다면 스택이 늘었으니 배율을 다시 계산합니다.
-        // ※ OnChanged 는 여기서 따로 쏘지 않습니다. 값이 바뀌는 경로(RecalculatePermanent /
-        //   임시 버프의 RecalculateTemp)가 이미 한 번씩 알리므로, 또 쏘면 구독 UI 가 두 번 갱신됩니다.
-        //   즉시 보상 카드는 증강 값을 바꾸지 않습니다(재화·경험치는 각 매니저가 알립니다).
+        // 영구면 배율 재계산 — OnChanged 는 재계산 경로가 이미 알리므로 여기서 또 쏘지 않음(두 번 갱신 방지)
         if (card.IsPermanent)
         {
             RecalculatePermanent();
@@ -232,9 +172,7 @@ public partial class AugmentManager : MonoBehaviour
                       $"치명타 +{critDamageBonus * 100f:0.#}%p");
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  영구 스택
-    // ─────────────────────────────────────────────────────────
+    // ── 영구 스택 ──
 
     public int StackOf(AugmentCard card)
     {
@@ -251,17 +189,7 @@ public partial class AugmentManager : MonoBehaviour
         permanentStacks[card.Id] = n + 1;
     }
 
-    /// <summary>
-    /// 영구 배율을 0부터 다시 계산합니다.
-    ///
-    /// [왜 매번 처음부터 다시 계산하나]
-    /// "누적해서 더하기"는 편해 보이지만, 저장 복구·환생(리셋)·밸런스 패치 때
-    /// 값이 어긋나기 시작하면 원인을 찾을 수 없습니다.
-    /// 스택 수만 진실로 삼고 배율은 항상 다시 계산하면, 어떤 경로로 와도 결과가 같습니다.
-    /// 이걸 '단일 진실 공급원(single source of truth)' 이라고 부릅니다.
-    ///
-    /// Enemy.ApplyStatMultiplier() 의 "누적(*=)이 아니라 대입(=)" 과 같은 이야기예요.
-    /// </summary>
+    /// <summary>영구 배율을 스택 수로부터 0부터 다시 계산 — 누적하면 복구·리셋·패치 때 어긋나므로 스택만 진실로 삼음.</summary>
     public void RecalculatePermanent()
     {
         attackMultiplier = 1f;
@@ -295,9 +223,7 @@ public partial class AugmentManager : MonoBehaviour
         Save();                  // → Save.cs
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  에디터 테스트
-    // ─────────────────────────────────────────────────────────
+    // ── 에디터 테스트 ──
     [ContextMenu("테스트: 카드 선택창 열기")]
     private void TestOpen() => Open();
 

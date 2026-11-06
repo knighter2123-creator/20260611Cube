@@ -128,8 +128,7 @@ public class BackendChatService : IChatService, IChatClientListener
         try { client.Update(); }   // 이 안에서 IChatClientListener 콜백이 옴
         catch (Exception e) { Debug.LogException(e); }
 
-        // 연결 오류는 Update 가 끝난 뒤에 알림 — 콜백 안에서 알리면 ChatManager 가 바로 Disconnect(=Dispose) 해서
-        // 아직 돌고 있는 client.Update 안에서 자기 자신을 정리하게 됨
+        // 연결 오류는 Update 가 끝난 뒤 알림 (콜백 안이면 ChatManager 가 바로 Dispose 해 돌고 있는 client.Update 를 정리하게 됨)
         if (failReason != null)
         {
             string reason = failReason;

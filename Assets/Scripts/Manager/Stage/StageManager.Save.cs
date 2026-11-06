@@ -1,7 +1,6 @@
 using UnityEngine;
 
-// StageManager의 세이브 연동 partial.
-// 스테이지 진행도(world/stage)를 SaveData와 주고받는다.
+// StageManager 세이브 연동 — 진행도(world/stage)를 SaveData 와 주고받음
 public partial class StageManager
 {
     /// <summary>현재 진행도를 SaveData에 기록.</summary>
@@ -11,10 +10,7 @@ public partial class StageManager
         d.currentStage = currentStage;
     }
 
-    /// <summary>
-    /// SaveData의 진행도를 필드에 반영하고 누적 난이도 배율을 재계산.
-    /// 적 스폰은 호출자가 NextStage()로 처리 (Start 참고).
-    /// </summary>
+    /// <summary>SaveData 진행도를 반영하고 난이도 배율 재계산 (스폰은 호출자가 NextStage 로).</summary>
     public void ApplyFrom(SaveData d)
     {
         SetPosition(d.currentWorld, d.currentStage);

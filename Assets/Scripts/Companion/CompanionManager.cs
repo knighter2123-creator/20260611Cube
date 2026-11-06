@@ -53,9 +53,7 @@ public partial class CompanionManager : MonoBehaviour
         placeableTilemap = tilemap;
     }
 
-    // ──────────────────────────────────────────────
-    //  세이브 연동
-    // ──────────────────────────────────────────────
+    // ── 세이브 연동 ──
 
     /// <summary>보유 동료 id 목록 + 배치를 SaveData에 기록.</summary>
     public void CaptureTo(SaveData d)
@@ -75,13 +73,7 @@ public partial class CompanionManager : MonoBehaviour
             d.ownedCompanionIds.Add(data.id);
         }
 
-        // ── 배치 ──
-        // 배치 가능한 씬에서 '복원이 끝난 뒤' 에만 스냅샷 갱신. 그 전(로드 직후·다른 씬)이면 기존 배치를 보존.
-        //
-        // ★ [수정] 예전 조건은 occupied.Count > 0 이었습니다.
-        //   그러면 "아직 복원 전이라 비어 있음" 과 "유저가 전부 회수해서 비어 있음" 을 구분하지 못해,
-        //   마지막 동료까지 회수하고 저장해도 옛 배치가 그대로 남아 → 재시작하면 회수한 동료가 다시 나타났습니다.
-        //   개수(상태) 대신 "이 씬에 복원했는가"(사건) 를 기준으로 — CompanionFragment.loaded 와 같은 원칙입니다.
+        // ── 배치 — 이 씬에 복원이 끝난 뒤에만 스냅샷 갱신 (개수 > 0 기준이면 '전부 회수'와 '복원 전'을 구분 못 해 회수한 동료가 부활) ──
         if (placeableTilemap != null && restoredIntoScene)
         {
             SavePlacementSnapshot();
@@ -101,10 +93,7 @@ public partial class CompanionManager : MonoBehaviour
         // else: 기존 d.companionPlacements 그대로 유지 (병합 저장)
     }
 
-    /// <summary>
-    /// SaveData의 보유 id 목록을 DB로 되찾아 데이터 목록을 복원하고, 배치 의도도 복원.
-    /// (실제 오브젝트 생성·배치는 게임 씬의 RestoreIntoScene이 담당)
-    /// </summary>
+    /// <summary>보유 id 를 DB 로 데이터 복원 + 배치 의도 복원 (오브젝트 생성·배치는 게임 씬의 RestoreIntoScene).</summary>
     public void ApplyFrom(SaveData d)
     {
         if (d == null) return;
@@ -149,9 +138,7 @@ public partial class CompanionManager : MonoBehaviour
         RecalculateSynergy();
     }
 
-    // ──────────────────────────────────────────────
-    //  동료 획득
-    // ──────────────────────────────────────────────
+    // ── 동료 획득 ──
     public bool AddCompanion(CompanionData data)
     {
         if (data == null) return false;
@@ -167,13 +154,7 @@ public partial class CompanionManager : MonoBehaviour
         ownedCompanionData.Add(data);
         GameLog.Info($"[CompanionManager] {data.companionName} 신규 보유 등록");
 
-        // ★ [수정] 오브젝트는 '항상' 만듭니다. (최대 6 제한은 PlaceCompanion 이 '배치 수' 기준으로 검사)
-        //   예전에는 오브젝트 수가 6이면 새 동료는 데이터만 보유했습니다.
-        //   그러면 배치된 동료가 6명 미만이어도 7번째 동료는 배치할 오브젝트가 없어
-        //   "배치 대상 없음" 으로 실패했고, 앱을 재시작하면(RestoreIntoScene 은 제한 없이 전부 생성) 또 됐습니다.
-        //   ★ 인덱스 영향 없음: 두 경로 모두 '데이터 순서대로' 오브젝트를 만들므로
-        //     ownedCompanions[i] 와 ownedCompanionData[i] 가 계속 같은 동료입니다 (세이브의 ownedIndex 와 일치).
-        //   비용: 꺼진 오브젝트가 몇 개 더 생길 뿐이라 무시할 수준입니다 (Update 도 isPlaced 가 아니면 즉시 반환).
+        // 오브젝트는 항상 생성(6명 제한은 PlaceCompanion 이 배치 수로 검사) — 안 만들면 7번째 동료가 배치 불가, 데이터 순서대로라 인덱스 짝 유지
         Companion companion = SpawnCompanionObject(data);
         if (companion != null)
             ownedCompanions.Add(companion);
@@ -182,17 +163,9 @@ public partial class CompanionManager : MonoBehaviour
         return true;
     }
 
-    // ──────────────────────────────────────────────
-    //  진화 — 교체 / 제거
-    // ──────────────────────────────────────────────
-    //
-    // ★ 보유 목록은 '순서' 가 곧 배치 기억입니다 (placementByIndex: 목록 인덱스 → 셀, 세이브의 ownedIndex).
-    //   그래서 교체는 같은 인덱스에 끼워 넣고(배치 그대로), 제거는 뒤 인덱스를 한 칸씩 당겨 맞춥니다.
+    // ── 진화 — 교체 / 제거 (목록 순서 = 배치 기억이라 교체는 같은 인덱스, 제거는 뒤 인덱스를 당겨 맞춤) ──
 
-    /// <summary>
-    /// 보유 동료 하나를 다른 동료로 바꿉니다 (진화 — 대상을 아직 안 가진 경우).
-    /// 목록의 같은 자리를 쓰므로, 맵에 배치돼 있었다면 새 동료가 같은 칸에 그대로 섭니다.
-    /// </summary>
+    /// <summary>보유 동료를 다른 동료로 교체(진화, 대상 미보유) — 같은 목록 자리라 배치돼 있었으면 같은 칸에 섬.</summary>
     public bool ReplaceCompanion(CompanionData from, CompanionData to)
     {
         if (from == null || to == null) return false;
@@ -305,9 +278,7 @@ public partial class CompanionManager : MonoBehaviour
         return companion;
     }
 
-    // ──────────────────────────────────────────────
-    //  씬 전환 — 배치 스냅샷 / 복원
-    // ──────────────────────────────────────────────
+    // ── 씬 전환 — 배치 스냅샷 / 복원 ──
     /// <summary>현재 occupied를 placementByIndex로 반영 (배치 가능한 씬에서 호출).</summary>
     public void SavePlacementSnapshot()
     {
@@ -319,11 +290,7 @@ public partial class CompanionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 새 씬에서 타일맵 연결 후 호출.
-    /// 동료 오브젝트를 데이터로 재생성하고 배치 의도(placementByIndex)대로 같은 셀에 재배치.
-    /// 생성 실패가 있어도 인덱스가 어긋나지 않게 placementByIndex를 새 인덱스로 다시 만든다.
-    /// </summary>
+    /// <summary>새 씬에서 타일맵 연결 후: 동료 오브젝트를 데이터로 재생성하고 배치 의도대로 같은 셀에 재배치 (생성 실패에도 인덱스가 어긋나지 않게 다시 만듦).</summary>
     public void RestoreIntoScene(Tilemap tilemap)
     {
         GameLog.Info($"[CompanionManager] RestoreIntoScene — 데이터 {ownedCompanionData.Count}명, 오브젝트 {ownedCompanions.Count}개");
@@ -370,13 +337,7 @@ public partial class CompanionManager : MonoBehaviour
         RecalculateSynergy();
     }
 
-    // ──────────────────────────────────────────────
-    //  배치 / 회수 (셀 좌표 기반)
-    // ──────────────────────────────────────────────
-    // ★ 시너지 — 공개 메서드(PlaceCompanion / RetrieveCompanion)는 '바뀌었으면 재계산' 까지 합니다.
-    //   내부 메서드(PlaceInternal / RetrieveInternal)는 재계산 없이 배치만 바꿉니다.
-    //   여러 동료를 한꺼번에 옮기는 곳(RestoreIntoScene · ReplaceCompanion)은 내부 메서드를 쓰고
-    //   끝에서 한 번만 계산합니다. (PlaceCompanion 안의 회수까지 재계산하면 한 번 배치에 두 번 계산 · 두 번 알림)
+    // ── 배치 / 회수 (셀 좌표) — 공개 메서드는 시너지 재계산까지, 내부 메서드는 배치만 (여러 명을 옮기는 곳은 끝에서 한 번만 계산) ──
     public bool PlaceCompanion(Companion companion, Vector3Int cell)
     {
         if (!PlaceInternal(companion, cell)) return false;
@@ -414,9 +375,7 @@ public partial class CompanionManager : MonoBehaviour
             return false;
         }
 
-        // ★ [추가] 최대 배치 수 — 규칙을 지키는 최종 관문은 데이터를 가진 이쪽입니다.
-        //   (배치 컨트롤러도 같은 검사를 하지만, 그건 유저에게 알림을 띄우기 위한 것)
-        //   이미 배치된 동료를 다른 칸으로 '옮기는' 경우는 수가 늘지 않으므로 통과.
+        // 최대 배치 수의 최종 관문은 데이터를 가진 이쪽 (컨트롤러 검사는 알림용), 옮기기는 수가 안 늘어 통과
         if (!companion.IsPlaced && occupied.Count >= maxCompanions)
         {
             GameLog.Info($"[CompanionManager] 최대 배치 수({maxCompanions}) 도달 — 배치하지 않습니다.");
@@ -442,9 +401,7 @@ public partial class CompanionManager : MonoBehaviour
         return true;
     }
 
-    // ──────────────────────────────────────────────
-    //  배치 컨트롤러가 쓰는 조회 헬퍼
-    // ──────────────────────────────────────────────
+    // ── 배치 컨트롤러가 쓰는 조회 헬퍼 ──
     public bool TryGetCell(Vector3 worldPos, out Vector3Int cell)
     {
         cell = default;
@@ -460,11 +417,7 @@ public partial class CompanionManager : MonoBehaviour
 
     public Vector3 GetCellCenter(Vector3Int cell) => placeableTilemap.GetCellCenterWorld(cell);
 
-    // ──────────────────────────────────────────────
-    //  조회
-    // ──────────────────────────────────────────────
-    // ★ 읽기 전용으로 내줍니다. 바깥에서 Add/Remove 하면 ownedCompanions[i] ↔ ownedCompanionData[i]
-    //   짝이 어긋나 세이브의 ownedIndex 가 엉뚱한 동료를 가리키게 됩니다. 변경은 이 매니저의 메서드로만.
+    // ── 조회 — 읽기 전용 (바깥에서 Add/Remove 하면 오브젝트·데이터 인덱스 짝이 어긋남) ──
     public IReadOnlyList<Companion>     GetOwnedCompanions()    => ownedCompanions;
     public IReadOnlyList<CompanionData> GetOwnedCompanionData() => ownedCompanionData;
     public int                          MaxCompanions           => maxCompanions;   // 배치 가능한 최대 수 (읽기 전용)
@@ -478,10 +431,7 @@ public partial class CompanionManager : MonoBehaviour
         return false;
     }
 
-    /// <summary>
-    /// 보유 동료 오브젝트를 id 로 찾는다. (인스턴스 비교 금지 — 에셋 참조가 달라도 id 가 같으면 같은 동료)
-    /// 리스트 아이템 / 배치 컨트롤러가 각자 같은 검색을 하던 것을 여기로 모았습니다.
-    /// </summary>
+    /// <summary>보유 동료 오브젝트를 id 로 찾음 (에셋 참조가 달라도 id 가 같으면 같은 동료).</summary>
     public Companion FindOwnedCompanion(string id)
     {
         if (string.IsNullOrEmpty(id)) return null;

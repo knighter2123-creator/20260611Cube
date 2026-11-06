@@ -1,18 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// ShopScene의 Close 버튼 처리. 풀 씬 이동으로 StageScene 복귀.
-/// (additive 아님. StageScene은 세이브 기준으로 재구성됨.)
-///
-/// [작동 순서]
-///   Close 버튼 OnClick → CloseShop() → ShopSceneLoader.SaveAndLoad()
-///     → (연타 방지) → (씬 등록 확인) → 저장 → 비동기 로드
-///   OpenShopButton 과 방향만 반대인 같은 동작이라, 공통 로직은 ShopSceneLoader 에 있습니다.
-///
-/// [왜 additive 로 상점을 띄우지 않나]
-///   additive 로 겹쳐 올리면 StageScene 의 적·코루틴이 뒤에서 계속 돌아 상태 관리가 복잡해집니다.
-///   통째로 씬을 바꾸고 돌아올 때 세이브로 다시 짓는 쪽이 단순하고, 상점에서 바뀐 재화도 자연스럽게 반영됩니다.
-/// </summary>
+/// <summary>ShopScene 닫기 버튼 — ShopSceneLoader.SaveAndLoad 로 StageScene 에 Single 전환 복귀 (additive 면 뒤에서 적·코루틴이 계속 돌아 복잡, 세이브로 재구성하면 재화도 자연 반영).</summary>
 public class ShopSceneController : MonoBehaviour
 {
     [SerializeField] private string stageSceneName = "StageScene";

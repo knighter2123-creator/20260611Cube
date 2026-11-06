@@ -1,20 +1,8 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// 화면에 보이는 오류·상태 문장 모음 — 서버·데이터 코드(ChatManager, 뒤끝 서비스, Mailbox, AuthManager ...)가 만드는 문장.
-/// (창에 붙은 UI 컴포넌트의 글자는 각 컴포넌트 인스펙터에 있습니다 — ChatPanel, FriendPanel, RankingPanel ...)
-///
-/// [고치는 곳]  Assets/Resources/GameMessages.asset 을 선택하고 인스펙터에서 고치세요. 플레이 중에 고쳐도 바로 반영됩니다
-///   (플레이 중 고친 값도 에셋에 남습니다 — ScriptableObject 라서).
-///   에셋이 없거나 이름이 바뀌면 아래 코드의 기본 문장을 씁니다 (게임은 그대로 돌아감, 경고 로그 한 번).
-///
-/// [자리 표시]  {name} {max} {count} {code} {reason} 같은 자리는 실행 중에 값으로 바뀝니다. 각 칸의 Tooltip 에 쓸 수 있는 자리가 있습니다.
-///   중괄호를 잘못 써도 오류는 나지 않고 그 글자가 그대로 보입니다 (ChatText.Fill).
-///
-/// [새 문장 더하기]  아래 묶음 클래스에 필드를 더하고(기본값 = 지금 문장), 코드에서 GameMessages.Chat.새필드 처럼 씁니다.
-///   이미 만든 에셋에는 새 필드가 기본값으로 들어갑니다.
-/// </summary>
+/// <summary>서버·데이터 코드가 만드는 오류·상태 문장 모음(ScriptableObject) — Resources/GameMessages.asset 인스펙터에서 고치고(플레이 중 즉시 반영), 에셋이 없으면 코드 기본 문장 사용.</summary>
+// {name}{max}{count} 등 자리는 ChatText.Fill 로 치환 / 새 문장은 묶음 클래스에 필드 추가(기본값 = 문장) → GameMessages.Chat.필드
 [CreateAssetMenu(fileName = "GameMessages", menuName = "Game/Game Messages (오류·상태 문장)")]
 public class GameMessages : ScriptableObject
 {

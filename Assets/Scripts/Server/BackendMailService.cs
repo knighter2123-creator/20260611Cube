@@ -5,16 +5,9 @@ using LitJson;
 using Manager.currency;
 using UnityEngine;
 
-/// <summary>
-/// 뒤끝 우편 — 관리자 우편 · 랭킹 보상 우편 · 쿠폰 우편을 받아 와 MailItem 으로 바꿉니다.
-///
-/// [★ 아이템 차트 형식 — 뒤끝 콘솔에서 우편·랭킹 보상에 넣을 아이템]
-///   뒤끝 우편의 아이템은 '차트' 의 한 줄입니다. 게임은 그 줄의 itemType 컬럼으로 재화를 알아봅니다.
-///     itemType : "gold" / "gem" / "gachaTicket"   (대소문자 무시, "골드" / "보석" / "소환권" 도 됨)
-///     amount   : (선택) 한 개당 수량. 없으면 1
-///   받는 양 = 우편에 넣은 개수(itemCount) × amount.  예) itemType=gem, amount=100 인 줄을 30개 → 보석 3,000
-///   itemType 이 맞지 않는 아이템이 든 우편은 받기를 막습니다 (받으면 서버에서 사라지는데 지급할 방법이 없어서).
-/// </summary>
+/// <summary>뒤끝 우편(관리자·랭킹 보상·쿠폰)을 받아 MailItem 으로 변환 — 차트 줄의 itemType 으로 재화를 알아봄.</summary>
+// [아이템 차트] itemType: gold/gem/gachaTicket(골드/보석/소환권도 됨), amount(선택, 기본 1) → 받는 양 = itemCount × amount
+// ⚠ itemType 이 안 맞는 우편은 받기를 막음 (받으면 서버에서 사라지는데 지급할 방법이 없어서)
 public class BackendMailService : IMailService
 {
     // 이 순서로 받아 와 하나로 합침 (유저 간 우편 PostType.User 는 쓰지 않음)

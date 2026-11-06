@@ -3,24 +3,8 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 
-/// <summary>
-/// 일일 던전 씬 진행 담당. (EvolveStageManager 와 같은 흐름) 던전 데이터의 rule 로 규칙이 갈립니다.
-///
-///   BossKill (골드 던전)
-///     보스 1마리 스폰 → 제한시간(기본 60초) 안에 처치하면 클리어, 시간 초과면 실패
-///
-///   Defense (소환권 던전)
-///     적이 일정 주기로 계속 몰려옴 → 제한시간 동안 버티면 클리어
-///     적이 도착 지점(breachPoint)에 닿을 때마다 침입 1회, maxBreaches(기본 3)회가 되면 실패
-///
-///   클리어 → 입장 횟수 차감 + 보상 지급 → 원래 스테이지로 복귀
-///   실패   → 보상 없이 복귀하고, 입장 횟수도 차감하지 않습니다.
-///
-/// ★ 씬 구성: EvolveScene 을 복제해 DailyDungeonScene 으로 저장하고,
-///   EvolveStageManager 컴포넌트를 지운 뒤 이 컴포넌트를 붙이세요.
-///   SceneBinder(동료 복원) / HpBar / 웨이포인트는 그대로 쓰면 됩니다.
-///   동료 목록 UI(CompanionListUI)를 두지 않으므로 던전 안에서는 배치를 바꿀 수 없습니다.
-/// </summary>
+/// <summary>일일 던전 씬 진행: BossKill = 제한시간 안에 보스 처치 / Defense = 버티기(침입 maxBreaches 회면 실패) — 클리어면 횟수 차감·보상 후 복귀, 실패면 보상·차감 없이 복귀.</summary>
+// 씬: EvolveScene 복제 → EvolveStageManager 대신 이 컴포넌트 (SceneBinder·HpBar·웨이포인트 유지, 동료 목록 UI 가 없어 던전 안에선 배치 변경 불가)
 public class DailyDungeonManager : MonoBehaviour
 {
     public static DailyDungeonManager Instance;
@@ -222,10 +206,7 @@ public class DailyDungeonManager : MonoBehaviour
         StartCoroutine(DefenseSpawnLoop());
     }
 
-    /// <summary>
-    /// 스폰 루프. WaitForSeconds(배속 영향 받음) — 배속을 올리면 적도 빨리 나오고 제한시간도 빨리 줄어
-    /// 일반 스테이지(EnemyRespawn)와 같은 체감이 됩니다.
-    /// </summary>
+    /// <summary>스폰 루프 — WaitForSeconds(배속 영향)라 일반 스테이지처럼 배속 시 적도 시간도 함께 빨라짐.</summary>
     private IEnumerator DefenseSpawnLoop()
     {
         if (firstSpawnDelay > 0f) yield return new WaitForSeconds(firstSpawnDelay);
@@ -249,10 +230,7 @@ public class DailyDungeonManager : MonoBehaviour
         return new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * spawnJitterRadius;
     }
 
-    /// <summary>
-    /// 풀에서 꺼내 초기화 → 활성화. 순서는 EnemyRespawn.Spawn 과 같습니다 (그쪽 주석 참고):
-    ///   꺼내기(비활성) → OnSpawnFromPool(스탯) → 오프셋·경로 → SetActive → HP바
-    /// </summary>
+    /// <summary>풀에서 꺼내 초기화 후 활성화 (EnemyRespawn.Spawn 과 같은 순서: 꺼내기 → 스탯 → 경로 → SetActive → HP바).</summary>
     private void SpawnDefenseEnemy(Vector2 offset)
     {
         GameObject prefab   = ActiveData.defenseEnemyPrefab.gameObject;
@@ -283,10 +261,7 @@ public class DailyDungeonManager : MonoBehaviour
         return obj;
     }
 
-    /// <summary>
-    /// 도착 지점에 닿은 적을 찾아 침입 처리합니다. 매 프레임 거리만 비교 (콜라이더·트리거 불필요).
-    /// 적은 경로를 무한히 도는 구조(TargetMove)라, 닿는 순간 치우지 않으면 한 바퀴 더 돌아 또 들어옵니다.
-    /// </summary>
+    /// <summary>도착 지점에 닿은 적을 거리 비교로 찾아 침입 처리 — 경로를 무한히 돌아서 닿는 순간 치우지 않으면 또 들어옴.</summary>
     private void CheckBreaches()
     {
         Vector2 goal = BreachPosition();
@@ -345,8 +320,7 @@ public class DailyDungeonManager : MonoBehaviour
     {
         if (ActiveData == null) return "";
 
-        // 입장 횟수는 클리어했을 때만 차감합니다. (실패하면 횟수 그대로)
-        // 입장 UI 가 남은 횟수를 확인하고 들여보냈고, 던전 도중 횟수가 줄어드는 경로는 없으므로 보통 실패하지 않습니다.
+        // 입장 횟수는 클리어 때만 차감 (입장 UI 가 확인했으므로 보통 실패하지 않음)
         if (!DailyDungeonProgress.CompleteClear(ActiveData, ActiveLevel))
             Debug.LogWarning($"[DailyDungeonManager] 남은 입장 횟수가 없는데 클리어했습니다 ({ActiveData.id}) — 단독 테스트 실행이 아니라면 확인이 필요합니다.");
 

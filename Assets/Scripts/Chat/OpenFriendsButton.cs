@@ -2,10 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 친구 창을 여는 버튼 (StageScene 의 랭킹 버튼 옆). 받은 친구 요청이 있으면 글자 옆에 개수를 붙입니다.
-/// Tools/UI 굽기/채팅 탭·친구 창 이 랭킹 버튼을 복제해 만들고 칸을 채웁니다.
-/// </summary>
+/// <summary>친구 창 열기 버튼 — 받은 요청이 있으면 글자 옆에 개수 (Tools/UI 굽기/채팅 탭·친구 창 이 만듦).</summary>
 [RequireComponent(typeof(Button))]
 public class OpenFriendsButton : MonoBehaviour
 {

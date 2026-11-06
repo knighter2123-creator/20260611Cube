@@ -1,37 +1,16 @@
 using UnityEngine;
 
-/// <summary>
-/// 안드로이드 진동(햅틱) 매니저.
-///
-/// [붙이는 위치]
-///   로그인 씬의 ManagerRoot 하위. 다른 매니저들과 같은 DontDestroyOnLoad 싱글턴이다.
-///
-/// [★ 이 코드는 minSdkVersion 30(Android 11) 이상을 전제로 한다]
-///   그래서 API 26(VibrationEffect) 분기를 두지 않는다. 설치되는 모든 기기에 이미 있다.
-///   VibrationAttributes(API 30)도 마찬가지로 항상 쓸 수 있다.
-///   ※ 나중에 최소 버전을 30 미만으로 낮추면 이 파일을 반드시 다시 봐야 한다.
-///     (createOneShot / createWaveform / VibrationAttributes 가 전부 없는 기기가 생긴다)
-///
-/// [왜 Handheld.Vibrate()를 주로 쓰지 않는가]
-///   유니티 기본 Handheld.Vibrate()는 안드로이드에서 무조건 약 500ms를 통째로 울린다.
-///   레벨업처럼 톡 치고 지나가야 하는 연출에 쓰면 "윙—" 하고 손이 얼얼해진다.
-///   그래서 JNI(VibrationEffect)로 길이·세기를 정해 울리고, JNI 호출이 실패했을 때만 대신 씁니다 (FallbackVibrate).
-///
-/// [★ 가장 중요한 함정 — 권한]
-///   AndroidManifest.xml 에 VIBRATE 권한이 없으면 진동이 "조용히" 실패한다 (에러도 로그도 없음).
-///   유니티는 코드에 Handheld.Vibrate() 가 있으면 빌드할 때 이 권한을 자동으로 넣어 준다.
-///   → FallbackVibrate 의 Handheld.Vibrate() 호출이 그 역할도 합니다. 지우면 권한이 빠지니
-///     지우려면 Custom Main Manifest 에 &lt;uses-permission android:name="android.permission.VIBRATE" /&gt; 를 직접 넣을 것.
-/// </summary>
+/// <summary>안드로이드 진동 매니저: JNI VibrationEffect 로 길이·세기를 정해 짧게 울림 (Handheld.Vibrate 는 항상 ~500ms 라 실패 시 대체용으로만).</summary>
+// [붙이는 위치] 로그인 씬 ManagerRoot 하위 DontDestroyOnLoad 싱글턴
+// ⚠ minSdk 30 전제(VibrationEffect·VibrationAttributes 분기 없음) — 30 미만으로 낮추면 이 파일을 다시 볼 것
+// ⚠ VIBRATE 권한이 없으면 조용히 실패 — FallbackVibrate 의 Handheld.Vibrate 호출이 권한을 자동으로 넣어 주므로 지우면 Manifest 에 직접 추가
 public partial class HapticManager : MonoBehaviour
 {
     public static HapticManager Instance { get; private set; }
 
     private const string PrefKey = "haptic_enabled";
 
-    // ★ 에디터 전용 필드는 #if 로 감쌉니다.
-    //   감싸지 않으면 실기기 빌드에서 "할당했지만 한 번도 읽지 않는 필드"가 되어
-    //   CS0414 경고가 뜹니다. (이 필드는 #elif UNITY_EDITOR 블록에서만 읽힙니다)
+    // 에디터에서만 읽는 필드라 #if 로 감쌈 (안 감싸면 실기기 빌드에서 CS0414 경고)
 #if UNITY_EDITOR
     [Header("에디터 테스트")]
     [Tooltip("에디터에서도 진동 토글을 만질 수 있게 합니다. 실제 진동 대신 로그만 찍힙니다. " +
@@ -121,10 +100,7 @@ public partial class HapticManager : MonoBehaviour
             using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
             using (var activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
             {
-                // ★ 이 분기는 최소 API 30 에서도 반드시 필요하다.
-                //   VibratorManager 는 API 31(안드로이드 12)에 들어왔으므로
-                //   API 30 기기에는 존재하지 않는다.
-                //   지우면 안드로이드 11 에서만 진동이 죽는, 찾기 고약한 버그가 된다.
+                // ★ VibratorManager 는 API 31+ — 이 분기를 지우면 안드로이드 11 에서만 진동이 죽음
                 if (apiLevel >= 31)
                 {
                     using (var vibratorManager = activity.Call<AndroidJavaObject>("getSystemService", "vibrator_manager"))
@@ -134,19 +110,11 @@ public partial class HapticManager : MonoBehaviour
                     }
                 }
 
-                // API 30 경로 (그리고 위가 실패했을 때의 폴백).
-                // API 31+ 에서 deprecated 이지만 여전히 동작한다.
+                // API 30 경로 + 위 실패 시 폴백 (31+ 에선 deprecated 지만 동작)
                 if (vibrator == null)
                     vibrator = activity.Call<AndroidJavaObject>("getSystemService", "vibrator");
 
-                // ★ 권한이 실제로 부여됐는지 런타임에 확인한다.
-                //
-                //   매니페스트에 줄을 넣었는지 눈으로 확인하는 것과,
-                //   그 줄이 실제로 빌드된 APK 에 들어갔는지는 다른 문제다.
-                //   Custom Main Manifest 체크를 안 했거나 <application> 안쪽에 잘못 넣으면
-                //   파일에는 있는데 APK 에는 없는 상태가 된다.
-                //   checkSelfPermission 은 그 최종 결과를 알려주므로 추측이 사라진다.
-                //   (0 = PackageManager.PERMISSION_GRANTED)
+                // 빌드된 APK 에 VIBRATE 권한이 실제로 들어갔는지 런타임 확인 (0 = GRANTED) — 매니페스트 파일에 있어도 빠질 수 있어서
                 try
                 {
                     int granted = activity.Call<int>("checkSelfPermission", "android.permission.VIBRATE");
@@ -175,8 +143,7 @@ public partial class HapticManager : MonoBehaviour
             // minSdk 30 이므로 VibrationEffect 는 항상 존재한다. 버전 분기 불필요.
             vibrationEffectClass = new AndroidJavaClass("android.os.VibrationEffect");
 
-            // 세기(amplitude) 제어 지원 여부. 저가형은 켜기/끄기만 되는 경우가 많다.
-            // 지원 안 하면 amplitude 값이 무시되고 최대 세기로 울린다.
+            // 세기 제어 지원 여부 (저가형은 켜기/끄기만 — 미지원이면 최대 세기)
             hasAmplitudeControl = vibrator.Call<bool>("hasAmplitudeControl");
 
             InitVibrationAttributes();
@@ -187,22 +154,15 @@ public partial class HapticManager : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            // JNI는 기기/롬에 따라 예상 못한 예외가 난다. 진동은 없어도 게임은 돌아야 하므로
-            // 반드시 try-catch로 감싸고 절대 위로 던지지 않는다.
+            // JNI 는 기기·롬마다 예외가 날 수 있음 — 진동이 없어도 게임은 돌아야 하므로 위로 던지지 않음
             IsSupported = false;
             Debug.LogWarning($"[Haptic] 초기화 실패: {e.Message}");
         }
 #elif UNITY_EDITOR
-        // ★ 에디터에서는 실제 진동이 불가능하다.
-        //   IsSupported 를 false 로 두면 BindToggle 이 toggle.interactable = false 로 만들어서
-        //   설정 화면의 진동 토글이 회색으로 죽어 아예 눌리지 않는다.
-        //   그래서 에디터에서는 UI 상으로만 '지원됨'으로 취급한다.
-        //   Vibrate() 는 아래 #elif UNITY_EDITOR 분기를 타서 로그만 찍으므로 안전하다.
+        // 에디터는 진동 불가지만 토글이 회색으로 죽지 않게 UI 상으로만 '지원됨' 처리 (Vibrate 는 아무것도 안 함)
         IsSupported = editorTreatAsSupported;
 
-        // ★ 에디터에서도 초기화 사실을 남긴다.
-        //   이 줄이 없으면 "HapticManager 가 씬에 있긴 한가?"를 에디터에서 확인할 방법이 없다.
-        //   실기기 분기에는 초기화 로그가 있는데 에디터 분기에만 없어서 생긴 사각지대였다.
+        // 에디터에서도 매니저가 있는지 확인할 수 있게 초기화 로그
         GameLog.Info($"[Haptic] (에디터) 초기화 — 실제 진동은 불가, UI 상 지원 {IsSupported}", this);
 #else
         // iOS / PC — 진동 없음.
@@ -211,23 +171,7 @@ public partial class HapticManager : MonoBehaviour
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-    /// <summary>
-    /// 진동의 "용도"를 시스템에 알린다. (VibrationAttributes, API 30+)
-    ///
-    /// [왜 필요한가]
-    ///   용도를 지정하지 않으면 USAGE_UNKNOWN 으로 분류된다.
-    ///   안드로이드 12 이후로는 용도 불명 진동을 시스템이 억제하는 경우가 있어,
-    ///   기기와 시스템 설정 조합에 따라 진동이 조용히 무시될 수 있다.
-    ///   게임 피드백은 USAGE_TOUCH 로 표시하는 것이 맞다.
-    ///
-    /// [최소 API 30 이라 마침 맞아떨어진다]
-    ///   VibrationAttributes 가 정확히 API 30 에 추가되었다.
-    ///   즉 이 프로젝트가 설치되는 모든 기기에 존재하므로 버전 분기가 필요 없다.
-    ///
-    ///   그래도 try-catch 로 감싸는 이유는 제조사 커스텀 롬에서 예상 못한 동작을 하는
-    ///   경우가 실제로 있기 때문이다. 실패하면 touchAttributes 가 null 로 남고
-    ///   기본 경로로 조용히 되돌아간다 — 진동이 아예 안 되는 것보다 낫다.
-    /// </summary>
+    /// <summary>진동 용도를 USAGE_TOUCH 로 표시 — 용도 불명 진동은 안드로이드 12+ 에서 억제될 수 있어서 (커스텀 롬 대비 실패하면 기본 경로).</summary>
     private void InitVibrationAttributes()
     {
         try
@@ -245,13 +189,7 @@ public partial class HapticManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 실제 vibrate 호출을 한 곳으로 모은다.
-    /// 용도 표시가 가능하면 그쪽을, 실패하면 기본 경로를 쓴다.
-    ///
-    /// useAttributes 플래그를 내리는 이유 — 한 번 실패한 호출은 이 기기에서 계속 실패한다.
-    /// 매번 예외를 던지고 잡으면 레벨업마다 비용이 생기므로 첫 실패에 경로를 갈아탄다.
-    /// </summary>
+    /// <summary>실제 vibrate 호출 — 용도 표시 경로가 한 번 실패하면 이 기기에선 계속 실패하므로 기본 경로로 영구 전환(매번 예외 비용 방지).</summary>
     private static void CallVibrate(AndroidJavaObject effect)
     {
         if (useAttributes && touchAttributes != null)
@@ -277,10 +215,7 @@ public partial class HapticManager : MonoBehaviour
     /// <summary>레벨업 연출용 진동. LevelUpEffect.Play()와 같은 타이밍에 부른다.</summary>
     public void LevelUp() => Vibrate(levelUpDurationMs, levelUpAmplitude);
 
-    /// <summary>
-    /// 보스 등장 · 증강 카드 획득 같은 묵직한 피드백. 어디서든 바로 부르면 됩니다 —
-    /// 매니저가 없거나(씬 단독 테스트) 유저가 진동을 껐으면 아무것도 하지 않습니다.
-    /// </summary>
+    /// <summary>보스 등장·증강 획득 같은 묵직한 진동 — 매니저가 없거나 진동을 껐으면 아무것도 안 함.</summary>
     public static void PlayHeavy()
     {
         HapticManager h = Instance;
@@ -301,8 +236,7 @@ public partial class HapticManager : MonoBehaviour
 
         try
         {
-            // 세기 제어를 못 하는 기기에는 DEFAULT_AMPLITUDE(-1)를 넘겨야 한다.
-            // 지원 안 하는데 임의 값을 넣으면 기기에 따라 예외가 나기도 한다.
+            // 세기 제어 미지원 기기엔 DEFAULT_AMPLITUDE(-1) — 임의 값은 기기에 따라 예외
             int amp = hasAmplitudeControl ? Mathf.Clamp(amplitude, 1, 255) : DEFAULT_AMPLITUDE;
 
             using (var effect = vibrationEffectClass.CallStatic<AndroidJavaObject>(
@@ -319,10 +253,7 @@ public partial class HapticManager : MonoBehaviour
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-    /// <summary>
-    /// JNI 진동을 쓸 수 없을 때 유니티 기본 진동(약 500ms)으로 대신합니다 — 길지만 아무 느낌도 없는 것보다 낫습니다.
-    /// ★ 이 Handheld.Vibrate() 호출 덕분에 빌드에 VIBRATE 권한이 자동으로 들어갑니다 (클래스 주석 [권한]).
-    /// </summary>
+    /// <summary>JNI 실패 시 기본 진동(~500ms)으로 대체 — ★ 이 Handheld.Vibrate 호출이 빌드에 VIBRATE 권한을 넣어 줌.</summary>
     private static void FallbackVibrate(string reason)
     {
         Debug.LogWarning($"[Haptic] {reason} — 기본 진동으로 대신합니다.");
@@ -331,19 +262,13 @@ public partial class HapticManager : MonoBehaviour
     }
 #endif
 
-    /// <summary>
-    /// 진동 공통 관문 — 유저 설정 / 기기 지원 / 쿨다운. 통과하면 쿨다운 시각을 갱신합니다.
-    ///
-    /// ★ 기기 미지원처럼 원인을 알아야 하는 경우만 이유를 남깁니다.
-    ///   유저가 끈 경우와 쿨다운은 정상 동작이라 조용히 막습니다 (진동 호출마다 경고가 쌓이지 않게).
-    /// </summary>
+    /// <summary>진동 관문(유저 설정·기기 지원·쿨다운) — 기기 미지원만 로그, 꺼짐·쿨다운은 정상이라 조용히 막음.</summary>
     private bool TryPassGate(bool ignoreCooldown)
     {
         if (!userEnabled) return false;
         if (!IsSupported) { LogBlocked("IsSupported = false — 위쪽 '초기화 완료' 로그를 확인하세요"); return false; }
 
-        // 방치형에서 레벨이 한 번에 5개 오르면 진동도 5번 겹친다.
-        // "따다다닥" 하고 손이 떨려서 연출이 아니라 고장처럼 느껴진다.
+        // 한 번에 여러 레벨이 오를 때 진동이 겹쳐 고장처럼 느껴지지 않게 쿨다운
         if (!ignoreCooldown && Time.unscaledTime - lastVibrateTime < minInterval) return false;
 
         lastVibrateTime = Time.unscaledTime;
@@ -379,8 +304,7 @@ public partial class HapticManager : MonoBehaviour
         // 켜는 순간 한 번 울려주면 "적용됐다"는 걸 손으로 알 수 있다.
         if (on) Vibrate(20, 120, ignoreCooldown: true);
 
-        // 코드에서 직접 호출됐을 때도 화면의 토글이 따라오게 한다.
-        // SetIsOnWithoutNotify 를 쓰므로 무한 루프가 생기지 않는다. (Binding.cs 참고)
+        // 코드에서 바꿔도 토글이 따라오게 (SetIsOnWithoutNotify 라 무한 루프 없음)
         RefreshBoundToggle();
     }
 

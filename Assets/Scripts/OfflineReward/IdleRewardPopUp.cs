@@ -3,10 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// 오프라인 보상 팝업. 경과 시간 + 골드/exp 미리보기를 표시하고,
-/// 수령 / 2배 수령 / 닫기를 처리한다.
-/// </summary>
+/// <summary>오프라인 보상 팝업 — 경과 시간·골드/exp 미리보기, 수령/2배 수령/닫기.</summary>
 public class IdleRewardPopup : MonoBehaviour
 {
     [Header("루트")]
@@ -44,9 +41,7 @@ public class IdleRewardPopup : MonoBehaviour
         if (root != null) root.SetActive(false);
     }
 
-    // ──────────────────────────────────────────────
-    //  열기
-    // ──────────────────────────────────────────────
+    // ── 열기 ──
 
     /// <summary>사용자가 버튼을 눌러 여는 경우. 받을 게 없어도 팝업은 열린다.</summary>
     public void Open() => Open(isAutoOpen: false);
@@ -76,8 +71,7 @@ public class IdleRewardPopup : MonoBehaviour
             return;
         }
 
-        // 이전: ① 받을 게 없을 때도 쌓인 금액(+37 등)을 보여줘 "아직 모인 보상이 없어요"와 어긋났고,
-        //       ② 자르기 전 double 값을 보여줘 고스테이지에서 실제 지급액(int 상한)보다 큰 숫자가 떴다.
+        // 받을 게 없으면 0, 금액은 지급과 같은 int 변환값으로 표시 (안내 문구·실지급액과 일치)
         int gold = preview.CanClaim ? IdleRewardManager.ToIntClamped(preview.Gold) : 0;
         int exp  = preview.CanClaim ? IdleRewardManager.ToIntClamped(preview.Exp)  : 0;
 
@@ -109,14 +103,11 @@ public class IdleRewardPopup : MonoBehaviour
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  수령
-    // ──────────────────────────────────────────────
+    // ── 수령 ──
 
     private void OnClaim()
     {
-        // 이전: IdleRewardStatus.EvaluateNow()로 검사 — 그 함수는 정리하며 없앴다.
-        //       Claim() 안에서도 같은 검사를 하지만, 받을 게 없으면 팝업을 닫지 않기 위해 여기서도 본다.
+        // Claim 도 검사하지만 받을 게 없으면 팝업을 닫지 않으려고 여기서도 확인
         var manager = IdleRewardManager.Instance;
         if (manager == null || !manager.Preview().CanClaim) return;
 
@@ -130,8 +121,7 @@ public class IdleRewardPopup : MonoBehaviour
         var manager = IdleRewardManager.Instance;
         if (manager == null || !manager.Preview().CanClaim) return;
 
-        // 이전: CurrencyManager.Instance.SpendGem(...) — 같은 파일의 RefreshClaimButtons는 ?.로 null을
-        //       대비하는데 여기만 무방비라, 매니저가 없으면 NullReferenceException이 났다.
+        // 매니저 null 대비 (없으면 NRE)
         var currency = CurrencyManager.Instance;
         if (currency == null || !currency.SpendGem(claim2xGemCost))
         {
@@ -144,11 +134,7 @@ public class IdleRewardPopup : MonoBehaviour
         Close();
     }
 
-    /// <summary>
-    /// 수령 버튼 활성 상태 갱신.
-    ///   일반 수령 : 받을 보상이 있는가
-    ///   2배 수령  : 받을 보상이 있는가 AND 젬이 충분한가
-    /// </summary>
+    /// <summary>수령 버튼 활성 갱신 — 일반은 보상이 있으면, 2배는 보상 있고 젬이 충분하면.</summary>
     private void RefreshClaimButtons(bool canClaim)
     {
         SetText(claim2xCostText, $"젬 {claim2xGemCost:N0}");
@@ -166,8 +152,7 @@ public class IdleRewardPopup : MonoBehaviour
         if (root != null) root.SetActive(false);
     }
 
-    // 초 → "N시간 M분" / "M분" 문자열
-    // 이전: double → float → int 로 두 번 변환해 직접 나눴다. TimeSpan이 시/분 계산을 대신한다.
+    // 초 → "N시간 M분" / "M분" (TimeSpan 으로 계산)
     private static string FormatElapsed(double seconds)
     {
         TimeSpan t = TimeSpan.FromSeconds(seconds);

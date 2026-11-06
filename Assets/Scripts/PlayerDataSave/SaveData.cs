@@ -43,18 +43,13 @@ public class DailyDungeonSaveData
     public List<DailyDungeonRecord> records = new List<DailyDungeonRecord>();
 }
 
-/// <summary>
-/// 디스크에 저장되는 플레이어 진행 데이터 (JsonUtility 직렬화용).
-/// 필드를 추가하면 자동으로 저장/로드 대상에 포함됩니다.
-/// 호환성을 위해 기존 필드 이름은 함부로 바꾸지 마세요.
-/// </summary>
+/// <summary>디스크에 저장되는 진행 데이터(JsonUtility) — 필드를 추가하면 자동 저장 대상, ⚠ 옛 세이브 호환을 위해 기존 필드 이름은 바꾸지 말 것.</summary>
 [Serializable]
 public class SaveData
 {
     public int saveVersion = 1;
 
-    // ── 클라우드 세이브 (CloudSave) ──
-    // 시각 값이지만 "버전 번호" 로만 씁니다 — 기기마다 시계가 달라서 크기 비교는 하지 않고 같은지만 봅니다.
+    // ── 클라우드 세이브 (CloudSave) — 시각이지만 '버전 번호'로만 씀 (기기마다 시계가 달라 같은지만 비교) ──
     public long savedAt       = 0;   // 이 데이터를 마지막으로 파일에 쓴 시각 (UTC ms). SaveManager.WriteToDisk 가 매번 갱신
     public long cloudSyncedAt = 0;   // 클라우드와 마지막으로 맞췄을 때 클라우드에 있던 savedAt (0 = 맞춘 적 없음)
     public bool nicknamePromptShown;   // 닉네임 자동 팝업을 이미 띄웠는가 (기본 false)
@@ -70,8 +65,7 @@ public class SaveData
     public int upgradeCritChance = 0;
     public int upgradeCritDamage = 0;
 
-    // ── 강화로 누적된 실제 전투 스탯 ──
-    // ※ PlayerStat의 실제 타입에 맞추세요. baseDamage가 int면 int로 바꿔야 합니다.
+    // ── 강화로 누적된 실제 전투 스탯 (타입은 PlayerStat 과 맞출 것) ──
     public int baseDamage         = 0;
     public float critical           = 0f;
     public float criticalMultiplier = 0f;
@@ -81,8 +75,7 @@ public class SaveData
     public int currentWorld = 1;
     public int currentStage = 1;
 
-    // ── 영구 버프 ──
-    // 누적 데미지 배율. 1.0 = 버프 없음, AddPermanentDamageBuff(0.3) → 1.3
+    // ── 영구 버프: 누적 데미지 배율 (1.0 = 없음, AddPermanentDamageBuff(0.3) → 1.3) ──
     public float damageMultiplier = 1f;
 
     // ── 진화 보상 1회 지급 플래그 (지급 완료된 티어 id 목록) ──
@@ -99,8 +92,7 @@ public class SaveData
     public int gold = 0;
     public int gem  = 0;
 
-    // ── 소환권 (GachaTicket 이 직접 읽고 씀) ──
-    // 이 필드가 없던 예전 세이브는 0 장으로 읽힙니다 (JsonUtility 의 기본값) — 따로 이관할 것이 없습니다.
+    // ── 소환권 (GachaTicket 이 직접 읽고 씀, 예전 세이브는 0 장으로 읽혀 이관 불필요) ──
     public int gachaTicket = 0;
 
     // ── 기타 ──
@@ -119,13 +111,9 @@ public class SaveData
     // ── 일일 던전 (DailyDungeonProgress 가 직접 읽고 씀) ──
     public DailyDungeonSaveData dailyDungeon = new DailyDungeonSaveData();
 
-    // ── 로컬 우편함 (Mailbox 가 직접 읽고 씀). 서버(뒤끝) 우편은 저장하지 않음 ──
-    // 이 필드가 없던 예전 세이브는 빈 우편함으로 읽힙니다 — Mailbox.Data 가 null 이면 새로 채웁니다.
+    // ── 로컬 우편함 (Mailbox 가 직접 읽고 씀, 서버 우편은 저장 안 함 / 예전 세이브는 Mailbox.Data 가 새로 채움) ──
     public MailboxSaveData mailbox = new MailboxSaveData();
 
-    // ── 튜토리얼 ──
-    // ★ 새 세이브(신규 유저)는 false → MainScene 에서 자동 팝업.
-    //   이 필드가 생기기 전의 구버전 세이브(기존 유저)는 SaveManager.Load() 에서 true 로 바꿔 준다.
-    //   (JsonUtility 는 JSON 에 없는 필드를 초기값(false)으로 두기 때문에, 그냥 두면 기존 유저에게도 뜬다)
+    // ── 튜토리얼: 신규 유저는 false → 자동 팝업, 키가 없던 옛 세이브는 SaveManager.Load 가 true 로 (안 그러면 기존 유저에게도 뜸) ──
     public bool tutorialDone = false;
 }

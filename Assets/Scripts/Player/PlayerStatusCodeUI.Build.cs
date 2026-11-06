@@ -3,32 +3,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 플레이어 스탯 창 — 코드 생성 버전의 **생김새** 담당.
-///
-/// 이 파일에는 "언제 열리는가" 가 한 줄도 없습니다. 그건 코어 파일의 일입니다.
-/// 여기 있는 건 전부 "무엇을 어떻게 그리는가" 입니다.
-///
-/// ─────────────────────────────────────────────────────────────
-/// [코드로 UI 를 만들 때 알아야 하는 것들]
-///
-/// ① 유니티 UI 는 결국 RectTransform + Graphic(Image/TMP) 의 조합입니다.
-///    프리팹에서 손으로 하는 일을 그대로 코드로 옮기는 것뿐입니다.
-///
-/// ② 레이아웃은 직접 좌표를 계산하지 말고 LayoutGroup 에게 맡깁니다.
-///    "위에서부터 18픽셀 간격으로 쌓기" 를 VerticalLayoutGroup 한 줄로 해결하면,
-///    스탯을 하나 추가할 때 아래 항목들의 y좌표를 다시 계산할 필요가 없습니다.
-///    좌표를 직접 다루기 시작하면 기기 해상도가 바뀔 때마다 깨집니다.
-///
-/// ③ 둥근 사각형처럼 스프라이트가 필요한 것은 런타임에 텍스처를 그려서 만듭니다.
-///    에셋을 준비하지 않아도 되는 게 코드 생성 방식의 장점입니다.
-/// ─────────────────────────────────────────────────────────────
-/// </summary>
+/// <summary>스탯 창 생김새(코드 생성): Build Parent 아래 창·헤더·경험치 게이지·스탯 4줄을 LayoutGroup 으로 쌓음 — 좌표 대신 LayoutGroup 이라 해상도·항목 추가에 강하고, 둥근 스프라이트도 런타임에 그림.</summary>
 public partial class PlayerStatusCodeUI
 {
-    // ══════════════════════════════════════════════════════════
-    //  인스펙터 설정 — 생김새
-    // ══════════════════════════════════════════════════════════
+    // ── 인스펙터 설정 — 생김새 ──
     [Header("창 모양")]
     [Tooltip("창 너비(px). 0 이하로 두면 부모 너비를 꽉 채웁니다.\n" +
              "탭 안에 넣을 때는 0 을 권장합니다 — 고정 폭은 탭 영역과 거의 항상 어긋납니다.")]
@@ -48,9 +26,7 @@ public partial class PlayerStatusCodeUI
     [SerializeField] private Color labelColor = new Color(0.78f, 0.82f, 0.90f);
     [SerializeField] private Color totalColor = Color.white;
 
-    // ══════════════════════════════════════════════════════════
-    //  만들어진 부품들 — 코어의 Refresh() 가 이걸 채웁니다
-    // ══════════════════════════════════════════════════════════
+    // ── 만들어진 부품들 — 코어의 Refresh() 가 이걸 채웁니다 ──
     private bool          built;
     private GameObject    panelRoot;
     private RectTransform windowRect;
@@ -64,9 +40,7 @@ public partial class PlayerStatusCodeUI
     private TMP_Text attackSpeedTotal, attackSpeedDetail;
     private TMP_Text critChanceTotal,  critChanceDetail;
 
-    // ══════════════════════════════════════════════════════════
-    //  진입점
-    // ══════════════════════════════════════════════════════════
+    // ── 진입점 ──
 
     /// <summary>아직 만들지 않았으면 만듭니다. 여러 번 불러도 안전합니다.</summary>
     private void EnsureBuilt()
@@ -83,9 +57,7 @@ public partial class PlayerStatusCodeUI
             return;
         }
 
-        // 클릭이 동작하려면 씬에 EventSystem 이 있어야 합니다.
-        // 자동으로 만들지 않는 이유: 프로젝트가 이미 하나를 관리하고 있고,
-        // 두 개가 생기면 입력이 이상하게 갈립니다. 경고만 띄우고 판단은 사람에게 맡깁니다.
+        // EventSystem 이 없으면 경고만 (자동 생성하면 두 개가 되어 입력이 갈릴 수 있음)
         if (UnityEngine.EventSystems.EventSystem.current == null)
             Debug.LogWarning("[PlayerStatusCodeUI] 씬에 EventSystem 이 없어 버튼이 눌리지 않습니다.");
 
@@ -105,9 +77,7 @@ public partial class PlayerStatusCodeUI
         return canvas != null ? canvas.transform : null;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  패널
-    // ══════════════════════════════════════════════════════════
+    // ── 패널 ──
 
     private void BuildPanel(Transform parentTransform)
     {
@@ -118,17 +88,10 @@ public partial class PlayerStatusCodeUI
 
         // 어두운 배경(Dim)은 만들지 않습니다 — 탭 창(TabWindow)에 이미 깔려 있어, 또 깔면 창 '안쪽'만 한 겹 더 어두워집니다.
 
-        // ── 창 ──
-        // 높이를 0 으로 두고 ContentSizeFitter 에게 맡깁니다.
-        // 스탯을 추가하면 창이 알아서 길어집니다.
+        // ── 창 ── 높이는 ContentSizeFitter 가 내용에 맞춤
         windowRect = NewRect("Window", root);
 
-        // ★ Window Width 를 0 이하로 두면 부모 너비를 꽉 채웁니다.
-        //   탭 안에서는 고정 920px 이 거의 항상 문제가 됩니다. 탭 영역이 그보다 좁으면
-        //   창이 옆으로 삐져나가고, 넓으면 가운데에 덩그러니 뜹니다.
-        //
-        //   가로만 늘리고 세로는 여전히 ContentSizeFitter 에게 맡깁니다.
-        //   네 방향 Stretch 를 쓰면 Fitter 가 정한 높이를 앵커가 덮어써서 둘이 싸웁니다.
+        // Window Width ≤ 0 이면 가로만 부모를 채움 (탭 안에선 고정 폭이 어긋남, 네 방향 Stretch 는 Fitter 와 싸움)
         if (windowWidth > 0f)
         {
             Center(windowRect, new Vector2(windowWidth, 0f));
@@ -217,13 +180,7 @@ public partial class PlayerStatusCodeUI
         image.raycastTarget = false;
     }
 
-    // ── 스탯 한 줄 ────────────────────────────────────────────
-    //
-    // Row (Vertical)
-    // ├─ Top (Horizontal) : 라벨 ────── 합계
-    // └─ Detail           : 기본 · 강화 · 증강
-    //
-    // 이 함수 하나로 네 줄을 다 만듭니다. 스탯을 추가할 때 호출 한 줄만 늘어납니다.
+    // ── 스탯 한 줄: Top(라벨 ── 합계) + Detail(기본·강화·증강) — 스탯 추가는 호출 한 줄 ──
     private void BuildStatRow(RectTransform parent, string label,
                               out TMP_Text total, out TMP_Text detail)
     {
@@ -248,14 +205,7 @@ public partial class PlayerStatusCodeUI
         detail = NewText("Detail", row, "", detailFontSize, style.detailColor, TextAlignmentOptions.Left);
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  범용 UI 도구 — 여기부터는 '스탯' 이라는 단어를 모릅니다
-    // ══════════════════════════════════════════════════════════
-    //
-    // AugmentUIFactory 를 뺐던 것과 같은 성격의 코드입니다.
-    // 프로젝트에 이미 AugmentUIFactory 가 있으니, 나중에 두 파일의 도구를 합쳐서
-    // UIFactory 하나로 만들면 더 깔끔합니다. 지금은 이 파일만 복사해도
-    // 동작하도록 자족적으로 두었습니다.
+    // ── 범용 UI 도구 (AugmentUIFactory 와 중복 — 나중에 UIFactory 하나로 합치면 깔끔, 지금은 자족적으로) ──
 
     private static RectTransform NewRect(string name, Transform parent)
     {
@@ -286,15 +236,7 @@ public partial class PlayerStatusCodeUI
         rect.localScale       = Vector3.one;
     }
 
-    /// <summary>
-    /// 가로는 부모를 꽉 채우고, 세로는 내용(ContentSizeFitter)이 정하게 둡니다.
-    ///
-    /// ★ 왜 Stretch() 를 그대로 쓰지 않는가
-    ///   Stretch 는 네 방향 앵커를 펼치고 offset 으로 크기를 정합니다.
-    ///   그러면 ContentSizeFitter 가 계산한 높이를 앵커가 매 프레임 덮어써서
-    ///   "높이가 안 늘어난다 / 깜빡인다" 는 증상이 납니다.
-    ///   한쪽 축만 앵커로 늘리고 다른 축은 Fitter 에게 맡기면 둘이 싸우지 않습니다.
-    /// </summary>
+    /// <summary>가로만 부모를 채우고 세로는 ContentSizeFitter 에 맡김 (네 방향 Stretch 면 앵커가 Fitter 높이를 덮어써 깜빡임).</summary>
     private static void StretchWidth(RectTransform rect)
     {
         rect.anchorMin        = new Vector2(0f, 0.5f);
@@ -362,11 +304,7 @@ public partial class PlayerStatusCodeUI
         if (height > 0f) element.preferredHeight = height;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  둥근 사각형 스프라이트 생성
-    // ══════════════════════════════════════════════════════════
-    //
-    // 반지름별로 하나만 만들어 캐시합니다. 창·버튼·게이지가 같은 반지름을 쓰면 재사용됩니다.
+    // ── 둥근 사각형 스프라이트 생성 (반지름별로 하나만 만들어 캐시) ──
 
     private static readonly Dictionary<int, Sprite> roundedCache = new Dictionary<int, Sprite>();
 
@@ -391,8 +329,7 @@ public partial class PlayerStatusCodeUI
         {
             for (int x = 0; x < size; x++)
             {
-                // 각 축에서 "모서리 원의 중심" 까지의 거리.
-                // 가운데 영역이면 0 이 되어 알파가 1 이 됩니다.
+                // 각 축에서 모서리 원 중심까지의 거리 (가운데 영역은 0 → 알파 1)
                 float dx = x < radius ? radius - x : (x > size - 1 - radius ? x - (size - 1 - radius) : 0f);
                 float dy = y < radius ? radius - y : (y > size - 1 - radius ? y - (size - 1 - radius) : 0f);
 
@@ -422,16 +359,7 @@ public partial class PlayerStatusCodeUI
         return sprite;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  static 캐시와 도메인 리로드
-    // ══════════════════════════════════════════════════════════
-    //
-    // Project Settings → Editor → Enter Play Mode Options 에서 "Reload Domain" 을 끄면
-    // static 값이 플레이 종료 후에도 남습니다. 이미 파괴된 텍스처를 가리킬 수 있어요.
-    // (위에서 `cached != null` 을 한 번 더 검사하는 것도 같은 이유입니다 —
-    //  유니티는 파괴된 오브젝트를 == null 로 취급해 줍니다)
-    //
-    // 확실하게 하려면 진입점에서 비워줍니다. 모든 static 캐시의 공통 함정입니다.
+    // ── static 캐시 비우기 — Reload Domain 을 끄면 지난 플레이의 파괴된 텍스처를 가리킬 수 있어서 ──
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticCache()

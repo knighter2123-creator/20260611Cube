@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-/// <summary>
-/// 채팅 차단 — 차단한 사람의 전체 채팅을 내 화면에서 숨기고, 그 사람과의 대화방에서 나갑니다 (상대에게는 '나갔다' 로만 보임).
-/// 목록은 서버(뒤끝 게임 정보 테이블 BLOCK_DATA — BackendBlockStore)에 저장되어, 같은 계정이면 어느 기기에서나 같습니다.
-/// 차단은 내 화면에서 바로 숨긴 뒤 서버에 저장하고, 저장에 실패하면 되돌립니다.
-/// </summary>
+/// <summary>채팅 차단: 그 사람의 채팅을 숨기고 대화방에서 나감(상대에겐 '나갔다'로만 보임) — 화면에서 먼저 숨긴 뒤 서버(BLOCK_DATA)에 저장, 실패하면 되돌림.</summary>
 public partial class ChatManager
 {
     public const int MAX_BLOCKS = 100;

@@ -1,5 +1,4 @@
-// LevelUpManager의 세이브 연동 partial.
-// 레벨/경험치/강화레벨/전투스탯을 SaveData와 주고받는다.
+// LevelUpManager 세이브 연동 — 레벨·경험치·강화 레벨·전투 스탯을 SaveData 와 주고받음
 
 using UnityEngine;
 
@@ -23,8 +22,7 @@ public partial class LevelUpManager
         d.critical           = stat.Critical;
         d.criticalMultiplier = stat.CriticalMultiplier;
 
-        // 공격 주기는 불러올 때 쓰이지 않지만(레벨에서 재계산) 계속 기록합니다.
-        // SaveData 필드 호환성을 유지하고, 세이브 파일을 열어 현재 값을 확인하는 용도로도 쓸모가 있습니다.
+        // 공격 주기는 불러올 때 레벨로 재계산하지만 호환성·파일 확인용으로 계속 기록
         d.attackSpd = stat.AttackSpd;
     }
 
@@ -35,12 +33,10 @@ public partial class LevelUpManager
 
         stat.Level = d.level > 0 ? d.level : 1;
 
-        // 필요 경험치는 저장값(사본)을 믿지 않고 레벨(원본)에서 다시 계산합니다 (치명타·공격 주기와 같은 원칙).
-        // 공식을 바꿔도 기존 세이브에 옛 값이 남지 않습니다.
+        // 필요 경험치는 레벨로 다시 계산 (공식을 바꿔도 옛 값이 남지 않게)
         stat.MaxExperience = CalculateMaxExp(stat.Level);
 
-        // 옛 공식으로 저장된 세이브는 경험치 '진행률'을 유지해 새 기준으로 옮깁니다.
-        // (그대로 두면 새 필요량을 넘어서 다음 처치 때 레벨이 한꺼번에 오를 수 있음)
+        // 옛 공식 세이브는 경험치 진행률을 유지해 옮김 (그대로면 다음 처치 때 레벨이 한꺼번에 오를 수 있음)
         long savedExp = System.Math.Max(0L, d.experience);
         if (d.maxExperience > 0 && d.maxExperience != stat.MaxExperience)
         {
@@ -58,8 +54,7 @@ public partial class LevelUpManager
         stat.baseDamage         = d.baseDamage         > 0 ? d.baseDamage         : PlayerStat.BASE_DAMAGE;
         stat.CriticalMultiplier = d.criticalMultiplier > 0 ? d.criticalMultiplier : PlayerStat.BASE_CRIT_MULT;
 
-        // 치명타 확률과 공격 주기는 저장값(사본)을 믿지 않고 강화 레벨(원본)에서 다시 계산합니다.
-        // 사본이 오염돼도 영향이 없고, 인스펙터에서 곡선을 바꿔도 다음 실행 때 자동 반영됩니다.
+        // 치명타 확률·공격 주기는 강화 레벨로 다시 계산 (저장값이 오염돼도 무관, 곡선 변경도 자동 반영)
         stat.Critical  = CritChanceForLevel(stat.UpgradeLevelCritChance);
         stat.AttackSpd = AttackSpdForLevel(stat.UpgradeLevelAttackSpd);
 

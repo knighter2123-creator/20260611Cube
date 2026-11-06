@@ -3,14 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>
-/// 설정(OPTION) 패널의 주인.
-/// 패널 열기/닫기, 버튼, timeScale, 뒤로가기를 전담한다.
-///
-/// 블룸/진동 슬라이더·토글 바인딩은 GameSettingManager.Bindings.cs 에 분리되어 있다.
-/// ★ [계정 삭제] 버튼·확인 팝업은 GameSettingManager.AccountReset.cs 에 분리되어 있다.
-///   이 파일에서 바뀐 곳은 "★ [계정 삭제]" 로 표시한 네 군데뿐이다. (OnEscape, Start, Open, Close)
-/// </summary>
+/// <summary>설정 패널 주인: 열기/닫기·버튼·배속 복원·뒤로가기 처리 (블룸/진동 바인딩은 .Bindings.cs, 계정 삭제 버튼·팝업은 .AccountReset.cs).</summary>
 public partial class GameSettingManager : MonoBehaviour
 {
     public static GameSettingManager Instance { get; private set; }
@@ -53,17 +46,11 @@ public partial class GameSettingManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    // ─────────────────────────────────────────────
-    // 뒤로가기(ESC)
-    // ─────────────────────────────────────────────
+    // ── 뒤로가기(ESC) ──
 
     private void OnEnable()
     {
-        // ★ GameManager.Instance 가 null 이면 조용히 등록이 안 되고 다시 시도하지 않습니다.
-        //   CompanionFragment 에서 봤던 것과 정확히 같은 함정입니다.
-        //   MainScene 에서는 GameManager 가 ManagerRoot 로 이미 살아 있으니 안전하지만,
-        //   실행 순서에 기대지 않도록 Script Execution Order 에서
-        //   GameManager 를 -90 정도로 지정해 두세요. (SaveManager -100 다음)
+        // ⚠ GameManager 가 없으면 재시도 없이 등록이 빠짐 — Script Execution Order 에서 GameManager 를 -90 정도로 (SaveManager -100 다음)
         if (GameManager.Instance != null)
             GameManager.Instance.RegisterEscapeHandler(OnEscape);
         else
@@ -74,8 +61,7 @@ public partial class GameSettingManager : MonoBehaviour
     {
         GameManager.Instance?.UnregisterEscapeHandler(OnEscape);
 
-        // 씬을 떠나는 길이므로 여기서는 배속 복원이 아니라 1f 고정이 맞다.
-        // (SceneLoader.LoadScene 도 어차피 1f 로 맞춘다)
+        // 씬을 떠나는 길이라 배속 복원이 아닌 1f 고정 (SceneLoader 도 1f)
         if (IsOpen)
         {
             UnbindAll();
@@ -87,25 +73,19 @@ public partial class GameSettingManager : MonoBehaviour
 
     private bool OnEscape()
     {
-        // ★ 튜토리얼 중에는 설정 패널을 열지 않고 튜토리얼 스킵으로 처리한다.
-        //   평소엔 TutorialManager 가 Begin 때 핸들러를 "나중에" 등록하므로(스택 = 나중 것 먼저)
-        //   이 코드까지 오지 않는다. 등록 순서가 꼬였을 때를 대비한 안전망일 뿐이다.
+        // 튜토리얼 중이면 스킵 처리 (보통은 튜토리얼 핸들러가 먼저 받음 — 등록 순서가 꼬였을 때의 안전망)
         if (TutorialManager.IsRunning)
         {
             TutorialManager.Instance.Skip();
             return true;
         }
 
-        // ★ [계정 삭제] 초기화가 진행 중이면 뒤로가기를 "삼킨다"(true).
-        //   false 를 돌려주면 다른 핸들러(게임 종료 확인 등)로 넘어가 버려,
-        //   씬을 내리는 도중에 엉뚱한 창이 뜰 수 있다.
+        // 계정 초기화 중엔 삼킴 (넘기면 씬을 내리는 도중 엉뚱한 창이 뜸)
         if (AccountReset.IsRunning) return true;
 
         if (!refsOk) return false;   // 아직 준비 안 됐으면 다른 핸들러에게 넘긴다
 
-        // ★ [계정 삭제] 확인 팝업이 떠 있으면 뒤로가기는 "팝업만 닫기".
-        //   안드로이드 관례: 뒤로가기는 가장 위에 있는 것 하나만 닫는다.
-        //   이게 없으면 팝업이 떠 있는 채로 설정 패널 전체가 닫혀 버린다.
+        // 삭제 확인 팝업이 떠 있으면 팝업만 닫기 (뒤로가기는 맨 위 하나만 닫는 안드로이드 관례)
         if (IsDeleteConfirmOpen)
         {
             HideDeleteConfirm();
@@ -165,9 +145,7 @@ public partial class GameSettingManager : MonoBehaviour
         return ok;
     }
 
-    // ─────────────────────────────────────────────
-    // 열기 / 닫기
-    // ─────────────────────────────────────────────
+    // ── 열기 / 닫기 ──
 
     public void Open()
     {
@@ -183,10 +161,7 @@ public partial class GameSettingManager : MonoBehaviour
 
         BindAll();          // 열 때마다 저장값으로 다시 맞춘다 (Bindings.cs)
 
-        // ★ 패널이 열려 있는 동안 블룸을 계속 켜 둔다.
-        //   안 그러면 토글을 켜도 PulseFor(1.5초)만 반짝하고 꺼져서
-        //   "토글이 아무 영향이 없다"로 보인다.
-        //   Push/Pop 은 참조 카운트라 다른 연출과 겹쳐도 안전하다.
+        // 열린 동안 블룸 유지(안 그러면 토글 효과가 1.5초 반짝하고 끝남) — Push/Pop 참조 카운트라 다른 연출과 겹쳐도 안전
         BloomController.Instance?.Push();
     }
 
@@ -201,8 +176,7 @@ public partial class GameSettingManager : MonoBehaviour
 
         BloomController.Instance?.Pop();   // Open 의 Push 와 짝
 
-        // ★ [계정 삭제] 패널과 함께 확인 팝업도 닫는다.
-        //   안 하면 다음에 설정을 열 때 "정말 삭제하시겠습니까?" 가 떠 있는 채로 열린다.
+        // 삭제 확인 팝업도 닫음 (다음에 열 때 떠 있지 않게)
         HideDeleteConfirm();
 
         IsOpen = false;
@@ -211,21 +185,7 @@ public partial class GameSettingManager : MonoBehaviour
         RestoreGameSpeed();
     }
 
-    /// <summary>
-    /// ★ 게임 배속 복원.
-    ///
-    ///   여기서 Time.timeScale = 1f 로 고정하면, 2배속/3배속으로 방치 중이던 플레이어가
-    ///   설정을 한 번 열었다 닫는 것만으로 1배속으로 떨어집니다.
-    ///   게임이 멈추지도 않고 에러도 없어서 "왜 갑자기 느려졌지?" 로만 체감됩니다.
-    ///
-    ///   SceneLoader.GoToStage() 가 가챠 씬을 닫을 때 같은 처리를 하고 있습니다.
-    ///   ("가챠 닫을 때 1f로 고정하지 말고, 저장된 배속을 복원")
-    ///   패널을 닫는 것도 "일시정지를 푸는 것"이지 "배속을 초기화하는 것"이 아니므로
-    ///   같은 규칙을 따라야 합니다.
-    ///
-    ///   ★ timeScale 을 0으로 만드는 곳이 생기면 항상 짝이 되는 복원 지점을 찾아
-    ///     '1f 고정'인지 '원래 값 복원'인지 먼저 판단하세요.
-    /// </summary>
+    /// <summary>게임 배속 복원(1f 고정 아님) — 1f 로 두면 배속 방치 중이던 플레이어가 설정을 열었다 닫기만 해도 1배속으로 떨어짐.</summary>
     private void RestoreGameSpeed()
     {
         if (GameSpeedManager.Instance != null)
@@ -262,18 +222,9 @@ public partial class GameSettingManager : MonoBehaviour
         GameLog.Info($"[Setting] {action} — 클릭된 오브젝트: {(go != null ? go.name : "(키보드 또는 코드 호출)")}", go);
     }
 
-    // ─────────────────────────────────────────────
-    // ★ 튜토리얼 다시 보기 (기존 유저용)
-    // ─────────────────────────────────────────────
+    // ── ★ 튜토리얼 다시 보기 (기존 유저용) ──
 
-    /// <summary>
-    /// 순서가 중요합니다.
-    ///   ① Close()  : 리스너 해제(UnbindAll), 블룸 Pop, 배속 복원 — 패널을 닫을 때 해야 할 일이 전부 여기 있다.
-    ///                 SetActive(false) 만 하면 블룸 refCount 가 남고 리스너가 쌓인다.
-    ///   ② Begin()  : timeScale 0.
-    ///   ①에서 배속이 잠깐 복원되지만 같은 프레임 안에 ②가 0 으로 내리므로 게임은 한 프레임도 흐르지 않는다.
-    ///   튜토리얼이 끝나면 TutorialManager 가 다시 배속을 복원한다.
-    /// </summary>
+    /// <summary>튜토리얼 다시 보기: ① Close(리스너·블룸·배속 정리 — SetActive 만 하면 남음) → ② Begin(timeScale 0, 같은 프레임이라 게임은 흐르지 않음).</summary>
     private void OpenTutorial()
     {
         if (TutorialManager.Instance == null)

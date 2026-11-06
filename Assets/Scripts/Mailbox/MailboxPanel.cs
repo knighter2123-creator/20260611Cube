@@ -3,25 +3,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 우편함 창 — 받은 우편 목록 + 줄마다 [받기] + [모두 받기].
-///
-/// [붙이는 위치 / UI]
-///   StageScene 을 열고 Tools/UI 굽기/우편함 메뉴를 누르세요 (UIBaker).
-///   MailboxPanel 오브젝트, MailboxCanvas, 랭킹(친구) 버튼 옆 우편함 버튼을 만들고 칸을 모두 채웁니다. 그 뒤 씬을 저장하면 됩니다.
-///
-///   MailboxCanvas (Canvas 500)
-///     Dim (Button)                  ← dimButton. 누르면 닫힘
-///     Window
-///       Title / Close (Button)      ← closeButton
-///       Viewport (ScrollRect)
-///         Content (VerticalLayoutGroup)   ← content
-///           Row (MailRow, 꺼 둠)            ← rowTemplate. 복제해서 씀
-///         Status                    ← statusText
-///       ClaimAll (Button)           ← claimAllButton
-///
-/// [데이터]  Mailbox 를 읽어 그리기만 합니다. 우편이 오거나 받으면 Mailbox.OnChanged 로 다시 그립니다.
-/// </summary>
+/// <summary>우편함 창: Mailbox 를 읽어 줄마다 [받기] + [모두 받기]를 그리기만 하고, Mailbox.OnChanged 때 다시 그림.</summary>
+// [UI] StageScene 에서 Tools/UI 굽기/우편함(UIBaker) → 창·버튼 생성 후 씬 저장
 public class MailboxPanel : MonoBehaviour
 {
     [Header("UI (Tools/UI 굽기/우편함 이 채움)")]

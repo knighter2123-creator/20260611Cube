@@ -1,12 +1,4 @@
-/// <summary>
-/// 시너지가 올려 주는 능력치 종류.
-///
-/// ★ SynergyDefinition 에셋에 숫자로 저장됩니다. 새 항목은 반드시 '맨 뒤' 에 추가하세요.
-///
-/// 값의 단위 (SynergyEffect.value)
-///   비율(%)  — 0.15 = +15%.  SkillDamage / Cooldown / DebuffDuration / DotDamage / PlayerDamage
-///   %p 가산  — 0.10 = +10%p. SlowRate / ArmorBreakRate (원래 값이 0~1 비율이라 곱하지 않고 더합니다)
-/// </summary>
+/// <summary>시너지 능력치 종류 — ⚠ 에셋에 숫자로 저장되니 새 항목은 맨 뒤에, 값은 비율(0.15 = +15%) 또는 SlowRate·ArmorBreakRate 만 %p 가산.</summary>
 public enum SynergyStat
 {
     SkillDamage    = 0,   // 동료 스킬 피해 (플레이어 공격력 몫 포함 최종 피해에 곱함)
@@ -41,8 +33,7 @@ public static class SynergyStatText
         };
     }
 
-    // "0.#" — 소수 첫째 자리까지, 0 이면 생략 (0.15 → +15%, 0.125 → +12.5%)
-    // ※ 폰트에 '−'(유니코드 마이너스)가 없을 수 있어 일반 하이픈을 씁니다 (PlayerStatusText 의 글리프 주의 참고).
+    // "0.#" 형식(0.125 → +12.5%), 마이너스는 폰트에 없을 수 있어 일반 하이픈
     private static string Percent(float rate)
         => (rate < 0f ? "-" : "+") + (UnityEngine.Mathf.Abs(rate) * 100f).ToString("0.#") + "%";
 }

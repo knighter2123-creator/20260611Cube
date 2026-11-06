@@ -3,14 +3,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 일일 던전 입장 확인 팝업. "이 동료 배치로 시작할까요?" 를 묻고, 확인을 누르면 콜백을 실행합니다.
-///
-/// [붙이는 위치]
-///   StageScene Canvas 아래 "항상 켜져 있는" 오브젝트에 붙이고, panel 에는 실제 팝업 오브젝트를 연결합니다.
-///   (QuitConfirmController 와 같은 이유 — 팝업 자신에 붙이면 꺼져 있는 동안 뒤로가기 핸들러가 등록되지 않습니다)
-///   ★ 탭 창보다 '위에' 그려지는 곳에 두세요.
-/// </summary>
+/// <summary>일일 던전 입장 확인 팝업("이 동료 배치로 시작할까요?") — 확인하면 콜백 실행.</summary>
+// ⚠ Canvas 아래 항상 켜진 오브젝트에 붙이고 panel 에 팝업 연결 (팝업 자신이면 꺼진 동안 뒤로가기 등록 안 됨), 탭 창보다 위에 그려지는 곳에
 public class DungeonConfirmPopup : MonoBehaviour
 {
     [SerializeField] private GameObject      panel;

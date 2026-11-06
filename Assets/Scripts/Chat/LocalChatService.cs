@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-/// <summary>
-/// 서버 없이 채팅 UI 를 확인하는 테스트용. 보낸 메시지가 나에게만 바로 돌아옵니다.
-/// (ChatManager 의 Backend 를 Local 로 두면 로그인 없이도 에디터에서 써 볼 수 있습니다)
-/// </summary>
+/// <summary>서버 없는 채팅 테스트용(보낸 메시지가 나에게만 돌아옴) — ChatManager 의 Backend 를 Local 로 두면 로그인 없이 에디터에서 확인.</summary>
 public class LocalChatService : IChatService
 {
     public event Action<IReadOnlyList<ChatMessage>> MessagesReceived;
@@ -14,11 +11,7 @@ public class LocalChatService : IChatService
     public IFriendService Friends { get; } = new LocalFriendService();
     public IDirectService Direct  { get; } = new LocalDirectService();
 
-    /// <summary>
-    /// 로그인했으면 그 계정 UID, 아니면 "local".
-    /// 계정이 바뀌면 값도 바뀌어 ChatManager 가 친구·대화를 비우고 새 계정으로 다시 연결합니다
-    /// (계속 "local" 이면 다른 계정으로 로그인해도 이전 계정의 친구 목록이 남음).
-    /// </summary>
+    /// <summary>로그인 UID, 아니면 "local" — 계정이 바뀌면 값도 바뀌어 ChatManager 가 이전 계정 목록을 비우고 재연결.</summary>
     public bool TryGetIdentity(out string uid, out string reason)
     {
         AuthManager auth = AuthManager.Instance;

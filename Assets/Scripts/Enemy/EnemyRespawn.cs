@@ -1,16 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// 적 스폰 담당. 스테이지가 바뀔 때마다 StageManager가 ResetStage()를 불러
-/// "이번 스테이지는 어떤 프리팹을, 어떤 배율로, 얼마 간격으로 뽑을지"를 알려줍니다.
-///
-///   · 잡몹은 보스가 나오기 전까지(bossSpawned == false) 수 제한 없이 계속 스폰됩니다.
-///   · 한 주기마다 enemiesPerSpawn 마리를 동시에 뽑고, 2마리 이상이면
-///     spawnJitterRadius 반지름의 원 위에 등각으로 흩뿌려 겹침을 막습니다.
-///   · 보스 등장 시점은 StageManager가 SpawnBoss()를 호출해 결정합니다.
-///   · 스폰 주기에는 증강 '적 생성 주기 감소'(AugmentManager.SpawnDelay)가 실시간 반영됩니다.
-/// </summary>
+/// <summary>적 스폰 — StageManager 가 ResetStage 로 프리팹·배율을 정해주면 보스 전까지 주기마다 enemiesPerSpawn 마리를 원 위 등각으로 스폰 (주기는 증강 실시간 반영, 보스는 SpawnBoss).</summary>
 public class EnemyRespawn : MonoBehaviour
 {
     public static EnemyRespawn Instance { get; private set; }
@@ -44,8 +35,7 @@ public class EnemyRespawn : MonoBehaviour
     private bool  bossSpawned    = false;
     private float statMultiplier = 1f;
 
-    // ── 현재 스테이지에 적용 중인 값 (ApplyStageSet에서 채워짐) ──
-    // 계산은 스테이지 전환 때 1번만 하고, 스폰할 때는 이 값만 읽습니다.
+    // ── 현재 스테이지 값 (ApplyStageSet 에서 1번 계산, 스폰 땐 읽기만) ──
     private GameObject currentEnemyPrefab;
     private GameObject currentBossPrefab;
     private float      currentSpeedMult = 1f;
@@ -75,17 +65,12 @@ public class EnemyRespawn : MonoBehaviour
     {
         hpBarRoot = FindFirstObjectByType<HpBar>();
 
-        // ★ 여기서 스폰 루프를 시작하지 않습니다.
-        //   프리팹은 "몇 월드 몇 스테이지인가"를 알아야 정할 수 있고,
-        //   그 정보는 StageManager만 가지고 있기 때문입니다.
-        //   StageManager가 ResetStage()를 부르는 순간 루프가 시작됩니다.
+        // 루프는 여기서 시작 안 함 — 월드·스테이지 정보가 StageManager 에 있어 ResetStage() 때 시작
     }
 
     // ── 스테이지 리셋 (StageManager에서 호출) ──────
 
-    /// <summary>
-    /// 스테이지 시작 시 호출. 스탯 배율과 현재 위치(월드-스테이지)를 받습니다.
-    /// </summary>
+    /// <summary>스테이지 시작 시 호출 — 스탯 배율과 월드-스테이지를 받음.</summary>
     public void ResetStage(float newStatMult, int world, int stage)
     {
         statMultiplier = newStatMult;
@@ -93,8 +78,7 @@ public class EnemyRespawn : MonoBehaviour
 
         ApplyStageSet(world, stage);
 
-        // 이전 스테이지의 코루틴이 남아 있으면 반드시 정리.
-        // 안 그러면 스폰 루프가 두 개, 세 개로 늘어나 적이 배로 쏟아집니다.
+        // 이전 루프 정리 (안 하면 루프가 겹쳐 적이 배로 쏟아짐)
         if (respawnCoroutine != null) StopCoroutine(respawnCoroutine);
         respawnCoroutine = StartCoroutine(RespawnLoop());
 
@@ -103,9 +87,7 @@ public class EnemyRespawn : MonoBehaviour
                   $"/ 동시 생성 {SpawnCount}마리");
     }
 
-    /// <summary>
-    /// 월드/스테이지 번호로 이번 스테이지의 프리팹·배율을 확정합니다.
-    /// </summary>
+    /// <summary>월드/스테이지 번호로 이번 스테이지의 프리팹·배율을 확정.</summary>
     private void ApplyStageSet(int world, int stage)
     {
         if (worldSets == null || worldSets.Length == 0)
@@ -114,8 +96,7 @@ public class EnemyRespawn : MonoBehaviour
             return;
         }
 
-        // 준비된 월드 수를 넘어서면 Clamp로 "마지막 세트"를 계속 씁니다.
-        // (방치형처럼 스테이지가 끝없이 늘어나는 장르의 IndexOutOfRange 안전장치)
+        // 준비된 월드 수를 넘으면 마지막 세트 사용 (끝없는 스테이지의 IndexOutOfRange 방지)
         int idx = Mathf.Clamp(world - 1, 0, worldSets.Length - 1);
         var set = worldSets[idx];
 
@@ -140,9 +121,7 @@ public class EnemyRespawn : MonoBehaviour
             currentDelay     = respawnDelay * ov.respawnDelayMultiplier;
         }
 
-        // 프리팹이 바뀌었을 수 있으므로 매 스테이지 예열 (부족분만 채우므로 여러 번 불러도 안전)
-        // ★ [프레임 드랍 수정] 한 프레임에 몰아 만들지 않고 나눠서 만듭니다 (ObjectPoolManager.PrewarmOverFrames 참고).
-        //   보스도 1마리 미리 만들어 둡니다 — 없으면 보스가 등장하는 순간 Instantiate 하느라 멈칫합니다.
+        // 매 스테이지 예열(부족분만, 여러 프레임에 나눠) — 보스도 1마리 미리 만들어 등장 순간 멈칫 방지
         ObjectPoolManager pool = ObjectPoolManager.Instance;
         if (pool != null)
         {
@@ -173,16 +152,7 @@ public class EnemyRespawn : MonoBehaviour
         GameLog.Info("[EnemyRespawn] 보스 소환!");
     }
 
-    /// <summary>
-    /// 동시에 태어나는 count마리 중 index번째의 위치 오프셋. count가 1이면 항상 0.
-    ///
-    /// ─── 왜 랜덤이 아니라 균등 분배(원 위 등각)인가? (학습 포인트) ──────────
-    /// Random.insideUnitCircle으로 각자 뽑으면 운 나쁘게 두 마리가 비슷한
-    /// 방향으로 겹쳐 나올 수 있습니다(특히 2~3마리일 때 체감이 큼).
-    /// 360도를 마릿수만큼 등분해서 배치하면 "몇 마리가 나오든 서로 겹치지
-    /// 않는다"가 항상 보장됩니다.
-    /// ────────────────────────────────────────────────────────────────────
-    /// </summary>
+    /// <summary>동시 스폰 count 마리 중 index 번째 오프셋(1마리면 0) — 랜덤은 겹칠 수 있어 원 위 등각 배치로 겹침 없음 보장.</summary>
     private Vector2 GetSpawnOffset(int index, int count)
     {
         if (count <= 1 || spawnJitterRadius <= 0f) return Vector2.zero;
@@ -191,27 +161,8 @@ public class EnemyRespawn : MonoBehaviour
         return new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * spawnJitterRadius;
     }
 
-    /// <summary>
-    /// 풀에서 꺼내 초기화 → 활성화까지 담당하는 공통 경로.
-    ///
-    /// ─── 호출 순서가 왜 중요한가 (가장 중요한 학습 포인트) ───────────────
-    ///
-    ///   ① GetInactive()      : 꺼져 있는 상태로 받아온다
-    ///   ② OnSpawnFromPool()  : 체력·디버프 초기화
-    ///                          → 내부에서 ResetDebuffs() → TargetMove.ResetForSpawn()
-    ///                          → 이때 spawnSpeedMult / pathOffset이 리셋됨!
-    ///   ③ SetSpawnSpeedMultiplier() / SetPathOffset() : 그래서 ②보다 뒤에 와야 한다
-    ///   ④ SetupPath()        : isInitialized = true → 이제부터 움직일 수 있다
-    ///   ⑤ SetActive(true)    : OnEnable에서 Enemy.Active 목록에 등록
-    ///   ⑥ RegisterEnemy()    : HP바는 오브젝트가 켜진 뒤에 붙인다
-    ///
-    /// 순서를 바꾸면 "속도 배율이 안 먹는다", "적이 경로 중간에서 출발한다",
-    /// "체력 0인 적이 한 프레임 보인다" 같은 재현하기 어려운 버그가 납니다.
-    ///
-    /// offset은 스폰 위치와 이동 경로 전체를 똑같이 평행 이동시킵니다
-    /// (TargetMove가 웨이포인트를 읽을 때 더할 뿐, 원본 좌표는 건드리지 않음).
-    /// ──────────────────────────────────────────────────────────────────
-    /// </summary>
+    /// <summary>풀에서 꺼내 초기화→활성화하는 공통 경로 — offset 은 스폰 위치와 경로 전체를 평행 이동(원본 좌표 불변).</summary>
+    // ⚠ 순서 고정: GetInactive → OnSpawnFromPool(배율·오프셋 리셋) → SetSpawnSpeedMultiplier/SetPathOffset → SetupPath → SetActive → RegisterEnemy(HP바)
     private GameObject Spawn(GameObject prefab, Vector2 offset)
     {
         if (ObjectPoolManager.Instance == null || !HasWaypoints) return null;
@@ -240,11 +191,7 @@ public class EnemyRespawn : MonoBehaviour
         return obj;
     }
 
-    /// <summary>
-    /// 스폰 루프. 증강은 스테이지 '도중에' 주기를 바꾸므로 매 주기 delay를 다시 계산하되,
-    /// WaitForSeconds는 "값이 바뀐 순간에만" 새로 만들어 불필요한 할당을 피합니다.
-    /// (AugmentManager가 없으면 SpawnDelay는 항상 1)
-    /// </summary>
+    /// <summary>스폰 루프 — 증강이 도중에 주기를 바꾸므로 매 주기 delay 재계산, WaitForSeconds 는 값이 바뀔 때만 새로 생성(할당 절약).</summary>
     private IEnumerator RespawnLoop()
     {
         float lastDelay = -1f;

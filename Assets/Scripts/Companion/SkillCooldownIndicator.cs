@@ -1,20 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 동료(Companion) 머리 위에 스킬 쿨다운을 표시하는 인디케이터.
-/// 필요한 UI(월드 캔버스 / 원형 배경 / 라디얼 필 / 남은시간 텍스트)를 코드로 자동 생성하므로
-/// 프리팹 세팅이 전혀 필요 없습니다.
-///
-/// 사용법 : SkillCooldownIndicator.Begin(companion, skill.icon, skill.GetCooldown(companion));
-/// </summary>
+/// <summary>동료 머리 위 스킬 쿨다운 표시(월드 캔버스·라디얼 필·남은 시간을 코드로 생성, 프리팹 불필요) — Begin(companion, icon, cooldown).</summary>
 [DisallowMultipleComponent]
 public class SkillCooldownIndicator : MonoBehaviour
 {
     [Header("배치")]
     [Tooltip("동료 기준 표시 위치 오프셋")]
-    // ★ 배치 칸이 1유닛이라 1.1 이면 바로 위 칸 동료의 중심에 겹쳐 그 동료의 인디케이터처럼 보였습니다.
-    //   0.6 = 동료 머리(0.5) 바로 위.
+    // 0.6 = 머리(0.5) 바로 위 (1.1 이면 칸이 1유닛이라 위 칸 동료 것처럼 보임)
     public Vector3 offset = new Vector3(0f, 0.6f, 0f);
     [Tooltip("월드 기준 아이콘 지름(유닛)")]
     public float worldSize = 0.55f;
@@ -51,9 +44,7 @@ public class SkillCooldownIndicator : MonoBehaviour
     /// <summary>0(방금 사용) ~ 1(사용 가능)</summary>
     public float Progress01 => (_running && _duration > 0f) ? 1f - (Remaining / _duration) : 1f;
 
-    // ─────────────────────────────────────────────
-    // 정적 진입점
-    // ─────────────────────────────────────────────
+    // ── 정적 진입점 ──
     public static SkillCooldownIndicator Begin(Component owner, Sprite icon, float cooldown)
     {
         if (owner == null || cooldown <= 0f) return null;
@@ -91,8 +82,7 @@ public class SkillCooldownIndicator : MonoBehaviour
     {
         if (_root == null) return;
 
-        // ★ 쿨다운도 반짝임도 없으면 UI 가 숨겨진 상태라 할 일이 없습니다.
-        //   동료마다 붙어 있는 컴포넌트라 쉬는 동안의 매 프레임 계산을 건너뜁니다.
+        // 쿨다운·반짝임이 없으면 할 일 없음 (동료마다 붙어 있어 매 프레임 계산을 건너뜀)
         if (!_running && _flashUntil <= 0f) return;
 
         // 부모가 좌우 반전(scale.x = -1)돼도 UI는 항상 정방향 유지
@@ -114,8 +104,7 @@ public class SkillCooldownIndicator : MonoBehaviour
             {
                 _text.enabled = true;
 
-                // ★ 표시되는 숫자가 바뀔 때만 문자열을 만듭니다. (ToString 은 매번 새 문자열 → GC)
-                //   1초 이상: 정수 단위(양수 키) / 1초 미만: 0.1초 단위(음수 키) — 두 표기가 같은 키를 갖지 않게 부호로 나눕니다.
+                // 표시 숫자가 바뀔 때만 문자열 생성(GC 방지) — 1초 이상은 정수(양수 키), 미만은 0.1초(음수 키)로 키 충돌 방지
                 int key = remain >= 1f ? Mathf.CeilToInt(remain) : -1 - Mathf.RoundToInt(remain * 10f);
                 if (key != _lastTextKey)
                 {
@@ -162,9 +151,7 @@ public class SkillCooldownIndicator : MonoBehaviour
             _root.gameObject.SetActive(on);
     }
 
-    // ─────────────────────────────────────────────
-    // UI 생성
-    // ─────────────────────────────────────────────
+    // ── UI 생성 ──
     private void EnsureBuilt()
     {
         if (_root != null) return;
@@ -187,9 +174,7 @@ public class SkillCooldownIndicator : MonoBehaviour
 
         Sprite circle = CircleSprite();
 
-        // 그리는 순서 = 생성 순서 : 테두리 → 배경 → 라디얼 필 → 아이콘 → 숫자
-        //   라디얼 필을 아이콘보다 먼저 만들어 아이콘 '뒤'에 깔립니다.
-        //   그래서 쿨다운 진행은 아이콘 둘레(배경 88 > 아이콘 70)에서 보이고, 스킬 이미지는 원본 그대로 보입니다.
+        // 생성 순서 = 그리는 순서(테두리 → 배경 → 필 → 아이콘 → 숫자) — 필을 아이콘 뒤에 깔아 진행은 둘레에서 보이고 아이콘은 원본 그대로
         _ring = CreateImage("Ring", _root, circle, new Color(ringColor.r, ringColor.g, ringColor.b, 0.25f), 100f);
         _bg   = CreateImage("BG",   _root, circle, bgColor,   88f);
 

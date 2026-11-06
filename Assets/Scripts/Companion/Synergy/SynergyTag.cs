@@ -1,12 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 동료 계열. 같은 계열을 여러 명 배치하면 시너지가 켜집니다 (SynergyDefinition).
-///
-/// ★ 에셋(CompanionData · SynergyDefinition)에는 이름이 아니라 숫자로 저장됩니다.
-///   새 계열은 반드시 '맨 뒤' 에 추가하세요. 중간에 끼우면 기존 에셋의 계열이 한 칸씩 밀립니다 (CurrencyType 과 같은 규칙).
-/// </summary>
+/// <summary>동료 계열(같은 계열 여러 명이면 시너지) — ⚠ 에셋에 숫자로 저장되니 새 계열은 맨 뒤에 (중간에 끼우면 한 칸씩 밀림).</summary>
 public enum SynergyTag
 {
     None    = 0,   // 계열 없음 / CompanionData 에서는 '스킬로 자동 판정'
@@ -15,22 +10,13 @@ public enum SynergyTag
     Debuff  = 3,   // 약화 — 독, 방어력 감소
 }
 
-/// <summary>
-/// 계열 판정 · 표시 이름 · 색. 같은 규칙을 HUD · 도감 · 목록이 함께 쓰도록 한 곳에 둡니다 (CompanionGradeStyle 과 같은 판단).
-/// </summary>
+/// <summary>계열 판정·표시 이름·색 — HUD·도감·목록이 같은 규칙을 쓰도록 한 곳에.</summary>
 public static class SynergyTags
 {
     /// <summary>None 을 뺀 실제 계열 목록. '조화'(모든 계열) 시너지가 이 목록을 돕니다.</summary>
     public static readonly SynergyTag[] All = { SynergyTag.Dealer, SynergyTag.Control, SynergyTag.Debuff };
 
-    /// <summary>
-    /// 이 동료의 계열.
-    ///   CompanionData.synergyTag 를 지정했으면 그 값, None 이면 고유 스킬 종류로 판정합니다.
-    ///
-    /// ★ 왜 스킬로 자동 판정하나
-    ///   기존 동료 에셋 18개를 하나하나 열어 계열을 적지 않아도 바로 동작하게 하려는 것입니다.
-    ///   "폭발 스킬인데 제어 계열" 같은 예외 동료는 에셋에서 synergyTag 를 직접 지정하면 됩니다.
-    /// </summary>
+    /// <summary>이 동료의 계열 — synergyTag 가 None 이면 고유 스킬 종류로 자동 판정 (기존 에셋을 하나하나 안 고쳐도 되게, 예외는 에셋에서 직접 지정).</summary>
     public static SynergyTag Of(CompanionData data)
     {
         // ScriptableObject 라 '?.' 대신 유니티식 null 검사
@@ -70,9 +56,7 @@ public static class SynergyTags
     /// <summary>'조화'(모든 계열) 시너지 색.</summary>
     public static readonly Color HarmonyColor = new Color(0.90f, 0.66f, 0.12f);   // 금색
 
-    /// <summary>
-    /// 계열 색. HUD(어두운 배경)와 동료 목록(흰 카드) 양쪽에서 읽히도록 중간 밝기로 맞췄습니다.
-    /// </summary>
+    /// <summary>계열 색 — 어두운 HUD 와 흰 카드 양쪽에서 읽히게 중간 밝기.</summary>
     public static Color GetColor(SynergyTag tag)
     {
         return tag switch

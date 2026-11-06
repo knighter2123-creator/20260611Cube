@@ -4,11 +4,8 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 
-/// <summary>
-/// LoadingScene에 배치합니다.
-/// SceneLoader.GoToStage() 대신 SceneLoader.GoToStageWithLoading()을 호출하면
-/// 이 씬을 거쳐 StageScene으로 이동합니다.
-/// </summary>
+/// <summary>로딩 화면 UI — SceneLoader.GoToStageWithLoading() 이 이 씬을 거쳐 StageScene 으로 이동.</summary>
+// [붙이는 위치] LoadingScene
 public class LoadingSceneUI : MonoBehaviour
 {
     [Header("UI 참조")]

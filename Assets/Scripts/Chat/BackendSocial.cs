@@ -3,10 +3,7 @@ using BackEnd;
 /// <summary>뒤끝 친구·쪽지 서비스(BackendFriendService / BackendDirectService)가 함께 쓰는 도우미.</summary>
 public static class BackendSession
 {
-    /// <summary>
-    /// 지금 이 계정으로 뒤끝에 물을 수 있는가. 안 되면 화면에 보일 이유, 되면 null.
-    /// 뒤끝 세션(Backend.UserInDate)이 그 계정이 아니면 막습니다 — 다른 계정의 목록이 섞여 보이지 않게.
-    /// </summary>
+    /// <summary>이 계정으로 뒤끝에 물을 수 있는가(되면 null, 안 되면 이유) — 세션이 다른 계정이면 막아 목록이 섞이지 않게.</summary>
     public static string Problem(string uid, string signInPrompt)
     {
         AuthManager auth = AuthManager.Instance;
@@ -17,11 +14,7 @@ public static class BackendSession
     }
 }
 
-/// <summary>
-/// '목록 다시 받기' 를 한 번에 하나만 돌리고, 계정이 바뀐 뒤 늦게 온 응답을 버리는 문지기.
-///   - 받는 중에 또 부르면 끝난 뒤 한 번 더 돌도록 기억합니다 (TryBegin → false, End → true).
-///   - Reset(연결·끊기) 마다 세대가 올라가 이전 세대의 응답은 IsCurrent 가 false.
-/// </summary>
+/// <summary>목록 다시 받기를 한 번에 하나만 돌리는 문지기 — 도중 재요청은 끝난 뒤 한 번 더, Reset 마다 세대를 올려 계정이 바뀐 뒤 늦은 응답은 버림.</summary>
 public sealed class RefreshGate
 {
     public int  Generation { get; private set; }

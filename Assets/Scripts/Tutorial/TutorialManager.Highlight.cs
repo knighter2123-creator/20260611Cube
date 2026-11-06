@@ -1,23 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 강조 표시 담당 (partial).
-///
-/// 원리 — "구멍 뚫린 어두운 화면"을 셰이더 없이 만드는 법
-///   ┌───────────────┐
-///   │      위       │   구멍(강조 영역)을 둘러싸는 검은 Image 4장을 배치한다.
-///   ├────┬────┬─────┤   구멍 자리에는 아무것도 없으니 뒤의 게임 화면이 그대로 보인다.
-///   │ 왼 │구멍│ 오  │   흰 테두리도 같은 방식으로 얇은 Image 4장.
-///   ├────┴────┴─────┤
-///   │     아래      │   → 스프라이트/머티리얼 준비 없이 코드만으로 끝난다.
-///   └───────────────┘
-///
-/// 좌표계: 모든 사각형은 "overlayRoot 의 로컬 좌표"로 계산한다.
-///   화면 좌표(픽셀) → ScreenPointToLocalPointInRectangle → overlayRoot 로컬
-///   → 자식에 넣을 땐 anchoredPosition = 중심 - overlayRoot.rect.center
-///   (앵커를 가운데(0.5,0.5)로 고정했기 때문에 이 식이 성립)
-/// </summary>
+/// <summary>강조 표시 partial — 구멍(강조 영역)을 둘러싼 검은 Image 4장 + 얇은 흰 테두리 4장으로 셰이더 없이 '구멍 뚫린 어두운 화면', 좌표는 overlayRoot 로컬로 계산해 anchoredPosition = 중심 − root.rect.center (가운데 앵커 전제).</summary>
 public partial class TutorialManager
 {
     [Header("강조 표시")]
@@ -57,9 +41,7 @@ public partial class TutorialManager
         // 설명 박스도 가운데 앵커로 통일 (위치 계산식이 이것을 전제로 함)
         messageBox.anchorMin = messageBox.anchorMax = messageBox.pivot = new Vector2(0.5f, 0.5f);
 
-        // 튜토리얼 캔버스가 Overlay 면 카메라는 null 을 넘겨야 한다
-        // ★ (true) = 꺼져 있는 오브젝트에서도 찾기. overlayRoot 를 꺼진 채로 씬에 저장해 두면
-        //   인자 없는 GetComponentInParent 는 null 을 돌려줘서 NullReferenceException 이 납니다.
+        // Overlay 캔버스면 카메라 null, (true) 로 꺼진 overlayRoot 에서도 캔버스를 찾음 (아니면 NRE)
         Canvas canvas = overlayRoot.GetComponentInParent<Canvas>(true);
         if (canvas == null)
         {
@@ -91,9 +73,7 @@ public partial class TutorialManager
         }
     }
 
-    // ─────────────────────────────────────────────
-    // 타겟 → 사각형
-    // ─────────────────────────────────────────────
+    // ── 타겟 → 사각형 ──
 
     /// <summary>단계가 바뀔 때 한 번만: GetComponent 류는 매 프레임 부르지 않는다.</summary>
     private void PrepareTarget(TutorialStep step)
@@ -144,19 +124,13 @@ public partial class TutorialManager
                 break;
             }
 
-            // ★ 추가 — 플레이어 사거리.
-            //   Bullet 은 풀에서 런타임에 꺼내는 객체라 인스펙터로 참조할 수 없고,
-            //   timeScale 0 인 튜토리얼 중에는 발사되지도 않습니다.
-            //   그래서 "총알"이 아니라 "총알이 닿는 범위"를 보여줍니다.
-            //   Player.FindTarget 이 쓰는 값과 같은 stat.attackRange 를 읽으므로
-            //   강화/증강으로 사거리가 바뀌어도 강조 범위가 자동으로 따라갑니다.
+            // 플레이어 사거리 — 총알은 런타임 풀 객체·튜토리얼 중 미발사라 범위를 보여줌, FindTarget 과 같은 attackRange 라 강화도 자동 반영
             case TutorialTargetType.PlayerRange:
             {
                 Player p = Player.Instance;   // 인스펙터 연결 없이 싱글턴으로 찾는다
                 if (p == null || !p.gameObject.activeInHierarchy || p.stat == null) return false;
 
-                // FindTarget 은 "반지름" 비교라 지름 = 반지름 × 2.
-                // 구멍은 사각형이라 사거리 원에 딱 맞는 정사각형(외접)으로 그려집니다.
+                // 지름 = 반지름 × 2, 구멍은 사거리 원에 외접하는 정사각형
                 float diameter = p.stat.attackRange * 2f;
                 Bounds b = new Bounds(p.transform.position, new Vector3(diameter, diameter, 0f));
 
@@ -183,10 +157,7 @@ public partial class TutorialManager
         return true;
     }
 
-    /// <summary>
-    /// 월드 Bounds 의 네 꼭짓점 → 화면 좌표(screenCorners). World / PlayerRange 가 같이 쓴다.
-    /// (같은 계산을 두 case 에 복사해 두면 한쪽만 고쳐지는 일이 생기므로 함수로 뺌)
-    /// </summary>
+    /// <summary>월드 Bounds 네 꼭짓점 → 화면 좌표 (World·PlayerRange 공용).</summary>
     private bool WorldBoundsToScreen(Bounds b)
     {
         if (worldCamera == null) worldCamera = Camera.main;   // Camera.main 은 태그 검색이라 캐시해 둔다
@@ -207,9 +178,7 @@ public partial class TutorialManager
         return true;
     }
 
-    // ─────────────────────────────────────────────
-    // 매 프레임 갱신
-    // ─────────────────────────────────────────────
+    // ── 매 프레임 갱신 ──
 
     private void SnapHighlight()
     {
@@ -239,10 +208,7 @@ public partial class TutorialManager
     {
         if (TryGetTargetRect(steps[index], out target))
         {
-            // ★ 수정 — 화면 가장자리 버튼(미션·상점)에서 아래 테두리가 잘리던 문제.
-            //   padding 을 더한 구멍 + 테두리 두께가 화면 밖으로 나가면, 밖으로 나간 테두리는 그려지지 않습니다.
-            //   그래서 구멍을 "안전 영역 안쪽으로 테두리 두께만큼 들어온 사각형" 안으로 잘라 넣습니다.
-            //   밀어서 옮기는 게 아니라 넘친 쪽의 여백만 줄이는 것이라, 구멍이 버튼에서 벗어나지 않습니다.
+            // 구멍을 '안전 영역 − 테두리 두께' 안으로 잘라 넣음 (가장자리 버튼에서 테두리 잘림 방지, 넘친 쪽 여백만 줄어듦)
             Rect s = GetSafeLocalRect();
             float t = frameThickness;
             target = ClampInside(target, Rect.MinMaxRect(s.xMin + t, s.yMin + t, s.xMax - t, s.yMax - t));
@@ -253,13 +219,7 @@ public partial class TutorialManager
         return false;
     }
 
-    /// <summary>
-    /// ★ 추가 — 기기의 안전 영역(Screen.safeArea)을 overlayRoot 로컬 좌표로.
-    ///   Galaxy Note10 처럼 펀치홀 카메라·둥근 모서리가 있는 기기는
-    ///   화면 끝 몇 픽셀이 가려집니다. 설명 박스와 테두리는 이 안에만 둡니다.
-    ///   (시뮬레이터 상단 'Safe Area' 버튼으로 영역을 눈으로 확인할 수 있습니다)
-    ///   Rect 몇 개 계산이라 매 프레임 불러도 성능 영향은 무시할 수준입니다.
-    /// </summary>
+    /// <summary>Screen.safeArea 를 overlayRoot 로컬로 — 펀치홀·둥근 모서리 기기에서 박스·테두리가 가려지지 않게 (Rect 계산뿐이라 매 프레임 OK).</summary>
     private Rect GetSafeLocalRect()
     {
         Rect sa = Screen.safeArea;   // 픽셀 단위, 좌하단 (0,0)
@@ -308,10 +268,7 @@ public partial class TutorialManager
         for (int i = 0; i < 4; i++) framePieces[i].color = c;
     }
 
-    /// <summary>
-    /// 구멍 옆(좌/우)에 자리가 있으면 옆에, 없으면(가로로 긴 상단 바 등) 위/아래에 박스를 둔다.
-    /// 사진처럼 "타워 왼쪽 → 설명은 오른쪽"이 기본.
-    /// </summary>
+    /// <summary>설명 박스 위치 — 구멍 좌/우에 자리가 있으면 옆, 없으면 위/아래.</summary>
     private Vector2 ComputeBoxPosition(Rect hole, bool hasTarget)
     {
         Rect root = overlayRoot.rect;
@@ -353,9 +310,7 @@ public partial class TutorialManager
             pos.y = Mathf.Clamp(pos.y, r.yMin + boxMargin + half.y, r.yMax - boxMargin - half.y);
         }
 
-        // overlayRoot 로컬 → 가운데 앵커 기준 anchoredPosition.
-        // ★ 안전 영역(r)의 중심이 아니라 overlayRoot 전체(root)의 중심을 빼야 합니다.
-        //   앵커 기준점은 부모(overlayRoot) 사각형의 중심이기 때문입니다.
+        // 로컬 → anchoredPosition — 안전 영역이 아닌 root 중심을 뺌 (앵커 기준점이 부모 중심)
         return pos - root.center;
     }
 

@@ -1,13 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// 씬 이동 담당 (DontDestroyOnLoad). 모든 씬 이동은 일반 전환(Single)입니다.
-///
-/// [가챠(ShopScene)]  GoToGacha() 가 StageScene 을 내리고 ShopScene 으로 이동합니다 — 떠나기 전에 저장 (SaveBeforeLeavingStage).
-///   GoToStage() 로 돌아올 때 StageScene 을 다시 불러오고 저장된 배속을 복원합니다.
-///   ShopScene 은 단독으로 열리므로 카메라·EventSystem 을 자기 씬에 가지고 있습니다 (위에 겹쳐 열면 중복됨).
-/// </summary>
+/// <summary>씬 이동 담당(DontDestroyOnLoad, 전부 Single 전환) — 가챠로 갈 땐 떠나기 전 저장, 돌아올 땐 StageScene 재로드 후 배속 복원 (ShopScene 은 자체 카메라·EventSystem 보유).</summary>
 public class SceneLoader : MonoBehaviour
 {
     public static SceneLoader Instance;
@@ -27,19 +21,8 @@ public class SceneLoader : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
-            // ★ 여기가 "게임 재시작 불가능"의 진원지입니다.
-            //
-            //   LoginScene을 다시 로드하면 씬에 있는 SceneLoader가 새로 하나 생깁니다.
-            //   기존 것(DontDestroyOnLoad로 살아남은 것)이 이미 있으니 새 것은 스스로를 지웁니다.
-            //   여기까지는 의도된 동작이고 정상입니다.
-            //
-            //   문제는 LoginScene의 버튼이 인스펙터에서 "씬에 있던 그 SceneLoader"를
-            //   드래그해 연결돼 있을 때입니다. 그 참조는 방금 지워진 새 오브젝트를 가리키므로
-            //   두 번째 로그인 화면부터는 버튼을 눌러도 아무 일도 일어나지 않습니다.
-            //   에러도 안 납니다. UnityEvent는 대상이 사라지면 조용히 건너뛰기 때문입니다.
-            //
-            //   해결책은 버튼을 인스펙터가 아니라 코드에서 SceneLoader.Instance 경유로 연결하는 것입니다
-            //   (예: GuideQuestHUD, Login_Name).
+            // 중복 인스턴스는 스스로 파괴
+            // ⚠ 버튼을 인스펙터로 씬의 SceneLoader 에 연결하면 재진입 시 파괴된 쪽을 가리켜 조용히 무반응 — 코드에서 SceneLoader.Instance 경유로 연결
             if (logDuplicate)
                 GameLog.Info($"[SceneLoader] 중복 인스턴스 제거 — 씬 '{gameObject.scene.name}' 의 '{name}'. " +
                           "이 씬의 버튼이 인스펙터로 이 오브젝트를 참조하고 있다면 그 연결은 이제 끊깁니다.", this);
@@ -54,12 +37,7 @@ public class SceneLoader : MonoBehaviour
         ValidateSceneNames();
     }
 
-    /// <summary>
-    /// ★ [재검토] 씬 이름 상수 오타 방어.
-    ///   이제 가챠에서 돌아올 때 LoadScene(STAGE_SCENE) 을 반드시 거치므로,
-    ///   이름이 Build Settings 의 실제 씬과 다르면 "가챠에서 못 나오는" 상태가 됩니다.
-    ///   시작할 때 한 번 확인해서 경고로 알립니다 (에러가 아니라 경고 — 게임은 계속 진행).
-    /// </summary>
+    /// <summary>씬 이름 상수가 Build Settings 에 있는지 시작 시 확인해 경고 (틀리면 가챠에서 못 돌아옴).</summary>
     private void ValidateSceneNames()
     {
         string[] names = { LOGIN_SCENE, STAGE_SCENE, GACHA_SCENE, LOADING_SCENE, EVOLVE_SCENE, DAILY_DUNGEON_SCENE };
@@ -73,10 +51,7 @@ public class SceneLoader : MonoBehaviour
 
     void OnDestroy()
     {
-        // ★ static 필드가 파괴된 오브젝트를 계속 붙잡고 있으면
-        //   "null은 아닌데 쓸 수는 없는" 좀비 상태가 됩니다.
-        //   Instance == this 로 검사하는 이유는, 중복 인스턴스가 스스로 지워질 때
-        //   살아 있는 진짜 Instance까지 null로 만들면 안 되기 때문입니다.
+        // 파괴 시 Instance 비움(좀비 참조 방지) — == this 검사로 중복 인스턴스 파괴가 진짜를 지우지 않게
         if (Instance == this) Instance = null;
     }
 
@@ -102,8 +77,7 @@ public class SceneLoader : MonoBehaviour
 
         LoadScene(STAGE_SCENE);
 
-        // LoadScene 은 timeScale 을 1 로 되돌립니다. 가챠에서 돌아올 때는 저장된 배속으로 돌아가야 하므로 복원합니다.
-        //   timeScale 은 씬이 바뀌어도 유지되는 전역 값이라, 로드 요청 직후에 설정해도 새 씬에 그대로 적용됩니다.
+        // 저장된 배속 복원 (timeScale 은 전역이라 로드 요청 직후 설정해도 새 씬에 적용)
         if (returningFromGacha) RestoreGameSpeed();
     }
 
@@ -112,9 +86,7 @@ public class SceneLoader : MonoBehaviour
         // 이미 가챠 씬이면 다시 불러오지 않음 (연타·중복 호출 시 재로드 방지)
         if (IsInGacha) return;
 
-        // ★ StageScene 을 떠나기 "전에" 저장합니다.
-        //   StageScene 은 돌아올 때 세이브(SaveManager.Current)에서 다시 만들어지므로,
-        //   마지막 저장 이후의 진행(스테이지 킬 수, 경험치·골드 등)을 모아 두지 않으면 가챠에 다녀오는 것만으로 되돌아갑니다.
+        // 떠나기 전 저장 — StageScene 은 세이브로 재구성되므로 안 하면 가챠 왕복만으로 진행이 되돌아감
         SaveBeforeLeavingStage();
 
         LoadScene(GACHA_SCENE);
@@ -133,15 +105,7 @@ public class SceneLoader : MonoBehaviour
         return scene.IsValid() && scene.isLoaded;
     }
 
-    /// <summary>
-    /// 가챠로 떠나기 전 저장.
-    /// ★ 처음엔 "현재 씬 이름 == STAGE_SCENE 일 때만" 저장했는데, 조건을 뺐습니다.
-    ///   씬 이름이 상수와 조금만 달라도(예: 실제 씬이 MainScene) 저장이 조용히 건너뛰어져,
-    ///   에러 없이 "가챠 다녀오면 진행이 되돌아가는" 버그가 됩니다.
-    ///   Save() 는 원래 어느 씬에서 불러도 안전합니다 — 게임 씬이면 저장하고,
-    ///   로그인/로딩 씬이면 SaveManager 의 '게임 시작 전 저장 차단' 이 알아서 무시합니다.
-    ///   "지금 저장해도 되는가" 의 판단은 SaveManager 한 곳에 맡깁니다.
-    /// </summary>
+    /// <summary>가챠로 떠나기 전 저장 — 씬 이름 조건 없이 호출하고 '저장해도 되는가'는 SaveManager 가 판단 (이름 비교는 어긋나면 조용히 건너뜀).</summary>
     private void SaveBeforeLeavingStage()
     {
         // SaveManager 는 Unity 오브젝트라 ?. 대신 == null 로 검사 (파괴된 인스턴스도 걸러냄)

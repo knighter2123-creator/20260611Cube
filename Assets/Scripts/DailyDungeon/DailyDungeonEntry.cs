@@ -4,24 +4,8 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-/// <summary>
-/// 일일 던전 입장 패널 1개. 던전 데이터를 여러 개 넣고 선택 버튼으로 하나를 골라 입장합니다.
-///   - 던전 선택 (골드 던전 / 소환권 던전 …) — 고른 던전 기준으로 아래 항목을 다시 그림
-///   - 오늘 남은 입장 횟수 표시 (예: "남은 횟수 2/3") — 횟수는 던전마다 따로 (각 던전의 dailyEntries 회)
-///   - 난이도 선택 (◀ ▶) — 클리어한 최고 난이도 + 1 까지, 던전마다 따로 기억
-///   - 선택한 난이도의 보상 미리보기
-///   - 소탕 — 클리어한 난이도는 던전에 들어가지 않고 바로 보상 (횟수 1회 차감)
-///   - 입장 횟수 추가 — 확인 팝업 후 재화 차감 (던전마다 하루 최대 extraEntryCosts 길이만큼, 비용은 점점 증가)
-///   - 입장 → 확인 팝업("현재 동료 배치로 시작할까요?") → 던전 씬 (횟수는 클리어 시에만 차감)
-///   - 개방 조건 — unlockWorld-unlockStage(기본 2-1) 클리어 전에는 입장/소탕/횟수 추가를 막고 lockedNoticeText 를 띄움
-///
-/// 텍스트/버튼은 enterButton 과 confirmPopup 외에는 전부 선택입니다. 비우면 그 항목만 건너뜁니다.
-/// 던전이 1개뿐이면 선택 버튼은 비워 두어도 됩니다.
-///
-/// TabWindow 의 탭 안에 둘 때는 EvolveStageEntry 와 같은 규칙을 지키세요.
-///   ① 입장 직전에 창을 닫는다 (ownerWindow — 비우면 부모에서 자동으로 찾음)
-///   ② TabWindow 인스펙터에서 이 탭을 Dont Remember As Last Tab 으로
-/// </summary>
+/// <summary>일일 던전 입장 패널: 던전 선택 → 남은 횟수·난이도(최고 클리어+1 까지)·보상 미리보기 → 입장(확인 팝업, 횟수는 클리어 때만 차감)/소탕/횟수 추가(재화) — 개방 조건(기본 2-1) 전엔 잠김.</summary>
+// enterButton·confirmPopup 외 칸은 선택 / TabWindow 탭 안이면 입장 직전에 창을 닫고, 이 탭을 Dont Remember As Last Tab 으로
 public class DailyDungeonEntry : MonoBehaviour
 {
     [Serializable]
@@ -310,10 +294,7 @@ public class DailyDungeonEntry : MonoBehaviour
 
     // ── 소탕 ───────────────────────────────────────
 
-    /// <summary>
-    /// 소탕할 난이도. 선택한 난이도를 클리어했으면 그 난이도, 아직이면(기본 선택인 '다음 도전 난이도') 최고 클리어 난이도.
-    /// 클리어한 난이도가 없으면 0.
-    /// </summary>
+    /// <summary>소탕 난이도 — 선택한 난이도를 클리어했으면 그것, 아니면 최고 클리어 난이도 (없으면 0).</summary>
     private static int SweepLevel(DailyDungeonData dungeon, int selectedLevel)
         => Mathf.Min(selectedLevel, DailyDungeonProgress.HighestCleared(dungeon));
 
@@ -448,8 +429,7 @@ public class DailyDungeonEntry : MonoBehaviour
 
     private void Enter(DailyDungeonData dungeon, int level)
     {
-        // 팝업이 떠 있는 사이 상태가 바뀌었을 수 있으니 확인을 누른 시점에 다시 판정합니다.
-        // 횟수는 여기서 차감하지 않습니다 — 클리어했을 때만 DailyDungeonManager 가 차감합니다.
+        // 확인을 누른 시점에 다시 판정 (팝업 사이 상태 변화), 횟수는 클리어 때만 DailyDungeonManager 가 차감
         if (!IsUnlocked() ||
             !DailyDungeonProgress.IsLevelUnlocked(dungeon, level) ||
             DailyDungeonProgress.RemainingEntries(dungeon) <= 0)

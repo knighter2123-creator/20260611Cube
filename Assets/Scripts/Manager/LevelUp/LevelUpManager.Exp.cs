@@ -26,12 +26,7 @@ public partial class LevelUpManager
         }
     }
 
-    /// <summary>
-    /// 레벨에 따른 필요 경험치. 100 × L^1.5 → 100, 283, 520 ... (Lv.100 = 10만, Lv.999 ≈ 316만)
-    /// 지수는 획득 경험치 배율(StageFormula.ExpGrowthPower)과 같은 값을 써서,
-    /// 획득량과 필요량이 같은 속도로 커지고 스테이지당 약 1레벨 페이스가 끝까지 유지됩니다.
-    /// (이전: 100 × 1.15^(L-1) — 후반에 레벨이 멈추고 281레벨부터 long 오버플로)
-    /// </summary>
+    /// <summary>필요 경험치 100 × L^1.5 — 획득 경험치와 같은 지수(ExpGrowthPower)라 스테이지당 약 1레벨 페이스 유지 (옛 1.15^L 은 281레벨부터 long 오버플로).</summary>
     private static long CalculateMaxExp(int level)
         => (long)Math.Max(1.0, Math.Round(100.0 * Math.Pow(level, StageFormula.ExpGrowthPower))); // 0 방지 가드
 }

@@ -3,51 +3,11 @@ using BackEnd;
 using LitJson;
 using UnityEngine;
 
-/// <summary>
-/// 클라우드 세이브 — 로그인한 계정의 세이브를 뒤끝 클라우드 저장(Backend.CloudSave)에 올리고, 다른 기기에서 이어서 할 수 있게 받아 옵니다.
-///
-/// [붙이는 위치]  따로 붙이지 않습니다. SaveManager.Awake 가 자기 오브젝트에 AddComponent 합니다.
-///   SaveManager 와 수명이 같아서, 계정 삭제·전환·클라우드 적용으로 매니저를 새로 만들 때 함께 새로 시작합니다.
-///
-/// [뒤끝 콘솔 준비]  클라우드 저장에서 컬렉션 COLLECTION("saves") 을 미리 만들어 두세요.
-///   없으면 받기·올리기가 404 "not exist folder" 로 실패합니다 → 오류 로그를 남기고 이 기기 데이터로만 진행합니다 (올리지 않음).
-///
-/// [저장 구조]  컬렉션 하나에 계정마다 JSON 하나 (뒤끝이 로그인한 계정 기준으로 나눔 — 최대 1MB, 올리면 통째로 덮어씀)
-///     data      : string — save.json 내용 (SaveData JSON) 을 UTF-8 → Base64 로
-///     augments  : string — 증강 스택 (PlayerPrefs 에 따로 있어서 함께 실음, AugmentManager.ExportForCloud) 도 Base64 로
-///   ★ Base64 인 이유: 뒤끝 SDK(5.18.3)가 올리기 전 내장 JSON 파서로 검사하는데, 이 파서가 문자열 안의 \" 를 읽지 못해
-///     JSON 을 문자열로 넣으면 400 "Failed to parse the string into JSON." 으로 막힙니다 (2026-11-04 재현).
-///     Base64 에는 따옴표가 없어 안전합니다. 받을 때 Base64 가 아니면 그대로 읽습니다.
-///     savedAt   : long   — 그 세이브의 버전 (SaveData.savedAt)
-///     world / stage / level : int — 관리용 요약
-///     updatedAt : string — 올린 기기 시각 (UTC ISO, 관리용)
-///   ★ 뒤끝 호출은 '지금 로그인한 계정' 에 적용되므로, 부르기 직전에 세이브 주인 == Backend.UserInDate 인지 확인합니다
-///     (계정 전환 도중 옛 계정 세이브를 새 계정 클라우드에 올리지 않게).
-///
-/// [버전 비교]  SaveData.savedAt 은 파일에 쓸 때마다 바뀌는 버전 번호, cloudSyncedAt 은 "마지막으로 맞췄을 때 클라우드 버전".
-///   시계는 기기마다 달라서 크기(어느 쪽이 최신인가)는 비교하지 않고 "같은가" 만 봅니다.
-///
-/// [게임 시작 전 확인]  Login_Name 이 씬을 옮기기 직전에 CheckBeforeStart 를 부릅니다.
-///   ① 클라우드에 없음                         → 이 기기 것 사용 (첫 저장 때 올림)
-///   ② 버전이 같음                             → 이미 같은 데이터
-///   ③ 이 기기에서 세이브 삭제를 했음           → 이 기기 것 사용 (클라우드를 덮어씀 — SaveManager.IsRankingResetPending)
-///   ④ 이 기기 세이브가 비어 있음 (새 기기)     → 클라우드 것 자동 적용
-///   ⑤ 클라우드가 마지막 동기화 뒤 그대로임     → 이 기기 것 사용 (이 기기에서만 진행함)
-///   ⑥ 이 기기가 마지막 동기화 뒤 그대로임      → 클라우드 것 자동 적용 (다른 기기에서만 진행함)
-///   ⑦ 양쪽 모두 바뀜                          → 플레이어에게 묻기 (CloudSaveConflictPopup)
-///   클라우드 것을 적용할 때는 파일을 바꾼 뒤 매니저를 전부 새로 만들고(AccountReset) 자동으로 다시 시작합니다.
-///   매니저들이 LoginScene 에서 이미 옛 세이브를 읽었기 때문입니다 (계정 전환과 같은 이유).
-///
-/// [올리기]  확인이 끝난 계정만 올립니다 — 확인 전에 올리면 새 기기의 1-1 이 클라우드를 덮어씁니다.
-///   SaveManager 가 파일을 쓸 때마다 알려 주고(NotifySaved), uploadInterval 마다 한 번씩 올립니다. 앱이 백그라운드로 가면 바로 올립니다.
-///   올리기 전에 먼저 받아 와서 "클라우드가 아직 마지막으로 맞춘 버전인가" 를 확인합니다. 그사이 다른 기기가 올렸으면
-///   덮어쓰지 않고 이번 실행에서는 올리기를 멈춥니다 → 다음 실행의 확인에서 ⑦ 로 물어봅니다.
-///   ⚠ 뒤끝 클라우드 저장에는 트랜잭션이 없어서 받기~올리기 사이(1초 안팎)에 다른 기기가 올리면 막지 못합니다.
-///     두 기기에서 동시에 같은 계정으로 하는 경우만 해당 — 감수합니다.
-///
-/// [오프라인으로 시작]  확인을 못 했으면 이번 실행에서는 올리지 않고, 게임 중에 다시 확인합니다.
-///   게임 중에는 매니저를 새로 만들 수 없으므로 ①②③⑤ (이 기기 것 사용) 일 때만 확인을 마치고, 나머지는 다음 실행으로 미룹니다.
-/// </summary>
+/// <summary>클라우드 세이브: 게임 시작 전 클라우드와 버전(savedAt/cloudSyncedAt '같은가'만 비교)을 맞춰 어느 쪽을 쓸지 정하고, 확인을 마친 계정만 uploadInterval 마다 세이브+증강을 Base64 로 올림.</summary>
+// [붙이는 위치] SaveManager.Awake 가 자동으로 붙임 / [뒤끝 콘솔] 클라우드 저장에 컬렉션 "saves" 생성 필요 (없으면 404 로 올리지 않음)
+// 판단: 클라우드 없음·같음·이 기기에서 세이브 삭제·클라우드 그대로 → 이 기기 / 새 기기·이 기기 그대로 → 클라우드 적용 후 재시작 / 둘 다 바뀜 → 팝업으로 물음
+// ★ Base64 인 이유: 뒤끝 SDK 가 문자열 속 \" 를 못 읽어 400 이 남 / ★ 뒤끝 호출 직전 세이브 주인 == Backend.UserInDate 확인 (옛 계정 세이브를 새 계정에 안 올리게)
+// ⚠ 올리기 전 받아 와서 다른 기기가 올렸으면 멈추지만, 트랜잭션이 없어 그 사이 1초 안팎의 경합은 못 막음 (감수)
 public class CloudSave : MonoBehaviour
 {
     public static CloudSave Instance { get; private set; }
@@ -128,11 +88,7 @@ public class CloudSave : MonoBehaviour
 
     // ───────────────────────────── 게임 시작 전 확인 ─────────────────────────────
 
-    /// <summary>
-    /// 씬을 옮기기 직전에 부릅니다. 결과는 onDone 으로 옵니다 (기다리는 동안 팝업이 뜰 수 있음).
-    ///   Proceed   → 그대로 시작
-    ///   Rebooting → 클라우드 세이브를 적용하려고 재시작 중 — 씬을 옮기지 말 것 (재시작 후 자동으로 다시 들어옴)
-    /// </summary>
+    /// <summary>씬 이동 직전 클라우드 확인 → onDone(Proceed=그대로 시작 / Rebooting=클라우드 적용 재시작 중이라 씬 이동 금지), 도중에 팝업이 뜰 수 있음.</summary>
     public void CheckBeforeStart(float timeoutSeconds, Action<StartCheck> onDone)
     {
         // 게스트 / 로그인 정보 없음 / 세이브 주인이 아직 다른 계정 → 클라우드와 상관없이 시작
@@ -190,8 +146,7 @@ public class CloudSave : MonoBehaviour
 
                     if (!shown)
                     {
-                        // 씬에 팝업이 없음 — 고르지 않은 채로는 어느 쪽도 덮어쓰지 않습니다.
-                        //   이 기기 데이터로 시작하되 확인을 마치지 않아 이번 실행에서는 올리지 않음 → 다음 실행 때 다시 물음
+                        // 팝업이 없으면 어느 쪽도 덮지 않음 — 이 기기 데이터로 시작하고 올리지 않음(다음 실행에 다시 물음)
                         Debug.LogError("[CloudSave] 저장 데이터 선택 팝업이 LoginScene 에 없습니다 (Tools/UI 굽기). 이번에는 이 기기 데이터로 시작하고 클라우드에 올리지 않습니다.");
                         deferredUid = uid;   // 게임 중 확인도 같은 결론이므로 다시 묻지 않음
                         onDone?.Invoke(StartCheck.Proceed);
@@ -270,8 +225,7 @@ public class CloudSave : MonoBehaviour
         }
         AugmentManager.ImportFromCloud(uid, remote.Augments);
 
-        // ③ 다시 시작 — 새 SaveManager 가 방금 쓴 파일을 읽고, 새 LoginScene 에서 자동으로 게임 시작
-        //   (그때의 CheckBeforeStart 는 ② 버전이 같음 → 바로 통과)
+        // ③ 재시작 — 새 SaveManager 가 이 파일을 읽고 자동 시작 (그때 확인은 버전이 같아 바로 통과)
         GameLog.Info($"[CloudSave] 클라우드 세이브 적용 — 매니저를 새로 만들고 다시 시작합니다 ({Describe(d)})");
         AccountSwitch.RequestAutoStartAfterReload();
         AccountReset.RestartFromLogin();
@@ -284,11 +238,7 @@ public class CloudSave : MonoBehaviour
     private static bool IsBackendAccount(string uid)
         => !string.IsNullOrEmpty(uid) && uid == Backend.UserInDate;
 
-    /// <summary>
-    /// 클라우드 데이터를 받아 옵니다. 실패·시간 초과면 onDone(null).
-    /// ★ 실패를 "클라우드에 없음" 으로 착각하면 ① 로 판단해 이 기기 데이터로 클라우드를 덮어씁니다 —
-    ///   404 "not exist file"(이 계정은 아직 올린 적 없음) 만 '없음' 이고, 그 밖의 실패는 모두 null.
-    /// </summary>
+    /// <summary>클라우드 받기, 실패·시간 초과면 onDone(null) — ★ 404 "not exist file" 만 '없음'으로 봄 (실패를 없음으로 착각하면 클라우드를 덮어씀).</summary>
     private void Fetch(string uid, float timeoutSeconds, Action<Remote> onDone)
     {
         if (!IsBackendAccount(uid))
@@ -394,10 +344,7 @@ public class CloudSave : MonoBehaviour
             Upload(uid);
     }
 
-    /// <summary>
-    /// 게임 중 확인 (오프라인으로 시작했다가 연결된 경우). 이 기기 것을 쓰는 결과일 때만 확인을 마칩니다.
-    /// 클라우드 것을 써야 하면 지금은 매니저를 새로 만들 수 없으므로 다음 실행으로 미룹니다.
-    /// </summary>
+    /// <summary>오프라인으로 시작했다 연결된 경우 게임 중 재확인 — 이 기기 것을 쓰는 결과만 확정하고, 클라우드가 필요하면 재시작할 수 없어 다음 실행으로 미룸.</summary>
     private void RecheckInGame(string uid)
     {
         if (uid == deferredUid) return;
@@ -528,9 +475,7 @@ public class CloudSave : MonoBehaviour
 
     private void OnApplicationPause(bool paused)
     {
-        // 백그라운드로 갈 때 간격을 기다리지 않고 바로 올림 (SaveManager.OnApplicationPause 의 Save() 가 먼저 파일을 씀).
-        //   멈추기 전에 Update 가 한 번 더 돌지 않을 수 있어서 여기서 직접 부릅니다.
-        //   앱이 그대로 꺼져 못 올렸어도, 다음 실행의 확인 ⑤ 에서 이 기기 것으로 판단해 이어서 올립니다.
+        // 백그라운드 전환 시 간격 없이 바로 올림 (멈추기 전 Update 가 안 돌 수 있어서 직접 호출, 못 올려도 다음 실행에 이어 올림)
         if (!paused) return;
         nextUploadTime = 0f;
         if (!checking && !uploading && pendingJson != null &&

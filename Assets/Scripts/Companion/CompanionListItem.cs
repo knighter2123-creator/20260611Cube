@@ -20,10 +20,7 @@ public class CompanionListItem : MonoBehaviour
     private CompanionData _data;
     private bool          _listenersBound;
 
-    // ★ 리스너는 '한 번만' 겁니다 (CompanionCodexItem.Init 과 같은 이유).
-    //   예전에는 Setup 마다 RemoveAllListeners → AddListener 를 했는데,
-    //   RemoveAllListeners 는 다른 스크립트가 코드로 건 리스너까지 지워버립니다.
-    //   Awake 가 아니라 Setup 에서 부르는 이유: 프리팹이 꺼진 채 저장돼 있으면 Awake 가 Setup 보다 늦을 수 있음.
+    // 리스너는 한 번만 (RemoveAllListeners 는 남의 리스너까지 지움) — 꺼진 프리팹은 Awake 가 늦어 Setup 에서 호출
     private void BindListenersOnce()
     {
         if (_listenersBound) return;
@@ -67,9 +64,7 @@ public class CompanionListItem : MonoBehaviour
         if (iconImage != null && data.icon != null)
             iconImage.sprite = data.icon;
 
-        // ★ 시너지 계열 배지 — 이름 뒤가 아니라 카드 모서리(tagText)에 따로 표시합니다.
-        //   이름 뒤에 붙이면 "반짝이는 폭발 지팡이 [제어]" 처럼 긴 이름에서 배지가 카드 밖으로 밀려납니다.
-        //   배지 글자만 계열 색 (TMP 리치 텍스트의 <color> 가 tagText.color 보다 우선)
+        // 계열 배지는 카드 모서리(tagText)에 따로 (이름 뒤면 긴 이름에서 밀려남), 글자만 계열 색
         if (tagText != null)
         {
             SynergyTag tag = SynergyTags.Of(data);
@@ -81,8 +76,7 @@ public class CompanionListItem : MonoBehaviour
         if (nameText != null)
         {
             nameText.text = data.companionName;
-            // ★ 등급 색은 도감과 같은 규칙(CompanionGradeStyle)을 씁니다. 색을 바꿀 땐 그 파일 한 곳만 고치면 됩니다.
-            //   목록 아이템은 흰 카드 위에 그려지므로 밝은 배경용 색을 씁니다 (일반 = 흰색이면 안 보임).
+            // 등급 색은 CompanionGradeStyle 의 밝은 배경용 (흰 카드에서 일반=흰색이 안 보여서)
             nameText.color = CompanionGradeStyle.GetColorOnLight(data.grade);
         }
 
@@ -99,8 +93,7 @@ public class CompanionListItem : MonoBehaviour
             SetFragmentText(count);
     }
 
-    // 상세 패널과 같은 형식 ("조각 37 / 100") — 문구 규칙은 CompanionStar 한 곳에 있습니다.
-    // 목록에는 진화 풀이 없어서 최대 성급이어도 "/ 100" 으로 표시합니다 (진화 가능 여부는 상세 패널에서 확인).
+    // 상세 패널과 같은 "조각 37 / 100" (목록엔 진화 풀이 없어 최대 성급이어도 / 100)
     private void SetFragmentText(int count)
     {
         if (fragmentText != null) fragmentText.text = CompanionStar.FragmentLabel(count);
@@ -123,9 +116,7 @@ public class CompanionListItem : MonoBehaviour
         if (next) RefreshActionButtons();
     }
 
-    // ★ 그리드에서는 뒤에 있는 형제(오른쪽·아래 아이템)가 나중에 그려져서 버튼을 덮습니다.
-    //   아이템 순서를 바꾸면 그리드 배치가 바뀌므로, 버튼 묶음에만 정렬을 덮어쓰는 Canvas 를 붙여 맨 위로 올립니다.
-    //   클릭도 받아야 하므로 GraphicRaycaster 를 같이 붙입니다. (한 번만 만들고 재사용)
+    // 뒤 형제 아이템이 버튼을 덮으므로 버튼 묶음에만 정렬 덮어쓰기 Canvas + GraphicRaycaster (한 번만 생성)
     private void BringActionButtonsToFront()
     {
         Canvas canvas = actionButtons.GetComponent<Canvas>();
@@ -135,9 +126,7 @@ public class CompanionListItem : MonoBehaviour
             actionButtons.AddComponent<GraphicRaycaster>();
         }
 
-        // 기준은 '실제로 정렬 값을 가진' 캔버스 = 정렬을 덮어쓴 가장 가까운 캔버스, 없으면 루트 캔버스.
-        //   중첩 캔버스의 sortingOrder 는 실제로 쓰이지 않는 값(보통 0)이라, 그걸 기준으로 하면
-        //   루트 순서가 더 클 때 버튼이 패널 전체 뒤로 가 버립니다.
+        // 기준은 정렬을 덮어쓴 가장 가까운 캔버스(없으면 루트) — 중첩 캔버스의 sortingOrder 는 안 쓰이는 값이라 기준이면 버튼이 뒤로 감
         Canvas basis = FindSortingCanvas(transform.parent);
         canvas.overrideSorting = true;
         if (basis != null) canvas.sortingLayerID = basis.sortingLayerID;

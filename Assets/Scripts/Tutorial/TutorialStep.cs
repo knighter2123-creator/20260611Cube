@@ -1,30 +1,19 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// 튜토리얼 한 단계가 "무엇을 강조할지"의 종류.
-/// </summary>
+/// <summary>튜토리얼 단계의 강조 대상 종류.</summary>
 public enum TutorialTargetType
 {
     None,   // 강조 없이 화면 전체를 어둡게 + 가운데 설명 (시작/마무리 인사 등)
     UI,     // 캔버스 위의 UI (스테이지 카운트, 메뉴 버튼 등) → RectTransform
     World,  // 월드 오브젝트 (플레이어 타워, 몬스터 생성 지점 등) → Transform
 
-    // ★ 추가 — 플레이어 사거리(Player.Instance.stat.attackRange) 범위. 연결할 것 없음.
-    //   반드시 맨 뒤에 추가해야 합니다: 유니티는 enum 을 "이름"이 아니라 "숫자(0,1,2…)"로 저장하기 때문에
-    //   중간에 끼워 넣으면 이미 설정해 둔 단계들의 타입이 한 칸씩 밀립니다.
+    // 플레이어 사거리 범위 (연결 불필요)
+    // ⚠ 새 값은 맨 뒤에만 추가 — enum 은 숫자로 저장돼 중간 삽입 시 기존 단계 타입이 밀림
     PlayerRange,
 }
 
-/// <summary>
-/// 튜토리얼 한 단계의 데이터.
-///
-/// ★ 왜 ScriptableObject 가 아니라 [Serializable] 클래스인가?
-///   이 프로젝트는 데이터를 보통 ScriptableObject 로 빼지만,
-///   튜토리얼 단계는 "씬 안의 오브젝트(타워, HUD 버튼)"를 직접 참조해야 합니다.
-///   ScriptableObject(에셋)는 씬 오브젝트를 참조할 수 없으므로(저장해도 빠짐),
-///   씬에 있는 TutorialManager 의 인스펙터 리스트에 두는 게 맞습니다.
-/// </summary>
+/// <summary>튜토리얼 한 단계 데이터 — 씬 오브젝트를 참조해야 해서 SO 대신 [Serializable] 로 TutorialManager 리스트에 둠.</summary>
 [Serializable]
 public class TutorialStep
 {

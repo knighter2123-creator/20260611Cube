@@ -11,21 +11,7 @@ public class CompanionPlacementController : MonoBehaviour
 {
     public static CompanionPlacementController Instance { get; private set; }
 
-    // ══════════════════════════════════════════════
-    //  배치 모드 시작 / 종료 알림
-    // ══════════════════════════════════════════════
-    //
-    // ★ 왜 이벤트가 필요한가
-    //   배치 모드에 들어가면 화면을 덮고 있는 UI 가 전부 비켜줘야 합니다.
-    //   IsPointerOverUI() 는 "탭 좌표에 UI 가 하나라도 있으면 무시" 하는 방식이라,
-    //   반투명 배경 한 장만 깔려 있어도 배치가 영원히 안 됩니다.
-    //
-    //   이 스크립트는 어떤 UI 가 화면을 덮고 있는지 모릅니다(알 필요도 없습니다).
-    //   "배치가 시작됐다 / 끝났다" 만 알리고, 비켜주고 되살리는 건 TabWindow 가 합니다.
-    //
-    // ★ static 이 아니라 인스턴스 이벤트인 이유
-    //   이 컴포넌트는 씬에 속해 있어 씬을 넘나들면 파괴/재생성됩니다.
-    //   static 이벤트는 구독자가 해제를 한 번만 빠뜨려도 파괴된 오브젝트를 계속 붙잡습니다.
+    // ── 배치 모드 시작/종료 알림 — UI 위 탭은 무시하므로 덮고 있는 창이 비켜야 함 (비키는 건 TabWindow), 씬마다 재생성돼 static 이 아닌 인스턴스 이벤트 ──
     public event Action OnPlacementBegan;
     public event Action OnPlacementEnded;
 
@@ -98,11 +84,7 @@ public class CompanionPlacementController : MonoBehaviour
     {
         if (data == null) return;
 
-        // ★ [추가] 컨트롤러가 꺼져 있으면 대기에 들어가지 않습니다.
-        //   꺼진 컴포넌트도 '메서드 호출'은 됩니다. 그래서 예전에는 isPlacing = true 가 되고
-        //   배치 시작 알림까지 나가서 탭 창은 숨는데, Update() 는 돌지 않아 맵을 눌러도 아무 일이 없었습니다.
-        //   에러도 없이 창만 사라지는 — 가장 찾기 힘든 형태의 고장입니다.
-        //   흔한 원인: 이 오브젝트가 탭 창의 '자식'이라 창과 같이 꺼짐 (TabWindow 도 같은 실수를 경고합니다).
+        // 꺼져 있으면 시작 안 함 — 꺼진 컴포넌트도 메서드는 불려 창만 숨고 Update 가 안 돌아 조용히 고장 (흔한 원인: 탭 창의 자식)
         if (!isActiveAndEnabled)
         {
             Debug.LogError("[Placement] CompanionPlacementController 가 비활성 상태라 배치를 시작할 수 없습니다. " +
@@ -111,10 +93,7 @@ public class CompanionPlacementController : MonoBehaviour
             return;
         }
 
-        // ★ [추가] 배치 대기에 들어가기 '전에' 자리부터 확인합니다.
-        //   꽉 찬 상태로 대기에 들어가면 창이 숨겨지고, 유저가 맵을 눌러 본 뒤에야
-        //   안 된다는 걸 알게 됩니다. 입구에서 막는 게 친절합니다.
-        //   이 경우 OnPlacementBegan 을 쏘지 않으므로 탭 창도 그대로 열려 있습니다.
+        // 꽉 찼으면 대기에 들어가기 전에 알림 (창을 숨긴 뒤에야 알게 되지 않게, 시작 알림도 안 쏨)
         CompanionManager cm = CompanionManager.Instance;
         if (cm != null && !cm.IsPlaced(data.id) && cm.IsFull)
         {
@@ -126,8 +105,7 @@ public class CompanionPlacementController : MonoBehaviour
         callerItem  = caller;
         isPlacing   = true;
 
-        // ★ "배치" 버튼을 누른 그 입력이 같은 프레임에 배치로 이어지는 걸 막습니다.
-        //   새로운 누름이 한 번 시작돼야 배치가 허용됩니다.
+        // "배치" 버튼을 누른 입력이 그대로 배치로 이어지지 않게 새 누름부터 허용
         armed = false;
         warnedNoTilemap  = false;
 
@@ -136,8 +114,7 @@ public class CompanionPlacementController : MonoBehaviour
             ghost.gameObject.SetActive(true);
             if (data.icon != null) ghost.sprite = data.icon;
         }
-        // ★ '배치 준비 중' 상태 — 유저가 칸을 누를 때까지 이 상태로 기다립니다.
-        //   (잘못된 칸을 눌러도 대기는 풀리지 않습니다. 취소는 화살표 버튼 / 탭 전환 / 우클릭)
+        // 칸을 누를 때까지 대기 (잘못된 칸은 유지, 취소는 화살표 버튼·탭 전환·우클릭)
         hintMessage = $"{data.companionName} 배치 준비 중 — 배치할 칸을 누르세요";
         if (hintText != null)
         {
@@ -152,9 +129,7 @@ public class CompanionPlacementController : MonoBehaviour
 
     public void CancelPlacement()
     {
-        // ★ 이미 배치 모드가 아니면 알림을 쏘지 않습니다.
-        //   CancelPlacement 는 ConfirmPlace 끝, 목록 닫기, 우클릭 등 여러 곳에서 불립니다.
-        //   가드가 없으면 "끝났다"가 여러 번 발생해, 구독자가 창을 두 번 되살리는 식으로 어긋납니다.
+        // 배치 중이었을 때만 종료 알림 (여러 곳에서 불려 중복 알림이면 창을 두 번 되살림)
         bool wasPlacing = isPlacing;
 
         pendingTrigger = false;
@@ -167,10 +142,7 @@ public class CompanionPlacementController : MonoBehaviour
         if (ghost != null)    ghost.gameObject.SetActive(false);
         if (hintText != null) hintText.gameObject.SetActive(false);
 
-        // ★ [수정] ?. → != null
-        //   CompanionListUI 는 목록을 갱신할 때 아이템을 Destroy 합니다.
-        //   파괴된 아이템은 유니티식 == null 검사에서는 null 이지만, C# 의 ?. 는 그걸 모르고 통과시킵니다.
-        //   그러면 파괴된 오브젝트의 메서드가 불려 MissingReferenceException 이 날 수 있습니다.
+        // 목록 갱신 때 파괴될 수 있어 ?. 대신 != null
         if (caller != null) caller.RefreshActionButtons();
 
         if (wasPlacing) OnPlacementEnded?.Invoke();
@@ -178,19 +150,10 @@ public class CompanionPlacementController : MonoBehaviour
 
     void Update()
     {
-        // ★ [수정] Pointer.current 하나만 믿지 않고, 연결된 '모든' 포인터 장치에서 읽습니다.
-        //   겪은 사례: Pointer.current 가 'Simulated Touchscreen'(Input Debugger 의 터치 흉내 기능) 으로 잡혀 있는데,
-        //   이 장치는 눌러도 좌표가 계속 (Infinity, ±Infinity) 였습니다.
-        //   그런데 UI 버튼은 정상적으로 눌립니다 → 다른 장치(마우스 등)는 올바른 좌표를 주고 있다는 뜻입니다.
-        //   Pointer.current 는 '마지막으로 신호를 보낸 장치' 일 뿐이라, 좌표가 고장 난 장치가 잡힐 수 있습니다.
-        //   → 모든 장치를 훑어서 '눌린 + 좌표가 유효한' 쪽을 씁니다. (UI 입력 모듈이 하는 방식과 같습니다)
-        //
-        // ★ [수정] 배치 대기가 아니면 장치를 훑지 않습니다. (예전엔 읽고 나서 버렸음 — 매 프레임 헛일)
-        //   눌림/뗌은 wasPressedThisFrame 로 '이번 프레임' 만 보므로, 대기 전 프레임을 읽지 않아도 놓치는 입력이 없습니다.
+        // 배치 대기 중에만, 모든 포인터 장치를 훑어 눌림 + 유효 좌표를 씀 (Pointer.current 는 좌표가 Infinity 인 Simulated Touchscreen 이 잡히기도 함)
         if (!isPlacing) return;
 
-        // 좌표 유효성 검사(화면 영역)에 카메라가 필요하므로 먼저 확보합니다.
-        // (씬 재로드 등으로 참조가 끊겼을 수 있음)
+        // 좌표 검사에 필요한 카메라 확보 (씬 재로드로 끊겼을 수 있음)
         if (cam == null) cam = Camera.main;
 
         PointerSample input = ReadPointers();
@@ -202,9 +165,7 @@ public class CompanionPlacementController : MonoBehaviour
             return;
         }
 
-        // ── 1) '눌렀다/뗐다' 를 먼저 기록 ──
-        //   터치는 누른 프레임에 좌표가 아직 무효일 수 있어, 누른 사실을 잠깐 기억했다가
-        //   좌표가 유효해지는 첫 프레임에 판정합니다.
+        // ── 1) 눌림/뗌을 먼저 기록 — 터치는 누른 프레임에 좌표가 무효일 수 있어 유효해지는 첫 프레임에 판정 ──
         if (input.pressedThisFrame)
         {
             armed = true;
@@ -269,9 +230,7 @@ public class CompanionPlacementController : MonoBehaviour
         if (!armed || !pendingTrigger) return;
         pendingTrigger = false;   // 한 번의 누름은 한 번만 처리
 
-        // UI 위 탭은 무시 (리스트 버튼 누르다 배치되는 사고 방지)
-        // ★ [순서 변경] UI 검사를 칸 검사보다 먼저 합니다.
-        //   HUD 버튼을 눌렀는데 "배치할 수 없는 위치입니다" 가 뜨면 이상하니까요.
+        // UI 위 탭은 무시 — 칸 검사보다 먼저 (HUD 버튼을 눌렀는데 '배치 불가' 가 뜨지 않게)
         if (IsPointerOverUI(screenPos)) return;
 
         // ★ [추가] 배치 불가 칸을 누르면 알려 주고, 대기 상태는 그대로 유지합니다.
@@ -284,9 +243,7 @@ public class CompanionPlacementController : MonoBehaviour
         ConfirmPlace(cm, cell);
     }
 
-    // ══════════════════════════════════════════════
-    //  포인터 읽기 (모든 장치)
-    // ══════════════════════════════════════════════
+    // ── 포인터 읽기 (모든 장치) ──
 
     /// <summary>한 프레임 동안 모은 포인터 입력 요약</summary>
     private struct PointerSample
@@ -297,18 +254,7 @@ public class CompanionPlacementController : MonoBehaviour
         public Vector2 position;
     }
 
-    /// <summary>
-    /// 연결된 모든 포인터(마우스·터치·펜)를 훑어 이번 프레임의 입력을 정리합니다.
-    ///
-    /// 좌표 우선순위 (높은 점수가 이김)
-    ///   3 : 이번 프레임에 눌린 장치
-    ///   2 : 누르고 있는 장치
-    ///   1 : 누르지 않았지만 좌표가 있는 장치 (마우스 호버 → 미리보기용)
-    ///   좌표가 NaN/무한대/화면 밖인 장치는 후보에서 뺍니다.
-    ///
-    /// ★ 성능: 연결된 장치는 보통 2~3개, 터치 슬롯은 장치당 10개 정도라 매 프레임 돌려도 부담이 없습니다.
-    ///   InputSystem.devices 는 새 배열을 만들지 않는 읽기 전용 뷰라 GC 도 생기지 않습니다.
-    /// </summary>
+    /// <summary>모든 포인터(마우스·터치·펜)를 훑어 이번 프레임 입력 정리 — 좌표 우선순위: 이번에 눌림(3) > 누르는 중(2) > 호버(1), 무효·화면 밖 좌표는 제외 (장치가 적고 devices 는 할당 없는 뷰라 가벼움).</summary>
     private PointerSample ReadPointers()
     {
         PointerSample result = default;
@@ -371,15 +317,13 @@ public class CompanionPlacementController : MonoBehaviour
 
         if (target == null)
         {
-            // 보유 목록엔 있는데 오브젝트가 없다면 RestoreIntoScene이 아직 안 된 것.
-            // 배치에서 새로 획득하지 않는다.
+            // 오브젝트가 없으면 RestoreIntoScene 전 — 배치에서 새로 만들지 않음
             Debug.LogError($"[Placement] {pendingData.companionName} 배치 대상 없음 (오브젝트 미생성/미보유)");
             CancelPlacement();
             return;
         }
 
-        // ★ [추가] 확정 직전에 한 번 더 확인합니다 (대기 중에 다른 경로로 배치가 늘었을 수 있음).
-        //   이미 배치된 동료를 옮기는 경우는 수가 늘지 않으므로 통과시킵니다.
+        // 확정 직전 재확인 (대기 중 배치가 늘었을 수 있음, 옮기기는 통과)
         if (!target.IsPlaced && cm.IsFull)
         {
             ShowNotice(MsgFull);
@@ -396,20 +340,13 @@ public class CompanionPlacementController : MonoBehaviour
 
         GameLog.Info($"[Placement] {pendingData.companionName} → {cell} 배치");
 
-        // ★ [추가] 배치는 유저가 직접 한 '의미 있는 변경'이라 바로 저장합니다.
-        //   예전에는 배치만으로는 저장이 일어나지 않아, 다른 이유로 저장되기 전에 앱이 종료되면
-        //   배치가 사라졌습니다. (지금 시점은 타일맵이 연결돼 있고 occupied 가 채워져 있어
-        //   CaptureTo 가 배치 스냅샷을 정상적으로 기록합니다)
+        // 유저가 직접 한 변경이라 바로 저장 (안 하면 저장 전 종료 시 배치가 사라짐)
         SaveManager.Instance?.Save();
 
         CancelPlacement();
     }
 
-    // ══════════════════════════════════════════════
-    //  알림
-    // ══════════════════════════════════════════════
-    //  ★ 배치 수 / '이미 배치됨' 판정은 점유 셀을 관리하는 CompanionManager 에 직접 묻습니다
-    //    (cm.IsFull / cm.IsPlaced). 같은 사실을 두 곳에서 세지 않기.
+    // ── 알림 (배치 수·이미 배치됨은 CompanionManager 에 직접 물음 — 같은 사실을 두 곳에서 세지 않기) ──
 
     /// <summary>짧은 알림을 noticeSeconds 동안 띄웁니다. (연속 호출 시 앞의 알림을 덮어씀)</summary>
     private void ShowNotice(string message)
@@ -444,16 +381,7 @@ public class CompanionPlacementController : MonoBehaviour
             target.gameObject.SetActive(false);
     }
 
-    /// <summary>
-    /// 스크린 좌표가 계산에 쓸 수 있는 값인가.
-    ///
-    /// ① NaN / Infinity 가 아닐 것
-    ///    float 는 '숫자가 아닌 값'을 담을 수 있고, 그런 값은 어떤 계산을 거쳐도 계속 퍼집니다.
-    ///    (NaN + 1 = NaN) 그래서 입구에서 한 번 걸러내는 게 가장 싸고 확실합니다.
-    /// ② 카메라가 그리는 영역(pixelRect) 안일 것
-    ///    마우스가 Game 뷰 밖에 있을 때처럼, 숫자는 정상이지만 화면 밖인 경우도 걸러냅니다.
-    ///    (지금 카메라 rect 가 0,0,2190,1080 이니 화면 전체와 같습니다)
-    /// </summary>
+    /// <summary>쓸 수 있는 스크린 좌표인가 — NaN/Infinity 아님(계산에 계속 퍼짐) + 카메라 pixelRect 안(Game 뷰 밖 마우스 제외).</summary>
     private bool IsUsableScreenPos(Vector2 p)
     {
         if (float.IsNaN(p.x) || float.IsNaN(p.y))           return false;
@@ -461,14 +389,7 @@ public class CompanionPlacementController : MonoBehaviour
         return cam.pixelRect.Contains(p);
     }
 
-    /// <summary>
-    /// ★ 원래 코드는 EventSystem.IsPointerOverGameObject() 를 인자 없이 불렀습니다.
-    ///   이 오버로드는 '마우스 포인터'를 기준으로 동작해서, 터치 환경에서는 결과가 어긋납니다.
-    ///   (에디터에서는 마우스라 정상 → 실기기에서만 배치가 막히는 원인)
-    ///
-    ///   포인터 id에 의존하지 않도록, 실제 탭 좌표로 직접 UI 레이캐스트를 돌립니다.
-    ///   에디터와 실기기가 완전히 동일하게 동작합니다.
-    /// </summary>
+    /// <summary>탭 좌표에 UI 가 있는가 — 실제 좌표로 직접 UI 레이캐스트 (인자 없는 IsPointerOverGameObject 는 마우스 기준이라 실기기 터치에서 어긋남).</summary>
     private bool IsPointerOverUI(Vector2 screenPos)
     {
         EventSystem es = EventSystem.current;

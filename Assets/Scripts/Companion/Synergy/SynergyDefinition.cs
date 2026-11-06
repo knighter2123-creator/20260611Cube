@@ -2,19 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 시너지 1종의 정의 (예: 딜러, 제어, 약화, 조화).
-/// Create → Companion → Synergy Definition 으로 에셋을 만들고 Resources/Synergy 폴더에 두면 자동으로 읽힙니다.
-///
-/// [규칙]
-///   · 조건을 만족한 인원 수(Count)를 세고, requiredCount 이하인 단계 중 '가장 높은 단계' 하나만 적용합니다.
-///     → 단계 값은 '누적 합계' 로 적으세요. (2명 +15%, 4명 +40% 이면 4명일 때 +40%. +55% 가 아님)
-///   · 여러 시너지의 같은 능력치는 더해집니다.
-///
-/// [조건 종류]
-///   TagCount — 이 계열(tag) 동료가 배치된 수
-///   EveryTag — 모든 계열(SynergyTags.All)에서 '가장 적게 배치된 계열의 수'. 예) 딜러2 제어2 약화1 → 1
-/// </summary>
+/// <summary>시너지 1종 정의 에셋(Resources/Synergy 에 두면 자동 로드) — 인원 수를 넘는 단계 중 가장 높은 하나만 적용하므로 단계 값은 '누적 합계'로 (2명 +15%, 4명 +40%).</summary>
+// 조건: TagCount = 그 계열 배치 수 / EveryTag = 모든 계열 중 가장 적게 배치된 수 (딜러2 제어2 약화1 → 1) / 여러 시너지의 같은 능력치는 더해짐
 [CreateAssetMenu(fileName = "Synergy", menuName = "Companion/Synergy Definition")]
 public class SynergyDefinition : ScriptableObject
 {

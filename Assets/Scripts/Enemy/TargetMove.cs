@@ -1,29 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 웨이포인트를 따라 이동하는 컴포넌트.
-///
-/// ─── 핵심 설계 원칙: "원본 값을 직접 바꾸지 않는다" (학습 포인트) ──────────
-/// 초보자가 가장 많이 하는 실수:
-///
-///     void ApplySlow()  { speed = speed * 0.5f; }   // 느려짐
-///     void ClearSlow()  { speed = speed * 2f;   }   // 원래대로?
-///
-/// 이러면 슬로우가 두 번 겹치거나, 도중에 다른 코드가 speed를 바꾸면
-/// 값이 영원히 어긋납니다. 게다가 오브젝트 풀링으로 재사용하면
-/// 어긋난 값이 다음 적한테 그대로 넘어가요.
-///
-/// 해결책은 "원본은 절대 안 건드리고, 배율만 곱해서 읽을 때 계산"하는 것:
-///
-///     실제속도 = 원본속도 × 스테이지배율 × 둔화배율   (스턴이면 0)
-///
-/// 각 배율은 서로를 모릅니다. 슬로우가 끝나도 slowMultiplier만 1로 돌아가고
-/// 스테이지 배율(1-5의 1.5배)은 그대로 유지됩니다.
-///
-/// pathOffset도 같은 원칙입니다 — 웨이포인트 좌표 자체는 건드리지 않고
-/// "읽을 때 더해서" 계산하므로, 적이 가는 길 전체가 살짝 평행 이동합니다.
-/// ────────────────────────────────────────────────────────────────────
-/// </summary>
+/// <summary>웨이포인트 이동 — 원본은 안 바꾸고 읽을 때 '원본 × 스테이지 × 둔화(스턴 0)'로 계산, pathOffset 도 읽을 때 더함 (직접 곱/나누면 겹침·풀 재사용 때 값이 어긋나서).</summary>
 public class TargetMove : MonoBehaviour
 {
     private Transform[] waypoints;
@@ -74,13 +51,7 @@ public class TargetMove : MonoBehaviour
     public void ClearSlow()                   => slowMultiplier = 1f;
     public void SetStunned(bool value)        => isStunned = value;
 
-    /// <summary>
-    /// 풀에서 꺼낼 때 호출 — 배율·오프셋·경로 진행도를 전부 초기화.
-    /// (Enemy.ResetDebuffs() 안에서 불립니다)
-    ///
-    /// 오브젝트 풀링의 가장 흔한 버그 유형이 "이전 생애의 상태가 남아있다"입니다.
-    /// 여기서 빠뜨린 값은 다음에 재사용되는 적에게 그대로 넘어갑니다.
-    /// </summary>
+    /// <summary>풀에서 꺼낼 때(Enemy.ResetDebuffs) 배율·오프셋·진행도 전부 초기화 — 빠뜨리면 이전 상태가 다음 적에게 넘어감.</summary>
     public void ResetForSpawn()
     {
         spawnSpeedMult     = 1f;
@@ -105,8 +76,7 @@ public class TargetMove : MonoBehaviour
         transform.position = Vector3.MoveTowards(
             transform.position, targetPosition, CurrentSpeed * Time.deltaTime);
 
-        // 거리 비교는 제곱끼리 — Vector3.Distance의 제곱근(√) 계산을 피합니다.
-        // (적이 수십 마리 × 매 프레임이면 이 차이가 쌓입니다)
+        // 거리 비교는 제곱끼리 (수십 마리 × 매 프레임 제곱근 비용 회피)
         Vector2 delta = (Vector2)(transform.position - targetPosition);
         if (delta.sqrMagnitude <= arrivalDistance * arrivalDistance)
             currentTargetIndex = (currentTargetIndex + 1) % waypoints.Length;

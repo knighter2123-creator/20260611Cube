@@ -1,8 +1,4 @@
-/// <summary>
-/// 일일 던전 입장과 복귀 사이에 정보를 전달하는 정적 보관소. (EvolveStageContext 와 같은 방식)
-///   - SelectedData / SelectedLevel : 어떤 던전의 몇 난이도로 입장했는지
-///   - ReturnWorld / ReturnStage    : 끝난 뒤 돌아갈 원래 스테이지 위치
-/// </summary>
+/// <summary>일일 던전 입장↔복귀 사이 정적 보관소 — 고른 던전·난이도와 돌아갈 원래 스테이지 위치.</summary>
 public static class DailyDungeonContext
 {
     public static DailyDungeonData SelectedData;

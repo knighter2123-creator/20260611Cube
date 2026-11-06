@@ -14,8 +14,7 @@ public partial class ChatPanel
     [Tooltip("개인 채팅 나가기. 개인 탭을 보는 동안에만 보입니다.")]
     [SerializeField] private Button leaveButton;
 
-    // 탭 색 기본값 — UIBaker 가 Tab 템플릿을 TabColor 로 굽고, 고른 탭 색 칸(colors.tabSelected)의 기본값이 TabSelectedColor.
-    // 실제로 쓰는 색: 안 고른 탭 = Tab 템플릿(하이어라키)의 색, 고른 탭 = 인스펙터 colors.tabSelected
+    // 탭 색 기본값(UIBaker 굽기용) — 실제 색: 안 고른 탭 = 하이어라키 Tab 템플릿, 고른 탭 = 인스펙터 colors.tabSelected
     public static readonly Color TabColor         = new Color(1f, 1f, 1f, 0.06f);
     public static readonly Color TabSelectedColor = new Color(0.30f, 0.55f, 0.95f, 0.9f);
 

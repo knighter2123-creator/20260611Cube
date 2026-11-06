@@ -3,21 +3,8 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-/// <summary>
-/// LoginScene 의 "게임 시작" 버튼 처리.
-///
-///   흐름:  [게임 시작] ─→ (계정 확인) ─→ LoadingScene → MainScene
-///
-/// · 닉네임은 여기서 정하지 않습니다. MainScene 에서 특정 스테이지 도달 시 정합니다
-///   (NicknamePrompt → NicknameChangePanel 의 '최초 설정' 모드 → PlayerProfile.TryRegister).
-/// · StartGame() 은 public — 다른 버튼(GoogleLoginButtonUI, EmailLoginUI 등)도 같은 입구로 들어옵니다.
-/// · 씬 이동 직전에 AccountSwitch.PrepareForStart() 로 로그인 계정과 세이브 주인을 맞춥니다.
-///   계정이 바뀌어 매니저 재시작이 필요하면 여기서 멈추고, 재시작된 LoginScene 에서 자동으로 이어서 시작합니다.
-/// · 그다음 CloudSave.CheckBeforeStart() 로 클라우드 세이브와 맞춥니다 (필요하면 선택 팝업).
-///   클라우드 것을 적용하면 같은 방식으로 재시작 후 자동으로 이어서 시작합니다.
-///
-/// ★ 시작 버튼의 인스펙터 OnClick 목록은 비워 두세요. 리스너는 코드(Start)에서 등록합니다.
-/// </summary>
+/// <summary>LoginScene 게임 시작의 단일 입구(StartGame): (게스트 로그인) → AccountSwitch 로 계정·세이브 맞춤 → CloudSave 확인 → LoadingScene, 재시작이 필요하면 멈추고 새 LoginScene 에서 자동으로 이어감.</summary>
+// ⚠ 시작 버튼의 인스펙터 OnClick 은 비울 것 (리스너는 Start 에서 등록) / 닉네임은 여기서 안 정함 (MainScene 의 NicknamePrompt)
 public class Login_Name : MonoBehaviour
 {
     [Header("시작 버튼")]
@@ -43,15 +30,12 @@ public class Login_Name : MonoBehaviour
 
     private void Start()
     {
-        // 예전 PlayerPrefs 에 이름이 있던 유저 → SaveData 로 1회 이관
-        // (SaveManager.Awake 가 먼저 끝나 있으므로 Start 에서 호출하면 안전)
+        // 옛 PlayerPrefs 이름 → SaveData 1회 이관 (SaveManager.Awake 뒤인 Start 라 안전)
         PlayerProfile.MigrateLegacyIfNeeded();
 
         if (startButton != null) startButton.onClick.AddListener(StartGame);
 
-        // 계정 전환 때문에 LoginScene 이 다시 로드된 직후라면, 유저는 이미 '시작' 을 누른 상태입니다.
-        // Start 에서 하는 이유: SaveManager(Awake, 실행 순서 -100)가 새 계정 파일을 이미 읽었고,
-        // 이 씬의 SceneLoader 도 Awake 에서 Instance 등록을 끝낸 뒤입니다.
+        // 재시작으로 다시 로드된 직후면 이미 '시작'을 누른 상태라 자동 시작 (Start 라 SaveManager·SceneLoader 준비 완료)
         if (AccountSwitch.ConsumeAutoStartAfterReload())
         {
             GameLog.Info("[Login_Name] 계정 전환 재시작 완료 — 게임을 이어서 시작합니다.");
@@ -66,9 +50,7 @@ public class Login_Name : MonoBehaviour
 
     // ───────── 시작 ─────────
 
-    /// <summary>
-    /// 게임 시작의 단 하나의 입구. 시작 경로가 하나여야 연타 방지(isLoading) 같은 규칙이 한 곳에서 지켜집니다.
-    /// </summary>
+    /// <summary>게임 시작의 유일한 입구 — 경로가 하나여야 연타 방지(isLoading)가 한 곳에서 지켜짐.</summary>
     public void StartGame()
     {
         if (isLoading) return;
@@ -80,13 +62,7 @@ public class Login_Name : MonoBehaviour
         StartCoroutine(StartRoutine());
     }
 
-    /// <summary>
-    /// 지금 로그인한 계정의 세이브로 시작하도록 맞춘 뒤 씬을 옮깁니다.
-    /// 로그인 상태를 아직 모르면(AuthManager 확인 전) 매 프레임 다시 물으며 최대 authWaitSeconds 만큼 기다립니다.
-    ///   Proceed   → 시작
-    ///   Rebooting → 계정 전환 재시작 중 — 씬을 옮기지 않음 (재시작 후 새 LoginScene 에서 자동으로 다시 들어옴)
-    ///   NotReady  → 시간 초과(오프라인 등) — 마지막으로 쓰던 계정 그대로 시작 (게임이 막히지 않게)
-    /// </summary>
+    /// <summary>로그인 계정의 세이브로 맞춘 뒤 씬 이동 — 로그인 상태를 모르면 최대 authWaitSeconds 대기, Rebooting 이면 이동 안 함, 시간 초과면 마지막 계정으로 시작.</summary>
     private IEnumerator StartRoutine()
     {
         // 로그인하지 않고 시작 → 뒤끝 게스트 계정으로 로그인 (구글·이메일 버튼은 로그인한 뒤에 여기로 오므로 건너뜀)
@@ -120,10 +96,7 @@ public class Login_Name : MonoBehaviour
         LoadMainScene();
     }
 
-    /// <summary>
-    /// 로그인 안 된 채 시작하면 뒤끝 게스트 로그인을 합니다. 기기에 남은 게스트 진행(save.json)은
-    /// 이어지는 AccountSwitch 가 새 게스트 계정으로 옮깁니다. 실패·시간 초과면 이 기기 게스트로 그대로 시작합니다.
-    /// </summary>
+    /// <summary>로그인 없이 시작하면 뒤끝 게스트 로그인 (기기 게스트 진행은 AccountSwitch 가 옮김, 실패하면 기기 게스트로 시작).</summary>
     private IEnumerator EnsureGuestAccount()
     {
         AuthManager auth = AuthManager.Instance;

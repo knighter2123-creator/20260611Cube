@@ -1,10 +1,6 @@
 namespace Manager.currency
 {
-    /// <summary>
-    /// 재화 종류.
-    /// ★ 에셋(상점 상품 등)에는 이름이 아니라 숫자로 저장됩니다.
-    ///   새 재화는 반드시 '맨 뒤' 에 추가하세요. 중간에 끼우면 기존 상품의 재화 종류가 한 칸씩 밀립니다.
-    /// </summary>
+    /// <summary>재화 종류 — ⚠ 에셋에 숫자로 저장되므로 새 재화는 맨 뒤에 추가 (중간에 끼우면 기존 상품이 한 칸씩 밀림).</summary>
     public enum CurrencyType
     {
         Gold        = 0,

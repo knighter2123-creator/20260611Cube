@@ -4,14 +4,8 @@ using BackEnd;
 using LitJson;
 using UnityEngine;
 
-/// <summary>
-/// 동료 뽑기. 확률은 클라이언트가 아니라 뒤끝 확률 차트(분류: percent)가 정합니다.
-///
-/// [흐름]  결제(소환권 우선 → 보석) → Backend.Probability.GetProbabilitys(차트, 횟수) 로 서버가 추첨
-///         → 응답의 companionId 를 풀 에셋에서 찾아 동료/조각 지급 → 저장.  서버 실패 시 결제를 되돌립니다.
-/// [차트]  Assets/Datas/BackEndChart/CompanionGachaChart.xlsx — 'percent' 열이 확률, 'companionId' 열이 동료 키.
-///         업로드(재업로드) 후 콘솔에 보이는 파일 ID 를 인스펙터 probabilityFileId 에 넣으세요.
-/// </summary>
+/// <summary>동료 뽑기 — 결제(소환권 우선→보석) 후 뒤끝 확률 차트로 서버 추첨, companionId 로 동료/조각 지급·저장, 서버 실패 시 환불 (확률 조작 방지로 서버가 결정).</summary>
+// [차트] Assets/Datas/BackEndChart/CompanionGachaChart.xlsx (percent·companionId 열) — 업로드 후 파일 ID 를 probabilityFileId 에
 public class GachaSystem : MonoBehaviour
 {
     public static GachaSystem Instance;
@@ -48,9 +42,7 @@ public class GachaSystem : MonoBehaviour
             Debug.LogError("[Gacha] Pool Asset 이 연결되지 않았습니다. 소환 결과가 비어 재화가 환불됩니다.", this);
     }
 
-    // ──────────────────────────────────────────────
-    //  뽑기 결과 구조체
-    // ──────────────────────────────────────────────
+    // ── 뽑기 결과 구조체 ──
     public struct GachaResult
     {
         public CompanionData data;
@@ -58,10 +50,7 @@ public class GachaSystem : MonoBehaviour
         public int           fragmentGain; // 조각 획득량
     }
 
-    // ──────────────────────────────────────────────
-    //  뽑기 공개 API
-    // ──────────────────────────────────────────────
-    // 서버 추첨이라 결과는 콜백으로 옵니다 (메인 스레드). 결제 실패 · 서버 실패면 빈 리스트입니다.
+    // ── 뽑기 공개 API (결과는 메인 스레드 콜백, 실패면 빈 리스트) ──
     public void DrawOne(Action<List<GachaResult>> onDone)     => Draw(1,   cost1,   onDone);
     public void DrawTen(Action<List<GachaResult>> onDone)     => Draw(10,  cost10,  onDone);
     public void DrawHundred(Action<List<GachaResult>> onDone) => Draw(100, cost100, onDone);
@@ -112,8 +101,7 @@ public class GachaSystem : MonoBehaviour
             return;
         }
 
-        // ★ 결제를 먼저 하고 서버에 묻습니다. 실패하면 Refund 로 되돌리므로, 응답 전에 앱이 꺼져도
-        //   (저장 전이라) 재화가 사라지지 않습니다.
+        // 결제 먼저 → 서버 실패 시 Refund (응답 전 앱이 꺼져도 저장 전이라 재화 유지)
         IsDrawing = true;
         string fileId = probabilityFileId.Trim();
         BackendManager.Call(cb => Backend.Probability.GetProbabilitys(fileId, count, cb), bro =>
@@ -169,9 +157,7 @@ public class GachaSystem : MonoBehaviour
         else if (paid == Payment.Gem) CurrencyManager.Instance?.AddGem(gemCost);
     }
 
-    // ──────────────────────────────────────────────
-    //  중복 처리
-    // ──────────────────────────────────────────────
+    // ── 중복 처리 ──
     private GachaResult ProcessResult(CompanionData data)
     {
         GachaResult result = new GachaResult { data = data };
@@ -196,10 +182,7 @@ public class GachaSystem : MonoBehaviour
         return result;
     }
 
-    /// <summary>
-    /// 이미 보유한 동료인가 — 이름이나 에셋 참조가 아니라 id 로 비교합니다.
-    /// (진단용 로그를 정리하면서, 세던 개수 변수(ownedCount)도 쓸 곳이 없어져 함께 뺐습니다)
-    /// </summary>
+    /// <summary>이미 보유한 동료인가 (이름·에셋 참조가 아닌 id 비교).</summary>
     private bool IsAlreadyOwned(CompanionData data)
     {
         CompanionManager cm = CompanionManager.Instance;
@@ -219,14 +202,9 @@ public class GachaSystem : MonoBehaviour
     /// <summary>가챠가 쓰는 풀 에셋. 도감이 자기 칸을 비워 뒀을 때의 예비 경로입니다.</summary>
     public CompanionPoolAsset Pool => poolAsset;
 
-    // ──────────────────────────────────────────────
-    //  서버 추첨 결과 → 동료
-    // ──────────────────────────────────────────────
+    // ── 서버 추첨 결과 → 동료 ──
 
-    /// <summary>
-    /// GetProbabilitys 응답의 elements(뽑힌 행 목록)를 풀 에셋의 동료로 바꿉니다.
-    /// 풀에 없는 companionId 는 건너뜁니다 (차트와 에셋이 어긋난 경우 — 경고 로그).
-    /// </summary>
+    /// <summary>응답 elements 를 풀 에셋의 동료로 변환 (풀에 없는 id 는 경고 후 건너뜀).</summary>
     private List<CompanionData> ParsePicks(BackendReturnObject bro)
     {
         List<CompanionData> picks = new List<CompanionData>();

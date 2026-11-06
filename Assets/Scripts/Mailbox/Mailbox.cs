@@ -4,24 +4,9 @@ using System.Text;
 using Manager.currency;
 using UnityEngine;
 
-/// <summary>
-/// 우편함 — 보상을 우편으로 받아 두었다가 [받기] 로 지급합니다.
-///
-/// [두 종류의 우편]
-///   로컬 우편 — 게임이 Send 로 직접 넣은 우편. SaveData.mailbox 에 저장 (GachaTicket 과 같은 방식 — 매니저 오브젝트 없음).
-///   서버 우편 — 뒤끝 우편 (관리자 · 주간 랭킹 보상 · 쿠폰). MailboxSync 가 받아 와 메모리에만 둡니다 (서버가 원본).
-///   화면(MailboxPanel)·개수 표시(OpenMailboxButton)는 둘을 합쳐서 봅니다.
-///
-/// [받기]
-///   로컬 — 받음 표시(claimed)를 먼저 하고 지급한 뒤 저장.
-///   서버 — 서버에 '받음' 처리를 먼저 하고(IMailService.Claim), 성공한 뒤에 지급·저장합니다.
-///          그래서 결과가 다음 프레임 이후에 옵니다. 진행 중에는 IsClaiming, 실패하면 LastError + OnChanged.
-///          뒤끝은 받은 우편을 목록에서 빼므로, 받은 기록을 로컬 우편함에 복사해 둡니다 (같은 id 의 서버 우편은 숨김).
-///   서버 우편은 로그인 계정 + 온라인 + 지금 세이브의 주인일 때만 받을 수 있습니다 (다른 계정 세이브에 지급하지 않게).
-///
-/// [받은 우편]  지우지 않고 "받음" 으로 남깁니다. 세이브가 끝없이 커지지 않게 받은 기록은 MAX_CLAIMED_KEPT 개까지만
-///   (넘으면 가장 오래전에 받은 것부터 정리). 받은 기록은 이 기기 세이브에 있으므로 클라우드 세이브와 함께 옮겨집니다.
-/// </summary>
+/// <summary>우편함: 로컬 우편(SaveData 저장)과 서버 우편(뒤끝, 메모리에만)을 합쳐 보여 주고 [받기]로 지급 — 로컬은 표시 후 지급, 서버는 서버 '받음' 성공 후 지급(중복 지급 방지).</summary>
+// 서버 우편은 받으면 뒤끝 목록에서 빠지므로 받은 기록을 로컬에 복사 / 받은 기록은 MAX_CLAIMED_KEPT 개까지만 (세이브 비대 방지)
+// ⚠ 서버 우편은 로그인 + 온라인 + 지금 세이브 주인일 때만 받음 (다른 계정 세이브에 지급하지 않게)
 public static class Mailbox
 {
     /// <summary>남겨 두는 받은 우편 수. 넘으면 오래전에 받은 것부터 정리합니다.</summary>
@@ -66,10 +51,7 @@ public static class Mailbox
         }
     }
 
-    /// <summary>
-    /// 지금 계정의 아직 안 받은 서버 우편 (계정이 바뀌었으면 빈 목록).
-    /// 로컬 우편함에 이미 받은 기록이 있는 id 는 뺍니다 — 서버가 받은 우편을 한동안 더 돌려줘도 두 번 보이지 않게.
-    /// </summary>
+    /// <summary>지금 계정의 안 받은 서버 우편 — 로컬에 받은 기록이 있는 id 는 빼서 서버가 늦게 지워도 두 번 안 보이게.</summary>
     private static List<MailItem> CurrentServerMails()
     {
         if (!ProfileSync.TryGetAccount(out string uid) || uid != serverUid) return new List<MailItem>();
@@ -161,10 +143,7 @@ public static class Mailbox
 
     // ───────────────────────────── 받기 ─────────────────────────────
 
-    /// <summary>
-    /// 우편 하나를 받습니다. 로컬 우편은 바로 지급, 서버 우편은 서버 확인 뒤 지급 (결과는 OnChanged / LastError).
-    /// 시작했으면 true.
-    /// </summary>
+    /// <summary>우편 하나 받기 — 로컬은 바로, 서버는 서버 확인 뒤 지급(결과는 OnChanged/LastError), 시작했으면 true.</summary>
     public static bool TryClaim(string mailId)
     {
         if (IsClaiming || !CanGrant()) return false;

@@ -3,32 +3,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Pool;
 
-/// <summary>
-/// 동료 도감 탭. (신규)
-///
-/// 게임에 존재하는 모든 동료를 격자로 보여주고, 아이콘을 누르면 상세창을 엽니다.
-///
-/// ■ 목록은 어디서 오나
-///   1) Pool Asset (가챠와 같은 CompanionPool 에셋)          ← 권장
-///   2) 비어 있으면 GachaSystem.Instance 의 풀                 ← 예비 경로
-///   3) + Extra Companions (가챠에서 안 나오는 동료)
-///   → 같은 id 는 한 번만, 등급 높은 순으로 정렬
-///
-///   CompanionPool 에셋에 동료를 넣기만 하면 가챠와 도감에 동시에 들어갑니다.
-///   도감 쪽은 아무것도 건드릴 필요가 없습니다.
-///
-/// ■ 보유 여부는 어디서 오나
-///   CompanionManager.GetOwnedCompanionData() 를 id 로 비교합니다.
-///   (이름이나 에셋 참조가 아니라 id — 가챠 중복 판정과 같은 기준)
-///
-/// ■ 이 스크립트가 하지 않는 것
-///   · 세이브를 읽거나 쓰지 않습니다. 보여주기만 합니다.
-///   · 매니저 이벤트를 구독하지 않습니다. 탭이 열릴 때마다 새로 읽습니다.
-///     동료를 얻는 곳(가챠)은 다른 씬이라, 도감을 보고 있는 동안 보유 목록이 바뀔 일이 없습니다.
-///     구독이 없으니 "매니저가 재생성됐는데 옛 인스턴스를 붙잡고 있는" 문제도 생기지 않습니다.
-///
-/// ★ 붙이는 곳: TabWindow 의 Codex_Content (탭 안). CompanionListUI 와 같은 자리 규칙입니다.
-/// </summary>
+/// <summary>동료 도감 탭: 풀 에셋(없으면 GachaSystem 풀) + Extra + 보유 동료를 id 로 합쳐 등급순 격자로 보여 주고 누르면 상세창 — 보여주기만 하고 구독 없이 열 때마다 새로 읽음.</summary>
+// [붙이는 곳] TabWindow 의 Codex_Content / CompanionPool 에셋에 넣으면 가챠와 도감에 동시 등록 / 보유 판정은 id 기준(가챠 중복과 같음)
 public class CompanionCodexUI : MonoBehaviour, ITabPage
 {
     [Header("도감 목록 출처")]
@@ -50,8 +26,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
     [Header("상세 패널")]
     [SerializeField] private CompanionDetailPanel detailPanel;
 
-    // ── 내부 상태 ──
-    // 만들어 둔 칸들. 부수지 않고 재사용합니다.
+    // ── 내부 상태 — 만들어 둔 칸들(재사용) ──
     private readonly List<CompanionCodexItem> spawnedItems = new List<CompanionCodexItem>();
 
     // 이번에 표시할 동료 목록 (중복 제거·정렬 후)
@@ -67,19 +42,10 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
     private bool warnedNoSource;
     private readonly HashSet<string> warnedUnlistedIds = new HashSet<string>();
 
-    // ══════════════════════════════════════════════
-    //  Unity 생명주기
-    // ══════════════════════════════════════════════
+    // ── Unity 생명주기 ──
     private void Awake()
     {
-        // ★ 상세창은 처음에 닫혀 있어야 합니다. 씬에 켜둔 채 저장해도 여기서 정리합니다.
-        //
-        // ★ 'detailPanel?.Hide()' 대신 'if (detailPanel != null)' 을 쓰는 이유
-        //   UnityEngine.Object 의 == null 은 유니티가 따로 정의한 검사라서,
-        //   "연결 안 됨" 뿐 아니라 "파괴됨" 도 null 로 취급합니다.
-        //   그런데 ?. 는 C# 언어 기능이라 이 유니티 검사를 건너뜁니다.
-        //   파괴된 오브젝트에 ?. 를 쓰면 null 이 아니라고 보고 들어가서 MissingReferenceException 이 납니다.
-        //   (learnings 의 UnassignedReferenceException 이야기와 같은 뿌리입니다)
+        // 상세창은 닫힌 채 시작 (켜 둔 채 저장해도) — Unity 오브젝트라 ?. 대신 != null (?. 는 파괴를 못 거름)
         if (detailPanel != null)
         {
             detailPanel.Hide();
@@ -93,16 +59,12 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         if (detailPanel != null) detailPanel.OnOwnedChanged -= Refresh;
     }
 
-    /// <summary>
-    /// 도감에 쓰는 풀 — 내 칸이 비어 있으면 가챠의 풀. 진화 대상도 이 풀에서 찾습니다.
-    /// </summary>
+    /// <summary>도감 풀 — 칸이 비면 가챠의 풀 (진화 대상도 여기서 찾음).</summary>
     private CompanionPoolAsset Pool
         => poolAsset != null ? poolAsset
          : GachaSystem.Instance != null ? GachaSystem.Instance.Pool : null;
 
-    // ══════════════════════════════════════════════
-    //  ITabPage — TabWindow 가 부른다
-    // ══════════════════════════════════════════════
+    // ── ITabPage — TabWindow 가 부른다 ──
 
     /// <summary>도감 탭이 보이기 시작했다 → 목록을 다시 그린다.</summary>
     public void OnTabShow()
@@ -112,20 +74,13 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         Refresh();
     }
 
-    /// <summary>
-    /// 다른 탭으로 넘어갔거나 창이 닫혔다 → 상세창을 닫는다.
-    ///
-    /// ★ 이걸 안 하면 상세창이 켜진 상태(activeSelf = true)로 남아서,
-    ///   다음에 도감 탭을 열었을 때 목록 대신 지난번 상세창이 먼저 보입니다.
-    /// </summary>
+    /// <summary>탭이 가려지면 상세창 닫기 (안 하면 다음에 열 때 지난 상세창이 먼저 보임).</summary>
     public void OnTabHide()
     {
         if (detailPanel != null) detailPanel.Hide();
     }
 
-    // ══════════════════════════════════════════════
-    //  목록 갱신
-    // ══════════════════════════════════════════════
+    // ── 목록 갱신 ──
     public void Refresh()
     {
         if (gridContent == null || itemPrefab == null)
@@ -134,23 +89,14 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
             return;
         }
 
-        // ★ [수정] 순서를 바꿨습니다: 보유 목록을 '먼저' 읽습니다.
-        //   BuildEntries 가 "보유 중인데 풀에 없는 동료"를 목록에 끼워 넣어야 하기 때문입니다.
+        // 보유 목록을 먼저 읽음 (BuildEntries 가 '보유 중인데 풀에 없는 동료'를 끼워 넣음)
         BuildOwnedIds();
         BuildEntries();
 
-        // ★ 누가 칸을 지웠으면(파괴됨) 목록에서 먼저 뺍니다.
-        //   그대로 두면 아래 while 이 '죽은 칸' 도 개수로 세서 새 칸을 안 만들고,
-        //   채우기 루프는 그 칸을 건너뛰어 해당 순번의 동료가 도감에서 빠집니다.
-        //   (== null 은 유니티식 검사라 파괴된 칸도 걸러 냅니다)
+        // 파괴된 칸을 먼저 뺌 (죽은 칸을 세면 새 칸을 안 만들어 그 순번 동료가 빠짐)
         spawnedItems.RemoveAll(item => item == null);
 
-        // ── 칸이 모자라면 그만큼만 새로 만든다 ──
-        // ★ CompanionListUI 는 매번 전부 Destroy → Instantiate 합니다.
-        //   도감은 동료 수가 계속 늘어나는 화면이라 처음부터 재사용 방식으로 만듭니다.
-        //   · Destroy 는 프레임 끝에 실행돼서, 한 프레임 동안 옛 칸 + 새 칸이 같이 존재합니다
-        //     (Grid 가 순간적으로 두 배 길이가 됨)
-        //   · 탭을 열 때마다 GC 쓰레기가 생깁니다
+        // ── 칸이 모자란 만큼만 새로 만듦 (매번 Destroy → Instantiate 면 한 프레임 두 배 길이 + GC) ──
         while (spawnedItems.Count < entries.Count)
         {
             CompanionCodexItem item = Instantiate(itemPrefab, gridContent);
@@ -158,11 +104,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
             spawnedItems.Add(item);
         }
 
-        // ── 수집 수는 '칸' 이 아니라 '목록' 으로 셉니다 ──
-        // ★ [수정] 예전에는 아래 칸 채우기 루프 안에서 셌습니다.
-        //   그 루프는 'item == null 이면 continue' 라서, 칸 하나가 사라져 있으면
-        //   그 동료는 보유 중이어도 숫자에서 빠졌습니다.
-        //   "화면 그리기" 와 "숫자 세기" 는 서로 다른 일이라 따로 둡니다.
+        // ── 수집 수는 칸이 아닌 목록으로 셈 (칸 루프에서 세면 빠진 칸의 동료가 누락) ──
         int ownedCount = 0;
         foreach (CompanionData data in entries)
             if (ownedIds.Contains(data.id)) ownedCount++;
@@ -212,19 +154,10 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
         if (extraCompanions != null)
             foreach (CompanionData d in extraCompanions) TryAddEntry(d);
 
-        // ③ [수정] 보유 중인데 ①② 어디에도 없는 동료
-        // ★ 가져본 동료는 "게임에 존재하는 동료" 가 분명하니 도감에서 빠지면 안 됩니다.
-        //   빠지면 수집 숫자가 실제 보유 수보다 작게 나옵니다. (이번 증상의 가장 흔한 원인)
-        //   예) 시작 동료처럼 코드로 지급하는 동료, 풀 에셋으로 옮기면서 빠뜨린 동료,
-        //       GachaSystem 이 아직 구버전 리스트를 쓰고 있어 에셋과 내용이 다른 경우
-        //   목록에는 넣어 주되, 에셋 쪽을 고칠 수 있게 경고는 id 당 한 번만 남깁니다.
+        // ③ 보유 중인데 ①② 에 없는 동료(코드 지급·풀에서 빠뜨림 등)도 넣음 — 빠지면 수집 수가 작게 나옴, 에셋 수정용 경고는 id 당 1회
         AddOwnedButUnlisted();
 
-        // ④ 정렬 — 등급 높은 순, 같은 등급끼리는 넣은 순서 유지 (안정 정렬).
-        // ★ List.Sort 는 안정 정렬이 아니라서 같은 등급의 순서가 열 때마다 바뀔 수 있습니다.
-        //   예전에는 LINQ(OrderByDescending + ToList)로 했는데, 탭을 열 때마다 새 리스트와 정렬용 배열이 생겼습니다.
-        //   등급이 4개뿐이라 '높은 등급부터 한 번씩 훑어 담기' 로 충분합니다.
-        //   임시 리스트는 UnityEngine.Pool.ListPool 에서 빌려 쓰고 돌려줍니다 (할당 없음).
+        // ④ 정렬 — 등급 높은 순·같은 등급은 넣은 순서 유지 (List.Sort 는 불안정, 등급 4개라 높은 등급부터 훑어 담기, 임시 리스트는 ListPool)
         using (ListPool<CompanionData>.Get(out List<CompanionData> sorted))
         {
             for (CompanionGrade g = CompanionGrade.Legendary; g >= CompanionGrade.Normal; g--)
@@ -255,8 +188,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
 
         if (entryById.TryGetValue(d.id, out CompanionData existing))
         {
-            // 같은 에셋이 여러 풀에 들어 있는 경우 → 정상. 조용히 한 번만 표시.
-            // ★ '다른 에셋' 인데 id 가 같다면 → 세이브가 둘을 구분하지 못하는 진짜 버그. 알립니다.
+            // 같은 에셋 중복은 정상(한 번만 표시), 다른 에셋인데 id 가 같으면 세이브가 구분 못 하는 버그라 경고
             if (existing != d)
                 Debug.LogError($"[CompanionCodexUI] 서로 다른 동료 '{existing.name}' 와 '{d.name}' 의 id 가 " +
                                $"'{d.id}' 로 같습니다. 세이브에서 둘이 섞입니다. id 를 고쳐주세요.", d);
@@ -295,8 +227,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
     {
         ownedIds.Clear();
 
-        // ★ Instance 를 매번 새로 읽습니다 (필드에 보관하지 않음).
-        //   매니저가 재생성돼도 항상 '지금 살아 있는' 인스턴스를 봅니다.
+        // Instance 를 매번 새로 읽음 (재생성돼도 살아 있는 인스턴스)
         CompanionManager cm = CompanionManager.Instance;
         if (cm == null) return;   // 매니저가 없으면 전부 미획득으로 표시 (도감은 그래도 뜸)
 
@@ -308,9 +239,7 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
                 ownedIds.Add(d.id);
     }
 
-    // ══════════════════════════════════════════════
-    //  상세창
-    // ══════════════════════════════════════════════
+    // ── 상세창 ──
     private void HandleItemClicked(CompanionData data, bool isOwned)
     {
         if (detailPanel == null)

@@ -25,12 +25,7 @@ public class GachaResultItem : MonoBehaviour
 
     public void Setup(GachaSystem.GachaResult result) => Setup(result, 1, !result.isDuplicate);
 
-    /// <summary>
-    /// 같은 동료를 묶어서 한 칸에 표시합니다.
-    ///   count  = 이번 뽑기에서 이 동료가 나온 횟수 (2 이상이면 아이콘 우하단에 "x{count}")
-    ///   hasNew = 그중 한 번이라도 신규 획득이었는가
-    /// ★ 묶었을 때는 조각 합계를 보여 주지 않습니다 — 횟수만 알려 줍니다.
-    /// </summary>
+    /// <summary>같은 동료를 한 칸에 묶어 표시 — count≥2 면 "x{count}", hasNew 는 한 번이라도 신규면 true (조각 합계는 안 보임).</summary>
     public void Setup(GachaSystem.GachaResult result, int count, bool hasNew)
     {
         Grade = result.data.grade;

@@ -2,8 +2,7 @@ using UnityEngine;
 
 public partial class MissionManager : MonoBehaviour
 {
-    // ---------------- 보상 수령 ----------------
-    // 외부용: 단건 수령 (즉시 저장 + 이벤트)
+    // ── 보상 수령 ── 외부용 단건 수령 (즉시 저장 + 이벤트)
     public bool TryClaim(string missionId)
     {
         if (!initialized) EnsureInitialized();
@@ -46,8 +45,7 @@ public partial class MissionManager : MonoBehaviour
         return count;
     }
 
-// 현재 탭의 완료 미션 일괄 수령 → "모두 수령" 버튼용
-// 반환: 실제로 수령된 미션 수
+// 현재 탭의 완료 미션 일괄 수령("모두 수령" 버튼) — 반환: 실제 수령 수
     public int ClaimAll(MissionType type)
     {
         if (!initialized) EnsureInitialized();

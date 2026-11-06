@@ -6,10 +6,7 @@ using UnityEngine;
 
 public partial class LevelUpManager
 {
-    /// <summary>
-    /// 두 곡선의 레벨별 공격 주기 / 초당 공격 횟수를 콘솔에 표로 찍습니다.
-    /// Play 하지 않아도 동작합니다 (스탯이 아니라 공식만 쓰기 때문).
-    /// </summary>
+    /// <summary>두 곡선의 레벨별 공격 주기·초당 횟수를 표로 출력 (공식만 써서 Play 없이 동작).</summary>
     [ContextMenu("테스트: 공격 속도 곡선 출력")]
     private void DumpAttackSpeedCurves()
     {

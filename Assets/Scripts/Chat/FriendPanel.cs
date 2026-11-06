@@ -29,10 +29,7 @@ public class FriendPanel : MonoBehaviour
     [Tooltip("[삭제] 를 누른 뒤 이 시간(초) 안에 한 번 더 누르면 삭제")]
     [SerializeField] private float confirmSeconds = 3f;
 
-    /// <summary>
-    /// 코드가 실행 중에 넣는 글자. {count} {max} 자리는 실행 중에 값으로 바뀝니다.
-    /// 창·줄의 모양(크기·위치·폰트·배경색)은 하이어라키(ChatCanvas > Friends)에서 직접 고치세요.
-    /// </summary>
+    /// <summary>실행 중 넣는 글자({count}{max} 치환) — 모양은 하이어라키(ChatCanvas > Friends)에서 고침.</summary>
     [Serializable]
     private class Texts
     {

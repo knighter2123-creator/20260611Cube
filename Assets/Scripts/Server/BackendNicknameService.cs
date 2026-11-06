@@ -2,11 +2,7 @@ using System;
 using BackEnd;
 using UnityEngine;
 
-/// <summary>
-/// 뒤끝 닉네임 — 뒤끝 계정의 닉네임(서버 전체에서 중복 불가)을 씁니다.
-///   읽기: GetUserInfo 의 row.nickname
-///   쓰기: 처음이면 CreateNickname, 이미 있으면 UpdateNickname
-/// </summary>
+/// <summary>뒤끝 닉네임(전체 중복 불가) — 읽기는 GetUserInfo.nickname, 쓰기는 처음이면 CreateNickname·있으면 UpdateNickname.</summary>
 public class BackendNicknameService : INicknameService
 {
     public void FetchMine(Action<string, string> onDone)

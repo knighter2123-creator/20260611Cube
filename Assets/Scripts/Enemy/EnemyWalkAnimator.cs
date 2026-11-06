@@ -1,20 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 적의 걷기(날갯짓) 프레임을 순서대로 넘겨 주는 가벼운 스프라이트 애니메이터.
-///
-/// ─── 왜 Animator 가 아니라 직접 넘기는가? (학습 포인트) ─────────────────
-/// 걷기 4프레임을 반복하는 게 전부라면 Animator(상태 머신 + AnimationClip)는 과합니다.
-/// 적은 수십 마리가 동시에 돌고 풀에서 계속 재사용되므로,
-/// "sprite 하나 바꾸기"만 하는 쪽이 싸고, 풀 재사용 시 상태가 남을 걱정도 없습니다.
-///
-/// 재생 속도는 TargetMove 의 실제 이동 속도를 따라갑니다.
-///   · 스턴      → CurrentSpeed 0 → 제자리에서 멈춤
-///   · 둔화      → 발걸음도 느려짐
-///   · 1-5 같은 고속 스테이지(속도 배율) → 발걸음도 빨라짐
-/// 그래서 디버프 연출을 따로 만들지 않아도 "느려졌다/멈췄다"가 눈에 보입니다.
-/// ────────────────────────────────────────────────────────────────────
-/// </summary>
+/// <summary>걷기 프레임을 sprite 교체로 넘기는 경량 애니메이터(수십 마리·풀 재사용에 Animator 는 과함) — 재생 속도가 실제 이동 속도를 따라 스턴·둔화가 그대로 보임.</summary>
 [RequireComponent(typeof(SpriteRenderer))]
 public class EnemyWalkAnimator : MonoBehaviour
 {
@@ -37,8 +23,7 @@ public class EnemyWalkAnimator : MonoBehaviour
         enemy = GetComponent<Enemy>();
     }
 
-    // 풀에서 다시 꺼낼 때마다 시작 프레임을 흩어 줍니다.
-    // 같이 스폰된 무리가 전부 같은 발을 동시에 내딛으면 어색하기 때문입니다.
+    // 꺼낼 때마다 시작 프레임을 흩음 (무리가 같은 발을 동시에 내딛으면 어색)
     void OnEnable()
     {
         if (frames == null || frames.Length == 0) return;

@@ -1,10 +1,7 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// LevelUpManager — 스탯 강화 (설정 · 비용 · 결제).
-/// 레벨 → 수치 공식은 LevelUpManager.Formula.cs 에 있습니다.
-/// </summary>
+/// <summary>스탯 강화(설정·비용·결제): 골드를 써서 강화 레벨을 올리고 스탯 반영 — 수치 공식은 .Formula.cs.</summary>
 public partial class LevelUpManager
 {
     /// <summary>강화 상한. UI 도 이 값을 읽습니다 (하드코딩 금지).</summary>
@@ -19,9 +16,7 @@ public partial class LevelUpManager
     // ×10 / ×100 반복 강화 중에는 이벤트를 억제하고, 끝난 뒤 한 번만 알립니다.
     private bool batchingUpgrades;
 
-    // ══════════════════════════════════════════════
-    //  강화 대상 열거형
-    // ══════════════════════════════════════════════
+    // ── 강화 대상 열거형 ──
     public enum StatType
     {
         Damage,
@@ -30,9 +25,7 @@ public partial class LevelUpManager
         Attackspd,
     }
 
-    // ══════════════════════════════════════════════
-    //  강화 설정 구조체  (인스펙터에서 조정 가능)
-    // ══════════════════════════════════════════════
+    // ── 강화 설정 구조체  (인스펙터에서 조정 가능) ──
     [Serializable]
     public struct UpgradeConfig
     {
@@ -60,9 +53,7 @@ public partial class LevelUpManager
     [SerializeField] private UpgradeConfig critChanceConfig = new UpgradeConfig { baseCost = 300, costPerLevel = 150, gainPerUpgrade = 0.05f };
     [SerializeField] private UpgradeConfig critDamageConfig = new UpgradeConfig { baseCost = 100, costPerLevel = 30,  gainPerUpgrade = 0.1f  };
 
-    // ══════════════════════════════════════════════
-    //  조회  (UI 표시용)
-    // ══════════════════════════════════════════════
+    // ── 조회  (UI 표시용) ──
 
     /// <summary>다음 강화 비용을 반환합니다.</summary>
     public int GetUpgradeCost(StatType type)
@@ -76,9 +67,7 @@ public partial class LevelUpManager
     public bool IsMaxUpgraded(StatType type)
         => IsReady && GetUpgradeLevelValue(type) >= MAX_UPGRADE_LEVEL;
 
-    // ══════════════════════════════════════════════
-    //  스탯 강화  (Currency 소비)
-    // ══════════════════════════════════════════════
+    // ── 스탯 강화  (Currency 소비) ──
 
     /// <summary>Currency를 소비해 스탯을 1단계 강화합니다.</summary>
     /// <returns>강화 성공 여부</returns>
@@ -102,8 +91,7 @@ public partial class LevelUpManager
 
         if (!cm.SpendGold(CalculateCost(GetConfig(type), currentLv))) return false;
 
-        // 레벨을 먼저 올리고 스탯을 반영합니다.
-        // 공격 속도와 치명타 확률은 '새 레벨'에서 계산하므로 순서가 바뀌면 한 단계씩 밀립니다.
+        // 레벨을 먼저 올리고 반영 (공격 속도·치명타는 새 레벨로 계산해서 순서가 바뀌면 한 단계 밀림)
         SetUpgradeLevelValue(type, currentLv + 1);
         ApplyGain(type);
 
@@ -113,10 +101,7 @@ public partial class LevelUpManager
         return true;
     }
 
-    /// <summary>
-    /// 최대 times 횟수만큼 반복 강화합니다. Currency가 부족하면 중단합니다.
-    /// UI의 ×10 / ×100 버튼 등에 활용하세요.
-    /// </summary>
+    /// <summary>최대 times 회 반복 강화(골드가 모자라면 중단) — ×10/×100 버튼용.</summary>
     /// <returns>실제 강화 성공 횟수</returns>
     public int TryUpgradeMultiple(StatType type, int times)
     {
@@ -125,8 +110,7 @@ public partial class LevelUpManager
 
         int successCount = 0;
 
-        // ×100이면 OnStatUpgraded가 100번 발화해 구독자(UpgradeUI)가 매번 TMP를 갱신하게 됩니다.
-        // 반복 중에는 억제하고 끝난 뒤 한 번만 알립니다.
+        // 반복 중엔 이벤트를 억제하고 끝에 한 번만 (×100 이면 UI 가 100번 갱신됨)
         batchingUpgrades = true;
         try
         {
@@ -144,19 +128,11 @@ public partial class LevelUpManager
         return successCount;
     }
 
-    /// <summary>
-    /// 비용 공식 — 프로젝트 전체에서 '1회 강화 비용'을 정의하는 유일한 곳입니다.
-    /// N회 누적 비용(MultiCost.cs)도 이 함수를 N번 더해서 구합니다.
-    /// 비용 곡선을 바꾸고 싶으면 여기 한 줄만 고치면 UI 표시와 실제 결제가 함께 바뀝니다.
-    /// </summary>
+    /// <summary>1회 강화 비용을 정의하는 유일한 곳(누적 비용도 이걸 N번 더함) — 여기만 고치면 UI 표시와 결제가 함께 바뀜.</summary>
     private static int CalculateCost(UpgradeConfig config, int currentLv)
         => config.baseCost + config.costPerLevel * currentLv;
 
-    /// <summary>
-    /// 현재 레벨에서 최대 times 회 강화하려 할 때, **상한 때문에 실제로 가능한 횟수**.
-    /// 비용 · 미리보기 · 구매 가능 횟수가 모두 이 함수를 써서 상한 규칙이 한 곳에만 있습니다.
-    /// remain 이 음수(손상된 세이브)면 0, times 보다 크면 times.
-    /// </summary>
+    /// <summary>상한 때문에 실제로 가능한 강화 횟수(0~times) — 비용·미리보기·구매가 모두 이걸 써서 상한 규칙이 한 곳에만.</summary>
     private static int ClampToRemaining(int currentLv, int times)
         => Mathf.Clamp(MAX_UPGRADE_LEVEL - currentLv, 0, Mathf.Max(0, times));
 
@@ -172,9 +148,7 @@ public partial class LevelUpManager
         }
     }
 
-    // ══════════════════════════════════════════════
-    //  StatType → 설정 / 레벨  (switch 는 여기 세 곳에만)
-    // ══════════════════════════════════════════════
+    // ── StatType → 설정 / 레벨  (switch 는 여기 세 곳에만) ──
 
     private UpgradeConfig GetConfig(StatType type) => type switch
     {

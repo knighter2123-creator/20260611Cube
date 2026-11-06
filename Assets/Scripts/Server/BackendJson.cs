@@ -2,11 +2,7 @@ using System;
 using System.Globalization;
 using LitJson;
 
-/// <summary>
-/// 뒤끝 응답 JSON(LitJson) 을 안전하게 읽는 도우미.
-///   - 키가 없거나 값이 null 이면 예외 대신 null / 기본값
-///   - 원본 행은 {"level":{"N":"3"}} 처럼 타입으로 감싸져 올 수 있어 벗겨서 읽음 (FlattenRows 를 거친 값은 그대로)
-/// </summary>
+/// <summary>뒤끝 응답 JSON 안전 읽기 — 키·값이 없으면 예외 대신 기본값, {"N":"3"} 같은 타입 포장은 벗겨서 읽음.</summary>
 public static class BackendJson
 {
     public static bool Has(JsonData obj, string key)

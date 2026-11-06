@@ -13,13 +13,7 @@ public class MailReward
     public MailReward(CurrencyType type, int amount) { this.type = type; this.amount = amount; }
 }
 
-/// <summary>
-/// 우편 한 통. 받으면(Mailbox.TryClaim) 보상을 지급하고 claimed 로 표시합니다 — 목록에서 지우지 않습니다.
-///   로컬 우편  — 게임이 직접 넣은 우편 (SaveData 에 저장). postType 이 비어 있음.
-///   서버 우편  — 뒤끝 우편 (관리자·랭킹 보상·쿠폰). 저장하지 않고 MailboxSync 가 서버에서 받아 와 메모리에만 둠.
-///                받으면 뒤끝이 목록에서 빼므로, 받은 기록은 로컬 우편함(SaveData)에 복사해 둡니다.
-/// id 는 목록 안에서 우편을 찾는 열쇠입니다 (서버 우편은 "Rank:2026-11-09T...").
-/// </summary>
+/// <summary>우편 한 통(id 로 찾음) — 받으면 지우지 않고 claimed 표시, postType 이 비면 로컬 우편·있으면 뒤끝 서버 우편.</summary>
 [Serializable]
 public class MailItem
 {

@@ -4,22 +4,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-/// <summary>
-/// 스킬 수치 하나를 '동료 등급 × 성급' 별로 다르게 줄 수 있게 해 주는 표.
-///
-///   Damage By Star  [✓]
-///            1성   2성   3성   4성   5성
-///   일반      20    24    28    32    36
-///   희귀      30    36    42    48    54
-///   영웅      45    54    63    72    81
-///   전설      70    84    98   112   126
-///
-/// ★ 사용 방식 (GradeFloat 와 같은 규칙)
-///   - 체크 끔 → 성급과 무관하게 지금까지의 값(원래 숫자 + 등급별 값)을 씀 — 기존 에셋은 그대로 동작
-///   - 체크 켬 → 이 표의 [등급, 성급] 칸 값을 씀
-///   체크를 처음 켜면 각 줄이 '그 등급의 지금 값' 으로 채워집니다 (OnValidate → FillIfEmpty).
-///   그 뒤 2성~5성 칸만 올려 적으면 됩니다.
-/// </summary>
+/// <summary>스킬 수치를 등급 × 성급 표로 주는 칸 — 체크 끔: 기존 값(원래 숫자 + 등급별), 켬: 표의 [등급, 성급] 값 (처음 켜면 각 줄이 그 등급의 지금 값으로 채워져 2~5성만 올려 적으면 됨).</summary>
 [Serializable]
 public class GradeStarFloat
 {
@@ -32,10 +17,7 @@ public class GradeStarFloat
     public float[] epic      = new float[CompanionStar.MAX_STAR];
     public float[] legendary = new float[CompanionStar.MAX_STAR];
 
-    /// <summary>
-    /// [등급, 성급] 값. 표가 꺼져 있거나 칸이 없으면 fallback(= 성급 없는 기존 값)을 돌려줍니다.
-    /// 성급은 1 ~ MAX_STAR 로 잘라서 읽습니다.
-    /// </summary>
+    /// <summary>[등급, 성급] 값 (표가 꺼졌거나 칸이 없으면 fallback, 성급은 1~MAX_STAR 로 자름).</summary>
     public float Get(float fallback, CompanionGrade grade, int star)
     {
         if (!enabled) return fallback;
@@ -53,10 +35,7 @@ public class GradeStarFloat
         _                        => normal
     };
 
-    /// <summary>
-    /// [에디터 편의] 줄 길이를 MAX_STAR 에 맞추고, 체크를 막 켰는데 줄 전체가 0 이면
-    /// 그 등급의 지금 값(gradeValue)으로 채웁니다 — 켜는 순간 수치가 0 이 되어 동료가 약해지는 걸 막습니다.
-    /// </summary>
+    /// <summary>[에디터] 줄 길이를 MAX_STAR 에 맞추고, 막 켰는데 줄이 모두 0 이면 그 등급의 지금 값으로 채움.</summary>
     public void FillIfEmpty(Func<CompanionGrade, float> gradeValue)
     {
         normal    = Resize(normal);
@@ -100,9 +79,7 @@ public class GradeStarFloat
 }
 
 #if UNITY_EDITOR
-/// <summary>
-/// 인스펙터에서 GradeStarFloat 를 등급×성급 표로 그려 줍니다. (GradeFloatDrawer 와 같은 이유로 같은 파일에 둠)
-/// </summary>
+/// <summary>GradeStarFloat 를 인스펙터에 등급×성급 표로 그림.</summary>
 [CustomPropertyDrawer(typeof(GradeStarFloat))]
 public class GradeStarFloatDrawer : PropertyDrawer
 {

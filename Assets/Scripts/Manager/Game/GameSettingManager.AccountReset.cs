@@ -2,22 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// GameSettingManager 의 '계정 삭제' 전담 partial 파일.
-/// 설정 패널 안의 [계정 삭제] 버튼 → 확인 팝업 → [삭제] 시 AccountReset 호출.
-///
-/// 이 파일은 버튼과 팝업만 다룬다. 실제로 무엇을 어떤 순서로 지우는지는 AccountReset.cs 의 책임이다.
-/// (Bindings.cs 가 "UI 맞추기만" 하고 열기/닫기는 본체가 하는 것과 같은 분리)
-///
-/// [흐름]
-///   [계정 삭제] ──→ 확인 팝업 표시
-///                     ├─ [취소] / 뒤로가기 → 팝업만 닫힘 (설정 패널은 그대로)
-///                     └─ [삭제]
-///                          ├─ ServerAccountData        서버 랭킹·닉네임 삭제. 실패 → 팝업에 안내, 아무것도 안 바뀜
-///                          ├─ AccountReset.TryWipe()   실패 → 팝업에 안내, 아무것도 안 바뀜
-///                          ├─ 패널 정리 (리스너 해제, 진동 취소, 블룸 요청 비우기)
-///                          └─ AccountReset.RestartFromLogin() → LoginScene (첫 실행 상태)
-/// </summary>
+/// <summary>설정 패널의 계정 삭제 버튼·확인 팝업(무엇을 지우는지는 AccountReset 책임): [삭제] → 서버 데이터 삭제 → AccountReset.TryWipe → 패널 정리 → RestartFromLogin.</summary>
 public partial class GameSettingManager
 {
     [Header("계정 삭제")]
@@ -47,9 +32,7 @@ public partial class GameSettingManager
     /// <summary>확인 팝업이 떠 있는가. OnEscape 가 "팝업만 닫기" 를 판단할 때 쓴다.</summary>
     private bool IsDeleteConfirmOpen => deleteConfirmPopup != null && deleteConfirmPopup.activeSelf;
 
-    // ─────────────────────────────────────────────
-    // 초기화 (Start 에서 호출)
-    // ─────────────────────────────────────────────
+    // ── 초기화 (Start 에서 호출) ──
 
     private void SetupAccountReset()
     {
@@ -62,9 +45,7 @@ public partial class GameSettingManager
             return;
         }
 
-        // ★ 확인 팝업이 없으면 버튼을 "막는다".
-        //   되돌릴 수 없는 동작을 확인 없이 실행하는 경로는 아예 만들지 않는 것이 원칙입니다.
-        //   (연결을 깜빡한 빌드가 나가도, 최악의 결과가 '버튼이 안 눌림' 이지 '한 번 터치로 계정 삭제' 가 아니게)
+        // ★ 확인 팝업 연결이 빠지면 버튼을 막음 — 되돌릴 수 없는 동작을 확인 없이 실행하는 경로를 만들지 않음
         accountResetReady = deleteConfirmPopup != null && deleteConfirmButton != null && deleteCancelButton != null;
         if (!accountResetReady)
         {
@@ -75,8 +56,7 @@ public partial class GameSettingManager
             return;
         }
 
-        // 기존 버튼들과 같은 규칙: 코드가 리스너를 건다. 인스펙터 On Click 은 비워 둘 것.
-        // (둘 다 걸려 있으면 한 번 누름에 두 번 처리 — 삭제 버튼에서는 특히 피해야 함)
+        // 리스너는 코드가 검 — 인스펙터 On Click 은 비울 것 (둘 다면 한 번에 두 번 처리)
         deleteAccountButton.onClick.RemoveAllListeners();
         deleteConfirmButton.onClick.RemoveAllListeners();
         deleteCancelButton.onClick.RemoveAllListeners();
@@ -92,9 +72,7 @@ public partial class GameSettingManager
         }
     }
 
-    // ─────────────────────────────────────────────
-    // 팝업 열기 / 닫기
-    // ─────────────────────────────────────────────
+    // ── 팝업 열기 / 닫기 ──
 
     private void OnClickDeleteAccount()
     {
@@ -115,9 +93,7 @@ public partial class GameSettingManager
         if (deleteConfirmPopup != null) deleteConfirmPopup.SetActive(false);
     }
 
-    // ─────────────────────────────────────────────
-    // 삭제 실행
-    // ─────────────────────────────────────────────
+    // ── 삭제 실행 ──
 
     private void OnClickConfirmDelete()
     {
@@ -129,8 +105,7 @@ public partial class GameSettingManager
         SetDeleteButtonsInteractable(false);
         SetDeleteStatus("삭제 중...");
 
-        // ⓪ 서버 기록(랭킹 + 닉네임) 삭제 — 네트워크라 실패할 수 있으므로 로컬보다 먼저.
-        //   실패하면 로컬도 지우지 않습니다 (서버 기록만 남은 계정이 생기지 않게). 게스트 세이브면 바로 성공.
+        // ⓪ 서버 데이터 삭제를 로컬보다 먼저(실패 가능) — 실패하면 로컬도 안 지움, 게스트면 바로 성공
         serverDeleteInProgress = true;
         ServerAccountData.DeleteForCurrentAccount((ok, serverError) =>
         {
@@ -151,7 +126,7 @@ public partial class GameSettingManager
     /// <summary>서버 기록 삭제가 끝난 뒤 — 로컬 진행 데이터를 지우고 LoginScene 부터 다시 시작.</summary>
     private void WipeLocalAndRestart()
     {
-        // ① 지우기 — 실패할 수 있는 일을 먼저. 실패하면 게임은 아무 일 없던 것처럼 계속된다.
+        // ① 로컬 지우기 (실패하면 게임은 그대로 계속)
         if (!AccountReset.TryWipe(LOGIN_SCENE, out string error))
         {
             // 서버 기록은 이미 지워졌는데 로컬은 그대로 → 계속 플레이하므로 서버에 다시 올림
@@ -163,29 +138,14 @@ public partial class GameSettingManager
             return;
         }
 
-        // ② 여기부터는 되돌릴 수 없다. 패널 정리 — ReturnToLogin() 과 같은 이유로 같은 것들을 정리한다.
-        //
-        //   ★ ReturnToLogin 과 다른 점 두 가지
-        //   - SaveManager.Save() 를 부르지 않는다.
-        //       방금 지운 데이터를 도로 저장하는 꼴이다. (어차피 잠겨 있어 무시되지만, 의도가 반대라 적지 않는다)
-        //   - LevelUpManager.ResetStat() 을 부르지 않는다.
-        //       ReturnToLogin 에서는 LevelUpManager 가 LoginScene 까지 살아남으므로 MainScene 의 스탯 참조를 끊어야 한다.
-        //       계정 삭제에서는 LevelUpManager 자체가 파괴되고 새로 만들어지므로 끊을 대상이 없다.
-        //
-        //   ★ [검토 후 수정] try / finally
-        //     TryWipe 가 성공한 순간 파일은 지워졌고 저장은 잠겼습니다. 저장 잠금을 푸는 건
-        //     RestartFromLogin() 이 만드는 새 SaveManager 뿐입니다.
-        //     아래 정리 코드에서 예외가 하나라도 나면 RestartFromLogin() 까지 도달하지 못하고,
-        //     게임은 아무 일 없던 것처럼 계속되는데 "다시는 저장되지 않는" 상태가 됩니다. (가장 찾기 힘든 종류)
-        //     finally 는 try 안에서 예외가 나도 반드시 실행되므로, 정리가 실패해도 초기화는 끝까지 갑니다.
-        //     (정리가 실패하면 씬이 내려갈 때 OnDisable 이 같은 정리를 한 번 더 시도합니다)
+        // ② 되돌릴 수 없는 구간 — ReturnToLogin 과 같은 정리 (Save·ResetStat 은 안 함: 지운 데이터 저장 금지, 매니저째 재생성)
+        // ★ try/finally — 정리 중 예외로 RestartFromLogin 을 못 가면 저장이 잠긴 채 '다시는 저장 안 되는' 상태가 되므로 반드시 진행
         try
         {
             if (IsOpen)
             {
                 UnbindAll();      // 슬라이더·토글 리스너 해제 — 등록과 해제는 항상 짝으로
-                IsOpen = false;   // 씬이 내려갈 때 OnDisable 이 같은 정리(UnbindAll, Bloom Pop)를 한 번 더 하지 않게
-                                  // (ReturnToLogin 과 같은 처리)
+                IsOpen = false;   // OnDisable 이 같은 정리를 한 번 더 하지 않게
             }
 
             HapticManager.Instance?.Cancel();
@@ -198,9 +158,7 @@ public partial class GameSettingManager
         }
     }
 
-    // ─────────────────────────────────────────────
-    // 작은 도우미
-    // ─────────────────────────────────────────────
+    // ── 작은 도우미 ──
 
     private void SetDeleteButtonsInteractable(bool on)
     {

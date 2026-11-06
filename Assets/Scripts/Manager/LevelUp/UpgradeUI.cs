@@ -5,22 +5,11 @@ using UnityEngine.Serialization;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// 스탯 강화 UI.
-/// ★ 변경점: 행마다 있던 ×1/×10/×100 버튼 3개를 없애고,
-///    패널 상단의 "공용 배수 버튼"(×1/×10/×100) + 행마다 "강화 버튼 1개" 구조로 바꿨습니다.
-///    선택된 배수는 selectedMultiplier 하나에만 저장되고, 모든 행이 그 값을 함께 봅니다.
-///
-/// ★ 이번 수정: 스탯 수치에 '현재 → 다음' 미리보기 추가
-///   statValueText 툴팁에 원래부터 "예: 10 → 12" 라고 적혀 있었는데, 실제로는 현재 값만
-///   보여주고 있었습니다. 선택한 배수(×1/×10/×100)만큼 강화했을 때의 값을 함께 보여줍니다.
-///   공격 속도는 곡선 방식으로 바뀌어 레벨마다 증가량이 달라서, 이 미리보기가 특히 유용합니다.
-/// </summary>
+/// <summary>스탯 강화 탭: 상단 공용 배수(×1/×10/×100) 하나를 모든 행이 공유하고, 행마다 누적 비용과 '현재 → 강화 후' 미리보기를 표시 (골드 변화는 refreshInterval 로 묶어서 다시 그림).</summary>
+// 창 열기·가이드 퀘스트 "강화 창 열기" 구독은 TabWindow 가 담당 (같은 오브젝트를 둘이 켜고 끄면 어긋나서)
 public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 {
-    // ══════════════════════════════════════════════
-    //  [직렬화] 공용 배수 버튼 1개
-    // ══════════════════════════════════════════════
+    // ── [직렬화] 공용 배수 버튼 1개 ──
     [System.Serializable]
     public struct MultiplierButton
     {
@@ -34,9 +23,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         public GameObject selectedMark;
     }
 
-    // ══════════════════════════════════════════════
-    //  [직렬화] 스탯 행 1개의 UI 묶음
-    // ══════════════════════════════════════════════
+    // ── [직렬화] 스탯 행 1개의 UI 묶음 ──
     [System.Serializable]
     public struct StatRow
     {
@@ -56,11 +43,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         public Button upgradeButton;
     }
 
-    // ══════════════════════════════════════════════
-    //  인스펙터 연결
-    // ══════════════════════════════════════════════
-    // ★ 이 UI 는 항상 TabWindow 의 한 탭입니다. 창을 열고 닫는 일과 가이드 퀘스트의 "강화 창 열기" 구독은
-    //   TabWindow 가 합니다 (같은 오브젝트를 둘이 켜고 끄면 반드시 어긋나므로 여기서는 하지 않음).
+    // ── 인스펙터 연결 ──
 
     [Header("공용 배수 버튼")]
     [SerializeField] private MultiplierButton[] multiplierButtons;
@@ -98,15 +81,9 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     [Tooltip("골드 변화가 잦아도 최소 이 간격으로만 UI를 다시 그립니다 (0 이면 즉시)")]
     [SerializeField] private float refreshInterval = 0.1f;
 
-    // ══════════════════════════════════════════════
-    //  내부 상태
-    // ══════════════════════════════════════════════
+    // ── 내부 상태 ──
 
-    // ★ bool 플래그(boundGold 등) 대신 "구독한 인스턴스 자체"를 들고 있습니다.
-    //   이유: 이 게임의 매니저들은 씬 왕복 중 파괴 후 재생성되는 경우가 있습니다.
-    //   bool 로만 관리하면 "구독했다=true" 인 채로 옛 인스턴스를 가리키게 되어,
-    //   새 매니저의 이벤트를 영원히 못 받는 조용한 죽은 UI 가 됩니다.
-    //   인스턴스를 비교하면 바뀐 순간 자동으로 갈아탑니다.
+    // 구독 여부를 bool 대신 '구독한 인스턴스'로 기억 — 매니저가 재생성되면 바뀐 순간 갈아탐 (bool 이면 옛 인스턴스에 묶인 죽은 UI)
     private LevelUpManager    boundLm;
     private CurrencyManager   boundCurrency;
 
@@ -130,12 +107,9 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
     private bool  refreshPending;
     private float nextRefreshTime;
 
-    // ★ 이 컴포넌트는 탭 내용 안에 붙어 있어, 탭이 가려지면 컴포넌트째 꺼집니다.
-    //   즉 "살아서 Update 가 돌고 있다 = 지금 보이고 있다" 이므로 '닫혀 있으면 그리지 않기' 검사가 필요 없습니다.
+    // 탭이 가려지면 컴포넌트째 꺼지므로 Update 가 돈다 = 보이는 중 ('닫혀 있으면 안 그림' 검사 불필요)
 
-    // ══════════════════════════════════════════════
-    //  Unity 생명주기
-    // ══════════════════════════════════════════════
+    // ── Unity 생명주기 ──
     private void Awake()
     {
         BuildRowIndex();
@@ -170,8 +144,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         if (rememberMultiplier)
             want = Mathf.Max(1, PlayerPrefs.GetInt(MultiplierPrefKey, want));
 
-        // ★ 저장된 값이 지금 버튼 구성에 없을 수 있습니다(×100 버튼을 나중에 뺀 경우 등).
-        //   그대로 두면 아무 버튼도 선택 표시되지 않은 채 ×100 이 적용되는 유령 상태가 됩니다.
+        // 저장값이 지금 버튼에 없으면(버튼을 뺀 경우) 선택 표시 없이 적용되는 유령 상태가 되므로 보정
         if (!HasMultiplier(want))
             want = FirstValidMultiplier();
 
@@ -192,8 +165,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         return 1;   // 배수 버튼을 아예 안 쓰는 구성이면 ×1 고정
     }
 
-    // ★ 가이드 퀘스트가 씬 전환으로 넘긴 "강화 UI 열기" 예약은 항상 켜져 있는 TabWindow.Start() 가 소비합니다.
-    //   (탭이 꺼져 있으면 이 컴포넌트의 Start 자체가 돌지 않으므로 여기 두면 조용히 고장 남)
+    // 가이드 퀘스트의 "강화 UI 열기" 예약은 항상 켜진 TabWindow.Start 가 소비 (탭이 꺼져 있으면 여기 Start 가 안 돎)
 
     private void OnEnable()
     {
@@ -205,17 +177,10 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 
     private void Update()
     {
-        // ★ 원래는 OnEnable에서 단 한 번만 구독을 시도했습니다.
-        //   그 시점에 매니저가 아직 없으면 조용히 실패하고, 그 세션 내내
-        //   강화해도 UI가 갱신되지 않았습니다.
-        //   지금은 "매니저 인스턴스가 바뀌었는지"까지 매 프레임 확인합니다.
-        //   (static 필드 3번 비교라 비용은 사실상 0입니다)
+        // 매 프레임 매니저 인스턴스가 바뀌었는지 확인 (OnEnable 한 번이면 그때 없을 때 세션 내내 갱신 안 됨, 비교라 비용 거의 0)
         TryBindAll();
 
-        // 쓰로틀된 갱신 처리
-        // ★ Time.time 이 아니라 unscaledTime 을 씁니다.
-        //   게임 속도(배속) 조절로 timeScale 이 바뀌어도 UI 갱신 주기는 일정해야 하고,
-        //   일시정지(timeScale = 0)에서도 강화 UI는 살아 있어야 하기 때문입니다.
+        // 묶어 둔 갱신 — 배속·일시정지에도 일정하게 unscaledTime
         if (refreshPending && Time.unscaledTime >= nextRefreshTime)
         {
             refreshPending = false;
@@ -229,17 +194,14 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         UnregisterButtonListeners();
     }
 
-    // ══════════════════════════════════════════════
-    //  매니저 구독 (인스턴스 교체 대응)
-    // ══════════════════════════════════════════════
+    // ── 매니저 구독 (인스턴스 교체 대응) ──
     private void TryBindAll()
     {
         // ── LevelUpManager ──
         var currentLm = LevelUpManager.Instance;
         if (currentLm != boundLm)
         {
-            // ★ Unity 의 != 는 "파괴된 오브젝트 == null" 로 처리해 줍니다.
-            //   그래서 옛 인스턴스가 이미 파괴됐다면 아래 해제는 자연스럽게 건너뜁니다.
+            // 옛 인스턴스가 파괴됐으면 Unity != null 이 걸러 해제를 건너뜀
             if (boundLm != null) boundLm.OnStatUpgraded -= HandleStatUpgraded;
 
             boundLm = currentLm;
@@ -278,14 +240,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         boundCurrency = null;
     }
 
-    /// <summary>
-    /// CurrencyManager 에서 현재 골드를 직접 읽어 캐시한다.
-    ///
-    /// ★ 원래는 OnGoldChanged 이벤트만으로 골드를 알았습니다.
-    ///   그런데 CurrencyManager 는 Start 의 ApplyFrom 에서 이벤트를 한 번 쏘는데,
-    ///   UpgradeUI 가 그보다 늦게 구독하면 그 한 번을 놓칩니다.
-    ///   IsLoaded 로 '진짜 0원'과 '아직 안 불러옴'을 구분할 수 있으니 직접 읽습니다.
-    /// </summary>
+    /// <summary>현재 골드를 직접 읽어 캐시 — 늦게 구독하면 복원 때의 이벤트를 놓치므로 (IsLoaded 로 미준비와 0원을 구분).</summary>
     private void SyncGoldFromManager()
     {
         var cm = boundCurrency;
@@ -295,9 +250,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         hasGoldValue = true;
     }
 
-    // ══════════════════════════════════════════════
-    //  버튼 리스너 등록 / 해제
-    // ══════════════════════════════════════════════
+    // ── 버튼 리스너 등록 / 해제 ──
     private void RegisterButtonListeners()
     {
         // ── 스탯 행: 행마다 버튼 1개 ──
@@ -309,8 +262,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
             var type = statRows[i].statType;   // 클로저 캡처용 지역 복사
             rowActions[i] = () => OnClickUpgrade(type);
 
-            // ★ Unity 오브젝트에 ?. 를 쓰면 파괴된 오브젝트를 살아있다고 판단합니다.
-            //   != null 로 검사해야 Unity의 수명 검사가 동작합니다.
+            // Unity 오브젝트는 ?. 대신 != null (파괴 검사)
             if (statRows[i].upgradeButton != null)
                 statRows[i].upgradeButton.onClick.AddListener(rowActions[i]);
         }
@@ -331,8 +283,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 
     private void UnregisterButtonListeners()
     {
-        // ★ RemoveAllListeners 는 다른 스크립트가 붙인 리스너까지 날려버립니다.
-        //   등록해둔 델리게이트만 정확히 제거합니다.
+        // RemoveAllListeners 는 남의 리스너까지 지우므로 등록한 것만 제거
         if (rowActions != null)
         {
             for (int i = 0; i < statRows.Length && i < rowActions.Length; i++)
@@ -350,9 +301,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         }
     }
 
-    // ══════════════════════════════════════════════
-    //  배수 선택
-    // ══════════════════════════════════════════════
+    // ── 배수 선택 ──
 
     /// <summary>공용 배수 선택 (인스펙터 OnClick 에 직접 물려도 됩니다)</summary>
     public void SelectMultiplier(int amount)
@@ -362,9 +311,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         if (rememberMultiplier)
         {
             PlayerPrefs.SetInt(MultiplierPrefKey, selectedMultiplier);
-            // ★ PlayerPrefs.Save() 는 일부러 호출하지 않습니다.
-            //   모바일에서 매 클릭마다 디스크 flush 를 걸면 프레임이 튑니다.
-            //   앱이 정상 종료/백그라운드 진입할 때 Unity가 알아서 저장합니다.
+            // PlayerPrefs.Save 는 일부러 안 부름 — 클릭마다 디스크 flush 는 프레임이 튐 (종료·백그라운드 때 Unity 가 저장)
         }
 
         RefreshMultiplierVisual();
@@ -386,10 +333,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
 
             if (mb.button == null) continue;
 
-            // ★ targetGraphic.color 를 직접 바꾸면 안 됩니다.
-            //   Button 의 Transition 이 Color Tint 이면, 버튼이 매 상태 변화마다
-            //   colors.normalColor 로 색을 덮어써서 우리가 칠한 색이 곧바로 사라집니다.
-            //   ColorBlock 자체를 바꿔야 유지됩니다.
+            // targetGraphic.color 는 Color Tint 가 곧바로 덮어쓰므로 ColorBlock 을 바꿈
             var cb = mb.button.colors;
             cb.normalColor   = isSelected ? multiplierSelectedColor : multiplierNormalColor;
             cb.selectedColor = cb.normalColor;
@@ -397,9 +341,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         }
     }
 
-    // ══════════════════════════════════════════════
-    //  버튼 콜백
-    // ══════════════════════════════════════════════
+    // ── 버튼 콜백 ──
 
     /// <summary>강화 버튼 클릭 — 배수는 공용 selectedMultiplier 를 사용</summary>
     private void OnClickUpgrade(LevelUpManager.StatType type)
@@ -417,17 +359,14 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
             return;
         }
 
-        // ★ 가이드 퀘스트에 "실제 성공 횟수"만큼 보고
-        //   OnStatUpgraded 이벤트를 구독하지 않는 이유: ×100의 발화 횟수를 신뢰할 수 없음
+        // 가이드 퀘스트에 실제 성공 횟수만큼 보고 (OnStatUpgraded 는 ×100 때 발화 횟수를 믿을 수 없음)
         GuideQuestManager.Instance?.ReportStatUpgrade(type, successCount);
 
         // ★ 골드가 줄었으므로 다른 행의 구매 가능 여부도 함께 바뀝니다.
         RefreshAllImmediate();
     }
 
-    // ══════════════════════════════════════════════
-    //  ITabPage — TabWindow 가 부른다
-    // ══════════════════════════════════════════════
+    // ── ITabPage — TabWindow 가 부름 ──
 
     /// <summary>이 탭이 선택됐다. 탭이 켜지면서 OnEnable 도 돌지만, 갱신을 한 번 더 보장한다.</summary>
     public void OnTabShow() => RefreshNow();
@@ -459,9 +398,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         // 필요하면 여기서 하이라이트 / 스크롤 이동 처리
     }
 
-    // ══════════════════════════════════════════════
-    //  이벤트 핸들러
-    // ══════════════════════════════════════════════
+    // ── 이벤트 핸들러 ──
 
     // 한 행만 바뀌어도 골드가 줄었으므로 다른 행의 구매 가능 여부까지 바뀐다 → 전체 갱신 요청
     private void HandleStatUpgraded(LevelUpManager.StatType type) => RequestRefresh();
@@ -473,9 +410,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         RequestRefresh();
     }
 
-    // ══════════════════════════════════════════════
-    //  UI 갱신
-    // ══════════════════════════════════════════════
+    // ── UI 갱신 ──
 
     /// <summary>"곧 다시 그려라" 예약. 골드처럼 초당 수십 번 오는 이벤트용.</summary>
     private void RequestRefresh()
@@ -507,14 +442,11 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         StatRow row = statRows[i];
         LevelUpManager.StatType type = row.statType;
 
-        // 스탯 수치는 매니저가 없어도 표시할 수 있습니다 (일단 현재 값만)
-        // 아래에서 강화 가능하다고 판단되면 '현재 → 다음' 으로 덮어씁니다.
+        // 일단 현재 값만 표시 (강화 가능하면 아래에서 '현재 → 다음'으로 덮어씀)
         if (row.statValueText != null)
             row.statValueText.text = GetStatValueString(type);
 
-        // ★ LevelUpManager 는 있는데 PlayerStat 이 아직 주입되지 않은 구간이 존재합니다.
-        //   그때 GetUpgradeCost 는 0을 돌려주므로, 검사하지 않으면
-        //   "0 / 5,000, 비용 : 0" 이라는 거짓 정보를 띄우고 버튼도 눌리게 됩니다.
+        // PlayerStat 주입 전엔 비용이 0 으로 나와 거짓 정보·버튼 활성이 되므로 IsReady 확인
         LevelUpManager lm = boundLm;
         if (lm == null || !lm.IsReady)
         {
@@ -543,22 +475,16 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
             return;
         }
 
-        // ★ 여기서부터가 이번 구조의 핵심.
-        //   "1회 비용"이 아니라 "선택한 배수만큼의 누적 비용"을 물어봅니다.
-        //   남은 레벨이 배수보다 적으면 buyable 에 실제로 살 수 있는 횟수가 돌아옵니다.
-        //   (예: 상한까지 3레벨 남았는데 ×100 을 골랐다면 buyable = 3, 비용도 3회분)
+        // 선택 배수만큼의 누적 비용 — 상한까지 남은 레벨이 적으면 buyable 이 실제 횟수 (예: 3 남음 + ×100 → 3회분)
         int  times     = Mathf.Max(1, selectedMultiplier);
         long totalCost = lm.GetUpgradeCostMultiple(type, times, out int buyable);
 
-        // ★ 비용 합계는 long 입니다. int 로 받으면 고레벨에서 21억을 넘는 순간
-        //   음수로 뒤집혀 "공짜로 살 수 있는 것처럼" 보입니다.
+        // 비용 합계는 long (int 면 21억을 넘을 때 음수가 돼 공짜처럼 보임)
         bool knowGold  = hasGoldValue;
         bool canAfford = !knowGold || cachedGold >= totalCost;
         bool usable    = buyable > 0 && (!disableWhenUnaffordable || canAfford);
 
-        // ★ [신규] '현재 → 다음' 미리보기
-        //   buyable(상한에 걸리면 줄어든 횟수)을 넘기므로, 비용 텍스트의 "(x3)" 과 항상 같은 기준입니다.
-        //   골드가 부족해도 보여줍니다 — "이만큼 오르니 모아볼까?" 라는 동기가 되니까요.
+        // '현재 → 다음' 미리보기 — 비용과 같은 buyable 기준, 골드가 부족해도 보여 줌(모을 동기)
         if (showNextValuePreview && buyable > 0 && row.statValueText != null)
         {
             float next = lm.PreviewStatValue(type, buyable);
@@ -579,9 +505,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         SetButtonInteractable(row.upgradeButton, usable);
     }
 
-    // ══════════════════════════════════════════════
-    //  스탯 수치 문자열
-    // ══════════════════════════════════════════════
+    // ── 스탯 수치 문자열 ──
 
     /// <summary>현재 스탯 값을 화면용 문자열로. Player 가 없으면 "-".</summary>
     private string GetStatValueString(LevelUpManager.StatType type)
@@ -603,14 +527,7 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
         return FormatStatValue(type, raw);
     }
 
-    /// <summary>
-    /// 스탯 값(PlayerStat 에 저장되는 단위)을 화면용 문자열로 바꿉니다.
-    ///
-    /// ★ [수정] 예전에는 형식 지정이 GetStatValueString 안에 박혀 있었습니다.
-    ///   '다음 값'도 똑같은 모양으로 보여줘야 해서 형식만 따로 뺐습니다.
-    ///   현재 값과 다음 값이 서로 다른 함수로 포맷되면, 한쪽만 고쳤을 때
-    ///   "2.27회/초 → 2.5 회/초" 처럼 모양이 어긋납니다.
-    /// </summary>
+    /// <summary>스탯 값 → 화면 문자열 — 현재 값과 다음 값이 같은 모양이 되도록 한 함수로 포맷.</summary>
     private static string FormatStatValue(LevelUpManager.StatType type, float raw)
     {
         if (float.IsNaN(raw)) return "-";
@@ -621,24 +538,14 @@ public class UpgradeUI : MonoBehaviour, ITabPage, IStatFocusTarget
                 return $"{raw:N0}";
 
             case LevelUpManager.StatType.CritChance:
-                // ★ [수정] F1 → F2.
-                //   치명타 확률은 이제 레벨당 약 0.0194% 씩 오릅니다.
-                //   소수 첫째 자리까지만 보여주면 ×1 미리보기가 "40.6 % → 40.6 %" 로
-                //   **아무것도 안 오르는 것처럼** 보입니다. 둘째 자리까지 보여야 변화가 드러납니다.
+                // F2 — 레벨당 약 0.0194% 라 F1 이면 ×1 미리보기가 안 오르는 것처럼 보임
                 return $"{raw:F2} %";
 
             case LevelUpManager.StatType.CritDamage:
                 return $"{raw:F2} x";
 
             case LevelUpManager.StatType.Attackspd:
-                // ★ AttackSpd 는 '공격 쿨다운(ms)'이라 강화할수록 숫자가 줄어듭니다.
-                //   raw 값을 그대로 보여주면 유저에겐 스탯이 나빠지는 것처럼 보이므로
-                //   초당 공격 횟수로 환산해 '올라가는 수치'로 표시합니다.
-                //
-                //   [수정] 하한을 PlayerStat.MIN_ATTACK_SPD 로 막습니다.
-                //   PlayerStat.FinalAttacksPerSecond(스탯창)와 같은 기준이라,
-                //   강화창과 스탯창이 서로 다른 숫자를 보여줄 수 없습니다.
-                //   (0 나누기 방어도 겸합니다)
+                // AttackSpd 는 쿨다운(ms)이라 줄수록 좋음 → 초당 공격 횟수로 환산 (하한은 스탯창과 같은 MIN_ATTACK_SPD, 0 나누기 방어 겸)
                 return $"{1000f / Mathf.Max(raw, PlayerStat.MIN_ATTACK_SPD):F2} 회/초";
 
             default:

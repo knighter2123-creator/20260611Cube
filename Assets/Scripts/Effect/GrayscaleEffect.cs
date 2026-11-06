@@ -1,18 +1,10 @@
 using UnityEngine;
 
-/// <summary>
-/// 대상(몬스터 등)의 SpriteRenderer 머티리얼을 흑백 머티리얼로 교체했다가
-/// 지속시간이 끝나면 원본으로 복구합니다.
-///
-/// 사용법 : GrayscaleEffect.Apply(enemy.gameObject, 2f);
-/// 컴포넌트를 미리 붙여둘 필요 없음 (없으면 자동으로 추가됨).
-/// </summary>
+/// <summary>대상 SpriteRenderer 를 흑백 머티리얼로 바꿨다가 지속시간 뒤 복구 — Apply(go, 초), 컴포넌트는 없으면 자동 추가.</summary>
 [DisallowMultipleComponent]
 public class GrayscaleEffect : MonoBehaviour
 {
-    // ─────────────────────────────────────────────
-    // 공용 흑백 머티리얼 (모든 대상이 공유 → 배칭 유지)
-    // ─────────────────────────────────────────────
+    // ── 공용 흑백 머티리얼 (모든 대상이 공유 → 배칭 유지) ──
     private const string ShaderName   = "Custom/2D/SpriteGrayscale";
     private const string ResourceName = "Mat_Grayscale";   // Assets/Resources/Mat_Grayscale.mat
 
@@ -48,16 +40,10 @@ public class GrayscaleEffect : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 머티리얼을 미리 읽어 둡니다. 처음 쓸 때 Resources.Load 하면 첫 스턴 순간 멈칫하므로
-    /// 전투 전에 부릅니다 (ObjectPoolManager.Start). 이미 읽었으면 아무것도 하지 않습니다.
-    /// 돌려주는 머티리얼은 RenderWarmup 으로 셰이더까지 미리 데우는 데 씁니다.
-    /// </summary>
+    /// <summary>머티리얼 미리 로드(전투 전 1회, 첫 스턴 순간 멈칫 방지) — 반환값은 RenderWarmup 셰이더 예열용.</summary>
     public static Material Preload() => GrayMaterial;
 
-    // ─────────────────────────────────────────────
-    // 정적 진입점
-    // ─────────────────────────────────────────────
+    // ── 정적 진입점 ──
 
     /// <summary>대상을 duration 초 동안 회색으로 만듭니다. (중첩 시 더 긴 쪽으로 연장)</summary>
     public static void Apply(GameObject target, float duration)
@@ -78,9 +64,7 @@ public class GrayscaleEffect : MonoBehaviour
         if (fx != null) fx.Stop();
     }
 
-    // ─────────────────────────────────────────────
-    // 인스턴스
-    // ─────────────────────────────────────────────
+    // ── 인스턴스 ──
     private SpriteRenderer[] _renderers;
     private Material[]       _originals;
     private bool             _isGray;

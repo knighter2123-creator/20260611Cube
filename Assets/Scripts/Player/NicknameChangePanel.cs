@@ -2,30 +2,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// MainScene 닉네임 팝업. 이름 유무에 따라 두 가지 모드로 열립니다.
-///
-///   이름 없음 → '최초 설정' 모드 : 무료, PlayerProfile.RequestRegister
-///   이름 있음 → '변경' 모드      : 보석 소모, PlayerProfile.RequestChangeName
-///   로그인 계정은 뒤끝에서 중복 검사를 거친 뒤 적용되므로 응답을 기다리는 동안 "확인 중..." 을 보여 줍니다.
-///
-/// 여는 쪽(네임플레이트 클릭, NicknamePrompt 의 스테이지 도달 자동 팝업)은 모드를 신경 쓰지 않고
-/// Open() 만 부르면 됩니다. 모드는 "여는 순간의 이름 유무" 로 이 스크립트가 정합니다.
-///   → 같은 판단을 여는 쪽마다 따로 하면, 한쪽만 고치는 실수가 생깁니다.
-///
-/// 이 스크립트는 화면(입력값 받기 · 비용/에러 표시)만 담당하고, 실제 유효성 검사·보석 차감·저장은
-/// 전부 PlayerProfile 에 맡깁니다 (UI 가 규칙을 중복 구현하지 않게).
-///
-/// [잠김 모드]
-///   이름이 없고 목표 스테이지에 아직 도달하지 않았으면(NicknamePrompt.IsFirstNameUnlocked == false)
-///   입력칸·확인 버튼을 막고 "1-5 스테이지에 도달하면…" 안내를 보여 줍니다.
-///   팝업 자체를 안 여는 대신 잠김 화면을 보여 주는 이유: 네임플레이트를 눌렀는데 아무 반응이 없으면
-///   유저는 고장으로 받아들입니다. 이미 이름이 있는 플레이어의 '변경(보석)' 은 잠그지 않습니다.
-///
-/// [중복 열기 방어]
-///   자동 팝업과 네임플레이트 클릭이 겹칠 수 있습니다. 두 번 열면 OnGemChanged 가 두 번 구독되므로
-///   Open() 은 이미 열려 있으면 무시합니다.
-/// </summary>
+/// <summary>MainScene 닉네임 팝업: 여는 순간 이름 유무로 모드 결정(없음 = 무료 최초 설정, 있음 = 보석 변경) — 화면만 담당하고 검사·차감·저장은 PlayerProfile, 로그인 계정은 서버 응답 동안 "확인 중...".</summary>
+// 목표 스테이지 전엔 열되 입력을 막은 잠김 화면 (반응이 없으면 고장으로 보여서) / 이미 열려 있으면 Open 무시 (중복 구독 방지)
 public class NicknameChangePanel : MonoBehaviour
 {
     [Header("패널")]
@@ -49,12 +27,7 @@ public class NicknameChangePanel : MonoBehaviour
     [SerializeField] private Color affordableColor = Color.white;
     [SerializeField] private Color insufficientColor = Color.red;   // UpgradeUI 의 "부족하면 빨간색" 관례와 통일
 
-    /// <summary>
-    /// 지금 팝업이 열려 있는가. (NicknamePrompt 가 겹쳐 열지 않으려고 확인)
-    /// ★ 별도 bool 에 기억하지 않고 "실제로 켜져 있는가" 를 매번 읽습니다.
-    ///   bool 로 들고 있으면, 누가 Close() 를 거치지 않고 패널을 꺼 버렸을 때 true 로 굳어
-    ///   이후 Open() 이 영영 무시되고 NicknamePrompt 도 영원히 기다리게 됩니다.
-    /// </summary>
+    /// <summary>열려 있는가 — bool 대신 실제 activeSelf 를 읽음 (Close 없이 꺼지면 bool 이 굳어 영영 못 엶).</summary>
     public bool IsOpen => panelRoot != null && panelRoot.activeSelf;
 
     private bool opening;            // Open() 안에서 SetActive(true) 하는 그 순간에만 true (Awake 가 닫지 않게)
@@ -62,21 +35,12 @@ public class NicknameChangePanel : MonoBehaviour
     private bool isLocked;           // ★ [도달 전 설정 잠금] 최초 설정인데 아직 목표 스테이지 전 → 입력 불가
     private bool initialized;
 
-    // 구독한 CurrencyManager 를 기억해 두고 "그 대상에서" 해제합니다.
-    // Instance 에서 해제하면, 그 사이 Instance 가 바뀌었을 때(계정 삭제로 매니저 재생성 등)
-    // 옛 매니저에 구독이 남습니다. (탭 창 문서의 "Instance 가 아니라 bound 를 쓰는 이유" 와 같음)
+    // 구독한 CurrencyManager 에서 해제 (Instance 가 바뀌면 옛 매니저에 구독이 남음)
     private CurrencyManager boundCurrency;
 
     // ───────────────────────────── 초기화 ─────────────────────────────
 
-    /// <summary>
-    /// ★ Awake 대신 여기서 초기화하는 이유
-    ///   패널을 "비활성 상태로 저장" 하면 씬이 로드돼도 Awake 가 불리지 않습니다 (Awake 는 처음 켜질 때 1회).
-    ///   그 상태에서 누가 Open() 을 부르면, 초기화 전이라 panelRoot 가 비어 있어 NullReferenceException 이 나고,
-    ///   panelRoot 를 채워 뒀더라도 SetActive(true) 순간 Awake 가 돌면서 panelRoot.SetActive(false) 로
-    ///   방금 연 패널을 도로 닫아 버립니다.
-    ///   → Open() 과 Awake() 가 모두 EnsureInit() 을 부르고(한 번만 실행), Awake 는 "열리는 중이 아닐 때만" 닫습니다.
-    /// </summary>
+    /// <summary>1회 초기화(Open·Awake 공용) — 꺼진 채 저장된 패널은 Awake 가 안 불려, Open 에서도 초기화하고 Awake 는 '여는 중이 아닐 때만' 닫음.</summary>
     private void EnsureInit()
     {
         if (initialized) return;
@@ -84,8 +48,7 @@ public class NicknameChangePanel : MonoBehaviour
 
         if (panelRoot == null) panelRoot = gameObject;
 
-        // ★ 리스너는 여기서만 겁니다. 인스펙터의 OnClick 에도 같은 함수를 연결하면
-        //   클릭 1번에 2번 처리됩니다. → Confirm / Cancel 버튼의 On Click() 은 인스펙터에서 비워 두세요.
+        // 리스너는 여기서만 — 인스펙터 On Click 은 비울 것 (둘 다면 한 번에 두 번 처리)
         if (confirmButton != null) confirmButton.onClick.AddListener(OnClickConfirm);
         if (cancelButton  != null) cancelButton.onClick.AddListener(Close);
     }
@@ -96,8 +59,7 @@ public class NicknameChangePanel : MonoBehaviour
         if (!opening) panelRoot.SetActive(false);   // Open() 때문에 켜지는 중이면 닫지 않음
     }
 
-    // 패널이 Close() 가 아닌 다른 경로로 꺼져도(다른 스크립트가 SetActive(false), 씬 전환 등) 구독을 남기지 않음.
-    // (이 스크립트가 panelRoot 자신에 붙어 있을 때 해당. 부모에 붙어 있다면 Open() 첫머리의 Unsubscribe 가 대신 막음)
+    // Close() 가 아닌 경로로 꺼져도 구독을 남기지 않음 (부모에 붙었으면 Open 첫머리의 Unsubscribe 가 대신 막음)
     private void OnDisable()
     {
         Unsubscribe();
@@ -138,14 +100,12 @@ public class NicknameChangePanel : MonoBehaviour
             nameInputField.text = isRegisterMode ? string.Empty : PlayerProfile.Name;
             nameInputField.characterLimit = PlayerProfile.MAX_LENGTH;
 
-            // ★ [도달 전 설정 잠금] 잠김이면 입력 자체를 막음. 매번 열 때 다시 설정해야
-            //   '잠김으로 한 번 연 뒤 → 도달 후 다시 열었을 때' 입력칸이 막힌 채로 남지 않습니다.
+            // 잠김이면 입력을 막음 — 열 때마다 다시 설정해야 도달 후 다시 열었을 때 막힌 채 남지 않음
             nameInputField.interactable = !isLocked;
         }
         SetError(string.Empty);
 
-        // 변경 모드에서만 보석 표시가 필요하므로 그때만 구독합니다.
-        // Open()/Close() 로 구독을 짝지어, 열려 있을 때만 구독하므로 리스너가 쌓이지 않습니다.
+        // 변경 모드에서만 보석 변화 구독 (Open/Close 짝이라 열린 동안만 — 쌓이지 않음)
         if (!isRegisterMode && CurrencyManager.Instance != null)
         {
             boundCurrency = CurrencyManager.Instance;
@@ -165,8 +125,7 @@ public class NicknameChangePanel : MonoBehaviour
 
     private void Unsubscribe()
     {
-        // boundCurrency 가 파괴됐어도(== null) C# 이벤트 해제 자체는 문제가 없지만,
-        // 파괴된 Unity 오브젝트의 멤버 접근을 피하려고 Unity 식 null 검사를 거칩니다.
+        // 파괴된 Unity 오브젝트 멤버 접근을 피하려고 Unity 식 null 검사
         if (boundCurrency != null)
             boundCurrency.OnGemChanged -= HandleGemChanged;
         boundCurrency = null;
@@ -214,8 +173,7 @@ public class NicknameChangePanel : MonoBehaviour
     {
         if (nameInputField == null) return;
 
-        // ★ [도달 전 설정 잠금] 버튼을 막아 두었지만, 코드 경로(키보드 완료 키 등)로 들어와도 등록되지 않게 한 번 더.
-        //   화면에서 막는 것과 동작에서 막는 것을 둘 다 두는 이유: 화면 쪽은 인스펙터 연결 실수로 풀릴 수 있습니다.
+        // 잠김이면 동작에서도 한 번 더 막음 (키보드 완료 키 등 — 화면 쪽 막기는 인스펙터 실수로 풀릴 수 있음)
         if (isLocked)
         {
             SetError(NicknamePrompt.LockedMessage);
@@ -224,8 +182,7 @@ public class NicknameChangePanel : MonoBehaviour
 
         if (PlayerProfile.IsNameRequestPending) return;   // 서버 응답 기다리는 중 — 연타 무시
 
-        // 모드에 따라 PlayerProfile 의 다른 창구를 부릅니다. 규칙 검사·서버 중복 검사·보석·저장은 전부 PlayerProfile 이 합니다.
-        //   로그인 계정은 뒤끝에 먼저 묻기 때문에 결과가 다음 프레임 이후에 옵니다 (게스트는 바로 옴).
+        // 모드별 PlayerProfile 창구 호출 (검사·서버·보석·저장은 전부 PlayerProfile, 로그인 계정은 결과가 다음 프레임 이후)
         SetBusy(true);
         System.Action<bool, string> onDone = (ok, error) =>
         {

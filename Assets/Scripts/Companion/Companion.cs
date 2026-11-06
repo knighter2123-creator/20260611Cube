@@ -38,10 +38,7 @@ public class Companion : MonoBehaviour
 
         skillTimer += Time.deltaTime;
 
-        // skill.cooldown(일반 값) 대신 '이 동료 등급·성급의' 쿨다운을 읽습니다.
-        //   스킬 에셋은 여러 동료가 같이 쓰므로, 값을 에셋에 쓰지 않고 매번 골라 읽기만 합니다.
-        //   (switch 와 사전 조회 한 번이라 매 프레임 불러도 성능 영향은 무시할 수준)
-        //   성급이 오르면 다음 프레임부터 바로 새 쿨다운이 적용됩니다.
+        // 이 동료 등급·성급의 쿨다운을 매번 읽음 (스킬 에셋을 여러 동료가 공유해 에셋에 쓰지 않음, 성급이 오르면 바로 반영)
         if (skillTimer >= skill.GetCooldown(this))
         {
             Enemy target = FindClosestEnemy();
@@ -53,9 +50,7 @@ public class Companion : MonoBehaviour
         }
     }
 
-    // ──────────────────────────────────────────────
-    //  배치 / 회수
-    // ──────────────────────────────────────────────
+    // ── 배치 / 회수 ──
     public void Place(Vector3 position)
     {
         transform.position = position;
@@ -70,15 +65,7 @@ public class Companion : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    // ──────────────────────────────────────────────
-    //  적 탐지
-    // ──────────────────────────────────────────────
-    // ★ [수정] FindGameObjectsWithTag + GetComponent → Enemy.Active 목록
-    //   쿨다운이 찼는데 범위 안에 적이 없으면 이 함수는 '매 프레임' 불립니다.
-    //   FindGameObjectsWithTag 는 부를 때마다 새 배열을 만들어 동료 수 × 프레임만큼 GC 쓰레기가 쌓였습니다.
-    //   Enemy.Active 는 적이 OnEnable/OnDisable 에서 스스로 등록·해제하는 목록이라 할당이 없고,
-    //   Player.FindTarget 과 같은 기준으로 적을 찾게 됩니다.
-    //   거리 비교는 제곱 거리로 합니다 (Sqrt 생략 — 대소 비교 결과는 같음).
+    // ── 적 탐지 — 매 프레임 불릴 수 있어 할당 없는 Enemy.Active 목록 + 제곱 거리 비교 (FindGameObjectsWithTag 는 매번 배열 할당) ──
     private Enemy FindClosestEnemy()
     {
         Vector3 myPos        = transform.position;

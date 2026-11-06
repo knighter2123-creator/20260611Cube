@@ -18,13 +18,7 @@ public struct DirectRoom
     public long      LastSentAt;   // 마지막 메시지 시각 (UTC ms), 없으면 방을 연 시각 — 탭 정렬 기준
 }
 
-/// <summary>
-/// 1:1 개인 메시지를 서버와 주고받는 부분. IChatService.Direct 로 얻습니다 (채팅과 같은 서버·같은 UID).
-///
-/// [받기]  대화방 목록은 항상 받고(Connect · Refresh), 메시지는 지금 보고 있는 방 하나만 넘깁니다(Watch).
-///   다른 방의 새 메시지는 대화방 목록의 Unread / LastSentAt 으로 알 수 있습니다.
-/// [약속]  IChatService 와 같음 — 모든 이벤트·콜백은 메인 스레드.
-/// </summary>
+/// <summary>1:1 개인 메시지 인터페이스(IChatService.Direct) — 대화방 목록은 항상, 메시지는 보고 있는 방 하나만(Watch), 다른 방 새 글은 Unread/LastSentAt 으로 (콜백은 메인 스레드).</summary>
 public interface IDirectService
 {
     /// <summary>내 대화방 전체 목록 (나간 방 포함). 바뀔 때마다 전체가 옵니다.</summary>

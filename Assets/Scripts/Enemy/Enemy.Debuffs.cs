@@ -1,12 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// 스킬 디버프 로직 (둔화 / 방어력 감소 / 독 / 스턴)
-/// 속도는 TargetMove의 배율 API를 통해서만 조작합니다 — 직접 대입 금지.
-///
-/// 같은 디버프가 다시 걸리면 이전 코루틴을 멈추고 새로 시작합니다(지속시간 갱신, 중첩 없음).
-/// </summary>
+/// <summary>디버프(둔화·방깎·독·스턴) — 속도는 TargetMove 배율 API로만 조작, 재적용 시 이전 코루틴을 멈추고 새로 시작(갱신, 중첩 없음).</summary>
 public partial class Enemy
 {
     // ── 상태 필드 ───────────────────────────────
@@ -44,9 +39,7 @@ public partial class Enemy
         _move?.ResetForSpawn();
     }
 
-    // ──────────────────────────────────────────
-    //  둔화
-    // ──────────────────────────────────────────
+    // ── 둔화 ──
     public void ApplySlow(float rate, float duration)
     {
         if (_move == null) return;
@@ -65,9 +58,7 @@ public partial class Enemy
         _slowCoroutine = null;
     }
 
-    // ──────────────────────────────────────────
-    //  방어력 감소
-    // ──────────────────────────────────────────
+    // ── 방어력 감소 ──
     public void ApplyArmorBreak(float rate, float duration)
     {
         RestartDebuff(ref _armorBreakCoroutine, ArmorBreakRoutine(rate, duration));
@@ -83,9 +74,7 @@ public partial class Enemy
         _armorBreakCoroutine  = null;
     }
 
-    // ──────────────────────────────────────────
-    //  독 (DoT)
-    // ──────────────────────────────────────────
+    // ── 독 (DoT) ──
     /// <summary>지금 들어가는 피해가 독 틱인가 — Enemy.TakeDamage 가 피해 숫자를 독 색으로 띄울 때 봄.</summary>
     private bool _dotTick;
 
@@ -96,8 +85,7 @@ public partial class Enemy
 
     private IEnumerator DotRoutine(float dotDamage, float dotInterval, float duration)
     {
-        // ★ 간격이 0 이하(스킬 에셋 입력 실수)면 elapsed 가 늘지 않아 매 프레임 피해를 '끝없이' 줍니다.
-        //   하한을 둬서 지속시간 안에 반드시 끝나게 합니다.
+        // 간격 하한 — 0 이하(입력 실수)면 매 프레임 끝없이 피해
         dotInterval = Mathf.Max(dotInterval, MinDotInterval);
 
         var   wait    = new WaitForSeconds(dotInterval);
@@ -109,8 +97,7 @@ public partial class Enemy
             elapsed += dotInterval;
             if (isDead) yield break;
 
-            // 독 피해 숫자는 독 색(DamageTextType.DoT)으로 — 피해 처리 자체는 일반 경로 그대로
-            //   (TakeDamage 를 덮어쓴 자식 클래스 — EvolveBoss 등 — 도 똑같이 거치게, 메서드를 나누지 않고 표시만 바꿈)
+            // 표시만 독 색으로, 피해는 일반 TakeDamage 경로 (override 한 자식도 똑같이 거치게)
             _dotTick = true;
             try     { TakeDamage(dotDamage); }
             finally { _dotTick = false; }
@@ -119,9 +106,7 @@ public partial class Enemy
         _dotCoroutine = null;
     }
 
-    // ──────────────────────────────────────────
-    //  스턴
-    // ──────────────────────────────────────────
+    // ── 스턴 ──
     public void ApplyStun(float duration)
     {
         if (_move == null) return;
@@ -138,9 +123,7 @@ public partial class Enemy
         _stunCoroutine = null;
     }
 
-    // ──────────────────────────────────────────
-    //  유틸
-    // ──────────────────────────────────────────
+    // ── 유틸 ──
 
     /// <summary>살아 있을 때만, 같은 종류의 이전 디버프를 끊고 새로 시작합니다.</summary>
     private void RestartDebuff(ref Coroutine slot, IEnumerator routine)

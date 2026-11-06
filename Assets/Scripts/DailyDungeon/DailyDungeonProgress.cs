@@ -1,31 +1,8 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// 일일 던전 기록 — 오늘 남은 입장 횟수 / 클리어한 최고 난이도.
-///
-/// [저장 — 매니저 오브젝트가 없는 이유]
-///   GachaTicket 과 같은 방식입니다. 값은 SaveData.dailyDungeon 에만 있고 SaveManager.Current 를 직접 읽고 씁니다.
-///   StageScene(입장 UI)과 DailyDungeonScene(클리어 기록) 양쪽에서 쓰기 때문에
-///   씬 오브젝트로 두면 어느 씬에 둘지 애매해지고, 사본이 생기면 둘이 어긋납니다.
-///
-/// [하루의 기준]
-///   미션과 같은 오전 6시입니다 (MissionManager.GetDailyPeriodStart 를 그대로 씀).
-///   기록을 읽을 때마다 "지금 기간의 시작 시각" 과 비교해서, 기간이 넘어갔으면 횟수를 0으로 돌립니다.
-///   그래서 앱을 켜 둔 채 6시를 넘겨도, 다음에 입장 UI 가 갱신될 때 바로 반영됩니다.
-///
-/// [입장 횟수 추가]
-///   던전마다 하루 extraEntryCosts 길이만큼 재화로 횟수를 추가할 수 있습니다 (기본 300 → 500 → 700 → 1000 → 1500).
-///   추가한 횟수도 오전 6시에 함께 초기화됩니다.
-///
-/// [클리어 / 소탕]
-///   실제 클리어(DailyDungeonManager)와 소탕은 둘 다 CompleteClear 를 거칩니다.
-///   → 입장 횟수 1회 차감 + 미션 진행 + 보상 지급 + 클리어 기록 + 저장이 한 곳에서 같은 순서로 일어납니다.
-///   소탕은 이미 클리어한 난이도(최고 클리어 이하)만 가능합니다.
-///
-/// [난이도 해금]
-///   난이도 1은 항상 열려 있고, N 난이도를 깨면 N+1 이 열립니다.
-/// </summary>
+/// <summary>일일 던전 기록(오늘 입장 횟수·추가 횟수·최고 클리어 난이도): SaveData 를 직접 읽고 쓰는 static(두 씬에서 써서 사본이 생기지 않게), 오전 6시 기준으로 읽을 때마다 기간이 넘어갔으면 초기화.</summary>
+// 클리어·소탕은 모두 CompleteClear(횟수 차감 → 미션 → 보상 → 기록 → 저장 한 곳) / 소탕은 클리어한 난이도만 / N 을 깨면 N+1 해금
 public static class DailyDungeonProgress
 {
     /// <summary>기록이 바뀔 때 (클리어 / 소탕 / 횟수 추가 / 일일 초기화). UI 갱신용.</summary>
@@ -92,11 +69,7 @@ public static class DailyDungeonProgress
 
     // ── 변경 ───────────────────────────────────────
 
-    /// <summary>
-    /// 클리어 처리 (실제 클리어 / 소탕 공통): 입장 횟수 1회 차감 + 미션 진행 + 보상 지급 + 클리어 기록 + 저장.
-    /// 반환값은 입장 횟수를 차감했는지입니다. 남은 횟수가 없어도 보상과 기록은 남깁니다
-    /// (던전 씬을 단독 실행해 테스트할 때를 위해 — 정상 경로에서는 입장 UI 가 횟수를 확인하고 들여보냄).
-    /// </summary>
+    /// <summary>클리어 처리(클리어·소탕 공통) — 반환: 횟수를 차감했는가 (횟수가 없어도 단독 테스트를 위해 보상·기록은 남김).</summary>
     public static bool CompleteClear(DailyDungeonData dungeon, int level)
     {
         if (dungeon == null || Data == null) return false;
@@ -117,10 +90,7 @@ public static class DailyDungeonProgress
         return consumed;
     }
 
-    /// <summary>
-    /// 소탕 — 던전을 진행하지 않고 CompleteClear 합니다. 조건(CanSweep)이 안 맞거나 보상을 줄 수 없으면
-    /// 아무것도 바꾸지 않고 false.
-    /// </summary>
+    /// <summary>소탕 — 진행 없이 CompleteClear (조건이 안 되거나 보상을 못 주면 아무것도 안 바꾸고 false).</summary>
     public static bool TrySweep(DailyDungeonData dungeon, int level)
     {
         if (dungeon == null || Data == null) return false;
@@ -144,10 +114,7 @@ public static class DailyDungeonProgress
         return true;
     }
 
-    /// <summary>
-    /// 재화를 내고 오늘 입장 횟수를 1회 추가합니다. 하루 최대 횟수를 넘었거나 재화가 부족하면 아무것도 바꾸지 않고 false.
-    /// 차감과 기록이 함께 남도록 여기서 바로 저장합니다 (ShopManager.TryPurchase 와 같은 방식).
-    /// </summary>
+    /// <summary>재화로 오늘 입장 1회 추가(하루 최대·재화 부족이면 false) — 차감과 기록이 함께 남게 바로 저장.</summary>
     public static bool TryPurchaseEntry(DailyDungeonData dungeon)
     {
         if (dungeon == null || Data == null) return false;

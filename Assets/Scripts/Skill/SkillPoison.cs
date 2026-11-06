@@ -13,11 +13,7 @@ public class SkillPoison : ActiveSkill
     public float dotDuration = 5f;
     public GradeFloat dotDurationByGrade = new GradeFloat();
 
-    /// <summary>
-    /// 독 간격 하한.
-    /// ★ Enemy.DotRoutine 은 'elapsed += dotInterval' 로 시간을 셉니다. 간격이 0 이면 elapsed 가 영원히 안 늘어서
-    ///   적이 죽을 때까지 '매 프레임' 독 피해가 들어갑니다. 등급 칸에 0 을 실수로 넣는 경우를 막습니다.
-    /// </summary>
+    /// <summary>독 간격 하한 — 0 이면 DotRoutine 의 elapsed 가 안 늘어 매 프레임 피해.</summary>
     private const float MIN_DOT_INTERVAL = 0.05f;
 
     public float GetDotDamage(CompanionGrade g)   => ByGrade(dotDamageByGrade, dotDamage, g);
@@ -32,9 +28,7 @@ public class SkillPoison : ActiveSkill
 
         var (finalDamage, isCritical) = CalcDamage(caster);
 
-        // 독 피해도 즉발 피해와 같은 공식 — '플레이어 공격력 + 독 피해' 에 같은 치명타 판정을 적용합니다.
-        // ★ [시너지] WithPlayerAttack 안에서 스킬 피해 보너스가 이미 곱해졌고, 여기서 독 피해 보너스를 한 번 더 곱합니다.
-        //   (두 보너스는 서로 다른 시너지라 둘 다 받는 게 맞습니다 — 같은 보너스를 두 번 곱하는 것과는 다릅니다)
+        // 즉발과 같은 공식 + 독 피해 시너지 추가 곱 (스킬 피해 보너스와는 별개 시너지라 중복 아님)
         float finalDot = WithSynergyScale(WithPlayerAttack(caster, GetDotDamage(g), isCritical), SynergyStat.DotDamage);
         float duration = WithSynergyScale(GetDotDuration(g), SynergyStat.DebuffDuration);
 

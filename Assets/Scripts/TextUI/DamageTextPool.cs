@@ -3,17 +3,8 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
-/// <summary>
-/// 데미지 텍스트 오브젝트 풀 싱글톤.
-/// 씬에 하나만 배치하고 DamageTextData와 Prefab을 Inspector에서 연결하세요.
-///
-/// ★ [프레임 드랍 수정] 시작 직후 끊김
-///   ① 데미지 글꼴(ThaleahFat_TTF SDF_kor)은 '동적' 아틀라스라, 숫자가 처음 화면에 나올 때마다
-///      글자를 그려 아틀라스 텍스처를 다시 올립니다. 전투 초반 몇 초 동안 첫 타격마다 끊겼습니다.
-///      → Awake 에서 쓸 글자(warmCharacters)를 한 번에 넣어 둡니다. 씬 로딩 중이라 체감되지 않습니다.
-///      (빌드에서는 동적 데이터가 비워진 채 시작하므로 매 실행 첫 전투에서 겪던 문제입니다)
-///   ② 미리 만들기 20개를 씬이 켜지는 한 프레임에 몰아 하지 않고 프레임마다 나눠 만듭니다.
-/// </summary>
+/// <summary>데미지 텍스트 풀 싱글톤 — Awake 에서 동적 폰트 아틀라스에 쓸 글자를 미리 넣고(첫 타격마다 아틀라스 재업로드로 끊김), 예열은 프레임마다 나눠 생성.</summary>
+// [붙이는 위치] 씬에 하나, DamageTextData·Prefab 연결
 public class DamageTextPool : MonoBehaviour
 {
     public static DamageTextPool Instance { get; private set; }
@@ -77,9 +68,7 @@ public class DamageTextPool : MonoBehaviour
         }
     }
 
-    // ───────────────────────────────────────────
-    // Public API
-    // ───────────────────────────────────────────
+    // ── Public API ──
 
     /// <summary>일반 데미지</summary>
     public void ShowDamage(Vector3 worldPos, int amount, bool isCritical = false)
@@ -93,9 +82,7 @@ public class DamageTextPool : MonoBehaviour
         Spawn(worldPos, amount, DamageTextType.DoT);
     }
 
-    // ───────────────────────────────────────────
-    // Internal
-    // ───────────────────────────────────────────
+    // ── Internal ──
 
     private void Spawn(Vector3 worldPos, int amount, DamageTextType type)
     {

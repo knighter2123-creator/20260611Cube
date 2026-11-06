@@ -68,10 +68,7 @@ public partial class ChatManager
 
     // ───────────────────────────── 대화방 열기 / 나가기 ─────────────────────────────
 
-    /// <summary>
-    /// 상대와의 대화방을 엽니다 — 없으면 만들고, 내가 나갔던 방이면 다시 들어갑니다. 탭은 바로 생깁니다.
-    /// 열 수 없으면 이유를 돌려줍니다 (null = 열림). 서버 쓰기가 나중에 실패하면 onFailed(이유) 가 오고 탭이 사라집니다.
-    /// </summary>
+    /// <summary>상대와의 대화방 열기(없으면 생성, 나갔던 방이면 재입장, 탭은 즉시) — 못 열면 이유 반환, 서버 쓰기가 나중에 실패하면 onFailed 후 탭 제거.</summary>
     public string OpenConversation(string peerUid, string peerName, Action<string> onFailed)
     {
         if (DirectUnavailableReason != null)                         return DirectUnavailableReason;
@@ -113,9 +110,7 @@ public partial class ChatManager
 
     // ───────────────────────────── 메시지 ─────────────────────────────
 
-    /// <summary>
-    /// 메시지를 받을 대화방 (ChatPanel 이 개인 탭을 보는 동안 그 상대, 아니면 null). 한 번에 한 방만 받습니다.
-    /// </summary>
+    /// <summary>메시지를 받을 대화방(개인 탭을 보는 동안 그 상대, 아니면 null — 한 번에 한 방만).</summary>
     public void WatchConversation(string peerUid)
     {
         if (watchedPeer == peerUid) return;
@@ -188,11 +183,7 @@ public partial class ChatManager
             RefreshDirect();
     }
 
-    /// <summary>
-    /// 개인 메시지를 다시 받는 간격(초). 대화 탭을 보고 있으면 짧게.
-    /// 실시간 알림(BackendNotify)이 연결돼 있으면 새 쪽지는 알림으로 바로 받으므로 길게 — 알림을 놓쳤을 때의 대비일 뿐.
-    /// 뒤끝 호출 수 = 2회 / 간격.
-    /// </summary>
+    /// <summary>개인 메시지 재수신 간격 — 대화 탭을 보면 짧게, 실시간 알림이 연결돼 있으면 놓침 대비라 길게 (뒤끝 호출 2회/간격).</summary>
     private float DirectPollSeconds
     {
         get

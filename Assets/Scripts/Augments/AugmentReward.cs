@@ -1,16 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 즉시 보상 카드들의 공통 부모. (골드 / 젬 / 경험치)
-///
-/// abstract 이므로 이 클래스로는 에셋을 만들 수 없습니다.
-/// 자식인 AugmentGold / AugmentGem / AugmentExp 로 만드세요.
-///
-/// [중복 코드를 줄이는 방법]
-/// 세 카드는 "얼마를 줄지 계산하는 방식"이 완전히 같고 "어디에 주는지"만 다릅니다.
-/// 그래서 계산 로직은 여기 한 번만 쓰고, 지급 부분만 자식이 채우게 했습니다.
-/// 나중에 '재료 지급' 카드를 추가할 때도 클래스 하나만 만들면 됩니다.
-/// </summary>
+/// <summary>즉시 보상 카드 부모(골드/젬/경험치, 에셋은 자식으로) — 지급량 계산(× 스테이지 배율)은 여기 한 번, 어디에 줄지만 자식이 구현.</summary>
 public abstract class AugmentReward : AugmentCard
 {
     [Header("지급량")]
@@ -35,8 +25,7 @@ public abstract class AugmentReward : AugmentCard
 
         if (scaleWithStage)
         {
-            // 현재 스테이지의 스탯 배율(적 체력/보상에 곱해지는 값)을 그대로 재활용합니다.
-            // 이러면 밸런스 곡선을 따로 관리하지 않아도 자동으로 따라옵니다.
+            // 적 스탯 배율을 재활용 — 밸런스 곡선을 따로 관리하지 않아도 따라옴
             v *= StageMultiplier() * stageScale;
         }
 
@@ -48,8 +37,7 @@ public abstract class AugmentReward : AugmentCard
 
     public override void Apply(AugmentManager manager, bool isRestore)
     {
-        // ★ 중요: 저장 복구 중이면 절대 다시 주면 안 됩니다.
-        //   안 그러면 게임을 켤 때마다 골드가 또 들어오는 무한 재화 버그가 됩니다.
+        // ⚠ 복구 중엔 다시 주지 않음 (켤 때마다 들어오는 무한 재화 버그 방지)
         if (isRestore) return;
 
         Grant(CalcAmount());

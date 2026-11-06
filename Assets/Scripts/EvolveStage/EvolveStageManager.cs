@@ -3,12 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-// EvolveStageManager는 partial로 분리되어 있습니다.
-//   EvolveStageManager.cs        — 보스 스폰 / 클리어 / 복귀
-//   EvolveStageManager.Timer.cs  — 제한시간(2분) / 시간초과 실패
-//
-// ★ 이번 수정: ReportBossKill()에 각성 보상 갱신 보고 1줄 추가.
-//   그 외에는 한 글자도 바뀌지 않았습니다.
+// partial: 이 파일 = 보스 스폰·클리어·복귀, .Timer = 제한시간(2분)·시간초과 실패
 public partial class EvolveStageManager : MonoBehaviour
 {
     public static EvolveStageManager Instance;
@@ -17,16 +12,7 @@ public partial class EvolveStageManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI stageText;
 
     [Header("보스 스폰")]
-    // ─── [FormerlySerializedAs] 는 무엇인가? (학습 포인트) ──────────────────
-    // 유니티는 인스펙터에 넣은 값을 "필드 이름"을 열쇠로 삼아 씬 파일에 저장합니다.
-    // 그래서 필드 이름을 bossPrefab → fallbackBossPrefab 으로 바꾸면,
-    // 유니티는 "fallbackBossPrefab이라는 새 필드가 생겼네" 라고 판단하고
-    // 기존에 연결해 둔 프리팹을 잃어버립니다(None이 됨).
-    //
-    // 이 속성을 붙여두면 "예전 이름으로 저장된 값도 이 필드로 읽어와라"라는 뜻이 되어
-    // 연결이 그대로 유지됩니다. 이름을 바꿀 때 습관적으로 붙여주면 사고를 막을 수 있어요.
-    // (충분히 시간이 지나 모든 씬이 새 이름으로 저장된 뒤에는 지워도 됩니다)
-    // ────────────────────────────────────────────────────────────────────
+    // FormerlySerializedAs — 필드 이름을 bossPrefab 에서 바꿔도 기존 인스펙터 연결 유지 (모든 씬이 재저장된 뒤엔 삭제 가능)
     [FormerlySerializedAs("bossPrefab")]
     [Tooltip("티어 데이터(EvolveStageData)에 bossPrefab이 비어 있을 때 사용할 예비 프리팹")]
     [SerializeField] private EvolveBoss fallbackBossPrefab;
@@ -68,18 +54,7 @@ public partial class EvolveStageManager : MonoBehaviour
         SpawnBoss();
     }
 
-    /// <summary>
-    /// 이번 티어에서 쓸 보스 프리팹을 결정합니다.
-    /// 우선순위: 티어 데이터의 bossPrefab → 인스펙터의 fallbackBossPrefab
-    ///
-    /// ─── 왜 함수로 뺐는가? (학습 포인트) ────────────────────────────
-    /// SpawnBoss() 안에 삼항연산자로 한 줄 넣어도 동작은 같습니다.
-    /// 하지만 "어느 프리팹이 선택되는가"는 나중에 규칙이 늘어날 가능성이 큰 부분이에요.
-    /// (예: 첫 클리어 이후엔 다른 스킨, 이벤트 기간엔 특별 보스 …)
-    /// 변할 것 같은 판단 로직을 이름 있는 함수로 떼어두면,
-    /// 나중에 그 함수 안만 고치면 되고 SpawnBoss는 건드릴 일이 없습니다.
-    /// ────────────────────────────────────────────────────────────
-    /// </summary>
+    /// <summary>보스 프리팹 결정(티어 데이터 → fallback) — 규칙이 늘 수 있는 부분이라 함수로 분리.</summary>
     private EvolveBoss ResolveBossPrefab()
     {
         if (ActiveData != null && ActiveData.bossPrefab != null)
@@ -109,15 +84,7 @@ public partial class EvolveStageManager : MonoBehaviour
         EvolveBoss boss = Instantiate(prefab, spawnPos, Quaternion.identity);
         HapticManager.PlayHeavy();   // 보스 등장 진동
 
-        // ★ 스탯 초기화 — 반드시 호출해야 합니다.
-        //
-        //   기존 코드는 EvolveBoss.InitStats()가 알아서 배율을 적용한다고 가정했지만,
-        //   InitStats()는 실제로 아무도 호출하지 않는 죽은 코드였습니다.
-        //   즉 지금까지 진화 보스는 프리팹 원본 체력 그대로 나오고 있었어요
-        //   (bossHpMultiplier 15배가 한 번도 안 먹었습니다).
-        //
-        //   일반 스테이지 배율(statMult)은 여기서도 적용하지 않습니다 —
-        //   진화 스테이지는 티어 데이터만으로 난이도가 결정되는 별개의 축이니까요.
+        // 스탯 초기화 필수 (안 부르면 원본 체력 그대로), 일반 스테이지 배율은 적용 안 함 — 난이도는 티어 데이터만
         boss.InitForEvolveStage();
         
         // ── 일반 스테이지 보스와 동일하게 이동 경로 전달 ──
@@ -137,26 +104,13 @@ public partial class EvolveStageManager : MonoBehaviour
         if (stageOver) return;
         stageOver = true;
 
-        // ★ 가이드 퀘스트 '각성 1회' 보고.
-        //   ReturnToStage()가 씬을 전환하므로 반드시 그 전에 호출해야 합니다.
-        //   (이 호출이 없어서 버프는 적용되는데 퀘스트만 안 끝나던 문제)
+        // 가이드 퀘스트 '각성 1회' 보고 — 씬 전환(ReturnToStage) 전에
         if (GuideQuestManager.Instance != null)
             GuideQuestManager.Instance.ReportEvolveClear();
         else
             Debug.LogWarning("[EvolveStageManager] GuideQuestManager를 찾을 수 없어 각성 퀘스트를 보고하지 못했습니다.");
 
-        // ══════════════════════════════════════════════════════════
-        // ★ 이번에 추가된 줄 — 각성 보상(스프라이트 / 발사체 / 연사) 갱신
-        //
-        //   AwakeningManager는 값을 직접 올리지 않고 세이브의 claimedEvolveRewards를
-        //   다시 읽어 계산합니다. 그래서:
-        //     · 여러 번 호출돼도 안전 (멱등)
-        //     · EvolveBoss가 보상을 기록하는 시점과의 순서에 덜 민감
-        //
-        //   혹시 여기서 순서가 어긋나더라도, AwakeningManager가 sceneLoaded에도
-        //   구독해 두어서 메인 스테이지에 도착하는 순간 다시 정확해집니다.
-        //   (한 번에 맞히려 하기보다, 틀려도 스스로 복구되게 설계한 부분입니다)
-        // ══════════════════════════════════════════════════════════
+        // 각성 보상 갱신 — 세이브 기록을 다시 읽어 계산하는 멱등 호출, 순서가 어긋나도 sceneLoaded 에서 자가 복구
         if (AwakeningManager.Instance != null)
             AwakeningManager.Instance.ReportEvolveCleared(ActiveData != null ? ActiveData.id : null);
         else

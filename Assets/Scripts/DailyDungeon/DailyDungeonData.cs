@@ -8,24 +8,8 @@ public enum DailyDungeonRule
     Defense,    // 제한시간 동안 버티면 클리어, 적이 도착 지점에 maxBreaches 번 닿으면 실패 (소환권 던전)
 }
 
-/// <summary>
-/// 일일 던전 1종(골드 던전 / 소환권 던전)의 설정값.
-/// 던전마다 에셋을 하나씩 만들어서 사용합니다. 난이도는 에셋을 나누지 않고 공식으로 계산합니다.
-///
-///   보상      = baseReward + rewardPerLevel × (난이도 - 1)
-///               골드 던전   : 500 / 500  → 500, 1000, 1500 …
-///               소환권 던전 :   1 /   1  →   1,    2,    3 …
-///   보스 체력 = 프리팹 체력 × hpMultiplier × hpGrowthPerLevel^(난이도 - 1)
-///   보스 방어 = 프리팹 방어 × defenceMultiplier × defenceGrowthPerLevel^(난이도 - 1)
-///   디펜스 적 = 프리팹 체력 × enemyHpMultiplier × hpGrowthPerLevel^(난이도 - 1)   (방어도 같은 방식)
-///   생성 주기 = spawnInterval × spawnIntervalGrowthPerLevel^(난이도 - 1), 하한 minSpawnInterval
-///
-/// ─── 왜 난이도마다 에셋을 만들지 않는가? ──────────────────────────────
-/// 진화 스테이지는 티어마다 보상 종류·보스가 달라서 에셋을 나눴지만,
-/// 일일 던전은 "같은 보스가 숫자만 커지는" 구조입니다. 규칙이 공식 하나로 표현되면
-/// 에셋 10개를 만드는 것보다 공식 하나를 두는 쪽이 밸런스 조정이 훨씬 쉽습니다.
-/// ────────────────────────────────────────────────────────────────────
-/// </summary>
+/// <summary>일일 던전 1종 설정 에셋 — 난이도는 에셋을 나누지 않고 공식으로 (같은 보스가 숫자만 커지는 구조라 밸런스 조정이 쉬움).</summary>
+// 보상 = baseReward + rewardPerLevel × (Lv-1) / 체력·방어 = 프리팹 × 배율 × 성장률^(Lv-1) / 생성 주기 = spawnInterval × 성장률^(Lv-1), 하한 minSpawnInterval
 [CreateAssetMenu(fileName = "DailyDungeonData", menuName = "Stage/Daily Dungeon Data")]
 public class DailyDungeonData : ScriptableObject
 {

@@ -2,10 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 
-/// <summary>
-/// 채팅·친구 UI 가 함께 쓰는 글자 도우미 — 색(TMP 리치 텍스트), 다른 사람 글 감싸기, 공통 문구.
-/// 아래 색은 '기본값' 입니다. 실제로 쓰는 색은 각 컴포넌트(ChatPanel · FriendPanel · Open*Button)의 인스펙터 칸에서 고칩니다.
-/// </summary>
+/// <summary>채팅·친구 UI 공용 글자 도우미(리치 텍스트 색, 남의 글 감싸기, {이름} 채우기) — 색은 기본값, 실제 색은 각 컴포넌트 인스펙터.</summary>
 public static class ChatText
 {
     public static readonly Color ProgressColor = new Color(1f, 217f / 255f, 51f / 255f);              // #FFD933 진행도 · 구역 제목
@@ -24,10 +21,7 @@ public static class ChatText
     public static StringBuilder AppendColored(this StringBuilder sb, Color color, string text)
         => sb.Append("<color=").Append(Hex(color)).Append('>').Append(text).Append("</color>");
 
-    /// <summary>
-    /// 인스펙터 문구의 {이름} 자리를 값으로 바꿉니다 (string.Format 과 달리 중괄호를 잘못 써도 예외가 나지 않음).
-    /// 예) Fill("친구 {count}/{max}", "count", "3", "max", "50")
-    /// </summary>
+    /// <summary>문구의 {이름} 자리를 값으로 (string.Format 과 달리 중괄호 오타에도 예외 없음) — 예: Fill("친구 {count}/{max}", "count", "3", "max", "50").</summary>
     public static string Fill(string template, params string[] pairs)
     {
         if (string.IsNullOrEmpty(template)) return string.Empty;
@@ -38,10 +32,7 @@ public static class ChatText
 
     private static readonly Regex NoParseTag = new Regex("</?noparse>", RegexOptions.IgnoreCase);
 
-    /// <summary>
-    /// 다른 사람이 보낸 글을 리치 텍스트로 해석하지 않게 감쌉니다. (예: "&lt;size=300&gt;" 로 화면을 덮는 장난 방지)
-    /// 글 안의 noparse 태그는 지웁니다 — 지운 뒤 다시 태그가 생기는 경우("&lt;nopa&lt;noparse&gt;rse&gt;")까지 반복.
-    /// </summary>
+    /// <summary>남의 글을 noparse 로 감싸 리치 텍스트 장난(size=300 등) 방지 — 글 속 noparse 태그는 다시 생기지 않을 때까지 반복 제거.</summary>
     public static string Plain(string s)
     {
         s = s ?? string.Empty;

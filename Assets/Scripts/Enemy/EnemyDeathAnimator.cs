@@ -2,15 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// 적 사망 연출 — Aseprite 로 만든 사망 프레임(Assets/Sprites/Enemy/Death)을 순서대로 넘긴 뒤 사라집니다.
-///
-/// 프레임이 비어 있는 적(사망 시트를 아직 만들지 않은 적)은
-/// SpriteRenderer 색의 알파만 줄여 페이드아웃합니다. 셰이더/머티리얼을 바꾸지 않으므로
-/// 여러 마리가 동시에 죽어도 배칭이 깨지지 않고, '처음 그릴 때' 멈칫하는 비용도 없습니다.
-///
-/// 사용법 : deathAnimator.Play(ReturnToPool);   // 연출이 끝나면 콜백 호출
-/// </summary>
+/// <summary>사망 연출 — 사망 프레임을 넘기고, 프레임이 없으면 색 알파만 페이드(머티리얼 교체 없음 → 배칭 유지·첫 그리기 멈칫 없음), Play(콜백).</summary>
 [DisallowMultipleComponent]
 public class EnemyDeathAnimator : MonoBehaviour
 {
@@ -131,11 +123,7 @@ public class EnemyDeathAnimator : MonoBehaviour
         sr.color  = originalColor;
     }
 
-    // 연출 도중 강제로 비활성화되면(씬 전환 등) 모습만 복구하고 콜백은 버립니다.
-    // 꺼지는 중인 오브젝트를 풀로 돌려보내면 유니티가 계층 변경 에러를 내기 때문입니다
-    // ("Cannot change GameObject hierarchy while activating or deactivating the parent").
-    // 사망 연출 중인 적은 이미 Enemy.Active 에서 빠져 있어 스테이지 정리가 건드리지 않으므로,
-    // 여기로 오는 경우는 사실상 씬 언로드(곧 파괴됨)뿐입니다.
+    // 연출 중 비활성화(사실상 씬 언로드)되면 모습만 복구하고 콜백 버림 — 꺼지는 중 풀 반환은 계층 변경 에러
     private void OnDisable()
     {
         if (!IsPlaying) return;

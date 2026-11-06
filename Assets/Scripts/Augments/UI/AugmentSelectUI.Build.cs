@@ -3,17 +3,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 증강 카드 선택창 — "어떻게 생겼는가".
-///
-/// 캔버스 뼈대는 최초 1회만 만들고(EnsureBuilt), 카드는 열 때마다 다시 만듭니다(BuildCards).
-/// 실제 생성 잡일은 AugmentUIFactory 에 맡기고, 여기서는 배치 의도만 서술합니다.
-/// </summary>
+/// <summary>증강 선택창 모양: 캔버스 뼈대는 최초 1회(EnsureBuilt), 카드는 열 때마다(BuildCards) 코드로 생성 — 생성 잡일은 AugmentUIFactory 에 맡김.</summary>
 public partial class AugmentSelectUI
 {
-    // 레이아웃 수치를 한곳에 모아둡니다.
-    // 코드 여기저기 박힌 숫자(매직 넘버)는 나중에 "이 40이 뭐였지?" 가 되기 쉬워서,
-    // 이름을 붙여 위로 끌어올리면 의미가 드러나고 조정도 한 곳에서 됩니다.
+    // 레이아웃 수치를 이름 붙여 한곳에 (매직 넘버 방지, 조정도 한 곳에서)
     private const float TitleAnchorY    = 0.845f;
     private const float SubtitleAnchorY = 0.785f;
     private const float TimerBarAnchorY = 0.135f;
@@ -31,9 +24,7 @@ public partial class AugmentSelectUI
     private const float CardPadding   = 22f;   // 카드 안쪽 여백
     private const float IconSize      = 115f;
 
-    // ─────────────────────────────────────────────────────────
-    //  캔버스 뼈대 — 최초 1회
-    // ─────────────────────────────────────────────────────────
+    // ── 캔버스 뼈대 — 최초 1회 ──
     private void EnsureBuilt()
     {
         if (canvas != null) return;
@@ -54,9 +45,7 @@ public partial class AugmentSelectUI
 
         rootGroup = canvasGo.GetComponent<CanvasGroup>();
 
-        // ── 어두운 배경 ────────────────────────────────────
-        // raycastTarget 을 켜둔 채로 둡니다. 그래야 배경을 눌렀을 때
-        // 뒤쪽 게임 버튼이 눌리지 않습니다. (클릭을 흡수하는 역할)
+        // ── 어두운 배경 ── raycastTarget 을 켜 둬서 뒤쪽 게임 버튼이 눌리지 않게 클릭 흡수
         var dim = AugmentUIFactory.CreateImage("Dim", canvasGo.transform, null, dimColor);
         AugmentUIFactory.Stretch(dim.rectTransform);
 
@@ -84,8 +73,7 @@ public partial class AugmentSelectUI
         cardArea.offsetMin = Vector2.zero;
         cardArea.offsetMax = Vector2.zero;
 
-        // LayoutGroup 을 쓰면 좌표 계산을 직접 하지 않아도 되고,
-        // 카드가 2장이든 4장이든 알아서 균등 배치됩니다.
+        // LayoutGroup 이 장수와 무관하게 균등 배치
         if (layout == LayoutMode.Horizontal)
             AugmentUIFactory.AddHorizontalGroup(cardArea.gameObject, CardSpacing,
                                                 TextAnchor.MiddleCenter, expandWidth: true);
@@ -116,9 +104,7 @@ public partial class AugmentSelectUI
         AugmentUIFactory.AnchorHorizontalBand(timerLabel.rectTransform, TimerTextAnchorY, 44f);
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  카드 — 창을 열 때마다
-    // ─────────────────────────────────────────────────────────
+    // ── 카드 — 창을 열 때마다 ──
     private void BuildCards(List<AugmentCard> cards)
     {
         ClearCards();
@@ -127,32 +113,7 @@ public partial class AugmentSelectUI
             spawnedCards.Add(CreateCard(cards[i]));
     }
 
-    /// <summary>
-    /// 이전에 만든 카드를 전부 치웁니다.
-    ///
-    /// ─── 왜 Destroy 만으로는 부족한가 (중요한 학습 포인트) ─────────────────
-    ///
-    /// Destroy() 는 **즉시 지우지 않습니다.** "이 프레임이 끝나면 지워라" 라고
-    /// 예약만 걸어둡니다. 그래서 Destroy 를 부른 직후에도 그 오브젝트는
-    /// 여전히 살아 있고, 여전히 cardArea 의 자식이고,
-    /// **여전히 LayoutGroup 이 자리를 잡아줍니다.**
-    ///
-    /// 바로 다음 줄에서 새 카드를 3장 만들면, 그 순간 화면에는 옛 카드까지
-    /// 합쳐서 보이게 됩니다. 그래서 SetActive(false) 를 함께 부릅니다.
-    /// 이건 예약이 아니라 즉시 반영이라 레이아웃에서 바로 빠집니다.
-    ///
-    /// (즉시 지우는 DestroyImmediate 도 있지만, 런타임에서 쓰면
-    ///  순회 중이던 컬렉션이 깨지는 등 위험해서 에디터 전용으로만 씁니다)
-    ///
-    /// ─── 왜 리스트가 아니라 자식을 도는가 ────────────────────────────────
-    ///
-    /// spawnedCards 리스트를 믿으면, 어떤 이유로든 리스트에 안 담긴 오브젝트가
-    /// 생겼을 때 그건 영원히 안 지워집니다.
-    /// "실제로 화면에 붙어 있는 것"인 cardArea 의 자식을 기준으로 치우면
-    /// 경로가 어떻든 확실하게 정리됩니다.
-    /// 이렇게 **기록이 아니라 실물을 기준으로 삼는 것**이 훨씬 튼튼합니다.
-    /// ────────────────────────────────────────────────────────────────────
-    /// </summary>
+    /// <summary>이전 카드를 전부 치움 — Destroy 는 프레임 끝이라 SetActive(false) 로 즉시 레이아웃에서 빼고, 리스트가 아닌 실제 자식을 기준으로 지워 누락이 없게.</summary>
     private void ClearCards()
     {
         int destroyed = 0;
@@ -168,8 +129,7 @@ public partial class AugmentSelectUI
             destroyed++;
         }
 
-        // 리스트에 담긴 수와 실제 자식 수가 다르면 뭔가 잘못된 겁니다.
-        // 대표적으로 씬에 AugmentSelectUI 가 두 개 있는 경우입니다.
+        // 기록과 실제 수가 다르면 이상 (대표적으로 AugmentSelectUI 가 둘)
         if (destroyed != spawnedCards.Count)
         {
             Debug.LogWarning(
@@ -193,8 +153,7 @@ public partial class AugmentSelectUI
 
         SetupCardButton(cardGo, border, card);
 
-        // ── 안쪽 배경 ──────────────────────────────────────
-        // 테두리보다 BorderWidth 만큼 안쪽에 깔아서 등급 색이 테두리처럼 보이게 합니다.
+        // ── 안쪽 배경 ── BorderWidth 만큼 안쪽에 깔아 등급 색이 테두리처럼 보이게
         var inner = AugmentUIFactory.CreateImage("Inner", cardGo.transform,
                                                  AugmentUIFactory.Rounded(), cardBackColor);
         AugmentUIFactory.Stretch(inner.rectTransform, BorderWidth);
@@ -231,28 +190,11 @@ public partial class AugmentSelectUI
         colors.fadeDuration     = 0.08f;
         btn.colors = colors;
 
-        // ─── 클로저 주의 (학습 포인트) ────────────────────────────────
-        // 람다는 바깥 변수를 '값 복사'가 아니라 '참조'로 붙잡습니다.
-        // for 루프 안에서 반복 변수 i 를 그대로 쓰면 모든 람다가 같은 i 를 보게 되어
-        // 결국 마지막 값만 남는 고전적인 버그가 납니다.
-        // 여기처럼 매개변수로 받은 지역 변수(card, cardGo)를 쓰면
-        // 호출마다 별도의 변수라서 안전합니다.
+        // 람다는 변수를 참조로 붙잡음 — 매개변수(card, cardGo)는 호출마다 별도라 안전 (루프 변수 i 는 위험)
         btn.onClick.AddListener(() => OnClickCard(card, cardGo));
     }
 
-    /// <summary>
-    /// 아이콘 — 항상 IconSize × IconSize 정사각형. 스프라이트가 없으면 등급 색 원으로 대체합니다.
-    ///
-    /// ─── 왜 '칸' 안에 한 번 더 넣는가 ─────────────────────────────────────
-    /// 부모 LayoutGroup 은 childForceExpand 로 자식을 줄 방향 반대쪽 끝까지 늘립니다
-    /// (세로 배치면 가로를 카드 폭만큼, 가로 배치면 세로를 카드 높이만큼).
-    /// 아이콘에 직접 LayoutElement 를 주면 그 늘어난 크기를 그대로 받아 납작해집니다.
-    /// 그래서 레이아웃은 '칸(IconSlot)' 만 잡게 하고, 아이콘은 칸 가운데에 고정 크기로 둡니다.
-    ///
-    /// CreateImage 는 스프라이트를 주면 Sliced(9슬라이스)로 만드는데, Sliced 에서는 preserveAspect 가 무시됩니다.
-    /// 아이콘은 늘릴 일이 없으므로 Simple 로 되돌립니다 — 정사각형이 아닌 그림도 비율 그대로 가운데에 맞춰집니다.
-    /// ────────────────────────────────────────────────────────────────────
-    /// </summary>
+    /// <summary>정사각형 아이콘(없으면 등급 색 원) — LayoutGroup 이 늘려 납작해지지 않게 칸(IconSlot) 안 가운데에 고정 크기, Sliced 는 preserveAspect 가 무시돼 Simple 로.</summary>
     private void BuildCardIcon(RectTransform parent, AugmentCard card, Color rarityColor)
     {
         var slot = AugmentUIFactory.CreateContainer("IconSlot", parent);
@@ -274,10 +216,7 @@ public partial class AugmentSelectUI
         rt.sizeDelta        = new Vector2(IconSize, IconSize);
     }
 
-    /// <summary>
-    /// 이 창의 모든 텍스트는 여기를 거칩니다. 인스펙터의 uiFont(한글 폰트)를 한 곳에서 적용하기 위해서입니다.
-    /// 비워 두면 TMP Settings 의 기본 폰트를 그대로 씁니다.
-    /// </summary>
+    /// <summary>모든 텍스트 생성 창구 — uiFont(한글 폰트)를 한 곳에서 적용 (비면 TMP 기본 폰트).</summary>
     private TextMeshProUGUI CreateText(string name, Transform parent, string text,
                                        float size, FontStyles style, Color color)
     {

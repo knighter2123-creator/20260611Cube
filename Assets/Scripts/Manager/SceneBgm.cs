@@ -1,12 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 이 씬의 배경음. 씬에 들어갈 때 SoundManager 로 재생합니다 — 코드 없이 씬마다 BGM 을 정하는 자리.
-///
-/// [붙이는 위치]  각 씬(StageScene, ShopScene, ...)의 아무 오브젝트에 하나. 클립을 넣으면 재생, 비워 두면 배경음을 멈춤.
-///   같은 클립이 이미 재생 중이면 처음부터 다시 틀지 않습니다 (씬을 오가도 끊기지 않게 — SoundManager.PlayBgm).
-///   볼륨은 설정 창의 배경음 슬라이더를 따릅니다.
-/// </summary>
+/// <summary>씬 배경음 지정 — 각 씬에 하나 두고 클립을 넣으면 진입 때 재생(비우면 멈춤), 같은 클립이면 이어서 재생해 씬을 오가도 안 끊김.</summary>
 public class SceneBgm : MonoBehaviour
 {
     [Tooltip("이 씬의 배경음. 비우면 이 씬에서는 배경음을 멈춥니다.")]

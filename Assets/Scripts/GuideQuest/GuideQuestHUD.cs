@@ -2,11 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// 이미지 속 가이드 퀘스트 위젯.
-/// 미완료 → 해당 콘텐츠로 즉시 이동 / 완료 → 보상 수령 후 다음 단계.
-/// ★ StageScene 소속으로 둘 것 (DontDestroyOnLoad 금지)
-/// </summary>
+/// <summary>가이드 퀘스트 위젯 — 미완료면 해당 콘텐츠로 이동, 완료면 보상 수령 후 다음 단계.</summary>
+// ⚠ StageScene 소속 (DontDestroyOnLoad 금지)
 public class GuideQuestHUD : MonoBehaviour
 {
     [Header("보상")]

@@ -2,24 +2,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// LoginScene 의 구글 로그인 버튼 UI — 씬 오브젝트 (ManagerRoot 에 넣지 않는다).
-///
-/// 버튼을 누르면 AuthManager 에 "로그인 해 줘" 라고 부탁만 하고,
-/// 화면 갱신은 AuthManager.StateChanged 를 받아 상태를 읽어서 한다 (AuthStateUI).
-///   → 씬을 다시 로드하면 이 UI 도 새로 태어나 새 버튼에 리스너를 건다.
-///     (UI 와 매니저를 합쳐 ManagerRoot 에 넣으면, 로그인 화면 복귀 시 새 버튼에 아무도 리스너를 걸지 않는다.)
-///
-/// [버튼의 세 가지 모습]
-///   로그인 전            → [Google 로그인]  누르면 로그인, 성공하면 바로 게임 시작
-///   구글로 로그인됨      → [시작하기]       누르면 게임 시작
-///   다른 방식으로 로그인됨 → 비활성          (이메일 버튼이 [시작하기]. 구글로 바꾸려면 로그아웃 후 로그인)
-///
-/// [자동 로그인 ≠ 자동 시작]
-///   Refresh 는 버튼을 눌렀을 때만이 아니라 씬에 들어올 때·로그인 확인 완료(자동 로그인)·다른 UI 의 로그인 때도 불립니다.
-///   "로그인돼 있으면 시작" 으로 짜면 로그인 화면에 머무를 수 없으므로,
-///   "이 버튼으로 방금 로그인했고 성공했다" (startAfterSignIn) 일 때만 자동으로 시작합니다.
-/// </summary>
+/// <summary>LoginScene 구글 버튼 UI(씬 오브젝트라 씬마다 새 버튼에 리스너를 검): 로그인 전=[Google 로그인], 구글=[시작하기], 게스트=[구글 연동], 이메일=비활성.</summary>
+// 자동 로그인 ≠ 자동 시작 — '이 버튼으로 방금 로그인 성공'(startAfterSignIn)일 때만 게임 시작 (아니면 로그인 화면에 머물 수 없음)
 public class GoogleLoginButtonUI : AuthStateUI
 {
     [SerializeField] private Login_Name loginName;
@@ -37,8 +21,7 @@ public class GoogleLoginButtonUI : AuthStateUI
     [Tooltip("게스트로 로그인돼 있을 때 — 누르면 지금 게스트 계정에 구글을 연결 (진행 유지)")]
     [SerializeField] private string linkLabel   = "구글 연동";
 
-    // 이 버튼으로 로그인을 시작했는가. 성공이 확인되면 게임을 시작하고 바로 내립니다.
-    // 자동 로그인(앱 재실행, 로그인 화면 복귀)은 이 버튼을 누르지 않았으므로 false → 시작하지 않습니다.
+    // 이 버튼으로 로그인을 시작했는가 (자동 로그인은 false → 시작 안 함)
     private bool startAfterSignIn;
 
     private void Awake()
@@ -49,8 +32,7 @@ public class GoogleLoginButtonUI : AuthStateUI
             enabled = false;   // OnEnable(구독)도 돌지 않음
             return;
         }
-        // 버튼 글자를 연결하지 않았으면 버튼 안의 TMP 를 찾아 씁니다.
-        // 씬에 적어 둔 글자는 그대로 '로그인 전' 글자로 두고, 구글 로그인 상태에서만 [시작하기] 로 바꿉니다.
+        // 글자 칸이 비면 버튼 안 TMP 를 찾아 씬 글자를 '로그인 전' 글자로 사용
         if (buttonLabel == null)
         {
             buttonLabel = googleLoginButton.GetComponentInChildren<TextMeshProUGUI>(true);
@@ -97,8 +79,7 @@ public class GoogleLoginButtonUI : AuthStateUI
         startAfterSignIn = true;
         auth.SignInWithGoogle();
 
-        // 시작도 못 하고 돌아온 경우(초기화 전, 미지원 플랫폼, 클라이언트 ID 비어 있음) 플래그를 남겨 두면,
-        // 나중에 다른 방법(이메일)으로 로그인했을 때 엉뚱하게 여기서도 시작이 걸립니다.
+        // 시작도 못 했으면 플래그를 내림 — 남기면 나중에 이메일 로그인 때 여기서도 시작이 걸림
         if (!auth.IsSigningIn) startAfterSignIn = false;
     }
 
@@ -120,11 +101,7 @@ public class GoogleLoginButtonUI : AuthStateUI
         bool signedInWithGoogle = a.SignedInWith(AuthManager.SignInMethod.Google);
         bool guest              = a.SignedInWith(AuthManager.SignInMethod.Guest);
 
-        // 누를 수 있는 조건
-        //   구글로 로그인됨 : [시작하기] — 플랫폼과 무관
-        //   게스트로 로그인됨 : [구글 연동] — 지원 플랫폼(Android)에서만
-        //   로그인 전       : [Google 로그인] — 지원 플랫폼(Android)에서만
-        //   이메일로 로그인됨 : 비활성
+        // 누를 수 있음: 구글로 로그인됨(플랫폼 무관) 또는 로그인 전·게스트(Android 에서만), 이메일 로그인은 비활성
         googleLoginButton.interactable = a.Ready && !a.SigningIn
             && (signedInWithGoogle || ((!a.SignedIn || guest) && AuthManager.IsGoogleSignInSupported));
 

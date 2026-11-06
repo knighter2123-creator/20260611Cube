@@ -1,8 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-// 흔들 대상 Transform에 붙입니다.
-// UI라면 resultPanel 루트(또는 흔들기 전용 컨테이너), 카메라 연출이면 Main Camera에.
+// [붙이는 위치] 흔들 대상 — UI 면 resultPanel 루트(또는 전용 컨테이너), 카메라 연출이면 Main Camera
 public class ScreenShake : MonoBehaviour
 {
     [SerializeField] private float defaultDuration  = 0.25f;
@@ -53,8 +52,7 @@ public class ScreenShake : MonoBehaviour
         shaking = null;
     }
 
-    // ★ 흔들리는 도중에 패널이 닫히면(SetActive(false)) 코루틴이 중단되면서
-    //   오브젝트가 어긋난 위치에 영구히 남습니다. 여기서 원위치로 되돌립니다.
+    // 흔들림 도중 꺼지면 코루틴이 끊겨 위치가 어긋난 채 남으므로 원위치 복구
     private void OnDisable()
     {
         shaking = null;   // 꺼지면 코루틴은 유니티가 이미 멈춤

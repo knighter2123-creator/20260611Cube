@@ -218,11 +218,7 @@ public partial class ChatManager : MonoBehaviour
 
     // ───────────────────────────── 보내기 ─────────────────────────────
 
-    /// <summary>
-    /// 메시지를 보냅니다. toUid 가 있으면 그 사람과의 대화방으로 (개인 메시지).
-    /// 결과는 메인 스레드에서 onDone(오류 문구) 로 옵니다 — 성공이면 null.
-    /// 검사에 걸리면 서버에 보내지 않고 바로 onDone 을 부릅니다.
-    /// </summary>
+    /// <summary>메시지 전송(toUid 가 있으면 개인 대화방) — 결과는 onDone(오류 문구, 성공이면 null), 검사에 걸리면 서버에 안 보내고 바로 onDone.</summary>
     public void Send(string raw, Action<string> onDone, string toUid = null)
     {
         string text  = (raw ?? string.Empty).Replace('\n', ' ').Replace('\r', ' ').Trim();
@@ -285,10 +281,7 @@ public partial class ChatManager : MonoBehaviour
 
     // ───────────────────────────── 도우미 타입 ─────────────────────────────
 
-    /// <summary>
-    /// 리스너 하나의 연결 상태 — 연결된 UID, 끊긴 이유, 다시 연결할 시각.
-    /// 채팅은 신원(TryGetIdentity)을, 친구·개인 메시지는 채팅의 Key 를 따라 열고 닫습니다.
-    /// </summary>
+    /// <summary>리스너 하나의 연결 상태(연결 UID·끊긴 이유·재연결 시각) — 채팅은 신원을, 친구·개인 메시지는 채팅의 Key 를 따라 열고 닫음.</summary>
     private sealed class Connection
     {
         public string Key        { get; private set; }   // 연결된 UID (null = 끊김)

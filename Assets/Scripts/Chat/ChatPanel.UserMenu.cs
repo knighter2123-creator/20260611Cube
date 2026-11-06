@@ -18,8 +18,7 @@ public partial class ChatPanel
     [Tooltip("누른 자리와 메뉴 상자 사이 간격 (1920x1080 기준)")]
     [SerializeField] private float menuGap = 16f;
 
-    // 메뉴 상자(Box)의 크기·색·버튼 배치·폰트는 하이어라키(ChatCanvas > Panel > UserMenu > Box)에서 직접 고치세요.
-    // 코드는 위치만 정합니다 (누른 자리 옆). 버튼 글자 중 '친구' 버튼은 관계에 따라 바뀌므로 인스펙터 texts.menu* 칸에서 고칩니다.
+    // 메뉴 모양은 하이어라키(…/UserMenu/Box)에서, 코드는 위치만 (관계에 따라 바뀌는 '친구' 버튼 글자는 인스펙터 texts.menu*)
 
     private string menuUid;
     private string menuName;
@@ -59,10 +58,7 @@ public partial class ChatPanel
         menuUid = menuName = null;
     }
 
-    /// <summary>
-    /// 메뉴 상자를 누른 자리 오른쪽 아래에 둡니다 (화면 밖으로 나가면 반대쪽으로).
-    /// 하이어라키에서 정한 상자의 크기·pivot·scale 은 그대로 둡니다 — anchor 만 가운데로 모읍니다 (크기는 유지).
-    /// </summary>
+    /// <summary>메뉴 상자를 누른 자리 오른쪽 아래에(화면 밖이면 반대쪽) — 하이어라키의 크기·pivot·scale 은 유지하고 anchor 만 모음.</summary>
     private void PlaceMenu(Vector2 screenPosition)
     {
         var area = (RectTransform)userMenuBox.parent;
@@ -150,10 +146,7 @@ public partial class ChatPanel
         if (uid != null) OpenDirect(uid, name);
     }
 
-    /// <summary>
-    /// 차단 — 그 사람의 메시지가 바로 사라집니다. 해제는 친구 창의 차단 목록에서만 합니다
-    /// (차단한 사람의 메시지는 채팅에 보이지 않으므로 이 메뉴를 다시 열 수 없음).
-    /// </summary>
+    /// <summary>차단 — 메시지가 바로 사라짐 (메시지가 안 보여 이 메뉴를 다시 못 여니 해제는 친구 창 차단 목록에서).</summary>
     private void OnMenuBlock()
     {
         ChatManager chat = ChatManager.Instance;

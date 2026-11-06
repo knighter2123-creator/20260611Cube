@@ -2,10 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-/// <summary>
-/// 플레이어 레벨 / 경험치 HUD
-/// Canvas 위에 배치하고 LevelUpManager의 이벤트를 구독합니다.
-/// </summary>
+/// <summary>플레이어 레벨·경험치 HUD — LevelUpManager 이벤트를 구독해 갱신 (매니저가 재생성돼도 다시 붙음).</summary>
 public class PlayerExpUI : MonoBehaviour
 {
     [Header("UI 참조")]
@@ -13,8 +10,7 @@ public class PlayerExpUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI expText;     // "120 / 300"
     [SerializeField] private Slider          expSlider;   // 경험치 바
 
-    // 구독한 매니저. 해제·표시 모두 Instance 가 아니라 이 대상을 씁니다
-    // (매니저가 재생성되면 Instance 가 바뀌어도 옛 구독을 정확히 풀 수 있게).
+    // 구독한 매니저 (해제·표시 모두 이 대상 — 재생성돼도 옛 구독을 정확히 풂)
     private LevelUpManager bound;
 
     void Awake()
@@ -30,8 +26,7 @@ public class PlayerExpUI : MonoBehaviour
 
     void Update()
     {
-        // LevelUpManager 가 나중에 만들어지거나 재생성돼도 붙을 때까지 재시도
-        // (파괴된 매니저는 Unity 식 == null 로 걸리므로 재생성도 여기서 처리됩니다)
+        // 매니저가 나중에 생기거나 재생성돼도 붙을 때까지 재시도 (파괴는 Unity == null 로 걸림)
         if (bound == null) TryBind();
     }
 

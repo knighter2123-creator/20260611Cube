@@ -2,16 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 증강 카드 선택창 — "어떻게 움직이는가".
-///
-/// 등장 연출, 선택 연출, 자동선택 카운트다운이 모여 있습니다.
-///
-/// ★ 이 파일의 모든 시간 계산은 Time.unscaledDeltaTime 을 씁니다.
-///   창이 떠 있는 동안 Time.timeScale 이 0이라, deltaTime 을 쓰면
-///   0이 계속 더해져 연출이 첫 프레임에서 영원히 멈춥니다.
-///   "일시정지 중에도 움직여야 하는 것"은 전부 unscaled 라고 기억해 두세요.
-/// </summary>
+/// <summary>증강 선택창 연출: 카드 순차 팝업 등장, 고른 카드 튕김 후 페이드, 자동 선택 카운트다운 — ★ timeScale 0 이라 모든 시간은 unscaledDeltaTime.</summary>
 public partial class AugmentSelectUI
 {
     // 연출 타이밍 (초)
@@ -25,9 +16,7 @@ public partial class AugmentSelectUI
     private const float PickFadeTime      = 0.15f;   // 창이 사라지는 시간
     private const float UnpickedAlpha     = 0.25f;   // 안 고른 카드가 흐려지는 정도
 
-    // ─────────────────────────────────────────────────────────
-    //  등장 연출
-    // ─────────────────────────────────────────────────────────
+    // ── 등장 연출 ──
     private IEnumerator PlayIntro()
     {
         rootGroup.alpha = 0f;
@@ -71,8 +60,7 @@ public partial class AugmentSelectUI
             yield return null;
         }
 
-        // 프레임 시간이 튀어도 최종 상태가 정확히 남도록 마지막에 확정값을 씁니다.
-        // (중간에 끊기는 경우는 StopIntro 가 같은 확정값을 씁니다)
+        // 프레임이 튀어도 최종 상태가 정확하게 확정값 (중간에 끊기면 StopIntro 가 같은 값)
         rootGroup.alpha = 1f;
         for (int i = 0; i < rts.Count; i++)
         {
@@ -83,9 +71,7 @@ public partial class AugmentSelectUI
         introRoutine = null;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  선택 연출 → 닫기 → 콜백
-    // ─────────────────────────────────────────────────────────
+    // ── 선택 연출 → 닫기 → 콜백 ──
     private IEnumerator PlayPickAndClose(AugmentCard card, GameObject chosenGo)
     {
         FadeUnchosenCards(chosenGo);
@@ -117,9 +103,7 @@ public partial class AugmentSelectUI
 
         Close();
 
-        // ★ 콜백은 창을 닫고 timeScale 을 되돌린 뒤에 부릅니다.
-        //   그래야 카드 효과 안에서 연출(레벨업 이펙트 등)을 재생해도 정상 속도로 보입니다.
-        //   순서를 바꾸면 "레벨업 연출이 멈춘 채로 떠 있는" 버그가 납니다.
+        // ★ 콜백은 timeScale 복구 뒤에 — 먼저 부르면 카드 효과의 레벨업 연출이 멈춘 채 뜸
         onChosen?.Invoke(card);
         onChosen = null;
     }
@@ -135,9 +119,7 @@ public partial class AugmentSelectUI
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  자동 선택 카운트다운
-    // ─────────────────────────────────────────────────────────
+    // ── 자동 선택 카운트다운 ──
     private IEnumerator AutoPickCountdown(List<AugmentCard> cards)
     {
         SetTimerVisible(true);
@@ -159,9 +141,7 @@ public partial class AugmentSelectUI
         timerRoutine = null;
         if (picked) yield break;
 
-        // 시간이 다 되면 랜덤으로 한 장 고릅니다.
-        // 방치형이라 "플레이어가 자리에 없다"가 정상 상황이므로,
-        // 게임이 멈춘 채 방치되지 않게 하는 안전장치입니다.
+        // 시간이 다 되면 랜덤 한 장 — 방치형은 자리를 비우는 게 정상이라 게임이 멈춘 채 남지 않게
         int idx = Random.Range(0, cards.Count);
         GameObject go = idx < spawnedCards.Count ? spawnedCards[idx] : null;
         OnClickCard(cards[idx], go);

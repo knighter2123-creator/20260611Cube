@@ -1,19 +1,7 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// 최고 클리어 스테이지 기록 — 랭킹에 올라가는 값.
-///
-/// [왜 currentWorld/currentStage 를 그대로 쓰지 않나]
-///   스테이지 실패 시 현재 스테이지가 한 단계 내려갑니다(StageManager.StageFail).
-///   그 값을 올리면 실패할 때마다 랭킹이 떨어지므로, "가장 멀리 깬 곳" 을 따로 기록합니다.
-///
-/// 저장 위치: SaveData.bestClearedProgress / bestClearedAt
-///   PlayerProfile 과 같은 방식 — 값을 따로 들고 있지 않고 매번 SaveManager.Current 를 읽습니다.
-///   StageClear 직후 StageManager 가 Save() 를 부르므로 따로 저장하지 않습니다.
-///
-/// [진행도 숫자]  1-1 클리어 = 1, 1-10 클리어 = 10, 2-1 클리어 = 11 … (0 = 아직 없음)
-/// </summary>
+/// <summary>랭킹용 최고 클리어 기록(진행도 1-1=1, 2-1=11…) — 실패 시 내려가는 currentStage 대신 '가장 멀리 깬 곳'을 SaveData 에 따로 둠.</summary>
 public static class StageRecord
 {
     /// <summary>최고 기록이 갱신된 순간 호출됩니다. (RankingManager 업로드용)</summary>
@@ -27,13 +15,7 @@ public static class StageRecord
 
     private static SaveData Data => SaveManager.Instance != null ? SaveManager.Instance.Current : null;
 
-    /// <summary>
-    /// 최고 클리어 진행도. 0 = 없음.
-    ///
-    /// ★ 기존 유저 이관: 이 필드가 생기기 전 세이브는 0 입니다.
-    ///   지금 스테이지에 와 있다는 건 그 앞 스테이지를 전부 깼다는 뜻이므로
-    ///   StageFormula.Progress(현재) (= 현재 앞까지 깬 개수) 와 비교해 큰 값을 씁니다.
-    /// </summary>
+    /// <summary>최고 클리어 진행도(0=없음) — 필드가 없던 옛 세이브도 맞도록 '현재 스테이지 앞까지 깬 개수'와 비교해 큰 값.</summary>
     public static int BestProgress
     {
         get
@@ -58,10 +40,7 @@ public static class StageRecord
         }
     }
 
-    /// <summary>
-    /// StageManager.StageClear 에서 "방금 깬" 월드·스테이지로 호출합니다 (currentStage++ 이전).
-    /// 기록이 갱신되면 true.
-    /// </summary>
+    /// <summary>StageClear 에서 방금 깬 스테이지로(currentStage++ 전) 호출 — 기록이 갱신되면 OnImproved 를 알리고 true.</summary>
     public static bool ReportClear(int world, int stage)
     {
         SaveData d = Data;

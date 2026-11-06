@@ -77,8 +77,7 @@ public class GachaUIManager : MonoBehaviour
 
         closeResultButton.onClick.AddListener(() => ShowGachaPanel());
 
-        // 결과 창은 자체 Canvas(Override Sorting)로 Tab bar 위에 그려집니다 (ShopScene).
-        //   배경 Image 가 터치를 받아야 뒤에 있는 Tab bar 버튼이 눌리지 않으므로, 씬에서 꺼져 있어도 켭니다.
+        // 결과 창 배경 Image 를 켬 — 터치를 막아야 뒤 Tab bar 버튼이 눌리지 않음
         if (resultPanel.TryGetComponent(out Graphic resultBackground)) resultBackground.raycastTarget = true;
         else Debug.LogWarning("[GachaUIManager] 결과 창에 배경 Image 가 없어 뒤의 Tab bar 가 눌릴 수 있습니다.", this);
 
@@ -125,12 +124,7 @@ public class GachaUIManager : MonoBehaviour
         label.text = gemCost >= 0 ? $"보석 {NumberFormat.Short(gemCost)}" : string.Empty;
     }
 
-    /// <summary>
-    /// effectLayer가 씬 오브젝트인지 검사.
-    /// 프리팹 애셋을 인스펙터에 넣으면 Instantiate(prefab, parent)가
-    /// "Cannot instantiate objects with a parent which is persistent" 경고를 내고
-    /// 부모 없이 씬 루트에 생성됩니다.
-    /// </summary>
+    /// <summary>effectLayer 가 씬 오브젝트인지 검사 (프리팹 애셋이면 부모 없이 씬 루트에 생성됨).</summary>
     private void ValidateEffectLayer()
     {
         effectLayerValid = false;
@@ -172,11 +166,7 @@ public class GachaUIManager : MonoBehaviour
         resultPanel.SetActive(true);
     }
 
-    /// <summary>
-    /// count 회 뽑기. 뽑기 화면 버튼과 결과 화면의 다시 뽑기 버튼이 함께 씁니다.
-    /// ★ 연출 중인지를 '결제 전에' 확인합니다. 예전처럼 Draw 를 먼저 부르고 OnDraw 에서 막으면
-    ///   재화는 빠지고 결과는 버려집니다 (결과 화면에서 연출 중에 다시 뽑기를 누르는 경우).
-    /// </summary>
+    /// <summary>count 회 뽑기(뽑기·다시 뽑기 버튼 공용) — 연출 중 여부를 결제 전에 확인 (뒤에서 막으면 재화만 빠짐).</summary>
     private void TryDraw(int count)
     {
         if (revealing != null) return;
@@ -184,8 +174,7 @@ public class GachaUIManager : MonoBehaviour
         GachaSystem gacha = GachaSystem.Instance;
         if (gacha == null || gacha.IsDrawing) return;   // 서버 응답 대기 중 → 연타로 이중 결제 방지
 
-        // 서버 추첨이라 결과는 나중에 옵니다. 그 사이 씬이 바뀌어 이 UI 가 사라졌으면 무시합니다
-        // (지급·저장은 GachaSystem 이 이미 끝냈으므로 보상은 남습니다).
+        // 응답 전에 UI 가 사라졌으면 무시 (지급·저장은 이미 끝나 보상은 남음)
         System.Action<List<GachaSystem.GachaResult>> onDone = results =>
         {
             if (this == null) return;
@@ -254,15 +243,7 @@ public class GachaUIManager : MonoBehaviour
         return groups;
     }
 
-    /// <summary>
-    /// 이전 뽑기 결과를 모두 제거합니다.
-    ///
-    /// ★ foreach (Transform child in resultContent) 안에서 계층을 바꾸면 안 됩니다.
-    ///   Transform의 열거자는 인덱스를 하나씩 올리며 GetChild(i)를 부르는데,
-    ///   중간에 자식을 떼어내면 뒤 인덱스가 당겨져서 '한 칸씩 건너뛰며' 절반만 지워집니다.
-    ///   → 10연차 뒤 1연차를 하면 이전 기물이 남아 보이던 원인이 이것입니다.
-    ///   반드시 역순 인덱스로 순회하세요.
-    /// </summary>
+    /// <summary>이전 결과 제거 — 역순 인덱스 순회 (foreach 중 자식을 떼면 인덱스가 당겨져 절반만 지워짐).</summary>
     private void ClearResults()
     {
         if (resultContent == null) return;
@@ -296,8 +277,7 @@ public class GachaUIManager : MonoBehaviour
             ui.Setup(result, group.count, group.hasNew);
             ui.PlayAppear();
 
-            // ★ 방금 생성한 아이템은 아직 레이아웃이 계산되지 않아 position이 (0,0)이거나
-            //   직전 위치입니다. 여기서 강제로 레이아웃을 확정해야 이펙트가 제 위치에 붙습니다.
+            // 레이아웃 강제 확정 — 막 생성한 아이템은 위치가 아직 계산 전이라 이펙트가 엉뚱한 곳에 붙음
             if (contentRect != null)
                 LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
 

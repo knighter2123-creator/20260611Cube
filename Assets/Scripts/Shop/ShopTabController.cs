@@ -3,19 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 뽑기 / 골드 / 보석 탭 토글. 선택된 탭의 패널만 켜고 나머지는 끈다.
-/// 탭 추가 = 인스펙터의 tabs 리스트에 항목 1개 추가 (코드 수정 불필요).
-///
-/// [작동 순서]
-///   Start: 각 탭 버튼에 "누르면 Select(내 번호)" 를 연결 → 기본 탭 선택
-///   버튼 클릭 → Select(i): 모든 탭을 돌며 i 번만 켜고 나머지는 끔
-///
-/// [왜 "켤 것만 켜기" 가 아니라 "전부 돌며 켜고 끄기" 인가]
-///   "이전 탭을 기억했다가 그것만 끄기" 는 기억한 값이 한 번 어긋나면 패널 두 개가 동시에 켜집니다.
-///   매번 전체를 원하는 상태로 다시 맞추면 이전 상태가 무엇이었든 결과가 항상 같습니다.
-///   (AugmentManager.RecalculatePermanent 의 "매번 처음부터 다시 계산" 과 같은 생각입니다)
-/// </summary>
+/// <summary>뽑기/골드/보석 탭 토글(탭 추가 = 인스펙터 tabs 에 항목 추가) — Select(i) 는 매번 전체를 돌며 i 만 켜고 나머지를 꺼서 이전 상태와 무관하게 결과가 같음.</summary>
 public class ShopTabController : MonoBehaviour
 {
     // [Serializable] 을 붙여야 인스펙터 리스트에 펼쳐서 보입니다.
@@ -30,10 +18,7 @@ public class ShopTabController : MonoBehaviour
 
     [SerializeField] private List<Tab> tabs = new();
 
-    // ★ 기본 탭은 '번호' 가 아니라 'id' 로 정합니다.
-    //   번호는 탭을 추가 · 삭제 · 순서 변경할 때마다 가리키는 탭이 바뀝니다.
-    //   실제로 탭이 2개(0~1)로 줄었는데 defaultIndex 가 2 로 남아, 아래 Clamp 때문에 뽑기가 아닌 골드 탭이 열렸습니다.
-    //   id 는 순서와 무관하게 같은 탭을 가리킵니다.
+    // 기본 탭은 번호가 아닌 id 로 (번호는 탭 추가·삭제·순서 변경 때 엉뚱한 탭을 가리킴)
     [Tooltip("상점을 열었을 때 처음 보일 탭의 id (tabs 의 id 와 철자까지 같아야 함). 비우거나 못 찾으면 Default Index 를 씁니다.")]
     [SerializeField] private string defaultTabId = "Gacha_UI";
 
@@ -69,8 +54,7 @@ public class ShopTabController : MonoBehaviour
                              "tabs 의 id 철자를 확인하세요.", this);
         }
 
-        // 인스펙터에서 탭을 지운 뒤 defaultIndex 가 범위를 벗어나면 모든 패널이 꺼진 빈 화면이 됩니다.
-        // 범위 안으로 당겨서 최소한 첫/마지막 탭은 보이게 하되, 조용히 넘어가지 않고 알립니다.
+        // 범위를 벗어나면 Clamp 후 경고 (빈 화면 방지)
         if (defaultIndex >= tabs.Count)
             Debug.LogWarning($"[ShopTabController] Default Index({defaultIndex}) 가 탭 수({tabs.Count})를 넘어 마지막 탭을 엽니다.", this);
 

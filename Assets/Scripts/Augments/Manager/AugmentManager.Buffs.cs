@@ -1,18 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 증강 시스템 — 지속시간이 있는 임시 버프.
-///
-/// "적 생성 주기 30% 감소, 45초간" 같은 카드가 여기서 관리됩니다.
-///
-/// [설계 원칙 — 배율 레이어]
-/// 값을 직접 빼지 않고 배율(×0.7)로 다룹니다.
-/// 뺄셈으로 하면 적이 강해질수록 효과가 무의미해지고 음수가 되는 사고도 생깁니다.
-/// 배율은 어느 구간에서든 체감이 일정합니다.
-/// 프로젝트의 TargetMove 가 baseSpeed × spawnSpeedMult × slowMultiplier 로
-/// 레이어를 쌓는 것과 똑같은 방식입니다.
-/// </summary>
+/// <summary>증강 임시 버프("적 생성 주기 30% 감소, 45초간" 등): 종류별 배율(×0.7)로 다루고 만료·스테이지 종료 때 제거 — 뺄셈이면 후반에 무의미하고 음수가 될 수 있어서.</summary>
 public partial class AugmentManager
 {
     /// <summary>진행 중인 임시 버프 하나.</summary>
@@ -30,25 +19,16 @@ public partial class AugmentManager
     private float spawnDelayMul   = 1f;
     private float enemyDefenseMul = 1f;
 
-    // ─────────────────────────────────────────────────────────
-    //  갱신 — 코어의 Update 에서 매 프레임 호출됩니다
-    // ─────────────────────────────────────────────────────────
+    // ── 갱신 — 코어의 Update 에서 매 프레임 호출됩니다 ──
     private void TickTempBuffs()
     {
         if (tempBuffs.Count == 0) return;   // 대부분의 프레임은 여기서 끝납니다
 
-        // ★ Time.time 을 쓰는 이유
-        //   카드 선택창이 떠서 timeScale = 0 인 동안에는 Time.time 도 멈춥니다.
-        //   즉 플레이어가 고민하는 시간만큼 버프가 손해 보지 않습니다.
-        //   (unscaledTime 을 쓰면 멈춘 동안에도 버프가 흘러가 버립니다)
+        // Time.time — 카드 선택창(timeScale 0) 동안 버프 시간이 흐르지 않게 (unscaledTime 이면 흘러감)
         float now = Time.time;
         bool  changed = false;
 
-        // ─── 역순 순회 (학습 포인트) ────────────────────────────────
-        // 앞에서부터 돌면서 지우면, 지운 자리로 뒤 원소가 당겨오면서 한 칸씩 건너뜁니다.
-        // 뒤에서부터 지우면 아직 방문하지 않은 앞쪽 인덱스가 흔들리지 않습니다.
-        // StageManager.NextStage() 가 Enemy.Active 를 도는 방식과 같습니다.
-        // ────────────────────────────────────────────────────────
+        // 역순으로 지움 (앞에서 지우면 당겨진 원소를 건너뜀)
         for (int i = tempBuffs.Count - 1; i >= 0; i--)
         {
             if (now < tempBuffs[i].endTime) continue;
@@ -60,9 +40,7 @@ public partial class AugmentManager
         if (changed) RecalculateTemp();
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  등록 / 해제
-    // ─────────────────────────────────────────────────────────
+    // ── 등록 / 해제 ──
 
     /// <param name="duration">0 이하면 스테이지가 끝날 때까지 유지</param>
     public void AddTempBuff(AugmentBuffKind kind, float multiplier, float duration)
@@ -105,16 +83,9 @@ public partial class AugmentManager
         RecalculateTemp();
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  계산
-    // ─────────────────────────────────────────────────────────
+    // ── 계산 ──
 
-    /// <summary>
-    /// 같은 종류의 버프는 곱으로 누적됩니다. (0.7 × 0.7 = 0.49)
-    ///
-    /// 여기서도 "누적하지 않고 매번 1부터 다시 계산" 원칙을 지킵니다.
-    /// 버프가 붙고 떨어지는 순서가 어떻든 결과가 항상 같아집니다.
-    /// </summary>
+    /// <summary>같은 종류는 곱으로 누적(0.7 × 0.7 = 0.49), 매번 1부터 다시 계산해 붙고 떨어지는 순서와 무관하게 같은 결과.</summary>
     private void RecalculateTemp()
     {
         spawnDelayMul   = 1f;

@@ -1,18 +1,8 @@
 using TMPro;
 using UnityEngine;
 
-/// <summary>
-/// 소환권 보유 수 표시. ShopScene 에만 둡니다.
-///
-/// [왜 CurrencyHUD 에 칸을 추가하지 않았나]
-///   CurrencyHUD 는 StageScene · EvolveScene · ShopScene 이 함께 쓰는 골드/보석 표시입니다.
-///   소환권은 "상점에서만 보인다" 가 규칙이라, 보여 줄 씬에만 이 컴포넌트를 붙이는 쪽이
-///   씬마다 칸을 비워 두는 것보다 실수할 여지가 적습니다. (StageScene 에는 붙이지 마세요)
-///
-/// [붙이는 법]
-///   ShopScene 의 골드/보석 표시 옆에 소환권 아이콘 + TMP 텍스트를 두고,
-///   이 컴포넌트를 그 오브젝트(또는 항상 켜진 부모)에 붙여 Count Text 를 연결합니다.
-/// </summary>
+/// <summary>소환권 보유 수 표시(ShopScene 전용) — 공용 CurrencyHUD 에 칸을 넣는 대신 보일 씬에만 붙임.</summary>
+// [붙이는 위치] ShopScene 골드/보석 옆 아이콘+TMP 오브젝트(또는 항상 켜진 부모)에 붙이고 Count Text 연결, StageScene 엔 붙이지 말 것
 public class GachaTicketHUD : MonoBehaviour
 {
     [Tooltip("보유 수를 표시할 텍스트")]

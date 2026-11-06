@@ -3,32 +3,9 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 스테이지 랭킹 창 — "순위 / 닉네임 / 스테이지" 목록 + 맨 아래 내 순위.
-///
-/// [붙이는 위치]
-///   StageScene 의 항상 켜진 빈 오브젝트. 여는 버튼에는 OpenRankingButton 을 붙이고 이 컴포넌트를 연결하세요.
-///
-/// [UI]  씬에 있는 오브젝트를 아래 칸에 연결해서 씁니다.
-///   처음 만들거나 모양을 다시 만들 때는 StageScene 을 열고 Tools/UI 굽기/랭킹 창 메뉴를 누르세요 (UIBaker) —
-///   RankingCanvas 를 씬 최상위에 만들고 아래 칸을 모두 채웁니다. 그 뒤 씬을 저장하면 됩니다.
-///   RankingCanvas 를 씬 최상위에 두는 이유: 다른 캔버스(예: Safe Panel) 안에 넣으면 '중첩 캔버스' 가 되어
-///   sortingOrder·CanvasScaler 가 무시되고, 어두운 배경도 Safe Area 만큼만 덮습니다.
-///
-///   RankingCanvas (Canvas 500)
-///     Dim (Button)               ← dimButton. 누르면 닫힘
-///     Window
-///       Title / Close (Button)   ← closeButton
-///       Header (RankingRow)      ← 머리줄
-///       Viewport (ScrollRect)
-///         Content (VerticalLayoutGroup)   ← content
-///           Row (RankingRow, 꺼 둠)         ← rowTemplate. 복제해서 씀
-///         Status                 ← statusText
-///       MyRank / Text            ← myRankText
-///
-/// [데이터]  RankingManager.FetchTop 으로 받아 와 그리기만 합니다 (값을 들고 있지 않음).
-///   너무 자주 열고 닫아도 서버 조회가 몰리지 않도록 refreshCooldown 동안은 이전 결과를 다시 씁니다.
-/// </summary>
+/// <summary>랭킹 창: RankingManager.FetchTop 결과를 rowTemplate 복제로 그리고 맨 아래 내 순위를 표시 (refreshCooldown 동안은 이전 결과 재사용해 서버 조회를 줄임).</summary>
+// [붙이는 위치] StageScene 의 항상 켜진 오브젝트 / UI 는 Tools/UI 굽기/랭킹 창(UIBaker)으로 만들고 씬 저장
+// ⚠ RankingCanvas 는 씬 최상위에 둘 것 — 다른 캔버스 안이면 중첩 캔버스가 되어 sortingOrder·CanvasScaler 가 무시되고 Dim 이 Safe Area 만 덮음
 public class RankingPanel : MonoBehaviour
 {
     [Header("UI (Tools/UI 굽기/랭킹 창 이 채움)")]
@@ -78,8 +55,7 @@ public class RankingPanel : MonoBehaviour
     public TMP_FontAsset Font         => font;
     public int           SortingOrder => sortingOrder;
 
-    // 굽기 기본값 — UIBaker 가 Row 템플릿·MyRank 줄을 이 색으로 굽고, RankingRow 강조 색 칸의 기본값도 여기서 옵니다.
-    // 실제로 쓰는 색은 하이어라키의 Row 템플릿(평소 색)과 그 RankingRow 컴포넌트(강조 색)에서 고치세요.
+    // UIBaker 굽기 기본색 — 실제 색은 하이어라키 Row 템플릿(평소)과 RankingRow 컴포넌트(강조)에서 고칠 것
     public static readonly Color RowColor    = new Color(1f, 1f, 1f, 0.04f);
     public static readonly Color MyRowColor  = new Color(1f, 0.85f, 0.2f, 0.25f);
     public static readonly Color GoldColor   = new Color(1f, 0.85f, 0.2f);

@@ -1,11 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 서버(뒤끝) 우편을 주기적으로 받아 옵니다 — 로그인 직후 한 번, 이후 refreshInterval 마다.
-/// 우편함 창을 열 때도 받아 옵니다 (MailboxPanel.Open).
-///
-/// [붙이는 위치]  따로 붙이지 않습니다. RankingManager.Awake 가 같은 오브젝트(ManagerRoot 하위)에 붙입니다.
-/// </summary>
+/// <summary>서버 우편을 로그인 직후 한 번, 이후 refreshInterval 마다 받아 오고 로그아웃 시 비움 (RankingManager.Awake 가 자동으로 붙임).</summary>
 public class MailboxSync : MonoBehaviour
 {
     [Tooltip("서버 우편을 다시 받아 오는 간격(초). 랭킹 보상은 주 1회라 자주 받을 필요가 없습니다.")]

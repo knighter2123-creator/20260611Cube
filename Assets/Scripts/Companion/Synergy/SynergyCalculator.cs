@@ -1,14 +1,6 @@
 using System.Collections.Generic;
 
-/// <summary>
-/// 배치된 동료 목록 → 시너지 결과. **상태가 없는 순수 함수입니다.**
-///
-/// ★ 왜 MonoBehaviour 가 아니라 static 함수인가
-///   · 같은 입력이면 항상 같은 결과 — 씬 · 실행 순서 · 타이밍과 무관합니다.
-///   · 실제로 배치하지 않은 '가상 배치' 로도 계산할 수 있습니다 (나중에 배치 미리보기에 그대로 씁니다).
-///   · 씬 없이 유닛 테스트할 수 있습니다.
-///   보관과 이벤트는 CompanionManager.Synergy.cs 가 맡습니다.
-/// </summary>
+/// <summary>배치된 동료 → 시너지 결과(상태 없는 static 순수 함수) — 실행 순서와 무관하고 가상 배치 미리보기·씬 없는 테스트도 가능, 보관·이벤트는 CompanionManager.Synergy.</summary>
 public static class SynergyCalculator
 {
     /// <param name="placed">맵에 배치된 동료 데이터. null · 중복 id 는 무시합니다.</param>
@@ -17,9 +9,7 @@ public static class SynergyCalculator
     {
         if (defs == null || defs.Count == 0) return SynergyResult.Empty;
 
-        // ── 1) 계열별 인원 수 ──
-        // ★ id 기준으로 한 번씩만 셉니다. 지금은 같은 동료를 두 칸에 둘 수 없지만,
-        //   규칙이 바뀌어도 "같은 동료 2명으로 2단계" 가 되지 않게 계산기 쪽에서 막아 둡니다.
+        // ── 1) 계열별 인원 수 — id 기준 한 번씩만 (같은 동료 두 명으로 단계가 오르지 않게) ──
         var counts  = new Dictionary<SynergyTag, int>();
         var seenIds = new HashSet<string>();
 
@@ -59,8 +49,7 @@ public static class SynergyCalculator
             states.Add(new SynergyState(def, count, active, next));
         }
 
-        // HUD 순서. List.Sort 는 안정 정렬이 아니라서 sortOrder 가 같으면 이름으로 한 번 더 비교합니다
-        // (그러지 않으면 같은 sortOrder 끼리 순서가 실행할 때마다 바뀔 수 있습니다).
+        // HUD 순서 — List.Sort 는 불안정 정렬이라 sortOrder 가 같으면 이름으로 한 번 더 비교
         states.Sort((a, b) =>
         {
             int c = a.Definition.sortOrder.CompareTo(b.Definition.sortOrder);
@@ -88,10 +77,7 @@ public static class SynergyCalculator
         return n;
     }
 
-    /// <summary>
-    /// 인원 수로 적용 단계와 다음 단계를 고릅니다.
-    /// 단계 목록이 정렬돼 있다고 가정하지 않습니다 (에셋을 손으로 고치다 순서가 섞여도 맞게 동작).
-    /// </summary>
+    /// <summary>인원 수로 적용 단계·다음 단계 선택 (단계 목록 순서가 섞여도 맞게 동작).</summary>
     private static void PickTier(SynergyDefinition def, int count, out SynergyTier active, out int next)
     {
         active = null;

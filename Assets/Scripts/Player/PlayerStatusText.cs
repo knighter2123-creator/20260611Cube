@@ -1,27 +1,10 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// PlayerStat → 화면에 띄울 문자열. **UI 부품을 전혀 모릅니다.**
-///
-/// ─────────────────────────────────────────────────────────────
-/// [왜 이 클래스를 따로 만들었나]
-///
-/// 스탯창(PlayerStatusCodeUI)은 "어디에 놓을지" 만 담당하고, "무슨 문장을 보여줄지" 는 여기서 정합니다.
-/// 스탯창을 다른 방식(프리팹 배치 등)으로 다시 만들더라도 이 클래스를 그대로 쓰면
-/// 같은 값·같은 문장이 보장됩니다.
-///
-///   판단 기준: 이 코드가 TMP_Text 나 Button 이라는 부품을 몰라도 되는가?
-///             몰라도 된다면 UI 밖으로 빼는 게 맞습니다.
-///
-/// static 클래스인 이유: 상태가 없습니다. 같은 PlayerStat 을 넣으면 항상 같은 문자열이 나옵니다.
-/// ─────────────────────────────────────────────────────────────
-/// </summary>
+/// <summary>PlayerStat → 스탯창 문자열(합계·출처별 세부 내역) — UI 부품을 몰라서 스탯창을 다른 방식으로 다시 만들어도 같은 문장 보장, 상태가 없어 static.</summary>
 public static class PlayerStatusText
 {
-    // ══════════════════════════════════════════════════════════
-    //  라벨 — 두 UI 버전이 같은 이름을 쓰도록 여기에 모읍니다
-    // ══════════════════════════════════════════════════════════
+    // ── 라벨 — 두 UI 버전이 같은 이름을 쓰도록 여기에 모읍니다 ──
     public const string TITLE              = "스탯";
     public const string LABEL_DAMAGE       = "공격력";
     public const string LABEL_CRIT_DAMAGE  = "치명타 공격력";
@@ -31,18 +14,7 @@ public static class PlayerStatusText
     /// <summary>값을 아직 읽을 수 없을 때 쓰는 표시. 0 을 보여주면 거짓 정보가 됩니다.</summary>
     public const string UNKNOWN = "-";
 
-    // ══════════════════════════════════════════════════════════
-    //  ★ 글리프 — 폰트에 없는 문자를 여기서 한 번에 바꿉니다
-    // ══════════════════════════════════════════════════════════
-    //
-    // TMP 는 폰트 에셋에 없는 문자를 만나면 □ 로 그리고 경고를 냅니다.
-    // 게임용 한글 폰트(배민 주아체 등)는 가운뎃점(·)이나 곱셈기호(×)가 빠진 경우가 많습니다.
-    // 이렇게 이름 붙여 한곳에 모아두면 폰트를 바꿀 때 여기만 보면 됩니다.
-    //
-    // [원래 기호로 되돌리고 싶다면]
-    //   Window → TextMeshPro → Font Asset Creator
-    //   → Character Set 을 "Custom Characters" 로 두고 아래를 붙여넣어 재생성
-    //        ·×✕−…™©
+    // ── 글리프 — 한글 폰트(주아체 등)에 없는 ·× 는 □ 로 보여 대체 문자를 한곳에 (되돌리려면 Font Asset Creator 에 ·×✕−… 를 추가해 재생성) ──
 
     /// <summary>세부 내역의 구분자. 폰트에 가운뎃점(·)이 있으면 "  ·  " 가 더 예쁩니다.</summary>
     public const string SEPARATOR = "  |  ";
@@ -50,14 +22,9 @@ public static class PlayerStatusText
     /// <summary>배율 기호. 폰트에 곱셈기호(×)가 있으면 "×" 로 바꾸세요.</summary>
     public const string MULTIPLY = "x";
 
-    // ══════════════════════════════════════════════════════════
-    //  표시 옵션
-    // ══════════════════════════════════════════════════════════
+    // ── 표시 옵션 ──
 
-    /// <summary>
-    /// 두 UI 버전이 인스펙터에 그대로 노출할 수 있도록 [Serializable] 로 묶었습니다.
-    /// MonoBehaviour 가 아니라 데이터 묶음이라 씬에 올릴 필요가 없습니다.
-    /// </summary>
+    /// <summary>표시 옵션 묶음 — [Serializable] 이라 UI 인스펙터에 그대로 노출 (씬에 올릴 필요 없음).</summary>
     [Serializable]
     public class Style
     {
@@ -70,8 +37,7 @@ public static class PlayerStatusText
         [Tooltip("증강(이번 판 한정) 기여분을 강조할 색")]
         public Color augmentColor = new Color(1f, 0.82f, 0.35f);
 
-        // 증강과 다른 색을 쓰는 이유: 증강은 이번 판이 끝나면 사라지고, 각성은 영구입니다.
-        // 같은 색으로 칠하면 플레이어가 "이 수치가 계속 남는 건가?"를 구분할 수 없습니다.
+        // 각성(영구)은 증강(이번 판)과 다른 색 — 계속 남는 수치인지 구분되게
         [Tooltip("각성(영구) 기여분을 강조할 색")]
         public Color awakenColor = new Color(0.55f, 0.85f, 1f);
 
@@ -83,9 +49,7 @@ public static class PlayerStatusText
     // 호출부가 Style 을 넘기지 않아도 동작하게 기본값을 하나 들고 있습니다.
     private static readonly Style Fallback = new Style();
 
-    // ══════════════════════════════════════════════════════════
-    //  레벨 / 경험치
-    // ══════════════════════════════════════════════════════════
+    // ── 레벨 / 경험치 ──
     public static string Level(PlayerStat s) => s == null ? $"Lv. {UNKNOWN}" : $"Lv. {s.Level}";
 
     public static string Exp(PlayerStat s)
@@ -99,9 +63,7 @@ public static class PlayerStatusText
         return Mathf.Clamp01((float)s.Experience / s.MaxExperience);
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  공격력
-    // ══════════════════════════════════════════════════════════
+    // ── 공격력 ──
     public static string DamageTotal(PlayerStat s)
         => s == null ? UNKNOWN : NumberFormat.Short(s.FinalDamage);
 
@@ -121,9 +83,7 @@ public static class PlayerStatusText
             $"보너스 {MULTIPLY}{s.AugmentAttackMultiplier:0.00} ({NumberFormat.Signed(s.AugmentDamageBonus)})",
             !Mathf.Approximately(s.AugmentAttackMultiplier, 1f)));
 
-        // ★ 각성 영구 버프.
-        //   버프가 없을 때(x1.00)는 줄이 길어지기만 하므로 기본적으로 숨깁니다.
-        //   showEmptyContributions 를 켜두셨다면 다른 항목과 마찬가지로 항상 보입니다.
+        // 각성 영구 버프 — x1.00 이면 showEmptyContributions 가 꺼져 있을 때 숨김
         d += Sep(Colored(st, st.awakenColor,
             $"각성 {MULTIPLY}{s.PermanentDamageMultiplier:0.00} ({NumberFormat.Signed(s.AwakenDamageBonus)})",
             !Mathf.Approximately(s.PermanentDamageMultiplier, 1f)));
@@ -136,15 +96,7 @@ public static class PlayerStatusText
         return d;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  치명타 공격력
-    // ══════════════════════════════════════════════════════════
-    //
-    // 배수(×2.45)보다 "터지면 1,776 이 들어간다" 가 체감에 직결되므로
-    // 합계는 실제 대미지, 내역 맨 앞에 배수를 둡니다.
-    //
-    // ※ 합계(FinalCriticalDamage)는 FinalDamage 를 쓰므로 각성 버프가 자동 반영됩니다.
-    //   그래서 이 함수는 손댈 곳이 없습니다 — 레이어를 한 곳에서만 곱하게 만든 덕분입니다.
+    // ── 치명타 공격력 — 합계는 체감되는 실제 대미지(FinalDamage 기반이라 모든 배율 자동 반영), 배수는 내역 맨 앞 ──
 
     public static string CritDamageTotal(PlayerStat s)
         => s == null ? UNKNOWN : NumberFormat.Short(s.FinalCriticalDamage);
@@ -169,13 +121,7 @@ public static class PlayerStatusText
         return d;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  공격 속도
-    // ══════════════════════════════════════════════════════════
-    //
-    // ★ 내부 값(AttackSpd)은 "공격 주기 ms" 라서 작을수록 빠릅니다.
-    //   그대로 보여주면 강화했는데 숫자가 줄어드는 걸 보고 약해졌다고 오해합니다.
-    //   그래서 초당 공격 횟수로 뒤집습니다.
+    // ── 공격 속도 — 내부 ms 는 줄수록 빨라 약해진 걸로 오해하므로 초당 공격 횟수로 표시 ──
 
     public static string AttackSpeedTotal(PlayerStat s)
     {
@@ -206,9 +152,7 @@ public static class PlayerStatusText
         return d;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  치명타 확률
-    // ══════════════════════════════════════════════════════════
+    // ── 치명타 확률 ──
     public static string CritChanceTotal(PlayerStat s)
         => s == null ? UNKNOWN : $"{s.FinalCritical:0.##}%";
 
@@ -233,14 +177,7 @@ public static class PlayerStatusText
         return d;
     }
 
-    // ══════════════════════════════════════════════════════════
-    //  문자열 조립 도우미
-    // ══════════════════════════════════════════════════════════
-    //
-    // 세부 내역은 "구분자로 이어붙인 조각들" 입니다.
-    // 기여분이 0 인 조각을 숨기는 옵션이 있어서 조각은 있을 수도 없을 수도 있습니다.
-    // "조각을 만드는 함수" 와 "구분자를 붙이는 함수" 를 나누면
-    // 위쪽 Detail 함수들에서 if 문이 전부 사라집니다.
+    // ── 문자열 조립 — 조각 만들기(Part)와 구분자 붙이기(Sep)를 나눠 Detail 함수에서 if 를 없앰 ──
 
     /// <summary>조건이 참일 때만(또는 옵션이 켜져 있을 때만) 문자열을 남깁니다.</summary>
     private static string Part(Style st, string text, bool visible = true)
@@ -250,11 +187,7 @@ public static class PlayerStatusText
     private static string Sep(string text)
         => string.IsNullOrEmpty(text) ? string.Empty : SEPARATOR + text;
 
-    /// <summary>
-    /// TMP 리치 텍스트로 색을 입힙니다.
-    /// &lt;color=#RRGGBB&gt; 태그를 지원하므로 텍스트를 여러 개로 쪼개지 않고
-    /// 한 줄 안에서 부분 색상을 줄 수 있습니다. (Rich Text 가 켜져 있어야 합니다)
-    /// </summary>
+    /// <summary>TMP 리치 텍스트 color 태그로 한 줄 안 부분 색상 (Rich Text 필요).</summary>
     private static string Colored(Style st, Color color, string text, bool visible = true)
     {
         string body = Part(st, text, visible);

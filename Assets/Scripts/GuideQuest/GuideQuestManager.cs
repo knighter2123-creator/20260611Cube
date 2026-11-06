@@ -2,10 +2,8 @@ using System;
 using Manager.currency;
 using UnityEngine;
 
-/// <summary>
-/// 가이드 퀘스트 진행 관리자. UI 참조를 절대 들지 않는다.
-/// ManagerRoot 하위(LoginScene)에 배치 — DontDestroyOnLoad는 ManagerRoot가 담당.
-/// </summary>
+/// <summary>가이드 퀘스트 진행 관리자 (UI 참조 없음, 씬 전환에도 살아남게).</summary>
+// [붙이는 위치] LoginScene 의 ManagerRoot 하위 (DontDestroyOnLoad 는 ManagerRoot 담당)
 public partial class GuideQuestManager : MonoBehaviour
 {
     public static GuideQuestManager Instance { get; private set; }
@@ -19,9 +17,7 @@ public partial class GuideQuestManager : MonoBehaviour
 
     private bool isLoading = false;   // ApplyFrom 중 저장 억제 (다른 매니저 데이터 보호)
 
-    // ★ '각성 1회' 단계에 아직 도달하지 않았을 때 들어온 각성 클리어를 적립해둔다.
-    //   Claim이 수동이라, 레벨업 보상을 받기 전에 각성 스테이지를 클리어하면
-    //   보고가 그냥 버려지고 그 티어의 각성 퀘스트를 영영 못 깨는 사고가 납니다.
+    // '각성 1회' 단계 전에 들어온 각성 클리어 적립 (Claim 이 수동이라 버리면 그 퀘스트를 영영 못 깸)
     private int pendingEvolveClears = 0;
     private const int MaxPendingEvolveClears = 8;
 
@@ -32,7 +28,7 @@ public partial class GuideQuestManager : MonoBehaviour
     public event Action<GuideQuest> OnQuestChanged;
     /// <summary>진행도가 변할 때 (현재, 목표)</summary>
     public event Action<long, long> OnProgressChanged;
-    // ── 이벤트 (기존 OnRewardClaimed 교체) ────────
+    // ── 이벤트 ────────────────────────────────────
     /// <summary>보상 수령 완료 시 (재화 종류, 수량)</summary>
     public event Action<CurrencyType, int> OnRewardClaimed;
     /// <summary>스테이지 씬의 강화 UI가 즉시 열려야 할 때</summary>
@@ -42,9 +38,7 @@ public partial class GuideQuestManager : MonoBehaviour
     public long Progress => progress;
     public bool IsComplete => Current != null && progress >= Current.requiredCount;
 
-    // ══════════════════════════════════════════════
-    //  생명주기
-    // ══════════════════════════════════════════════
+    // ── 생명주기 ──
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -69,8 +63,7 @@ public partial class GuideQuestManager : MonoBehaviour
 
     private void Update()
     {
-        // ★ 원래는 Start에서 한 번만 구독을 시도해서, LevelUpManager가 아직 없으면
-        //   그 세션 내내 레벨업 퀘스트가 진행되지 않았습니다. 붙을 때까지 재시도합니다.
+        // LevelUpManager 에 붙을 때까지 재시도 (한 번만 시도하면 세션 내내 레벨업 퀘스트가 멈춤)
         if (!levelUpBound) TryBindLevelUp();
     }
 
@@ -81,8 +74,7 @@ public partial class GuideQuestManager : MonoBehaviour
 
         LevelUpManager.Instance.OnLevelUp += ReportLevelUp;
 
-        // ★ 세이브 로드/씬 전환으로 레벨이 '복원'될 때도 퀘스트 진행도는 따라가야 합니다.
-        //   (연출은 OnStatRestored 를 구독하지 않으므로 레벨업 이펙트는 재생되지 않습니다)
+        // 레벨 '복원'에도 진행도는 따라감 (연출은 이 이벤트를 안 들어 이펙트 없음)
         LevelUpManager.Instance.OnStatRestored += ReportLevelUp;
 
         levelUpBound = true;
@@ -117,9 +109,7 @@ public partial class GuideQuestManager : MonoBehaviour
         }
     }
 
-    // ══════════════════════════════════════════════
-    //  진행 보고 API (외부 호출부)
-    // ══════════════════════════════════════════════
+    // ── 진행 보고 API (외부 호출부) ──
 
     /// <summary>적 사망 시 호출 (Enemy.Die 등)</summary>
     public void ReportEnemyKill(int count = 1)
@@ -128,10 +118,7 @@ public partial class GuideQuestManager : MonoBehaviour
         AddProgress(count);
     }
 
-    /// <summary>
-    /// chapter-stage 를 클리어한 적이 있는가 (클리어한 최고 스테이지 기준).
-    /// 실패로 진행 위치가 한 단계 내려가도 기록은 유지되므로, 콘텐츠 개방 조건에 씁니다.
-    /// </summary>
+    /// <summary>chapter-stage 를 클리어한 적 있는가 (최고 기록 기준이라 실패로 내려가도 유지 → 콘텐츠 개방 조건용).</summary>
     public bool HasClearedStage(int chapter, int stage)
         => highestChapter > chapter || (highestChapter == chapter && highestStage >= stage);
 
@@ -174,10 +161,7 @@ public partial class GuideQuestManager : MonoBehaviour
         SetProgress(newLevel);
     }
 
-    /// <summary>
-    /// ★ 신규 — 각성(진화) 스테이지 클리어 시 호출 (EvolveStageManager.ReportBossKill).
-    /// 아직 '각성 1회' 단계가 아니면 버리지 않고 적립해뒀다가 그 단계 진입 시 반영합니다.
-    /// </summary>
+    /// <summary>각성 스테이지 클리어 보고 — 아직 그 단계가 아니면 적립했다가 진입 시 반영.</summary>
     public void ReportEvolveClear(int count = 1)
     {
         if (count <= 0) return;
@@ -193,9 +177,7 @@ public partial class GuideQuestManager : MonoBehaviour
                   $"현재 퀘스트: {(Current != null ? Current.type.ToString() : "없음")}");
     }
 
-    // ══════════════════════════════════════════════
-    //  진행도 / 보상
-    // ══════════════════════════════════════════════
+    // ── 진행도 / 보상 ──
 
     private void AddProgress(long amount) => SetProgress(progress + amount);
 
@@ -240,10 +222,7 @@ public partial class GuideQuestManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// 이미 달성한 상태(목표 스테이지를 이미 클리어함 / 레벨이 이미 높음 / 각성을 이미 클리어함)를 즉시 반영.
-    /// 로드 직후, 단계 진행 직후 호출.
-    /// </summary>
+    /// <summary>이미 달성한 상태(스테이지·레벨·각성)를 즉시 반영 — 로드 직후·단계 진행 직후 호출.</summary>
     public void ReSyncCurrent()
     {
         if (Current == null) return;
@@ -281,9 +260,7 @@ public partial class GuideQuestManager : MonoBehaviour
         SaveManager.Instance?.Save();
     }
 
-    // ══════════════════════════════════════════════
-    //  스탯 강화 UI 포커스 예약
-    // ══════════════════════════════════════════════
+    // ── 스탯 강화 UI 포커스 예약 ──
     private bool hasPendingStatFocus = false;
     private LevelUpManager.StatType pendingStatType;
 

@@ -57,8 +57,7 @@ public class BackendFriendService : IFriendService
         if (!gate.TryBegin(out int gen)) return;   // 받는 중이면 끝난 뒤 한 번 더
         var list = new Dictionary<string, Friendship>();
 
-        // 친구 → 받은 요청 → 보낸 요청 순. 같은 사람이 겹치면 앞의 상태를 씁니다.
-        // 개수 지정(PAGE)이 서버 허용치를 넘으면 400 → 기본 개수로 한 번 더 (fallback)
+        // 친구 → 받은 요청 → 보낸 요청 순(겹치면 앞의 상태), PAGE 가 서버 허용치를 넘어 400 이면 기본 개수로 재시도
         Fetch(cb => Backend.Friend.GetFriendList(PAGE, cb), cb => Backend.Friend.GetFriendList(cb),
               FriendState.Friend, gen, list, e1 =>
         {

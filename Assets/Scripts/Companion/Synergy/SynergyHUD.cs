@@ -3,28 +3,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 시너지 HUD — 지금 배치 기준으로 어떤 시너지가 몇 명째인지 보여줍니다.
-///
-///   [간단히]  딜러 3/4   제어 1/2 ...        (켜진 시너지는 계열 색, 꺼진 건 회색)
-///   [자세히]  탭하면 단계별 효과까지 펼칩니다. 다시 탭하면 접힙니다.
-///             다음 단계 목표도 보이도록 모든 단계를 표시합니다(적용 중인 단계만 밝게).
-///             StageScene 에서는 Safe Panel 안 오른쪽 위에 오른쪽 정렬로 둡니다 — Safe Panel 이 카메라 구멍을 피해 주므로
-///             화면이 어느 쪽으로 돌아가도 가려지지 않습니다.
-///
-/// [붙이는 곳] StageScene 의 항상 켜져 있는 오브젝트 (예: 다른 HUD 옆).
-///   · Label 에 Canvas 아래의 TextMeshPro - Text(UI) 를 연결합니다.
-///     폰트 · 크기 · 위치 · 정렬은 그 텍스트의 인스펙터에서 정합니다.
-///   · ★ Label 에 ContentSizeFitter(Preferred Size) 를 붙여 두세요.
-///     큰 고정 영역을 두면 빈 부분까지 탭을 먹어서 그 아래 맵 칸에 배치가 안 되는 것처럼 보입니다.
-///
-/// ★ 배치 중에는 탭을 받지 않습니다.
-///   CompanionPlacementController 는 "탭 좌표에 UI 가 있으면 무시" 하므로,
-///   이 HUD 가 탭을 받는 상태로 남아 있으면 HUD 아래 칸에는 동료를 놓을 수 없습니다.
-///
-/// ★ TabWindow(Player Total 등)가 열려 있는 동안에도 탭을 받지 않습니다.
-///   이 HUD 가 창 위에 그려지는 자리라, 창 안의 버튼을 눌러도 시너지 설명이 대신 펼쳐지기 때문입니다.
-/// </summary>
+/// <summary>시너지 HUD: 배치 기준 시너지 인원(딜러 3/4…, 켜진 건 계열 색)을 보여 주고 탭하면 단계별 효과를 펼침 — 배치 중·TabWindow 가 열린 동안엔 탭을 받지 않음(아래 칸 배치·창 버튼을 가로채지 않게).</summary>
+// [붙이는 곳] StageScene 항상 켜진 오브젝트, Label 에 TMP 연결 / ⚠ Label 에 ContentSizeFitter(Preferred) — 큰 고정 영역이면 빈 부분까지 탭을 먹음
 public class SynergyHUD : MonoBehaviour
 {
     [Header("표시 텍스트")]
@@ -52,9 +32,7 @@ public class SynergyHUD : MonoBehaviour
 
     private readonly StringBuilder sb = new StringBuilder(256);
 
-    // ══════════════════════════════════════════════
-    //  라이프사이클
-    // ══════════════════════════════════════════════
+    // ── 라이프사이클 ──
 
     private void OnEnable()
     {
@@ -85,9 +63,7 @@ public class SynergyHUD : MonoBehaviour
         if (toggleButton != null) toggleButton.onClick.RemoveListener(ToggleDetail);
     }
 
-    // ══════════════════════════════════════════════
-    //  구독
-    // ══════════════════════════════════════════════
+    // ── 구독 ──
 
     private void TryBind()
     {
@@ -148,9 +124,7 @@ public class SynergyHUD : MonoBehaviour
         if (label != null) label.raycastTarget = tapToToggleDetail && !placing && !TabWindow.AnyOpen;
     }
 
-    // ══════════════════════════════════════════════
-    //  그리기
-    // ══════════════════════════════════════════════
+    // ── 그리기 ──
 
     private void ToggleDetail()
     {
@@ -224,9 +198,7 @@ public class SynergyHUD : MonoBehaviour
     private static string Colored(Color c, string text)
         => $"<color=#{ColorUtility.ToHtmlStringRGB(c)}>{text}</color>";
 
-    // ══════════════════════════════════════════════
-    //  텍스트 준비
-    // ══════════════════════════════════════════════
+    // ── 텍스트 준비 ──
 
     private void EnsureLabel()
     {

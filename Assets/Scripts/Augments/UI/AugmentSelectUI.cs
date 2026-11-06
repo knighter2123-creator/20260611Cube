@@ -4,22 +4,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 증강 카드 선택창 — 흐름 담당.
-///
-/// 이 클래스는 partial 로 세 파일에 나뉘어 있습니다.
-///   AugmentSelectUI.cs        ← 지금 이 파일. 상태와 "언제 열고 닫는가"
-///   AugmentSelectUI.Build.cs  ← "어떻게 생겼는가" (캔버스·카드 생성)
-///   AugmentSelectUI.Anim.cs   ← "어떻게 움직이는가" (등장/선택 연출, 타이머)
-///
-/// 파일을 열었을 때 "지금 내가 고치려는 것"만 보이도록 나눴습니다.
-/// 컴파일하면 완전히 같은 하나의 클래스라 성능 차이는 전혀 없습니다.
-///
-/// [일시정지 처리]
-/// Time.timeScale = 0 으로 게임을 멈춥니다.
-/// 그래서 모든 연출은 Time.deltaTime 이 아니라 Time.unscaledDeltaTime 을 씁니다.
-/// (deltaTime 을 쓰면 0이 곱해져 연출이 영원히 멈춥니다)
-/// </summary>
+/// <summary>증강 카드 선택창(흐름): Show 로 카드를 만들고 timeScale 0 으로 멈춘 뒤, 고르거나 자동 선택 타이머가 끝나면 연출 후 닫고 콜백 — 연출은 unscaledDeltaTime 사용.</summary>
+// partial 구성: 이 파일(언제 열고 닫나) / .Build.cs(캔버스·카드 생성) / .Anim.cs(등장·선택 연출, 타이머)
 public partial class AugmentSelectUI : MonoBehaviour
 {
     public enum LayoutMode
@@ -28,9 +14,7 @@ public partial class AugmentSelectUI : MonoBehaviour
         Vertical     // 카드 3장을 세로로 (세로 모바일에서 글자가 잘 보임)
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  인스펙터 설정
-    // ─────────────────────────────────────────────────────────
+    // ── 인스펙터 설정 ──
     [Header("레이아웃")]
     [SerializeField] private LayoutMode layout = LayoutMode.Vertical;
     [SerializeField] private Vector2 referenceResolution = new Vector2(1080, 1920);
@@ -72,10 +56,7 @@ public partial class AugmentSelectUI : MonoBehaviour
     [SerializeField] private AudioClip   openSfx;
     [SerializeField] private AudioClip   pickSfx;
 
-    // ─────────────────────────────────────────────────────────
-    //  런타임 상태
-    //  (Build / Anim 파일에서도 같은 클래스이므로 그대로 접근합니다)
-    // ─────────────────────────────────────────────────────────
+    // ── 런타임 상태 (Build / Anim 파일도 같은 클래스라 그대로 접근) ──
     private Canvas          canvas;
     private CanvasGroup     rootGroup;
     private RectTransform   cardArea;
@@ -91,17 +72,11 @@ public partial class AugmentSelectUI : MonoBehaviour
     private Coroutine introRoutine;
     private Coroutine timerRoutine;
 
-    // ─────────────────────────────────────────────────────────
-    //  라이프사이클
-    // ─────────────────────────────────────────────────────────
+    // ── 라이프사이클 ──
 
     private void Awake()
     {
-        // 씬에 이 컴포넌트가 둘 이상이면 각자 자기 캔버스를 만들어
-        // 카드가 겹쳐 보이거나 두 배로 보입니다. 조용히 넘어가면 원인 찾기가 아주 어려워서
-        // 시작할 때 한 번 경고를 남깁니다.
-        //
-        // FindObjectsByType 은 비용이 큰 함수라 Awake 에서 딱 한 번만 부릅니다.
+        // 둘 이상이면 캔버스가 겹쳐 카드가 두 배로 보이므로 경고 (FindObjectsByType 은 비싸서 Awake 에서 한 번만)
         var all = FindObjectsByType<AugmentSelectUI>(FindObjectsSortMode.None);
         if (all.Length > 1)
         {
@@ -111,30 +86,22 @@ public partial class AugmentSelectUI : MonoBehaviour
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  공개 API
-    // ─────────────────────────────────────────────────────────
+    // ── 공개 API ──
 
     /// <summary>카드 목록을 보여주고, 선택되면 콜백을 부릅니다.</summary>
     public void Show(List<AugmentCard> cards, Action<AugmentCard> callback)
     {
-        // [작동 순서]
-        //   ① 중복/빈 목록 거르기 → ② 화면 만들기 → ③ "열림" 확정 → ④ 일시정지 → ⑤ 연출·타이머 시작
-        //   카드 선택 → OnClickCard → PlayPickAndClose(Anim.cs) → Close → 콜백(AugmentManager.OnCardChosen)
+        // 순서: 거르기 → 화면 만들기 → 열림 확정 → 일시정지 → 연출·타이머 / 선택 → PlayPickAndClose → Close → 콜백
 
         if (isOpen)
         {
-            // 조용히 무시하면 "카드가 왜 안 뜨지?" 를 추적하기 어려워 로그를 남깁니다.
+            // 조용히 무시하면 카드가 안 뜨는 원인을 못 찾아 로그
             Debug.LogWarning("[AugmentSelectUI] 이미 창이 열려 있어 새 요청을 무시합니다.", this);
             return;
         }
         if (cards == null || cards.Count == 0) return;
 
-        // ★ 버그 수정: 예전에는 isOpen = true 를 화면을 만들기 '전에' 했습니다.
-        //   만드는 도중 예외가 나면(예: 카드 설명문 형식 오류) isOpen 이 true 로 남아
-        //   위의 중복 방지에 영원히 걸려 창이 다시는 안 열렸습니다.
-        //   실패할 수 있는 일(화면 만들기)을 먼저 하고, 성공한 뒤에 상태를 바꿉니다.
-        //   (ShopManager.TryPurchase 의 "검증 먼저, 상태 변경은 나중" 과 같은 원칙)
+        // 화면 만들기(실패 가능)를 먼저, 성공한 뒤 isOpen — 반대면 예외 때 isOpen 이 남아 창이 다시는 안 열림
         EnsureBuilt();      // → Build.cs
         BuildCards(cards);  // → Build.cs
 
@@ -161,9 +128,7 @@ public partial class AugmentSelectUI : MonoBehaviour
     }
 
 
-    // ─────────────────────────────────────────────────────────
-    //  선택 / 닫기
-    // ─────────────────────────────────────────────────────────
+    // ── 선택 / 닫기 ──
 
     /// <summary>카드 버튼 클릭 또는 자동선택 타이머 만료 시 진입점.</summary>
     private void OnClickCard(AugmentCard card, GameObject cardGo)
@@ -171,8 +136,7 @@ public partial class AugmentSelectUI : MonoBehaviour
         if (picked) return;      // 연타로 두 장 먹는 사고 방지
         picked = true;
 
-        // 등장 연출 도중에 고르면 두 코루틴이 같은 alpha/scale 을 매 프레임 번갈아 덮어씁니다.
-        // 등장 연출을 끊고 최종 상태로 확정한 뒤 선택 연출을 시작합니다.
+        // 등장 연출 중이면 두 코루틴이 alpha/scale 을 번갈아 덮으므로 등장을 끊고 최종 상태로 확정
         StopIntro();
         StopTimer();
         if (audioSource != null && pickSfx != null) audioSource.PlayOneShot(pickSfx);
@@ -198,10 +162,7 @@ public partial class AugmentSelectUI : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 창이 열린 상태로 씬이 바뀌거나 오브젝트가 꺼지면
-    /// timeScale 이 0인 채로 남아 게임 전체가 멈춥니다. 그걸 막는 안전장치입니다.
-    /// </summary>
+    /// <summary>열린 채 씬이 바뀌거나 꺼져도 timeScale 0 이 남아 게임이 멈추지 않게 복구하는 안전장치.</summary>
     private void OnDisable()
     {
         if (isOpen && pauseGame) Time.timeScale = savedTimeScale;
@@ -236,9 +197,7 @@ public partial class AugmentSelectUI : MonoBehaviour
         }
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  공용 헬퍼
-    // ─────────────────────────────────────────────────────────
+    // ── 공용 헬퍼 ──
 
     private Color GetRarityColor(AugmentRarity r)
     {

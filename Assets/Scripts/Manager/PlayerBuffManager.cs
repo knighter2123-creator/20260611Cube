@@ -1,10 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 플레이어 영구 버프(누적 데미지 배율) 관리.
-/// 영속성은 SaveManager(SaveData)에 위임 — 자체 PlayerPrefs 저장/로드는 제거함.
-/// LoginScene에 두고 DontDestroyOnLoad로 세션 내내 유지하세요.
-/// </summary>
+/// <summary>플레이어 영구 버프(누적 데미지 배율) 관리 — 저장은 SaveData 에 위임, LoginScene 에 두고 DontDestroyOnLoad.</summary>
 public class PlayerBuffManager : MonoBehaviour
 {
     public static PlayerBuffManager Instance { get; private set; }
@@ -23,16 +19,13 @@ public class PlayerBuffManager : MonoBehaviour
 
     void OnDestroy()
     {
-        // static 이 파괴된 오브젝트를 붙잡지 않게 정리.
-        // SaveManager.Save() 의 'Instance?.CaptureTo(d)' 에서 ?. 가 제대로 건너뛰게 하려면 필요하다.
-        // (C#의 ?. 는 유니티의 == 오버로딩을 타지 않아 파괴된 객체도 통과시킨다)
+        // Instance 정리 — SaveManager 의 Instance?.CaptureTo 가 파괴된 객체를 통과시키지 않게
         if (Instance == this) Instance = null;
     }
 
     void Start()
     {
-        // 모든 Awake 완료 후(= SaveManager가 파일 로드를 끝낸 시점)에 세이브에서 복원.
-        // 실행 순서에 의존하지 않으려고 Awake가 아닌 Start에서 가져온다. ← 좋은 선택이다
+        // 모든 Awake 후(SaveManager 로드 완료)에 복원 — 실행 순서에 의존하지 않으려고 Start
         if (SaveManager.Instance != null)
             ApplyFrom(SaveManager.Instance.Current);
         else
@@ -50,13 +43,7 @@ public class PlayerBuffManager : MonoBehaviour
     {
         if (d == null) return;
 
-        // ★ 추가 — Awake ~ Start 사이에는 DamageMultiplier 가 아직 초기값 1f 입니다.
-        //   그 구간에 저장이 돌면(앱을 곧바로 백그라운드로 보내는 등)
-        //   누적해둔 배율이 1.0 으로 덮어써집니다.
-        //
-        //   창은 한 프레임 남짓으로 좁지만, 날아가는 것이 영구 버프라 대가가 큽니다.
-        //   여기서 return 하면 Save() 가 Current 를 재사용하는 병합 방식이라
-        //   직전 저장값이 그대로 보존됩니다.
+        // 복원 전(Awake~Start)엔 쓰지 않음 — 그때 저장이 돌면 영구 배율이 1.0 으로 덮임 (병합 방식이라 직전 값 보존)
         if (!loaded) return;
 
         d.damageMultiplier = DamageMultiplier;

@@ -1,11 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 모든 CompanionData를 id로 찾을 수 있게 모아두는 레지스트리.
-/// 세이브에는 보유 동료를 id(문자열)로 저장하므로, 로드 시 id→데이터 복원에 사용한다.
-/// 에셋을 하나 만들고(all 목록에 모든 CompanionData 연결) CompanionManager에 연결하세요.
-/// </summary>
+/// <summary>모든 CompanionData 를 id 로 찾는 레지스트리 에셋 — 세이브의 id 를 데이터로 복원 (all 에 모든 동료를 넣고 CompanionManager 에 연결).</summary>
 [CreateAssetMenu(fileName = "CompanionDatabase", menuName = "Companion/CompanionDatabase")]
 public class CompanionDatabase : ScriptableObject
 {

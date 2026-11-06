@@ -2,15 +2,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 랭킹 창의 한 줄 — 순위 / 닉네임 / 스테이지. RankingPanel 이 목록을 그릴 때 rowTemplate 을 복제해 Set() 으로 채웁니다.
-/// (UI 는 Tools/UI 굽기/랭킹 창 메뉴가 만들고 아래 칸을 채웁니다 — UIBaker)
-///
-/// [색 고치기]  Row 템플릿(RankingCanvas > Window > Viewport > Content > Row)에서 고치면 모든 줄이 따라갑니다.
-///   평소 줄 — 하이어라키의 배경 Image 색 · 각 칸 TMP 글자 색 그대로
-///   내 줄   — 아래 myRowBackground 로 배경을 칠함
-///   상위 순위 — 아래 topTextColor 로 글자를 칠함 (몇 위까지인지는 RankingPanel 의 topHighlight, 기본 3)
-/// </summary>
+/// <summary>랭킹 한 줄(순위/닉네임/스테이지): 처음 Set 때 템플릿의 평소 색을 기억하고, 내 줄은 배경·상위 순위는 글자를 강조 색으로 칠함.</summary>
+// 색은 Row 템플릿(RankingCanvas > … > Content > Row)에서 고치면 모든 줄이 따라감
 public class RankingRow : MonoBehaviour
 {
     [SerializeField] private Image           background;

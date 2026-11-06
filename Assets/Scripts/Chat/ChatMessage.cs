@@ -1,7 +1,4 @@
-/// <summary>
-/// 채팅 한 줄. 보낸 순간의 닉네임·진행도를 그대로 담습니다 (나중에 이름을 바꾸거나 기록이 올라도 옛 메시지는 그대로).
-/// 어느 서버(IChatService 구현)를 쓰든 이 모양으로 주고받습니다.
-/// </summary>
+/// <summary>채팅 한 줄(서버 공통 모양) — 보낸 순간의 닉네임·진행도를 담아 나중에 바뀌어도 옛 메시지는 그대로.</summary>
 public struct ChatMessage
 {
     /// <summary>시스템 메시지(공지)의 Uid.</summary>

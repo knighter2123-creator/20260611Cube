@@ -3,26 +3,9 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 클라우드 세이브 충돌 팝업 — "이 기기 데이터 / 클라우드 데이터" 중 어느 쪽으로 할지 플레이어가 고릅니다.
-///
-/// [붙이는 위치]  LoginScene 최상위의 CloudSaveConflictCanvas (항상 켜 둠). 창(panel)만 열고 닫을 때 켜고 끕니다.
-///   처음 만들거나 모양을 다시 만들 때는 LoginScene 을 열고 Tools/UI 굽기/저장 데이터 선택 팝업 메뉴를 누르세요 (UIBaker) —
-///   캔버스를 씬 최상위에 만들고 아래 칸을 모두 채웁니다. 그 뒤 씬을 저장하면 됩니다.
-///   CloudSave 는 DontDestroyOnLoad 라 씬 오브젝트를 직접 연결할 수 없어서, 이 컴포넌트가 Instance 로 자신을 알립니다.
-///
-///   CloudSaveConflictCanvas (Canvas 3000, 이 컴포넌트)
-///     Panel                      ← panel. 꺼 둠
-///       Dim                      ← 뒤 화면 터치만 막음 (닫히지 않음)
-///       Window
-///         Title / Desc
-///         이 기기  / Summary / Button / Label     ← localSummary, localButton, localLabel
-///         클라우드 / Summary / Button / Label     ← cloudSummary, cloudButton, cloudLabel
-///         Notice                 ← noticeText
-///
-/// [두 번 확인]  고르지 않은 쪽은 덮어써져 되돌릴 수 없으므로, 한 번 누르면 "정말 ~ 로?" 로 바뀌고 한 번 더 눌러야 확정합니다.
-///   어두운 배경을 눌러도 닫히지 않습니다 — 고르지 않고 넘어가는 길이 없어야 합니다.
-/// </summary>
+/// <summary>클라우드 세이브 충돌 팝업: 이 기기/클라우드 중 고르게 하되, 고르지 않은 쪽은 덮어써지므로 두 번 눌러야 확정하고 배경을 눌러도 닫히지 않음.</summary>
+// [붙이는 위치] LoginScene 최상위 CloudSaveConflictCanvas(항상 켜 둠) — Tools/UI 굽기/저장 데이터 선택 팝업(UIBaker)으로 생성
+// CloudSave 는 DDOL 이라 씬 오브젝트를 연결할 수 없어 이 컴포넌트가 Instance 로 자신을 알림
 public class CloudSaveConflictPopup : MonoBehaviour
 {
     public static CloudSaveConflictPopup Instance { get; private set; }
@@ -96,10 +79,7 @@ public class CloudSaveConflictPopup : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    /// <summary>
-    /// 팝업을 띄웁니다. 고르면 onChoose(클라우드를 골랐는가) 가 한 번 불리고 팝업은 닫힙니다.
-    /// 씬에 팝업이 없으면 false — 호출한 쪽이 고르지 않은 채로 넘어가는 방법을 정합니다 (CloudSave).
-    /// </summary>
+    /// <summary>팝업을 띄우고 고르면 onChoose(클라우드 선택 여부)를 한 번 호출 — 씬에 팝업이 없으면 false.</summary>
     public static bool TryShow(string localText, string cloudText, Action<bool> onChoose)
     {
         if (Instance == null || Instance.onChoose != null) return false;   // 없음 / 이미 떠 있음

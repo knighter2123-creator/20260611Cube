@@ -40,10 +40,7 @@ public partial class ChatPanel : MonoBehaviour
     [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
 
-    /// <summary>
-    /// 코드가 실행 중에 넣는 글자. {name} {max} {count} 같은 자리는 실행 중에 값으로 바뀝니다 (지워도 됨).
-    /// 모양(크기·위치·폰트·배경색)은 이 칸이 아니라 하이어라키의 오브젝트(ChatCanvas 프리팹)에서 직접 고치세요.
-    /// </summary>
+    /// <summary>실행 중 넣는 글자({name}{max}{count} 는 값으로 치환) — 모양은 하이어라키(ChatCanvas 프리팹)에서 고침.</summary>
     [Serializable]
     private class Texts
     {
@@ -154,8 +151,7 @@ public partial class ChatPanel : MonoBehaviour
 
     private IEnumerator Start()
     {
-        // 첫 프레임(씬 로드 직후 Awake/Start 가 몰리는 때)은 건너뛰고, 그다음부터 조금씩 만듭니다.
-        // (panel 이 꺼져 있어도 Instantiate 는 됩니다 — 줄은 꺼진 채 풀에 들어감)
+        // 첫 프레임(Awake/Start 집중)은 건너뛰고 조금씩 줄을 미리 만듦 (panel 이 꺼져 있어도 꺼진 채 풀로)
         int perFrame = Mathf.Max(1, prewarmPerFrame);
         while (createdRows < prewarmLines)
         {
@@ -188,10 +184,7 @@ public partial class ChatPanel : MonoBehaviour
     /// <summary>미리보기를 이 UI(보통 OpenChatButton) 오른쪽에 붙입니다.</summary>
     public void AttachPreviewTo(RectTransform target) => previewFollow = target;
 
-    /// <summary>
-    /// 미리보기를 보이거나 숨기고, 붙은 버튼 오른쪽으로 옮깁니다. 버튼은 다른 캔버스(Safe Panel 등)에 있으므로
-    /// 버튼의 오른쪽 변 가운데 → 화면 좌표 → 미리보기 캔버스 좌표로 바꿉니다. 레이아웃이 끝난 뒤라 LateUpdate.
-    /// </summary>
+    /// <summary>미리보기 표시·위치(버튼 오른쪽) — 버튼이 다른 캔버스라 화면 좌표를 거쳐 변환, 레이아웃 뒤라 LateUpdate.</summary>
     private void LateUpdate()
     {
         bool visible = !IsOpen && (previewFollow == null || previewFollow.gameObject.activeInHierarchy);
@@ -270,13 +263,11 @@ public partial class ChatPanel : MonoBehaviour
             rejected = true;
             ShowNotice(error);
 
-            // 서버가 나중에 거절하면(뒤끝챗 콘솔의 도배·길이·금칙어 설정) 이미 비운 글을 되돌려 고쳐 보낼 수 있게.
-            //   그사이 새 글을 쓰기 시작했으면 덮어쓰지 않음.
+            // 서버가 나중에 거절하면(도배·길이·금칙어) 비운 글을 되돌림 — 그사이 새 글을 쓰기 시작했으면 덮지 않음
             if (cleared && input.text.Length == 0) input.text = text;
         }, currentPeer);
 
-        // 클라이언트 검사에 걸리면 콜백이 바로 와서 rejected = true → 글을 그대로 남겨 둠.
-        // 그 외에는 서버 응답을 기다리지 않고 비움 (연달아 입력할 수 있게).
+        // 클라이언트 검사에 걸리면(콜백 즉시) 글을 남기고, 아니면 응답을 기다리지 않고 비움 (연달아 입력 가능)
         if (!rejected)
         {
             input.text = string.Empty;
@@ -358,10 +349,7 @@ public partial class ChatPanel : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 지금 채널(전체 / 개인)의 메시지 목록과 줄 오브젝트를 맞춥니다. 새 메시지만 글자를 채우고, 빠진 메시지의 줄은 풀로 돌립니다.
-    /// 차단한 사람의 메시지는 뺍니다. 보이는 줄 수를 돌려줍니다.
-    /// </summary>
+    /// <summary>지금 채널의 메시지와 줄 오브젝트를 맞춤(새 메시지만 글자 채움, 빠진 줄은 풀로, 차단한 사람 제외) — 보이는 줄 수 반환.</summary>
     private int SyncRows(ChatManager chat)
     {
         liveIds.Clear();

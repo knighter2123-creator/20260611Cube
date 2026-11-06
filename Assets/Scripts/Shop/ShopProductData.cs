@@ -1,19 +1,8 @@
 using UnityEngine;
 using Manager.currency;
 
-/// <summary>
-/// 상점 상품 1개를 정의하는 ScriptableObject.
-/// Create → Shop → Shop Product 로 에셋 생성.
-/// 상품을 늘릴 때 코드 수정 없이 에셋만 추가하면 됨.
-///
-/// [왜 ScriptableObject 인가]
-///   상품 = 데이터입니다. 코드에 상품 목록을 박아 두면 가격 하나 바꿀 때마다 빌드를 다시 해야 하지만,
-///   에셋으로 두면 기획자가 인스펙터에서 숫자만 고치면 됩니다. (데이터와 로직의 분리)
-///
-/// [사용 흐름]
-///   ShopManager.products 리스트에 등록 → ShopProductList 가 Category 로 골라냄
-///   → ShopItemUI 가 표시 → 구매 버튼 → ShopManager.TryPurchase 가 Cost/Reward 를 읽어 처리
-/// </summary>
+/// <summary>상점 상품 1개 SO — 데이터로 빼 상품 추가·가격 조정은 에셋만 수정, ShopManager.products 에 등록하면 목록·카드·구매가 읽어 씀.</summary>
+// [생성] Create → Shop → Shop Product
 [CreateAssetMenu(fileName = "ShopProduct", menuName = "Shop/Shop Product")]
 public class ShopProductData : ScriptableObject
 {
@@ -38,9 +27,7 @@ public class ShopProductData : ScriptableObject
              "비워 두면 보상 재화 종류에 맞는 아이콘(CurrencyIconTable)을 자동으로 씁니다 — 골드면 골드, 소환권이면 소환권.")]
     [SerializeField] private Sprite rewardIcon;
 
-    // ── 읽기 전용 프로퍼티 ─────────────────────────────────────
-    // 필드는 private + [SerializeField] 로 인스펙터에만 열고, 코드에는 읽기만 허용합니다.
-    // 런타임에 누가 가격을 바꿔 버리면 에셋 파일 자체가(에디터에서는) 바뀌는 사고가 나기 때문입니다.
+    // ── 읽기 전용 프로퍼티 (런타임에 바꾸면 에디터에선 에셋 파일 자체가 바뀌어서) ──
     public string Id => id;
     public string Category => category;
     public string DisplayName => displayName;
@@ -54,10 +41,7 @@ public class ShopProductData : ScriptableObject
     public Sprite RewardIcon => rewardIcon;   // 비어 있으면 null — 표시하는 쪽이 재화 아이콘으로 대체
 
 #if UNITY_EDITOR
-    /// <summary>
-    /// 에디터에서 값을 고칠 때마다 자동 호출됩니다 (빌드에는 포함되지 않음).
-    /// 런타임에 터질 설정 실수를 "만드는 순간" 잡아내는 용도입니다.
-    /// </summary>
+    /// <summary>에디터에서 값을 고칠 때 자동 검증 (설정 실수를 만드는 순간 잡음, 빌드 미포함).</summary>
     private void OnValidate()
     {
         // CompanionData와 동일하게 id 자동 채움

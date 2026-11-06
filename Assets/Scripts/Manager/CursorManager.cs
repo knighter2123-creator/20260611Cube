@@ -1,22 +1,7 @@
 using UnityEngine;
 
-/// <summary>
-/// PC(Windows) 빌드용 마우스 커서 매니저. 지정한 스프라이트를 하드웨어 커서로 표시합니다.
-///
-/// [붙이는 위치]
-///   로그인 씬의 ManagerRoot 하위. 다른 매니저들과 같은 DontDestroyOnLoad 싱글턴입니다.
-///   Cursor.SetCursor 는 씬이 바뀌어도 유지되지만, 만든 커서 텍스처를 살려 두고
-///   창 포커스가 돌아왔을 때 다시 적용하려면 오브젝트가 살아 있어야 합니다.
-///
-/// [모바일]
-///   안드로이드/iOS 에서는 마우스 커서가 없으므로 아무것도 하지 않습니다.
-///
-/// [왜 스프라이트를 그대로 쓰지 않고 텍스처로 복사하는가]
-///   Cursor.SetCursor 는 Texture2D 전체를 커서로 씁니다. 스프라이트가 시트(aseprite 등)의 일부라면
-///   sprite.texture 를 넘기면 시트 전체가 커서로 나옵니다. 그래서 스프라이트 영역만 잘라
-///   새 텍스처를 만듭니다. GPU 로 복사(RenderTexture)하므로 원본의 Read/Write 설정과 압축 형식은 상관없습니다.
-///   도트 그림이 뭉개지지 않도록 확대는 Point 필터로 합니다.
-/// </summary>
+/// <summary>PC 빌드용 하드웨어 커서(모바일은 아무것도 안 함) — 스프라이트 영역만 GPU 로 잘라 Point 필터로 확대한 텍스처를 씀 (sprite.texture 는 시트 전체가 커서가 되어서).</summary>
+// [붙이는 위치] 로그인 씬 ManagerRoot 하위 — 포커스가 돌아올 때 다시 적용하려면 살아 있어야 함
 public class CursorManager : MonoBehaviour
 {
     public static CursorManager Instance { get; private set; }

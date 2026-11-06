@@ -4,47 +4,14 @@ using BackEnd;
 using Google;                // GoogleSignIn (google-signin-unity 플러그인)
 using UnityEngine;
 
-/// <summary>
-/// 로그인(인증) 매니저 — LoginScene 의 ManagerRoot 하위에 둔다. 서버는 뒤끝(BackendManager).
-///
-/// [하는 일]  뒤끝 초기화 요청, 구글 로그인 → 뒤끝 로그인, 이메일 가입/로그인, 자동 로그인, 로그아웃, 탈퇴, 로그인 상태 보관.
-/// [안 하는 일] UI. 버튼/텍스트 참조를 하나도 들고 있지 않다.
-///   → 이 매니저는 DontDestroyOnLoad 로 씬을 넘어 살아남지만, 버튼은 씬과 함께 파괴된다.
-///     UI 는 GoogleLoginButtonUI / EmailLoginUI 등이 맡고, 이 매니저의 상태를 읽어 갈 뿐이다.
-///
-/// [예전 Firebase 버전에서 옮겨 오며 지킨 것]  공개 API(IsReady / IsSignedIn / Uid / StateChanged / SignInWith... )는 그대로입니다.
-///   로그인 화면 UI, AccountSwitch, 계정별 세이브는 고치지 않아도 됩니다.
-///   Uid 는 이제 뒤끝의 유저 inDate 입니다 (다른 유저를 가리키는 뒤끝 API — 친구, 랭킹 등 — 가 쓰는 값).
-///
-/// [구글 로그인 — 2단계]
-///   1) GoogleSignIn : 구글 계정 주인임을 증명하는 ID 토큰을 받는다 (기기 네이티브 창)
-///   2) 뒤끝         : AuthorizeFederation(토큰, Google) 로 로그인. 처음이면 자동 가입.
-///   ★ 뒤끝 콘솔 > 프로젝트 설정 > 구글 로그인(페더레이션) 에 같은 구글 클라이언트 ID 를 등록해야 합니다.
-///
-/// [이메일 로그인]  뒤끝 '커스텀 가입/로그인' — 이메일을 아이디로 씁니다.
-///   가입하면 비밀번호 찾기용 이메일(UpdateCustomEmail)도 같은 주소로 등록합니다.
-///   네이티브 플러그인이 필요 없어서 **에디터에서도 동작**합니다.
-///
-/// [자동 로그인 / 오프라인]
-///   뒤끝은 로그인 토큰을 기기에 보관합니다. 앱을 다시 켜면 LoginWithTheBackendToken 으로 이어서 로그인합니다.
-///   서버에 닿지 못하면(오프라인·점검) 마지막 계정을 '오프라인 로그인' 으로 유지합니다 — IsSignedIn = true, IsOnline = false.
-///     → 비행기 모드로 켜도 게스트 세이브가 아니라 내 계정 세이브로 이어서 할 수 있습니다 (Firebase 때와 같은 동작).
-///     → 서버 기능은 IsOnline 을 보고 기다리면 됩니다. 연결되면 자동으로 다시 로그인하고 StateChanged 를 보냅니다.
-///   토큰이 만료·탈퇴·차단으로 거부되면 로그아웃 상태가 됩니다.
-///
-/// [로그아웃]  뒤끝 + 구글 계정 선택 상태를 지웁니다. 앱 종료·씬 이동·세이브 삭제는 하지 않습니다.
-/// [세이브]   CaptureTo/ApplyFrom 이 없다 → save.json 스키마와 무관. 마지막 계정 정보만 PlayerPrefs 에 따로 둔다.
-/// </summary>
+/// <summary>로그인 매니저(UI 없음): 뒤끝 초기화·구글/이메일/게스트 로그인·토큰 자동 로그인·로그아웃·탈퇴를 하고 상태를 StateChanged 로 알림 — Uid 는 뒤끝 유저 inDate.</summary>
+// [붙이는 위치] LoginScene ManagerRoot 하위 / 구글: ID 토큰 → AuthorizeFederation (★ 뒤끝 콘솔 구글 페더레이션에 같은 웹 클라이언트 ID 등록)
+// 서버에 못 닿으면 마지막 계정으로 '오프라인 로그인'(IsSignedIn=true, IsOnline=false) 유지 → 내 계정 세이브로 계속하고 연결되면 자동 재로그인
 public class AuthManager : MonoBehaviour
 {
     public static AuthManager Instance { get; private set; }
 
-    /// <summary>
-    /// 로그인 상태가 바뀔 때마다 발행 (준비 완료 / 로그인 시작 / 성공 / 실패·취소 / 로그아웃 / 온라인·오프라인 전환).
-    /// 구독하는 쪽은 인자 없이 받고, 필요한 값은 Instance 의 프로퍼티로 직접 읽는다.
-    /// ★ static 인 이유: UI 의 OnEnable 이 이 매니저의 Awake 보다 먼저 불려도 구독할 수 있게. 계정 삭제로 매니저가 새로 만들어져도 유지.
-    /// ⚠ 구독한 쪽은 반드시 OnDisable 에서 해제할 것.
-    /// </summary>
+    /// <summary>로그인 상태가 바뀔 때마다 발행(값은 Instance 에서 읽음) — static 이라 매니저 Awake 전·재생성 후에도 구독 유지, ⚠ OnDisable 에서 꼭 해제.</summary>
     public static event Action StateChanged;
 
     [Header("Google Sign-In")]
@@ -213,8 +180,7 @@ public class AuthManager : MonoBehaviour
                 string serverUid = CurrentBackendUid();
                 if (!string.IsNullOrEmpty(uid) && serverUid != uid)
                 {
-                    // 다른 코드가 이 기기의 뒤끝 로그인 토큰을 바꿨을 때 (예: 테스트 스크립트가 다른 계정으로 로그인).
-                    // 저장해 둔 이메일·로그인 방식은 이전 계정 것이므로 버리고, RefreshUserInfo 가 새 계정 값으로 채웁니다.
+                    // 토큰이 다른 계정으로 바뀜(테스트 스크립트 등) → 이전 계정 이메일·방식은 버리고 RefreshUserInfo 가 다시 채움
                     Debug.LogWarning($"[Auth] 저장된 계정({Short(uid)})과 토큰 계정({Short(serverUid)})이 다릅니다 — 토큰 계정을 씁니다.");
                     email     = null;
                     nickname  = null;
@@ -262,10 +228,7 @@ public class AuthManager : MonoBehaviour
     // 이번 구글 창이 '게스트 → 구글 연동' 인가 (false = 일반 구글 로그인)
     private bool linkingGuest;
 
-    /// <summary>
-    /// 구글 로그인 시작. 결과는 StateChanged 이벤트 + IsSignedIn 으로 확인한다.
-    /// 게스트로 로그인돼 있으면 '구글 연동' — 같은 계정(같은 Uid·진행)에 구글을 붙입니다 (LinkGuestToGoogle).
-    /// </summary>
+    /// <summary>구글 로그인 시작(결과는 StateChanged) — 게스트로 로그인돼 있으면 같은 Uid 에 구글을 붙이는 연동으로.</summary>
     public void SignInWithGoogle()
     {
         if (IsGuest) { LinkGuestToGoogle(); return; }
@@ -273,10 +236,7 @@ public class AuthManager : MonoBehaviour
         BeginGoogle(link: false);
     }
 
-    /// <summary>
-    /// 게스트 계정을 구글 계정으로 바꿉니다 (ChangeCustomToFederation). Uid 는 그대로라 세이브·랭킹·친구가 이어집니다.
-    /// 그 구글 계정이 이미 다른 뒤끝 계정에 쓰이고 있으면 실패합니다 — 그때는 로그아웃 후 구글로 로그인하라고 안내.
-    /// </summary>
+    /// <summary>게스트 → 구글 전환(ChangeCustomToFederation, Uid 유지로 진행 이어짐) — 그 구글이 이미 다른 계정이면 실패(409) 안내.</summary>
     public void LinkGuestToGoogle()
     {
         if (!IsGuest) return;
@@ -442,11 +402,7 @@ public class AuthManager : MonoBehaviour
 
     // ───────────────────────────── 게스트 로그인 ─────────────────────────────
 
-    /// <summary>
-    /// 뒤끝 게스트 계정으로 로그인합니다 (이 기기에 게스트 ID 가 저장돼 있으면 같은 계정). 결과는 StateChanged + IsSignedIn.
-    /// Login_Name 이 "로그인 안 한 채 [시작]" 을 누르면 부릅니다. 실패하면(오프라인 등) 기기 게스트로 시작하게 둡니다.
-    /// ⚠ 앱을 지우면 게스트 ID 가 사라져 계정을 잃습니다 — 구글 연동을 권하세요.
-    /// </summary>
+    /// <summary>뒤끝 게스트 로그인(기기에 저장된 게스트 ID 재사용, 실패하면 기기 게스트로 시작) — ⚠ 앱을 지우면 게스트 ID 와 계정을 잃음.</summary>
     public void SignInAsGuest()
     {
         if (!IsReady || IsSigningIn || IsSignedIn) return;
@@ -514,9 +470,7 @@ public class AuthManager : MonoBehaviour
     }
 
     // ───────────────────────────── 이메일 로그인 ─────────────────────────────
-    //
-    //  뒤끝 '커스텀 계정' 에 이메일을 아이디로 넣습니다. (뒤끝은 아이디가 이메일 형식인지 검사하지 않아서 여기서 검사)
-    //  [먼저 해 둘 것]  뒤끝 콘솔에서 커스텀 회원가입이 허용돼 있는지 확인하세요.
+    // 뒤끝 커스텀 계정 아이디로 이메일 사용(형식 검사는 여기서) — 콘솔에서 커스텀 회원가입 허용 필요
 
     /// <summary>새 계정 만들기. 성공하면 바로 로그인된 상태가 됩니다.</summary>
     public void SignUpWithEmail(string inputEmail, string password)
@@ -627,10 +581,7 @@ public class AuthManager : MonoBehaviour
         return dot > at + 1 && dot < s.Length - 1;
     }
 
-    /// <summary>
-    /// 뒤끝 응답을 유저에게 보여 줄 한국어 문구로 바꿉니다.
-    /// 커스텀 로그인은 없는 아이디·틀린 비밀번호가 둘 다 401 이라 같은 문구로 안내합니다 (가입 여부를 알려 주지 않게).
-    /// </summary>
+    /// <summary>뒤끝 응답 → 한국어 안내 문구 (없는 아이디·틀린 비밀번호는 둘 다 401 이라 같은 문구 — 가입 여부를 숨김).</summary>
     private static string ToKoreanMessage(BackendReturnObject bro, string actionName)
     {
         if (bro == null || bro.IsClientRequestFailError()) return GameMessages.Auth.checkInternet;
@@ -682,10 +633,7 @@ public class AuthManager : MonoBehaviour
         return !string.IsNullOrEmpty(inDate) ? inDate : Backend.UID;
     }
 
-    /// <summary>
-    /// 서버의 계정 정보(이메일, 가입 방식, 닉네임)로 표시 값을 맞춥니다. 실패해도 로그인 상태는 그대로.
-    /// 자동 로그인은 어떤 방식으로 가입했는지 모를 수 있어서 여기서 채웁니다.
-    /// </summary>
+    /// <summary>서버 계정 정보(이메일·가입 방식·닉네임)로 표시 값을 맞춤 — 자동 로그인은 가입 방식을 모를 수 있어서 (실패해도 로그인 유지).</summary>
     private void RefreshUserInfo()
     {
         string forUid = uid;
@@ -751,8 +699,7 @@ public class AuthManager : MonoBehaviour
             return;
         }
 
-        // 기기에 남은 마지막 계정 기록부터 지움 — 서버 로그아웃이 실패(오프라인)해도 다음 실행에 자동 로그인하지 않게
-        //   (자동 로그인은 이 기록이 있을 때만 시도함 — OnBackendInitialized)
+        // 기기의 마지막 계정 기록부터 지움 — 서버 로그아웃이 실패해도 다음 실행에 자동 로그인하지 않게
         ClearAccount();
 
         if (BackendManager.IsInitialized)
@@ -771,10 +718,7 @@ public class AuthManager : MonoBehaviour
         SetSigningIn(false);   // Notify
     }
 
-    /// <summary>
-    /// 뒤끝 계정 탈퇴 (계정 삭제). 온라인이어야 합니다. 결과는 메인 스레드에서 onDone(성공, 실패 문구).
-    /// 성공하면 로그아웃 상태가 됩니다. ServerAccountData 가 부릅니다.
-    /// </summary>
+    /// <summary>뒤끝 탈퇴(온라인 필요, ServerAccountData 가 호출) — 성공하면 로그아웃 상태, 결과는 onDone(성공, 실패 문구).</summary>
     public void DeleteAccount(Action<bool, string> onDone)
     {
         if (!IsOnline)

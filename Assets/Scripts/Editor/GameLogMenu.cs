@@ -2,13 +2,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 
-/// <summary>
-/// GameLog.Info 를 켜고 끄는 메뉴. 현재 빌드 타깃의 Scripting Define Symbols 에
-/// GAME_VERBOSE_LOG 를 넣거나 뺍니다. 바꾸면 스크립트가 다시 컴파일됩니다.
-///
-/// ★ Define 은 빌드 타깃별로 저장됩니다. 켠 채로 안드로이드 빌드를 뽑으면 빌드에도 로그가 들어가므로,
-///   출시 빌드 전에는 꺼 두세요.
-/// </summary>
+/// <summary>GameLog.Info 켜기/끄기 메뉴 — 현재 빌드 타깃의 Define 에 GAME_VERBOSE_LOG 를 넣고 빼서 재컴파일 (⚠ 타깃별 저장이라 출시 빌드 전엔 끌 것).</summary>
 public static class GameLogMenu
 {
     private const string MenuPath = "Tools/Game Log/상세 로그(Info) 켜기";

@@ -2,21 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 동료 시너지 — 보관 · 재계산 · 조회. (계산 규칙 자체는 SynergyCalculator)
-///
-/// ★ 왜 별도 매니저가 아니라 CompanionManager 의 partial 인가
-///   시너지는 '배치' 로 정해지고, 배치 데이터(occupied)의 주인이 CompanionManager 입니다.
-///   배치가 바뀌는 바로 그 메서드 끝에서 다시 계산하면 놓치는 경로가 생기지 않고,
-///   매니저끼리의 실행 순서(Awake/Start)도 신경 쓸 필요가 없습니다.
-///
-/// ★ 시너지는 저장하지 않습니다.
-///   배치 + CompanionData 로 언제든 다시 계산되는 '파생 상태' 라서 SaveData 에 필드가 없습니다.
-///   (저장해 두면 세이브 값과 실제 배치가 어긋나는 순간이 생길 뿐입니다)
-///
-/// 재계산 시점 — CompanionManager.cs 에서 "★ 시너지" 로 검색하세요.
-///   PlaceCompanion / RetrieveCompanion / RestoreIntoScene / ReplaceCompanion / RemoveCompanion / ApplyFrom
-/// </summary>
+/// <summary>동료 시너지 보관·재계산·조회(규칙은 SynergyCalculator) — 배치 데이터의 주인인 CompanionManager 의 partial 이라 배치가 바뀌는 메서드 끝에서 바로 재계산, 배치로 언제든 다시 구해지는 파생 상태라 저장 안 함.</summary>
+// 재계산 시점: PlaceCompanion / RetrieveCompanion / RestoreIntoScene / ReplaceCompanion / RemoveCompanion / ApplyFrom
 public partial class CompanionManager
 {
     /// <summary>시너지 정의 에셋을 자동으로 읽어 올 Resources 하위 폴더.</summary>
@@ -57,10 +44,7 @@ public partial class CompanionManager
         }
     }
 
-    /// <summary>
-    /// 스킬 · 스탯이 읽는 창구. 매니저가 없으면(씬 단독 테스트 등) 0.
-    /// ★ static 인 이유: 호출하는 쪽마다 "Instance 가 있나" 를 검사하면 한 곳은 반드시 빠뜨립니다.
-    /// </summary>
+    /// <summary>스킬·스탯이 읽는 창구(매니저가 없으면 0) — static 이라 호출하는 쪽마다 Instance 검사를 빠뜨릴 일이 없음.</summary>
     public static float SynergyValue(SynergyStat stat)
     {
         CompanionManager cm = Instance;
@@ -80,10 +64,7 @@ public partial class CompanionManager
         Synergy = SynergyCalculator.Compute(synergyBuffer, SynergyDefinitions);
         GameLog.Info($"[CompanionManager] 시너지 재계산 — 배치 {synergyBuffer.Count}명 / 활성 {DescribeActive(Synergy)}");
 
-        // ★ 구독자(HUD · 스탯창)에서 예외가 나도 배치 흐름은 끝까지 가야 합니다.
-        //   이 메서드는 PlaceCompanion '안에서' 불리므로, 예외가 그대로 올라가면
-        //   배치 컨트롤러의 저장(SaveManager.Save) 같은 뒤쪽 처리가 통째로 건너뛰어집니다.
-        //   구독자마다 따로 감싸서 하나가 터져도 나머지는 받게 합니다.
+        // 구독자마다 따로 감쌈 — 배치 도중 불리므로 예외가 올라가면 뒤쪽 저장까지 건너뜀
         Action<SynergyResult> handlers = OnSynergyChanged;
         if (handlers == null) return;
 

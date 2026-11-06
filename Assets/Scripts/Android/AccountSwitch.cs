@@ -1,30 +1,7 @@
 using UnityEngine;
 
-/// <summary>
-/// 게임 시작 직전에 "지금 로그인한 계정" 과 "지금 읽고 있는 세이브의 주인" 을 맞춥니다.
-/// Login_Name.StartGame() 이 씬 이동 직전에 PrepareForStart() 를 부릅니다.
-/// (게스트 시작 / 구글 로그인 성공 / 이메일 로그인 성공 — 세 경로 모두 Login_Name.StartGame 으로 모이므로 한 곳에서 처리)
-///
-/// [세 가지 경우]
-///   ① 같은 계정 (평소 — 앱을 다시 켜서 같은 계정으로 자동 로그인)
-///        → 아무것도 안 함. SaveManager 가 시작할 때 이미 이 계정 파일을 읽었음 (마지막 계정을 기억하므로)
-///
-///   ② 게스트 → 이 기기에서 처음 쓰는 계정  ★ 방식 A: 게스트 진행을 계정으로 옮기기
-///        → save.json 을 save_<UID>.json 으로 "이름만 바꿈" (+ 증강 PlayerPrefs 키도 이동)
-///        → 메모리의 진행(매니저 값)과 파일 내용이 똑같으므로 재시작 없이 그대로 시작
-///        → 게스트 파일은 사라지므로, 다른 계정이 같은 진행을 또 가져갈 수 없음
-///
-///   ③ 그 밖의 전환 (A 계정 → B 계정, 계정 → 게스트(로그아웃 후 시작), 이미 이 기기에 세이브가 있는 계정)
-///        → 지금 계정 진행 저장 → 저장 잠금 → 사용 계정 변경 → 매니저 전부 새로 만들고 LoginScene 다시 로드
-///          (계정 삭제의 RestartFromLogin 을 그대로 재사용) → 새 LoginScene 에서 자동으로 게임 시작
-///        → 매니저들이 이전 계정의 레벨·골드를 메모리에 들고 있기 때문에, 파일만 바꿔 읽으면 안 됩니다.
-///
-/// [계정을 아직 모르면]
-///   로그인 확인 전이거나(앱을 켜자마자 시작) 로그인 처리 중이면 NotReady 를 돌려줍니다.
-///   Login_Name 이 잠깐(기본 3초) 기다렸다가 다시 묻고, 그래도 모르면(오프라인·서버 오류) "지금 계정 그대로" 시작합니다.
-///   (바로 "지금 계정 그대로" 시작하면, A 가 로그아웃하고 앱을 끈 기기에서 다음 사람이
-///    켜자마자 시작을 누를 때 A 의 진행으로 들어가 A 파일에 저장되는 틈이 생깁니다)
-/// </summary>
+/// <summary>게임 시작 직전(Login_Name.StartGame) 로그인 계정과 세이브 주인을 맞춤: 같으면 그대로, 게스트→새 계정이면 세이브 파일 이름만 바꿔 이어서, 그 밖은 AccountReset 재시작으로 매니저를 새로 만듦.</summary>
+// 로그인 상태를 아직 모르면 NotReady → Login_Name 이 잠깐 기다렸다 다시 물음 (바로 시작하면 이전 사람 계정 파일에 저장되는 틈이 생김)
 public static class AccountSwitch
 {
     /// <summary>PrepareForStart 의 결과</summary>
@@ -48,9 +25,7 @@ public static class AccountSwitch
         skipCheckOnce = false;
     }
 
-    /// <summary>
-    /// 게임 시작 직전에 부릅니다. 결과에 따라 호출한 쪽이 시작 / 대기 / 중단을 정합니다 (StartResult 참고).
-    /// </summary>
+    /// <summary>게임 시작 직전에 호출 — 결과(StartResult)에 따라 호출 쪽이 시작/대기/중단을 정함.</summary>
     public static StartResult PrepareForStart()
     {
         if (skipCheckOnce)
@@ -73,8 +48,7 @@ public static class AccountSwitch
 
         GameLog.Info($"[AccountSwitch] 계정 변경 감지: {Label(current)} → {Label(target)}");
 
-        // 지금 계정의 진행을 먼저 파일에 확정 (로그인 화면으로 돌아온 경우 마지막 플레이분)
-        // 게임 씬에 들어간 적이 없으면 Save() 가 알아서 무시합니다 (매니저 ApplyFrom 전 — '게임 시작 전 저장 차단')
+        // 지금 계정 진행을 먼저 파일에 확정 (게임 씬에 들어간 적 없으면 저장하지 않음 — '게임 시작 전 저장 차단')
         if (sm.IsGameplayStarted) sm.Save();
 
         // ② 게스트 → 이 기기에 세이브가 없는 계정: 게스트 진행을 옮기고 그대로 시작
@@ -108,16 +82,10 @@ public static class AccountSwitch
         return StartResult.Rebooting;
     }
 
-    /// <summary>
-    /// 재시작 뒤 새 LoginScene 에서 게임을 자동으로 이어서 시작하게 합니다.
-    /// 계정 전환이 아닌 재시작(클라우드 세이브를 받은 뒤 — CloudSave)도 같은 자동 시작을 쓰려고 공개합니다.
-    /// </summary>
+    /// <summary>재시작 뒤 새 LoginScene 에서 게임을 자동으로 이어서 시작 (CloudSave 재시작도 쓰려고 공개).</summary>
     public static void RequestAutoStartAfterReload() => autoStartAfterReload = true;
 
-    /// <summary>
-    /// 새 LoginScene 의 Login_Name.Start 가 부릅니다. true 면 바로 StartGame() 을 이어서 부르면 됩니다.
-    /// (유저는 이미 '시작' 을 눌렀으므로 한 번 더 누르게 하지 않음)
-    /// </summary>
+    /// <summary>Login_Name.Start 가 호출 — true 면 바로 StartGame (유저가 이미 시작을 눌렀으므로 다시 누르게 하지 않음).</summary>
     public static bool ConsumeAutoStartAfterReload()
     {
         if (!autoStartAfterReload) return false;
@@ -126,11 +94,7 @@ public static class AccountSwitch
         return true;
     }
 
-    /// <summary>
-    /// 지금 로그인 상태로 판단한 "써야 할 계정". 판단할 수 없으면 false.
-    ///   로그인됨 → UID / 로그인 안 됨 → "" (게스트)
-    ///   ⚠ 로그인돼 있으면 '게스트로 시작하기' 버튼으로 시작해도 그 계정으로 시작합니다 (로그인 상태가 기준).
-    /// </summary>
+    /// <summary>써야 할 계정(로그인=UID, 아니면 "" 게스트), 판단 불가면 false — ⚠ 로그인돼 있으면 '게스트로 시작'을 눌러도 그 계정.</summary>
     private static bool TryGetSignedInAccount(out string accountId)
     {
         accountId = string.Empty;

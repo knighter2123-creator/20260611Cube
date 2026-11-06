@@ -30,9 +30,7 @@ public class SkillSlow : ActiveSkill
         target.ApplySlow(rate, duration);
     }
 
-    // 효과 요약
-    //   Enemy.SlowRoutine 이 SetSlowMultiplier(1 - rate) 로 쓰므로 slowRate 는 '감소율' 이 맞습니다.
-    //   (0.5 → 이동속도 50% 감소, 값이 클수록 강함)
+    // 효과 요약 — slowRate 는 감소율 (0.5 → 이동속도 50% 감소, 배율 = 1 − rate)
     public override string GetEffectSummary(CompanionGrade grade)
         => $"적 1체에게 피해 + {FormatSeconds(GetSlowDuration(grade))} 동안 이동속도 {FormatPercent(GetSlowRate(grade))} 감소";
 

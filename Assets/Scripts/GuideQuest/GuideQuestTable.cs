@@ -4,24 +4,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "GuideQuestTable", menuName = "Game/Guide Quest Table")]
 public class GuideQuestTable : ScriptableObject
 {
-    // ──────────────────────────────────────────────
-    //  ★ [보석 보상 퀘스트별 조정] 이번 변경
-    // ──────────────────────────────────────────────
-    //  예전: 보석 퀘스트 4종(스테이지/소환/레벨업/각성)이 모두 같은 공식
-    //        gemBase × gemGrowth^step (상한 gemCap) 을 써서, 같은 단계면 항상 같은 양이었습니다.
-    //  지금: 퀘스트 종류마다 "조정값" 을 하나씩 얹습니다.
-    //        - 배율(multiplier)    : gemBase × 배율   (예: 각성 ×5)
-    //        - 고정값(fixedAmount) : 0보다 크면 gemBase 를 무시하고 항상 이 값 (예: 소환 항상 100)
-    //
-    //  ★ [보석 성장·상한 삭제] 이번 변경
-    //    gemGrowth(단계마다 복리 증가)와 gemCap(상한)을 없앴습니다.
-    //    → 보석 보상은 이제 단계가 올라도 변하지 않는 "고정 보상" 입니다 (gemBase × 배율, 또는 고정값).
-    //    상한은 "계속 커지는 값을 멈추는" 장치였으므로, 커지지 않게 된 지금은 필요 없어 종류별 상한(cap)도 함께 뺐습니다.
-    //    골드 보상(goldBase / goldGrowth / goldCap)은 그대로 단계마다 증가합니다.
-    //
-    //  [삭제한 필드가 에셋에 남는 문제는?]
-    //    GuideQuestTable.asset 파일 안에는 gemGrowth/gemCap 값이 텍스트로 남아 있지만,
-    //    유니티는 스크립트에 없는 필드를 그냥 무시합니다(에러 없음). 다음에 에셋을 저장할 때 정리됩니다.
+    // 보석 보상은 단계와 무관한 고정값(gemBase × 종류별 배율, 또는 fixedAmount>0 이면 그 값), 골드만 단계마다 복리 증가 (에셋에 남은 옛 gemGrowth/gemCap 은 유니티가 무시)
 
     [System.Serializable]
     public class GemRewardAdjust
@@ -87,9 +70,8 @@ public class GuideQuestTable : ScriptableObject
     [Header("스테이지 클리어")]
     [SerializeField] private int stagesPerChapter = 10;
 
-    // ★ 1 → 5로 변경: 스테이지 클리어 가이드 퀘스트가 이제 5스테이지 단위로 반복됩니다
-    //   (예: 1-1 → 1-6 → 1-11 → ...). 스크립트의 기본값을 바꿔도 "이미 만들어진"
-    //   GuideQuestTable.asset 에 저장된 값은 그대로 유지되니, 인스펙터에서 직접 5로 바꿔주세요.
+    // 스테이지 퀘스트 간격 5 (1-1 → 1-6 → 1-11 …)
+    // ⚠ 기존 GuideQuestTable.asset 은 옛 값이 유지되므로 인스펙터에서 직접 5로
     [Tooltip("스테이지 클리어 퀘스트가 한 번 완료될 때마다 목표 스테이지가 몇 칸씩 올라가는지. " +
              "기존 에셋에 이미 저장된 값은 이 기본값으로 자동 갱신되지 않으니 인스펙터에서 직접 5로 바꿔주세요.")]
     [SerializeField] private int stageStep = 5;
@@ -98,8 +80,7 @@ public class GuideQuestTable : ScriptableObject
     [SerializeField] private int statBase = 1;
     [SerializeField] private float statPerCycle = 0.5f;
 
-    // ★ 동료 소환 퀘스트를 항상 1회 고정으로 요구하기로 하면서 summonBase/summonPerCycle(증가폭)
-    //   필드는 더 이상 쓰이지 않아 삭제했습니다. (Build()의 SummonCompanion 분기 참고)
+    // 동료 소환 퀘스트는 항상 1회 고정 (Build 의 SummonCompanion 분기)
 
     [Header("레벨업 (누적 목표 레벨)")]
     [Tooltip("레벨업 가이드 퀘스트의 목표 레벨 = levelBase + levelPerCycle × 사이클 번호. " +
@@ -109,16 +90,7 @@ public class GuideQuestTable : ScriptableObject
     [SerializeField] private int levelBase = 5;
     [SerializeField] private int levelPerCycle = 5;
 
-    // ──────────────────────────────────────────────
-    //  각성이 삽입되는 "사이클 번호" 계산
-    // ──────────────────────────────────────────────
-    //
-    // 레벨업 퀘스트의 목표 레벨은 항상 levelBase + levelPerCycle × 사이클번호 이므로,
-    // 반대로 "이 레벨이 몇 번째 사이클에서 나오는가"를 evolveLevels 각 값에서 거꾸로 계산합니다.
-    // (기본값 예: levelBase=5, levelPerCycle=5 → 레벨 30은 사이클 5, 레벨 50은 사이클 9 ...)
-    //
-    // evolveLevels 개수가 많아야 5~10개 수준이라, 매번 다시 계산해도 비용은 무시할 수준입니다
-    // (캐싱해서 얻는 이득보다, 인스펙터에서 값을 바꿨을 때 캐시가 낡아버릴 위험이 더 큽니다).
+    // ── 각성 삽입 사이클 = (evolveLevel − levelBase) / levelPerCycle 역산 (몇 개뿐이라 캐시 없이 매번 계산 — 인스펙터 변경 시 낡지 않게) ──
     private int[] BuildEvolveCycleIndices()
     {
         if (evolveLevels == null || evolveLevels.Length == 0)
@@ -131,9 +103,7 @@ public class GuideQuestTable : ScriptableObject
         {
             int offset = targetLevel - levelBase;
 
-            // levelBase/levelPerCycle 진행으로는 정확히 도달할 수 없는 레벨입니다.
-            // (예: levelPerCycle을 3으로 바꿨는데 evolveLevels에 30 대신 31이 남아있는 경우)
-            // → 각성 퀘스트가 영영 삽입되지 못하므로, 조용히 넘기지 않고 경고를 남깁니다.
+            // 진행으로 정확히 도달 못 하는 레벨 — 각성 퀘스트가 영영 안 나오므로 경고
             if (offset < 0 || offset % step != 0)
             {
                 Debug.LogWarning($"[GuideQuestTable] 각성 레벨 {targetLevel}은(는) levelBase({levelBase}) + " +
@@ -149,9 +119,7 @@ public class GuideQuestTable : ScriptableObject
         return list.ToArray();
     }
 
-    // ──────────────────────────────────────────────
-    //  step → (퀘스트 종류 / 그라인드 사이클 번호 / 레벨 목표) 해석
-    // ──────────────────────────────────────────────
+    // ── step → (퀘스트 종류 / 그라인드 사이클 번호 / 레벨 목표) 해석 ──
     private void ResolveStep(int step, out GuideQuestType type,
                              out int gCycle, out int levelTarget)
     {
@@ -163,8 +131,7 @@ public class GuideQuestTable : ScriptableObject
         int cycleCursor = 0;   // 지금부터 확인할 사이클 번호
         int stepCursor  = 0;   // cycleCursor 시작 지점까지 이미 소비된 step 수
 
-        // evolveCycles를 순서대로 훑으면서, step이 "이번 각성 지점까지의 구간" 안에 있는지 확인합니다.
-        // 구간 하나 = (cycleCursor .. evolveCycle 까지의 일반 사이클들) + (evolveCycle 사이클 끝의 각성 삽입 1스텝)
+        // 구간(일반 사이클들 + 끝의 각성 1스텝)을 차례로 훑어 step 이 속한 구간을 찾음
         for (int i = 0; i < evolveCycles.Length; i++)
         {
             int evolveCycle = evolveCycles[i];
@@ -264,11 +231,7 @@ public class GuideQuestTable : ScriptableObject
         return q;
     }
 
-    /// <summary>
-    /// 재화 종류별 보상 계산.
-    ///   골드 : 단계가 오를수록 복리 증가 (예전 그대로, 상한 goldCap)
-    ///   보석 : ★ 단계(step)와 무관한 고정 보상 — gemBase × 종류별 배율, 또는 종류별 고정값
-    /// </summary>
+    /// <summary>보상 계산 — 골드는 단계별 복리(상한 goldCap), 보석은 단계 무관 고정(gemBase × 배율 또는 고정값).</summary>
     private int CalcReward(CurrencyType currency, GuideQuestType type, int step)
     {
         // 골드 — 변경 없음
@@ -284,17 +247,11 @@ public class GuideQuestTable : ScriptableObject
 
         float multiplier = adjust != null ? adjust.multiplier : 1f;
 
-        // ★ [보석 성장·상한 삭제] 성장률 1(= 단계와 무관), 상한 0(= 없음) 으로 같은 계산 함수를 재사용합니다.
-        //   1^step 은 항상 1 이므로 결과는 gemBase × multiplier (반올림, 최소 1).
-        //   계산을 따로 만들지 않고 Compound 를 재사용하면 반올림·오버플로·최소 1 규칙이 골드와 항상 같게 유지됩니다.
+        // 성장률 1·상한 0 으로 Compound 재사용 → gemBase × 배율 (반올림·최소 1 규칙을 골드와 공유)
         return Compound(gemBase, 1f, 0, step, multiplier);
     }
 
-    /// <summary>
-    /// ★ [보석 보상 퀘스트별 조정] 퀘스트 종류 → 보석 조정값.
-    /// switch 로 한 곳에 모아 두어, 나중에 보석 퀘스트 종류가 늘면 여기에 한 줄만 추가하면 됩니다.
-    /// 목록에 없는 종류(null)는 gemBase 를 그대로 줍니다 — 새 종류를 추가하고 깜빡해도 보상이 0이 되지 않게.
-    /// </summary>
+    /// <summary>퀘스트 종류 → 보석 조정값 (한 곳에 모음, 목록에 없으면 null → gemBase 그대로라 0 보상 방지).</summary>
     private GemRewardAdjust GetGemAdjust(GuideQuestType type)
     {
         switch (type)
@@ -307,25 +264,16 @@ public class GuideQuestTable : ScriptableObject
         }
     }
 
-    /// <summary>
-    /// 복리 공식 base × growth^step × multiplier, 상한 cap(0 = 무제한), 최소 1.
-    /// (예전 CalcReward 본문을 그대로 옮기고 multiplier 만 추가 — 골드/보석이 같은 계산을 공유)
-    /// </summary>
+    /// <summary>base × growth^step × multiplier, 상한 cap(0=무제한), 최소 1 — 골드/보석 공용.</summary>
     private static int Compound(int baseValue, float growth, int cap, int step, float multiplier)
     {
         double v = baseValue * System.Math.Pow(growth, step) * multiplier;
 
-        // 안전장치: 단계가 아주 커지면 Pow 가 무한대가 되고, 거기에 배율 0 을 곱하면 NaN(숫자 아님)이 됩니다.
-        // NaN 은 어떤 비교도 false 라 아래 상한 검사를 그냥 통과하므로 먼저 걸러 냅니다.
-        // (지금은 골드 배율이 항상 1, 보석은 성장률 1 이라 실제로는 생기지 않지만, 값이 바뀌어도 안전하게)
+        // NaN 차단 — 무한대×0 이면 NaN 이 상한 검사를 그냥 통과함
         if (double.IsNaN(v)) v = 0;
         if (v > int.MaxValue) v = int.MaxValue;   // int 오버플로 방지
 
-        // ★ [배포 전 검토] 반올림 방식을 "사사오입" 으로 명시.
-        //   C# 의 Math.Round(x) 기본값은 '은행가 반올림(짝수 쪽으로)' 이라 22.5 → 22, 12.5 → 12 가 됩니다.
-        //   예: gemBase 15 × 배율 1.5 = 22.5 → 기획자는 23 을 기대하는데 22 가 지급됨.
-        //   보석은 이제 '기준값 × 배율' 이라 정확히 .5 가 자주 나오므로 AwayFromZero(0.5 는 올림)로 고정합니다.
-        //   골드는 1.12^단계 같은 값이라 정확히 .5 가 거의 안 나와서 사실상 변화가 없습니다.
+        // 사사오입(AwayFromZero) — 기본 Math.Round 는 은행가 반올림이라 22.5 → 22 가 됨
         int amount = (int)System.Math.Round(v, System.MidpointRounding.AwayFromZero);
         if (cap > 0 && amount > cap) amount = cap;
         return amount < 1 ? 1 : amount;

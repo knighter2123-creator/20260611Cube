@@ -16,11 +16,7 @@ public struct Friendship
     public FriendState State;
 }
 
-/// <summary>
-/// 친구 요청·수락·삭제와 채팅 차단 목록을 서버와 주고받는 부분. IChatService.Friends 로 얻습니다 (채팅과 같은 서버·같은 UID).
-/// 차단 목록도 서버에 두어 같은 계정이면 어느 기기에서나 같습니다 (BackendFriendService → BackendBlockStore).
-/// [약속]  IChatService 와 같음 — 모든 이벤트·콜백은 메인 스레드.
-/// </summary>
+/// <summary>친구 요청·수락·삭제·차단 목록 인터페이스(IChatService.Friends) — 차단도 서버에 둬 기기가 달라도 같음 (콜백은 메인 스레드).</summary>
 public interface IFriendService
 {
     /// <summary>내 친구 관계 전체 목록. 바뀔 때마다 전체가 옵니다.</summary>

@@ -1,17 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// BGM / 효과음 재생과 볼륨 설정을 담당합니다.
-/// ManagerRoot 하위에 배치하세요 (DontDestroyOnLoad는 ManagerRoot가 담당).
-///
-/// 사용법 :
-///   효과음  — SoundManager.Instance.PlaySfx(clip)            (Unity 오브젝트라 ?. 대신 != null 로 확인)
-///   배경음  — 씬에 SceneBgm 컴포넌트를 두고 클립을 넣으면 그 씬에 들어갈 때 바뀝니다 (비우면 멈춤).
-///   볼륨    — 설정 창의 효과음 / 배경음 슬라이더 (GameSettingManager.Bindings)
-///
-/// 소리가 안 나면 컴포넌트 우클릭 → "사운드 진단" 을 실행하세요.
-/// </summary>
+/// <summary>BGM·효과음 재생과 볼륨 설정 — 효과음은 PlaySfx(clip), 배경음은 씬의 SceneBgm, 볼륨은 설정 창 슬라이더 (소리가 안 나면 우클릭 → "사운드 진단").</summary>
+// [붙이는 위치] ManagerRoot 하위 (DontDestroyOnLoad 는 ManagerRoot 담당)
 [DisallowMultipleComponent]
 public class SoundManager : MonoBehaviour
 {
@@ -77,8 +68,7 @@ public class SoundManager : MonoBehaviour
         {
             s.playOnAwake = false;
 
-            // ★ 2D 게임에서 소리가 안 들리는 가장 흔한 원인입니다.
-            //   spatialBlend 가 1(3D)이면 리스너와의 거리에 따라 감쇠돼 거의 안 들립니다.
+            // spatialBlend 가 1(3D)이면 거리 감쇠로 거의 안 들림 — 2D 게임에서 무음의 가장 흔한 원인
             s.spatialBlend = 0f;
             s.dopplerLevel = 0f;
         }
@@ -97,9 +87,7 @@ public class SoundManager : MonoBehaviour
         // SFX 는 PlayOneShot 의 volumeScale 로 그때그때 적용합니다
     }
 
-    // ══════════════════════════════════════════════
-    //  재생
-    // ══════════════════════════════════════════════
+    // ── 재생 ──
 
     /// <summary>효과음 1회 재생. 여러 개가 동시에 겹쳐도 됩니다.</summary>
     public void PlaySfx(AudioClip clip, float volumeScale = 1f)
@@ -144,18 +132,12 @@ public class SoundManager : MonoBehaviour
         if (bgmSource != null) bgmSource.Stop();
     }
 
-    // ══════════════════════════════════════════════
-    //  볼륨 설정 (설정 패널 — GameSettingManager.Bindings 가 열 때 Bind, 닫을 때 Unbind)
-    //  마스터 볼륨은 슬라이더가 없어 저장된 값(기본 defaultMaster)을 그대로 씁니다.
-    // ══════════════════════════════════════════════
+    // ── 볼륨 설정 (설정 창이 열 때 Bind, 닫을 때 Unbind / 마스터는 슬라이더가 없어 저장값 그대로) ──
 
     public void SetBgmVolume01(float v) => SetVolume(PrefsBgm, ref bgmVol, v);
     public void SetSfxVolume01(float v) => SetVolume(PrefsSfx, ref sfxVol, v);
 
-    /// <summary>
-    /// 값만 바꾸고 바로 적용합니다. 디스크 저장(PlayerPrefs.Save)은 하지 않습니다 —
-    /// 슬라이더를 끄는 동안 매 프레임 불리므로, 저장은 패널을 닫을 때 한 번 (UnbindSliders → SaveVolumes).
-    /// </summary>
+    /// <summary>값만 바꾸고 바로 적용 — 드래그 중 매 프레임 불려서 디스크 저장은 패널을 닫을 때 한 번 (UnbindSliders → SaveVolumes).</summary>
     private void SetVolume(string key, ref float field, float value)
     {
         field = Mathf.Clamp01(value);
@@ -170,10 +152,7 @@ public class SoundManager : MonoBehaviour
     public void BindBgmSlider(UnityEngine.UI.Slider s) => Bind(s, bgmVol, SetBgmVolume01);
     public void BindSfxSlider(UnityEngine.UI.Slider s) => Bind(s, sfxVol, SetSfxVolume01);
 
-    /// <summary>
-    /// Bind*Slider 의 짝 — 건 리스너를 떼고 저장합니다. 안 떼면 패널을 열 때마다 리스너가 하나씩 쌓입니다.
-    /// (UnityEvent 는 대상 오브젝트 + 메서드로 비교하므로 등록 때와 다른 델리게이트로도 정확히 제거됨)
-    /// </summary>
+    /// <summary>Bind*Slider 의 짝 — 리스너를 떼고 저장 (안 떼면 열 때마다 쌓임).</summary>
     public void UnbindSliders(UnityEngine.UI.Slider sfx, UnityEngine.UI.Slider bgm)
     {
         if (sfx != null) sfx.onValueChanged.RemoveListener(SetSfxVolume01);
@@ -193,9 +172,7 @@ public class SoundManager : MonoBehaviour
         slider.onValueChanged.AddListener(setter);
     }
 
-    // ══════════════════════════════════════════════
-    //  진단
-    // ══════════════════════════════════════════════
+    // ── 진단 ──
 
     /// <summary>소리가 안 날 때 원인을 한 번에 확인합니다.</summary>
     [ContextMenu("사운드 진단")]

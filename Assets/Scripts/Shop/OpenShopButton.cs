@@ -1,15 +1,7 @@
 using UnityEngine;
 
-/// <summary>
-/// StageScene의 상점 버튼 처리. 풀 씬 이동으로 ShopScene 진입.
-/// ※ ShopScene을 Build Profiles 의 Scene List 에 반드시 등록할 것.
-///
-/// [작동 순서]
-///   버튼 OnClick → OpenShop() → ShopSceneLoader.SaveAndLoad()
-///     → (연타 방지) → (씬 등록 확인) → 저장 → 비동기 로드
-///   실제 로직은 ShopSceneLoader 한 곳에 있고, 이 컴포넌트는 "어느 씬으로 갈지"만 들고 있습니다.
-///   (인스펙터 OnClick 에 연결하려면 MonoBehaviour 의 public 함수가 필요해서 얇은 껍데기로 남겨 둡니다)
-/// </summary>
+/// <summary>StageScene 상점 버튼 — OnClick 용 얇은 껍데기로 목적지 씬만 들고 ShopSceneLoader.SaveAndLoad 에 위임(연타 방지·씬 확인·저장·비동기 로드).</summary>
+// ⚠ ShopScene 을 Build Profiles 의 Scene List 에 등록할 것
 public class OpenShopButton : MonoBehaviour
 {
     [SerializeField] private string shopSceneName = "ShopScene";

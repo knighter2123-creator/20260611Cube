@@ -4,17 +4,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// 도감에서 동료 아이콘을 눌렀을 때 뜨는 상세정보 창.
-/// 이름 · 등급 · 성급(★)과 조각 · 기본 능력치 · 스킬을 보여주고,
-/// 조각이 100개 이상이면 [성급 올리기] 로 성급을 올릴 수 있습니다 (CompanionFragment.TryStarUp).
-///
-/// ★ 붙이는 곳: Codex_Content 아래의 DetailPanel 오브젝트 (도감 탭 '안').
-///   탭이 가려지면 같이 가려지고, CompanionCodexUI 가 OnTabHide 에서 닫아 줍니다.
-///
-/// ★ 이 창은 CompanionData / ActiveSkill 에 '적힌 값'을 보여줍니다.
-///   실제 대미지는 플레이어 공격력이 더해지므로(ActiveSkill.CalcDamage) "플레이어 공격력 + N" 으로 표기합니다.
-/// </summary>
+/// <summary>도감 상세창: 이름·등급·성급·조각·능력치(이 등급·성급 값)·스킬을 보여 주고 조각 100개 이상이면 [성급 올리기]/[진화] — 대미지는 "플레이어 공격력 + N" 으로 표기.</summary>
+// [붙이는 곳] Codex_Content 아래 DetailPanel (탭이 가려지면 CompanionCodexUI 가 닫음)
 public class CompanionDetailPanel : MonoBehaviour
 {
     [Header("창")]
@@ -64,31 +55,21 @@ public class CompanionDetailPanel : MonoBehaviour
     private bool               shownOwned;
     private CompanionPoolAsset pool;   // 진화 대상을 찾을 풀 (도감이 Show 때 넘겨줌)
 
-    /// <summary>
-    /// 진화로 보유 목록이 바뀌었을 때 발생합니다. 도감이 격자(보유 표시 · 수집 수)를 다시 그리는 데 씁니다.
-    /// (성급만 오른 경우는 보유 목록이 그대로라 발생하지 않습니다)
-    /// </summary>
+    /// <summary>진화로 보유 목록이 바뀌었을 때 — 도감 격자 다시 그리기용 (성급만 오르면 발생 안 함).</summary>
     public event Action OnOwnedChanged;
 
     private GameObject Root => root != null ? root : gameObject;
 
-    // ══════════════════════════════════════════════
-    //  Unity 생명주기
-    // ══════════════════════════════════════════════
+    // ── Unity 생명주기 ──
     private void Awake()
     {
-        // ★ 리스너는 Awake 에서 한 번만. (Show 에서 걸면 열 때마다 쌓입니다)
-        //   창이 꺼진 채로 시작해도, 처음 Show() 로 켜지는 순간 Awake 가 먼저 돌기 때문에 괜찮습니다.
-        //
-        // ★ 버튼의 On Click () 리스트는 인스펙터에서 비워두세요. 둘 다 걸면 한 번 클릭에 두 번 실행됩니다.
+        // 리스너는 Awake 에서 한 번만 (Show 에서 걸면 쌓임) — ⚠ 인스펙터 On Click 은 비울 것
         if (closeButton  != null) closeButton.onClick.AddListener(Hide);
         if (dimmedButton != null) dimmedButton.onClick.AddListener(Hide);
         if (starUpButton != null) starUpButton.onClick.AddListener(OnClickStarUp);
         if (evolveButton != null) evolveButton.onClick.AddListener(OnClickEvolve);
 
-        // ★ root 는 '이 오브젝트 자신 / 부모 / 자식' 중 하나여야 합니다.
-        //   전혀 상관없는 오브젝트를 넣으면, 이 스크립트가 붙은 오브젝트는 꺼진 채로 남을 수 있고
-        //   그러면 Awake 가 영영 안 돌아 ✕ 버튼이 동작하지 않습니다. 에러도 안 납니다.
+        // root 는 자신·부모·자식 중 하나여야 함 (무관하면 이 오브젝트가 꺼진 채 남아 ✕ 가 조용히 안 됨)
         bool related = root == null
                     || root == gameObject
                     || transform.IsChildOf(root.transform)      // root 가 부모 쪽
@@ -107,9 +88,7 @@ public class CompanionDetailPanel : MonoBehaviour
         if (evolveButton != null) evolveButton.onClick.RemoveListener(OnClickEvolve);
     }
 
-    // ══════════════════════════════════════════════
-    //  성급 올리기
-    // ══════════════════════════════════════════════
+    // ── 성급 올리기 ──
 
     /// <summary>조각 100개를 써서 성급 +1. 성공하면 바뀐 성급·조각·능력치로 창을 다시 그립니다.</summary>
     private void OnClickStarUp()
@@ -122,10 +101,7 @@ public class CompanionDetailPanel : MonoBehaviour
             Fill(shownData, shownOwned);
     }
 
-    /// <summary>
-    /// 진화. 성공하면 창을 진화한 동료로 바꿔 보여주고, 도감에 보유 목록이 바뀌었다고 알립니다.
-    /// (원래 동료는 보유 목록에서 사라지므로 그 창을 계속 보여줄 이유가 없습니다)
-    /// </summary>
+    /// <summary>진화 — 성공하면 창을 진화한 동료로 바꾸고 도감에 보유 목록 변경을 알림 (원래 동료는 사라짐).</summary>
     private void OnClickEvolve()
     {
         CompanionFragment growth = CompanionFragment.Instance;
@@ -137,9 +113,7 @@ public class CompanionDetailPanel : MonoBehaviour
         OnOwnedChanged?.Invoke();
     }
 
-    // ══════════════════════════════════════════════
-    //  열기 / 닫기
-    // ══════════════════════════════════════════════
+    // ── 열기 / 닫기 ──
     /// <param name="evolutionPool">진화 대상을 찾을 풀. null 이면 진화 버튼을 숨깁니다.</param>
     public void Show(CompanionData data, bool owned, CompanionPoolAsset evolutionPool)
     {
@@ -152,9 +126,7 @@ public class CompanionDetailPanel : MonoBehaviour
         GameObject r = Root;
         r.SetActive(true);
 
-        // ★ 같은 부모 아래에서 '맨 뒤' 형제로 옮깁니다.
-        //   UI 는 하이어라키 아래쪽이 위에 그려지므로, 격자 ScrollView 보다 위에 뜨게 됩니다.
-        //   (하이어라키에서 순서를 잘못 놓아도 창이 목록 뒤에 숨지 않게 하는 안전장치)
+        // 맨 뒤 형제로 옮겨 격자보다 위에 그려지게 (하이어라키 순서 실수 방어)
         r.transform.SetAsLastSibling();
     }
 
@@ -164,9 +136,7 @@ public class CompanionDetailPanel : MonoBehaviour
         if (r.activeSelf) r.SetActive(false);
     }
 
-    // ══════════════════════════════════════════════
-    //  내용 채우기
-    // ══════════════════════════════════════════════
+    // ── 내용 채우기 ──
     private void Fill(CompanionData data, bool owned)
     {
         shownData  = data;
@@ -187,8 +157,7 @@ public class CompanionDetailPanel : MonoBehaviour
         if (gradeFrame != null) gradeFrame.color = CompanionGradeStyle.GetColor(data.grade);
         if (nameText   != null) nameText.text    = data.companionName;
 
-        // ★ 등급 글자에 색을 입힐 때 TMP 리치 텍스트(<color>)를 씁니다.
-        //   TMP_Text 의 Rich Text 옵션이 켜져 있어야 합니다 (기본값: 켜짐).
+        // 등급 글자 색은 TMP 리치 텍스트 (Rich Text 옵션 필요, 기본 켜짐)
         if (gradeText  != null) gradeText.text   = CompanionGradeStyle.GetColoredName(data.grade);
 
         if (ownedText  != null) ownedText.text   = owned ? "보유 중" : "<color=#888888>미획득</color>";
@@ -207,8 +176,7 @@ public class CompanionDetailPanel : MonoBehaviour
 
             if (skill != null)
             {
-                // 에셋의 원래 숫자가 아니라 '이 동료 등급·성급의' 값을 보여줍니다.
-                // 전투(Companion / CalcDamage)와 같은 함수를 부르므로 화면 수치와 실제 동작이 어긋나지 않습니다.
+                // 이 동료 등급·성급의 값 — 전투와 같은 함수라 화면과 실제가 어긋나지 않음
                 float cooldown = skill.GetCooldown(data.grade, star);
                 sb.Append('\n').Append("스킬 피해   <b>플레이어 공격력 + ").Append(skill.GetDamage(data.grade, star).ToString("0.#")).Append("</b>");
                 sb.Append('\n').Append("재사용 대기 <b>").Append(cooldown.ToString("0.#")).Append("초</b>");
@@ -218,9 +186,7 @@ public class CompanionDetailPanel : MonoBehaviour
             statsText.text = sb.ToString();
         }
 
-        // ── 스킬 ──
-        // ★ 스킬이 연결 안 된 동료도 있을 수 있습니다. 그 경우에도 창이 깨지지 않게 처리합니다.
-        //   (CompanionData 에서 ownedSkill 을 비워둔 에셋)
+        // ── 스킬 (ownedSkill 이 빈 에셋이어도 창이 깨지지 않게) ──
         if (skill == null)
         {
             if (skillIconImage  != null) skillIconImage.enabled = false;
@@ -240,9 +206,7 @@ public class CompanionDetailPanel : MonoBehaviour
 
         if (skillEffectText != null)
         {
-            // ★ 스킬마다 다른 효과 문장은 스킬 스스로 만듭니다 (ActiveSkill.GetEffectSummary).
-            //   여기서 'skill is SkillSlow' 같은 분기를 하지 않으므로, 새 스킬을 추가해도 이 파일은 그대로입니다.
-            // ★ [등급] 둔화율·스턴 시간 등도 등급마다 다르므로 이 동료의 등급을 넘깁니다.
+            // 효과 문장은 스킬 스스로 만듦(새 스킬을 추가해도 이 파일 불변), 효과량이 등급마다 달라 등급을 넘김
             string summary = skill.GetEffectSummary(data.grade);
             string desc    = skill.description;
 
@@ -257,14 +221,7 @@ public class CompanionDetailPanel : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 성급 · 조각 · [성급 올리기] / [진화] 버튼. 미획득 동료는 전부 숨깁니다 (성장시킬 대상이 아님).
-    ///
-    ///   최대 성급 전                 → [성급 올리기],  "조각 37 / 100"
-    ///   최대 성급 + 진화 대상 있음    → [진화 → 희귀 공격],  "조각 37 / 100"
-    ///   최대 성급 + 진화 대상 없음    → 버튼 없음,  "조각 37 (최대 성급)"
-    /// 버튼은 조각이 100개 이상일 때만 눌립니다.
-    /// </summary>
+    /// <summary>성급·조각 줄과 버튼(최대 전 = [성급 올리기], 최대 + 진화 대상 = [진화 → …], 없으면 버튼 없음) — 조각 100개 이상일 때만 눌림, 미획득은 숨김.</summary>
     private void FillGrowth(CompanionData data, bool owned, int star, CompanionFragment growth)
     {
         bool isMax = star >= CompanionStar.MAX_STAR;
@@ -297,11 +254,7 @@ public class CompanionDetailPanel : MonoBehaviour
             evolveButtonLabel.text = $"진화 → {CompanionGradeStyle.GetColoredName(evolveTarget.grade)} {evolveTarget.companionName}";
     }
 
-    /// <summary>
-    /// ★ 시너지 — 이 동료가 지금 맵에 배치돼 있고 시너지가 켜져 있으면, 시너지 반영 수치를 한 줄 덧붙입니다.
-    ///   위의 기본 수치는 그대로 둡니다 (도감은 '이 동료 자체' 의 값을 보여주는 곳이라).
-    ///   쿨다운은 전투와 같은 상수(ActiveSkill.SynergyCooldownFactor · MIN_COOLDOWN)로 계산해 실제와 어긋나지 않게 합니다.
-    /// </summary>
+    /// <summary>배치 중이고 시너지가 켜져 있으면 시너지 반영 수치를 한 줄 덧붙임 (기본 수치는 그대로, 쿨다운은 전투와 같은 상수로).</summary>
     private void AppendSynergyNote(CompanionData data, bool owned, float baseCooldown)
     {
         CompanionManager cm = CompanionManager.Instance;

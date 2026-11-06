@@ -1,19 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 서버 기능을 고르는 단 한 곳 — 게임 코드는 구체 클래스(뒤끝 등)가 아니라 여기의 인터페이스만 씁니다.
-///
-/// [왜]  서버를 바꾸거나, 서버 없이 시험할 때(Local) 이 파일의 한 줄만 바꾸면 되게.
-///       채팅의 IChatService(ChatManager.CreateService)와 같은 생각입니다.
-///
-/// [지금 있는 것]
-///   Nickname  — INicknameService  (뒤끝: BackendNicknameService / 시험: LocalNicknameService)
-///   Mail      — IMailService      (뒤끝 우편: BackendMailService)
-///   (랭킹은 RankingManager 가 뒤끝 유저 리더보드를 바로 씀)
-/// [다음 단계에서 추가]  클라우드 세이브 · 친구/쪽지 · 가챠 확률 · 채팅
-///
-/// 테스트 코드에서 바꿔 끼울 수 있게 setter 를 열어 둡니다. 플레이 시작 때마다 기본값으로 돌아갑니다.
-/// </summary>
+/// <summary>서버 구현(Nickname·Mail)을 고르는 단 한 곳 — 게임 코드는 인터페이스만 써서 서버 교체·Local 시험 때 여기 한 줄만 바꾸면 됨 (setter 는 테스트용, 플레이마다 기본값 복구).</summary>
 public static class ServerServices
 {
     public static INicknameService Nickname { get; set; } = new BackendNicknameService();

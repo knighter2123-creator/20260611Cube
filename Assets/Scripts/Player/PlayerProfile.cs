@@ -1,27 +1,14 @@
 using System.Text.RegularExpressions;
 using UnityEngine;
 
-/// <summary>
-/// 플레이어 이름을 읽고 "최초 1회" 등록하는 단 하나의 창구.
-///
-/// 설계: "읽기는 누구나, 쓰기는 정해진 창구로만"
-///   - Name / HasName  : 어느 씬에서든 읽을 수 있음
-///   - TryRegister()   : 이름이 아직 없을 때만 성공 (최초 등록, 무료)
-///   - TryChangeName() : 이미 이름이 있을 때만 성공 (보석을 소모하는 유료 개명)
-///   두 창구는 NicknameChangePanel 이 이름 유무로 골라 부릅니다.
-///
-/// 저장 위치: SaveData.playerName (save.json)
-///   - 이 클래스는 값을 따로 들고 있지 않고(캐시 없음) 매번 SaveManager.Current 를 읽습니다.
-///     → 세이브를 지우면 이름도 자연스럽게 함께 사라집니다.
-/// </summary>
+/// <summary>플레이어 이름의 유일한 창구: 읽기는 누구나(Name·DisplayName), 쓰기는 최초 등록(무료)·유료 개명(보석)·서버 경유 요청으로만 — 캐시 없이 매번 SaveData.playerName 을 읽어 세이브를 지우면 이름도 사라짐.</summary>
 public static class PlayerProfile
 {
     // ───────── 규칙 (UI 도 이 상수를 참조 → 숫자가 한 곳에만 존재) ─────────
     public const int MIN_LENGTH = 2;
     public const int MAX_LENGTH = 6;   // 기존 PlayerName.cs 의 제한(6자)을 그대로 유지
 
-    // 개명(닉네임 변경) 1회당 소모되는 보석. 기획 수치가 정해지면 이 한 줄만 바꾸면 됩니다.
-    //   (NicknameChangePanel 의 비용 안내 텍스트도 이 상수를 그대로 읽으므로 UI 표기가 자동으로 맞습니다)
+    // 개명 1회 보석 비용 (UI 안내도 이 상수를 읽어 자동으로 맞음)
     public const int CHANGE_NAME_GEM_COST = 3000;
 
     // 예전 PlayerName.cs 가 쓰던 PlayerPrefs 키 (이관용으로만 사용)
@@ -36,10 +23,7 @@ public static class PlayerProfile
     /// <summary>이름이 "변경"된 순간 호출됩니다 (TryChangeName 성공 시). UI 갱신용.</summary>
     public static event System.Action<string> OnNameChanged;
 
-    /// <summary>
-    /// Enter Play Mode Options 에서 "Reload Domain" 을 끄면 static 이벤트에
-    /// 이전 플레이의 (이미 파괴된) UI 가 구독된 채 남습니다. 플레이 시작 직전에 비웁니다.
-    /// </summary>
+    /// <summary>Reload Domain 을 끈 에디터에서 지난 플레이의 파괴된 UI 구독이 남지 않게 비움.</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -62,15 +46,7 @@ public static class PlayerProfile
 
     public const string ANONYMOUS_PREFIX = "익명";
 
-    /// <summary>
-    /// 이름을 정하기 전 보여 줄 "익명1234". 처음 읽을 때 한 번 만들어 세이브에 넣고, 이후엔 같은 값을 씁니다.
-    ///
-    /// [왜 playerName 에 바로 넣지 않는가]
-    ///   playerName 이 채워지면 HasName = true 가 되어 '최초 등록(무료)' 흐름(NicknamePrompt / TryRegister)이
-    ///   전부 막히고, 첫 이름 정하기부터 보석을 내야 합니다. 그래서 별도 필드에 두고 "표시용" 으로만 씁니다.
-    ///
-    /// 숫자 4자리 = "익명" + 4 = 6자로 MAX_LENGTH 안에 들어갑니다. 다른 유저와 겹칠 수 있습니다 (표시용이라 허용).
-    /// </summary>
+    /// <summary>이름 전 표시용 "익명1234"(처음 읽을 때 한 번 만들어 저장) — playerName 에 넣으면 무료 최초 등록이 막혀서 별도 필드, 다른 유저와 겹쳐도 허용.</summary>
     public static string AnonymousName
     {
         get
@@ -105,9 +81,7 @@ public static class PlayerProfile
 
     // ───────── 검사 ─────────
 
-    /// <summary>
-    /// 입력값을 다듬고(앞뒤 공백 제거) 규칙에 맞는지 검사합니다. 등록은 하지 않습니다.
-    /// </summary>
+    /// <summary>입력값을 다듬고(앞뒤 공백 제거) 규칙(길이·한글/영문/숫자) 검사만 함.</summary>
     public static bool Validate(string raw, out string cleaned, out string error)
     {
         cleaned = (raw ?? string.Empty).Trim();
@@ -130,12 +104,7 @@ public static class PlayerProfile
 
     // ───────── 쓰기 (딱 한 번만 성공) ─────────
 
-    /// <summary>
-    /// 이름을 최초 1회 등록합니다. (파일 기록 시점은 아래 Persist() 참고)
-    /// 이미 이름이 있으면 무조건 실패 → "MainScene 에서 임의로 못 바꾸게" 하는 장치.
-    /// (MainScene 에서 이름을 바꾸는 새 창구는 아래 TryChangeName 입니다)
-    /// </summary>
-    /// ⚠ 이 기기에만 저장합니다 (게스트용). 로그인 계정은 서버 중복 검사를 거치는 RequestRegister 를 쓰세요.
+    /// <summary>이름 최초 1회 등록(이미 있으면 실패 — 개명은 TryChangeName) — ⚠ 이 기기에만 저장(게스트용), 로그인 계정은 RequestRegister.</summary>
     public static bool TryRegister(string raw, out string error)
     {
         if (!CheckRegister(raw, out SaveData data, out string cleaned, out error))
@@ -175,32 +144,14 @@ public static class PlayerProfile
 
     // ───────── 쓰기 (MainScene, 보석 소모 개명) ─────────
 
-    /// <summary>
-    /// MainScene 네임플레이트 클릭 → NicknameChangePanel 에서 호출되는 "유료 개명".
-    /// TryRegister 와 정반대 조건입니다: 이미 이름이 있어야만 성공합니다.
-    ///
-    /// [TryRegister 와 저장 경로(Persist)를 공유하지 않는 이유]
-    ///   TryRegister → Persist() 는 LoginScene 의 매니저 초기화 타이밍 문제(아래 Persist() 주석 참고)를
-    ///   피하려고 SaveManager.Save() 대신 WriteCurrentToDisk() 를 직접 씁니다.
-    ///   이 메서드는 반드시 MainScene 에서만 호출되므로 그 타이밍 문제가 없고, 오히려
-    ///   SaveManager.Save() 를 써야 방금 SpendGem() 으로 줄어든 보석까지
-    ///   (CurrencyManager.CaptureTo 를 통해) 같은 저장에 함께 기록됩니다.
-    ///   WriteCurrentToDisk() 는 Current 를 그대로 파일에 쓸 뿐, 살아있는 매니저들의 최신 값을
-    ///   Current 로 모아오지 않으므로 여기서 쓰면 보석 차감이 저장에서 누락될 수 있습니다.
-    ///   (다른 MainScene 코드, 예: CompanionManager.AddCompanion 도 값 변경 후 SaveManager.Save() 를
-    ///    쓰는 것과 같은 이유 — 동료도감 셋업 문서 §9 참고)
-    /// </summary>
-    /// ⚠ 이 기기에만 저장합니다 (게스트용). 로그인 계정은 서버 중복 검사를 거치는 RequestChangeName 을 쓰세요.
+    /// <summary>유료 개명(이미 이름이 있어야 성공) — 전체 Save() 로 저장해 방금 줄어든 보석까지 함께 기록 / ⚠ 이 기기에만 저장(게스트용), 로그인 계정은 RequestChangeName.</summary>
     public static bool TryChangeName(string raw, out string error)
     {
         if (!CheckChange(raw, out SaveData data, out string cleaned, out bool same, out error))
             return false;
         if (same) return true;
 
-        // ★ 순서가 중요합니다: 유효성 검사를 전부 통과한 "직후", 실제로 이름을 바꾸기 "직전"에 소모합니다.
-        //   먼저 차감부터 하고 나중에 실패할 수 있는 순서로 짜면(예: GachaSystem.Draw 가 먼저 보석을
-        //   차감한 뒤 결과가 없으면 그냥 넘어가 버리는 기존 버그 — 동료도감 셋업 문서 §9 기록),
-        //   실패 시 보석만 사라지는 사고가 납니다.
+        // ★ 검사를 모두 통과한 직후, 이름을 바꾸기 직전에 차감 (먼저 차감하면 실패 시 보석만 사라짐)
         if (!CurrencyManager.Instance.SpendGem(CHANGE_NAME_GEM_COST))
         {
             error = $"보석이 부족합니다. (필요: {CHANGE_NAME_GEM_COST})";
@@ -211,10 +162,7 @@ public static class PlayerProfile
         return true;
     }
 
-    /// <summary>
-    /// 개명 전 검사 (이름 있음 + 규칙 + 보석 보유). same = 지금 이름과 같음 (보석 없이 성공 처리).
-    /// 보석은 여기서 쓰지 않습니다 — 확인만.
-    /// </summary>
+    /// <summary>개명 전 검사(이름 있음·규칙·보석 보유 확인만) — same = 지금 이름과 같음(보석 없이 성공).</summary>
     private static bool CheckChange(string raw, out SaveData data, out string cleaned, out bool same, out string error)
     {
         cleaned = string.Empty;
@@ -224,8 +172,7 @@ public static class PlayerProfile
 
         if (!HasName)
         {
-            // NicknameChangePanel 은 이름이 없으면 '최초 설정' 모드(TryRegister)로 열리므로
-            // 정상 흐름에선 여기 오지 않습니다. 다른 곳에서 잘못 불렀을 때를 위한 방어입니다.
+            // 정상 흐름에선 안 옴(이름이 없으면 패널이 최초 설정 모드) — 잘못된 호출 방어
             error = "등록된 이름이 없습니다. 먼저 이름을 설정해 주세요.";
             return false;
         }
@@ -233,8 +180,7 @@ public static class PlayerProfile
         if (!Validate(raw, out cleaned, out error))
             return false;
 
-        // 지금 이름과 똑같으면 보석을 쓰지 않고 조용히 성공 처리합니다.
-        // 이 검사가 없으면 오타로 같은 이름을 다시 입력한 유저의 보석이 이유 없이 사라집니다.
+        // 같은 이름이면 보석 없이 성공 (안 그러면 같은 이름을 다시 입력한 유저의 보석이 사라짐)
         if (cleaned == data.playerName)
         {
             same = true;
@@ -270,10 +216,7 @@ public static class PlayerProfile
     /// <summary>서버에 이름을 묻는 중인가 (확인 버튼 연타 방지).</summary>
     public static bool IsNameRequestPending { get; private set; }
 
-    /// <summary>
-    /// 최초 등록 (무료). 로그인 계정이면 뒤끝에 먼저 등록하고(중복 검사), 성공하면 이 기기에 적용합니다.
-    /// 게스트면 TryRegister 와 같습니다. 결과는 메인 스레드에서 onDone(성공, 실패 문구).
-    /// </summary>
+    /// <summary>최초 등록(무료) — 로그인 계정은 뒤끝에 먼저 등록(중복 검사) 후 기기에 적용, 게스트는 TryRegister.</summary>
     public static void RequestRegister(string raw, System.Action<bool, string> onDone)
     {
         if (!ProfileSync.TryGetAccount(out string uid))
@@ -298,10 +241,7 @@ public static class PlayerProfile
         });
     }
 
-    /// <summary>
-    /// 유료 개명 (보석). 로그인 계정이면 뒤끝에서 바꾼 "뒤에" 보석을 쓰고 이 기기에 적용합니다 — 서버가 거절하면 보석은 그대로.
-    /// 게스트면 TryChangeName 과 같습니다. 결과는 메인 스레드에서 onDone(성공, 실패 문구).
-    /// </summary>
+    /// <summary>유료 개명 — 로그인 계정은 뒤끝에서 바꾼 '뒤에' 보석 차감(거절되면 보석 그대로), 게스트는 TryChangeName.</summary>
     public static void RequestChangeName(string raw, System.Action<bool, string> onDone)
     {
         if (!ProfileSync.TryGetAccount(out string uid))
@@ -331,8 +271,7 @@ public static class PlayerProfile
         {
             if (!TryGetData(out SaveData data, out string e)) return e;
 
-            // 서버 이름은 이미 바뀌었으므로 이 기기도 반드시 맞춥니다.
-            // 기다리는 사이 보석을 다른 데 써서 모자라면 차감 없이 적용 (서버와 이름이 갈라지는 것보다 낫습니다)
+            // 서버 이름이 이미 바뀌어 반드시 맞춤 — 그 사이 보석이 모자라면 차감 없이 적용 (이름이 갈라지는 것보다 나음)
             if (CurrencyManager.Instance == null || !CurrencyManager.Instance.SpendGem(CHANGE_NAME_GEM_COST))
                 Debug.LogWarning("[PlayerProfile] 서버 개명 후 보석이 모자라 차감하지 못했습니다 — 이름만 적용합니다.");
 
@@ -379,10 +318,7 @@ public static class PlayerProfile
         });
     }
 
-    /// <summary>
-    /// 게스트 때 정한 이름을 서버에 올리려 했는데 다른 유저가 쓰고 있을 때 (ProfileSync 전용).
-    /// 이름을 지워 '최초 설정(무료)' 을 다시 하게 합니다 — NicknamePrompt 가 다시 물어봄.
-    /// </summary>
+    /// <summary>게스트 때 이름이 서버에서 이미 쓰이고 있을 때(ProfileSync 전용) — 이름을 지워 무료 최초 설정을 다시 하게.</summary>
     public static void ClearNameAfterServerConflict()
     {
         if (!TryGetData(out SaveData data, out _) || !HasName) return;
@@ -401,11 +337,7 @@ public static class PlayerProfile
     /// <summary>이름을 마지막으로 정한 시각 (UTC ms). 서버 값과 어느 쪽이 최신인지 비교할 때 씁니다.</summary>
     public static long NameUpdatedAt => Data?.nameUpdatedAt ?? 0;
 
-    /// <summary>
-    /// 서버(다른 기기)에서 정한 이름을 이 기기에 적용합니다. 보석을 쓰지 않습니다 —
-    /// 개명 비용은 이름을 바꾼 기기에서 이미 냈기 때문입니다.
-    /// 규칙에 안 맞는 값(콘솔에서 직접 고친 경우 등)은 적용하지 않습니다.
-    /// </summary>
+    /// <summary>다른 기기에서 정한 서버 이름을 적용(보석 없음 — 바꾼 기기에서 이미 냄), 규칙에 안 맞는 값은 무시.</summary>
     public static bool ApplyFromServer(string raw, long updatedAt)
     {
         if (!TryGetData(out SaveData data, out _)) return false;
@@ -432,23 +364,7 @@ public static class PlayerProfile
 
     // ───────── 파일 기록 ─────────
 
-    /// <summary>
-    /// TryRegister 전용 저장. "게임 씬에 들어갔는가" 로 저장 방법을 고릅니다.
-    ///
-    ///   게임 씬 진입 후 (지금의 정상 경로 — MainScene 스테이지 도달)
-    ///     → SaveManager.Save(). 매니저들이 이미 ApplyFrom 을 받아 진짜 값을 들고 있으므로
-    ///       전체 저장이 안전하고, 이름과 함께 그 시점의 진행(레벨·골드…)도 한 번에 기록됩니다.
-    ///       (TryChangeName 이 Save() 를 쓰는 것과 같은 이유)
-    ///
-    ///   게임 씬 진입 전 (LoginScene — 이제 정상 흐름에선 오지 않지만, 누군가 부를 경우 대비)
-    ///     → 예전 그대로 Persist(). 이때 Save() 를 부르면 매니저 초기값이 세이브를 덮어씁니다.
-    ///       (참고: 그 경우 SaveManager.Save() 는 IsGameplayStarted 검사로 어차피 무시되므로,
-    ///        Persist 로 보내지 않으면 이름이 파일에 전혀 기록되지 않습니다)
-    ///
-    /// 기준을 "씬 이름" 이 아니라 SaveManager.IsGameplayStarted 로 둔 이유:
-    ///   저장이 안전한지 판단하는 규칙을 SaveManager 한 곳에만 두기 위해서입니다.
-    ///   여기서 씬 이름을 따로 검사하면, 나중에 씬 구성이 바뀔 때 두 곳 중 한 곳만 고치게 됩니다.
-    /// </summary>
+    /// <summary>이름 등록 저장 — 게임 씬 진입 후면 전체 Save(), 전이면 Persist() (Save 는 매니저 초기값으로 덮거나 무시되므로); 판단은 SaveManager.IsGameplayStarted 한 곳 기준.</summary>
     private static void RegisterSave()
     {
         SaveManager sm = SaveManager.Instance;
@@ -460,23 +376,7 @@ public static class PlayerProfile
             Persist();
     }
 
-    /// <summary>
-    /// Current 에 넣은 이름을 파일에 확정합니다. (LoginScene 전용 — 예전 이름 이관, 게임 시작 전 등록.
-    /// MainScene 의 등록/개명은 SaveManager.Save() 사용 — 위 RegisterSave 참고)
-    ///
-    /// ★ SaveManager.Save() 를 쓰지 않는 이유
-    ///   Save() 는 살아있는 모든 매니저의 CaptureTo() 를 먼저 호출합니다.
-    ///   LoginScene 시점에는 매니저들이 아직 ApplyFrom() 으로 세이브를 받기 전일 수 있어서,
-    ///   그때 Save() 를 부르면 "기본값(레벨 1, 골드 0...)" 이 저장 파일을 덮어쓸 위험이 있습니다.
-    ///
-    /// ★ 첫 실행(세이브 파일 없음)이면 파일을 만들지 않는 이유
-    ///   이때 Current 는 new SaveData() 의 기본값입니다. 여기서 파일을 만들어 버리면
-    ///   HasSave() 가 true 가 되어, 매니저들이 "첫 실행 초기화" 대신 ApplyFrom() 을 타게 될 수 있습니다.
-    ///   그러면 SaveData 의 기본값(baseDamage 0, attackSpd 1, criticalMultiplier 0)이
-    ///   그대로 적용돼 공격력 0 이 되는 버그가 납니다. (스탯창 문서 3-2 의 그 문제)
-    ///   → 이름은 Current 에만 넣어 두고, MainScene 의 첫 Save() 때 함께 기록되게 둡니다.
-    ///     Save() 는 Current 를 바탕으로 저장하므로 이름이 사라지지 않습니다.
-    /// </summary>
+    /// <summary>Current 의 이름만 파일에 확정(LoginScene 전용, CaptureTo 없이 — Save 는 매니저 기본값으로 덮음) — ⚠ 첫 실행이면 파일을 만들지 않음 (만들면 기본값 baseDamage 0 이 적용돼 공격력 0 버그, 이름은 첫 Save 때 함께 기록).</summary>
     private static void Persist()
     {
         SaveManager sm = SaveManager.Instance;
@@ -490,12 +390,7 @@ public static class PlayerProfile
 
     // ───────── 예전 PlayerPrefs 이름 이관 (1회성) ─────────
 
-    /// <summary>
-    /// 예전 PlayerName.cs 로 이름을 정했던 기존 유저를 위해,
-    /// PlayerPrefs 에 남은 이름을 SaveData 로 옮깁니다. LoginScene 시작 시 한 번 호출하세요.
-    /// - 새 규칙(글자 수·허용 문자)에 맞으면 그대로 가져오고, 안 맞으면 버립니다 (유저가 새로 정함).
-    /// - 어느 쪽이든 PlayerPrefs 키는 지웁니다. 안 지우면 세이브 삭제 후 옛 이름이 되살아납니다.
-    /// </summary>
+    /// <summary>옛 PlayerPrefs 이름을 SaveData 로 1회 이관(LoginScene 시작 시) — 규칙에 맞으면 가져오고, 키는 지움 (안 지우면 세이브 삭제 후 옛 이름이 부활).</summary>
     public static void MigrateLegacyIfNeeded()
     {
         if (!PlayerPrefs.HasKey(LEGACY_PREFS_KEY)) return;
@@ -509,10 +404,7 @@ public static class PlayerProfile
             Persist();
             GameLog.Info($"[PlayerProfile] 예전 이름 이관: {cleaned}");
 
-            // 세이브 파일이 없으면 Persist() 가 파일에 쓰지 않았으므로 이름은 아직 메모리(Current)에만 있습니다.
-            // 이때 키를 지웠는데 첫 저장 전에 앱이 꺼지면 옛 이름이 영영 사라집니다.
-            // → 파일에 확정될 때까지 키를 남겨 둡니다.
-            //   다음 실행 때는 파일에 이름이 있으므로(HasName) 아래 else 로 가서 키가 지워집니다.
+            // 세이브 파일이 없으면 이름이 아직 메모리에만 있으므로 파일에 확정될 때까지 키를 남김 (다음 실행에 else 로 지워짐)
             if (!SaveManager.Instance.HasSave()) return;
         }
         else
@@ -526,28 +418,14 @@ public static class PlayerProfile
 
     // ───────── ★ [계정 삭제] ─────────
 
-    /// <summary>
-    /// 계정 삭제(AccountReset) 전용 — 예전 PlayerPrefs 이름 키를 지웁니다.
-    ///
-    /// [왜 필요한가]
-    ///   이 클래스는 이름을 SaveData 에만 두므로 save.json 을 지우면 이름도 사라집니다.
-    ///   그런데 위 MigrateLegacyIfNeeded() 는 "세이브 파일이 아직 없으면" 키를 일부러 남겨 둡니다.
-    ///   그 키가 남은 채로 계정을 삭제하면, LoginScene 이 시작될 때 이관 코드가 옛 이름을 다시 가져와
-    ///   "계정을 지웠는데 이름만 살아 있는" 상태가 됩니다.
-    ///
-    /// PlayerPrefs.Save() 는 부르지 않습니다 — AccountReset 이 여러 삭제를 모아 한 번에 부릅니다.
-    /// 이름 자체(SaveData.playerName)는 SaveManager.TryDeleteSaveFile() 이 Current 를 비울 때 함께 사라집니다.
-    /// </summary>
+    /// <summary>계정 삭제 전용: 남아 있을 수 있는 옛 이름 키 삭제 — 안 지우면 이관 코드가 옛 이름을 다시 가져옴 (PlayerPrefs.Save 는 AccountReset 이 한 번에).</summary>
     public static void DeleteLegacyPrefsForReset()
     {
         PlayerPrefs.DeleteKey(LEGACY_PREFS_KEY);
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    /// <summary>
-    /// 테스트 전용: 이름만 지워 첫 실행 상태로 되돌립니다. 다른 진행도는 유지됩니다.
-    /// 릴리스 빌드에서는 컴파일되지 않으므로 게임 코드에서 호출할 수 없습니다.
-    /// </summary>
+    /// <summary>테스트 전용: 이름만 지움(다른 진행도 유지, 릴리스 빌드엔 없음).</summary>
     public static void DebugClear()
     {
         SaveData data = Data;

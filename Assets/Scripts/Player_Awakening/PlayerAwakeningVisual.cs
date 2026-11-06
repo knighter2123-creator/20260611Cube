@@ -1,34 +1,8 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// 각성 단계에 맞춰 플레이어 스프라이트를 갈아끼웁니다.
-/// 플레이어 오브젝트(또는 그 자식 중 SpriteRenderer가 있는 곳)에 붙이세요.
-///
-/// ─── 왜 Player.cs에 넣지 않고 별도 컴포넌트로 뺐는가? (학습 포인트) ──────
-/// Player.cs는 "타겟을 찾고 공격한다"는 전투 책임을 집니다.
-/// 여기에 "어떻게 생겼는가"를 섞으면, 나중에 겉모습 연출을 늘릴 때마다
-/// (오라 파티클, 색 변화, 각성 연출…) 전투 코드 파일이 계속 두꺼워집니다.
-///
-/// 컴포넌트를 분리하면 이런 것도 공짜로 따라옵니다:
-///   · 동료(Companion)에게도 같은 스크립트를 붙여 재사용 가능
-///   · 이 기능만 통째로 꺼보고 싶을 때 컴포넌트 체크만 해제
-///   · Player.cs를 고칠 때 이 코드가 눈앞을 지나가지 않음
-/// ──────────────────────────────────────────────────────────────────────
-///
-/// ═══ 연출이 재생되는 시점 (중요) ═══════════════════════════════════════
-/// 각성 클리어는 EvolveScene에서 일어나고 **곧바로 씬이 전환됩니다.**
-/// 그래서 "스프라이트가 바뀌면 연출을 재생"하게 짜면, 연출이 씬과 함께
-/// 한두 프레임 만에 사라져 플레이어 눈에는 아무것도 안 보입니다.
-///
-/// 대신 AwakeningManager가 "축하할 일이 생겼다"는 예약만 들고 있다가,
-/// 메인 스테이지에 도착한 **새 플레이어의 Start()에서** 그걸 가져가 재생합니다.
-///
-/// 덤으로, 상점/가챠를 왕복할 때마다 연출이 터지는 문제도 같이 해결됩니다.
-/// (그 경우는 '각성'이 아니라 '복원'이라 예약이 없습니다 —
-///  LevelUpManager에서 OnLevelUp과 OnStatRestored를 나눈 것과 같은 구분입니다)
-/// ══════════════════════════════════════════════════════════════════════
-/// </summary>
+/// <summary>각성 단계에 맞춰 플레이어 스프라이트 교체(전투 코드와 분리한 외형 컴포넌트) — 축하 연출은 변경 순간이 아닌 메인 스테이지 도착 후 Start 에서 예약을 꺼내 재생(클리어 직후 씬이 바뀌고, 상점 왕복 '복원'엔 예약이 없어 안 터짐).</summary>
+// [붙이는 위치] 플레이어 오브젝트(또는 SpriteRenderer 가 있는 자식)
 public class PlayerAwakeningVisual : MonoBehaviour
 {
     [Header("대상")]
@@ -49,17 +23,13 @@ public class PlayerAwakeningVisual : MonoBehaviour
     [SerializeField] private float punchScale    = 1.25f;
     [SerializeField] private float punchDuration = 0.25f;
 
-    // ★ bool 플래그가 아니라 '구독한 인스턴스'를 들고 비교합니다.
-    //   PlayerStatusCodeUI에 적어두신 것과 같은 이유 — 매니저가 재생성되면
-    //   bool로는 옛 인스턴스를 붙잡은 채 새 매니저의 이벤트를 영영 못 받습니다.
+    // 구독한 인스턴스를 들고 비교 (bool 이면 매니저 재생성 시 새 이벤트를 영영 못 받음)
     private AwakeningManager boundAm;
 
     private Coroutine punchRoutine;
     private Vector3   baseScale;
 
-    // ══════════════════════════════════════════════
-    //  라이프사이클
-    // ══════════════════════════════════════════════
+    // ── 라이프사이클 ──
 
     void Awake()
     {
@@ -67,13 +37,10 @@ public class PlayerAwakeningVisual : MonoBehaviour
 
         if (punchTarget == null) punchTarget = transform;
 
-        // ★ 원래 크기는 여기서 딱 한 번 기억합니다.
-        //   연출 코루틴 안에서 늦게 기억하면, 연출 도중에 다시 호출됐을 때
-        //   '커진 상태의 크기'를 원래 크기로 착각할 위험이 있습니다.
+        // 원래 크기는 여기서 한 번만 기억 (연출 중에 기억하면 커진 크기를 원래로 착각)
         baseScale = punchTarget.localScale;
 
-        // 시작 시점의 모습을 '기본 모습'으로 기억해 둡니다.
-        // 각성을 초기화(세이브 삭제)했을 때 되돌아갈 곳이 필요하니까요.
+        // 시작 모습을 기본으로 기억 (세이브 삭제로 각성 초기화 시 되돌아갈 곳)
         if (baseSprite == null && targetRenderer != null)
             baseSprite = targetRenderer.sprite;
     }
@@ -86,14 +53,11 @@ public class PlayerAwakeningVisual : MonoBehaviour
 
     void Start()
     {
-        // ★ OnEnable 시점에는 AwakeningManager가 아직 없을 수 있습니다.
-        //   매니저는 Awake에서 Instance를 세팅하는데 실행 순서는 보장되지 않아요.
-        //   Start는 모든 Awake가 끝난 뒤라 여기서 한 번 더 시도합니다. (멱등)
+        // Start 에서 구독 재시도 (OnEnable 땐 매니저가 아직 없을 수 있음, 멱등)
         TrySubscribe();
         ApplySprite();
 
-        // 각성해서 넘어온 길이면 여기서 축하 연출을 재생합니다.
-        // ConsumeCelebration()은 가져가면 예약이 지워지므로 딱 한 번만 터집니다.
+        // 각성하고 넘어왔으면 축하 연출 (꺼내면 예약이 지워져 한 번만)
         if (punchOnAwaken && boundAm != null && boundAm.ConsumeCelebration())
             PlayPunch();
     }
@@ -106,9 +70,7 @@ public class PlayerAwakeningVisual : MonoBehaviour
         if (punchTarget != null) punchTarget.localScale = baseScale;
     }
 
-    // ══════════════════════════════════════════════
-    //  구독
-    // ══════════════════════════════════════════════
+    // ── 구독 ──
 
     private void TrySubscribe()
     {
@@ -124,23 +86,15 @@ public class PlayerAwakeningVisual : MonoBehaviour
 
     private void Unsubscribe()
     {
-        // ★ Instance가 아니라 boundAm에서 해제합니다.
-        //   구독한 대상과 해제할 대상이 다르면 원래 구독이 남아 누수가 됩니다.
+        // 구독한 boundAm 에서 해제 (Instance 와 다르면 구독이 남아 누수)
         if (boundAm != null) boundAm.OnChanged -= HandleAwakeningChanged;
         boundAm = null;
     }
 
-    /// <summary>
-    /// 각성 상태가 변했을 때. 스프라이트만 조용히 갈아끼웁니다.
-    ///
-    /// 여기서 연출을 재생하지 않는 이유는 클래스 주석의 '연출이 재생되는 시점' 참고.
-    /// (이 시점은 대개 EvolveScene이고, 곧바로 씬이 전환됩니다)
-    /// </summary>
+    /// <summary>각성 상태 변경 시 스프라이트만 교체 (연출 없음 — 대개 곧 씬이 바뀌는 EvolveScene 시점).</summary>
     private void HandleAwakeningChanged() => ApplySprite();
 
-    // ══════════════════════════════════════════════
-    //  적용
-    // ══════════════════════════════════════════════
+    // ── 적용 ──
 
     /// <summary>현재 각성 단계에 맞는 스프라이트로 갱신합니다. (연출 없음)</summary>
     public void ApplySprite()
@@ -172,9 +126,7 @@ public class PlayerAwakeningVisual : MonoBehaviour
                              "Target Renderer를 직접 연결해 주세요.", this);
     }
 
-    // ══════════════════════════════════════════════
-    //  연출
-    // ══════════════════════════════════════════════
+    // ── 연출 ──
 
     private void PlayPunch()
     {
@@ -189,9 +141,7 @@ public class PlayerAwakeningVisual : MonoBehaviour
         float t = 0f;
         while (t < punchDuration)
         {
-            // ★ unscaledDeltaTime을 쓰는 이유
-            //   증강 카드창이 열려 있으면 Time.timeScale이 0입니다.
-            //   deltaTime을 쓰면 연출이 멈춘 채 커진 상태로 굳어버립니다.
+            // unscaledDeltaTime — 증강 창(timeScale 0) 중에도 연출이 굳지 않게
             t += Time.unscaledDeltaTime;
 
             float k = Mathf.Clamp01(t / punchDuration);
@@ -207,9 +157,7 @@ public class PlayerAwakeningVisual : MonoBehaviour
         punchRoutine = null;
     }
 
-    // ══════════════════════════════════════════════
-    //  에디터 테스트
-    // ══════════════════════════════════════════════
+    // ── 에디터 테스트 ──
 
     [ContextMenu("테스트: 지금 단계로 외형 갱신")]
     private void TestApply() => ApplySprite();

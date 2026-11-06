@@ -3,47 +3,10 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;   // ★ [게임 시작 전 저장 차단] sceneLoaded
 
-/// <summary>
-/// 세이브 파일 입출력 + 저장 오케스트레이션.
-/// - 파일: Application.persistentDataPath/save.json (암호화 없음, JsonUtility)
-/// - 저장: 살아있는 매니저들의 CaptureTo()를 모아 파일에 기록 (병합 방식)
-/// - 불러오기: Awake에서 파일을 Current로 로드 → 각 매니저가 자기 시점에 ApplyFrom()으로 가져감
-/// LoginScene에 두고 DontDestroyOnLoad로 세션 내내 유지하세요.
-///
-/// 파일 구성 (위에서부터)
-///   생명주기 → 저장 → 불러오기 → 진화 보상 플래그 → 자동 저장   ← 평소 흐름
-///   [게임 시작 전 저장 차단] → [계정별 세이브] → [계정 삭제] 저장 잠금   ← 특수 상황 대응
-///
-/// ★ [계정 삭제] 이번에 바뀐 곳 (전부 "★ [계정 삭제]" 로 표시)
-///   1. 저장 잠금(IsSaveLocked) — 초기화 도중 옛 데이터가 파일로 되살아나는 것을 막는다
-///   2. TryDeleteSaveFile() — 인스턴스가 없어도(에디터에서 MainScene 바로 실행) 파일을 지울 수 있게 static
-///   3. SavePath 를 static 으로 — 2번이 쓰기 위해. 경로 문자열은 여전히 이 한 곳에만 있다
-///   4. Awake 에서 잠금 해제 — "새 SaveManager 가 태어났다 = 초기화가 끝났다"
-///   5. OnDestroy 에서 Instance 정리 — 다른 매니저들과 같은 패턴
-///
-/// ★ [게임 시작 전 저장 차단] 이번에 바뀐 곳 (전부 "★ [게임 시작 전 저장 차단]" 으로 표시)
-///   LoginScene / LoadingScene 에서는 매니저들이 아직 ApplyFrom() 을 받기 전이라,
-///   이때 Save() 가 불리면 매니저들의 '초기값' 이 CaptureTo() 로 불러온 데이터를 덮어쓴다.
-///   (기존 유저라면 진행이 초기값으로, 신규 유저라면 SaveData 기본값 baseDamage 0 등으로 저장)
-///   구글 로그인 창이 뜰 때 앱이 일시정지되며 OnApplicationPause → Save() 가 불리므로
-///   이제는 로그인하는 모든 유저가 이 경로를 밟는다. 그래서 게임 씬에 들어가기 전에는 Save() 를 막는다.
-///   6. preGameScenes (인스펙터) — "아직 게임 시작 전" 으로 볼 씬 이름 목록
-///   7. IsGameplayStarted — 게임 씬에 한 번이라도 들어갔는가 (인스턴스 값, 계정 삭제 시 새로 시작)
-///   8. Save() 입구에서 IsGameplayStarted 가 false 면 무시
-///   WriteCurrentToDisk()(이름 저장, PlayerProfile.Persist) 는 막지 않는다 — 게임 시작 전 저장의 정식 경로.
-///
-/// ★ [계정별 세이브] 이번에 바뀐 곳 (전부 "★ [계정별 세이브]" 로 표시)
-///   한 기기에서 여러 계정(구글/이메일)으로 로그인해도 진행이 섞이지 않게, 세이브 파일을 계정마다 나눕니다.
-///     게스트(로그인 안 함) → save.json            ← 예전 파일 이름 그대로 = 기존 데이터가 곧 게스트 데이터 (변환 불필요)
-///     계정 (뒤끝 UID)  → save_<UID>.json
-///   9.  ActiveAccountId — 지금 어느 계정의 파일을 쓰는가. PlayerPrefs 에 기억해 두어 앱을 다시 켜도 같은 파일을 바로 읽음
-///   10. SavePath 가 ActiveAccountId 에 따라 바뀜 (경로 계산은 여전히 PathFor 한 곳)
-///   11. SaveFileExists / TryMoveSaveFile / SetActiveAccount — 계정 전환(AccountSwitch)이 쓰는 도구
-///   어느 계정으로 바꿀지, 게스트 진행을 옮길지는 AccountSwitch.cs 가 결정합니다. 이 파일은 "파일 위치" 만 압니다.
-///
-/// ★ [클라우드 세이브]  CloudSave 를 같은 오브젝트에 붙이고(Awake), 파일을 쓸 때마다 버전(SaveData.savedAt)을 올려 알립니다.
-///   언제 올리고 어느 쪽을 쓸지는 CloudSave.cs 가 정합니다. 이 파일은 MarkCloudSynced / TryWriteDownloadedSave 창구만 줍니다.
-/// </summary>
+/// <summary>세이브 입출력: Awake 에서 계정별 파일(게스트 save.json / 계정 save_UID.json)을 Current 로 읽고, Save() 때 매니저들의 CaptureTo 를 모아 JSON 으로 씀 (매니저는 자기 시점에 ApplyFrom).</summary>
+// [붙이는 위치] LoginScene, DontDestroyOnLoad / CloudSave 를 같은 오브젝트에 붙이고 쓸 때마다 savedAt 버전을 올려 알림
+// ★ 게임 시작 전 저장 차단: 게임 씬에 들어가기 전 Save() 는 매니저 초기값으로 세이브를 덮으므로 무시 (구글 로그인 창의 OnApplicationPause 등)
+// ★ 저장 잠금(IsSaveLocked, static): 계정 삭제·전환 중 메모리의 옛 값이 지운 파일을 되살리지 않게 — 새 SaveManager Awake 에서 해제
 public class SaveManager : MonoBehaviour
 {
     public static SaveManager Instance { get; private set; }
@@ -55,47 +18,25 @@ public class SaveManager : MonoBehaviour
              "이 씬들만 거친 상태에서는 Save() 가 무시됩니다. 씬 이름을 바꾸면 여기도 같이 바꾸세요.")]
     [SerializeField] private string[] preGameScenes = { "LoginScene", "LoadingScene" };
 
-    /// <summary>
-    /// 이번 SaveManager 가 태어난 뒤 게임 씬(preGameScenes 가 아닌 씬)에 한 번이라도 들어갔는가.
-    ///
-    /// [왜 한 번 true 가 되면 다시 false 로 안 돌아가는가]
-    ///   MainScene → '로그인 화면으로 돌아가기' 로 LoginScene 에 와도, 매니저들은 DontDestroyOnLoad 로
-    ///   살아 있고 이미 진짜 값을 들고 있다. 이때의 Save() 는 안전하고, 오히려 해야 하는 저장이다.
-    ///   위험한 건 "이번 실행에서 아직 게임 씬을 한 번도 안 거친" 상태뿐이다.
-    ///
-    /// [왜 static 이 아니라 인스턴스 값인가]
-    ///   계정 삭제는 SaveManager 를 파괴하고 새로 만든다. 새 SaveManager 는 다시 "게임 시작 전" 이어야 하므로
-    ///   인스턴스와 수명을 같이 하는 편이 맞다. (IsSaveLocked 가 static 인 이유와 정반대)
-    /// </summary>
+    /// <summary>이 SaveManager 가 게임 씬에 한 번이라도 들어갔는가 — 로그인 화면으로 돌아와도 매니저 값은 진짜라 false 로 안 돌림, 재생성 시 새로 시작하도록 인스턴스 값.</summary>
     public bool IsGameplayStarted { get; private set; }
 
-    // ★ [계정 삭제] static 으로 변경.
-    //   인스턴스 데이터를 하나도 안 쓰는 계산이라 static 이어도 의미가 같습니다.
-    //   이렇게 해야 SaveManager 가 없는 상황에서도 "어느 파일을 지울지" 를 알 수 있습니다.
-    //   ("save.json" 이라는 이름을 AccountReset 에 한 번 더 적으면, 나중에 한쪽만 바뀌는 순간 초기화가 조용히 고장납니다)
-    //   ★ [계정별 세이브] 이제 "지금 계정" 의 파일 경로입니다 (아래 PathFor 참고).
+    // 지금 계정의 파일 경로 — 인스턴스 없이도 지울 파일을 알 수 있게 static (경로 규칙은 PathFor 한 곳)
     private static string SavePath => PathFor(ActiveAccountId);
 
-    // ─────────────────────────────────────────────
-    // 생명주기
-    // ─────────────────────────────────────────────
+    // ── 생명주기 ──
 
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        // ★ [게임 시작 전 저장 차단] DontDestroyOnLoad "전에" 내가 놓여 있던 씬을 기억합니다.
-        //   DontDestroyOnLoad 를 부르는 순간 gameObject.scene 은 "DontDestroyOnLoad" 라는 특수 씬으로 바뀝니다.
+        // DontDestroyOnLoad 전에 태어난 씬을 기억 (부른 뒤엔 scene 이 DDOL 특수 씬으로 바뀜)
         Scene bornScene = gameObject.scene;
 
         DontDestroyOnLoad(gameObject);
 
-        // ★ [계정 삭제] 잠금 해제 지점.
-        //   AccountReset 은 옛 매니저를 "전부 파괴한 뒤에" LoginScene 을 다시 불러옵니다.
-        //   그러므로 새 SaveManager 가 여기까지 왔다는 건, 옛 데이터를 저장할 수 있는 주체가
-        //   이미 하나도 남아 있지 않다는 뜻입니다. 이제 잠글 이유가 없습니다.
-        //   (위의 중복 제거 return 보다 "아래" 에 있어야 합니다 — 곧 죽을 복제본이 풀면 안 되니까요)
+        // 잠금 해제 지점 — 새 SaveManager 가 태어났다 = 옛 매니저가 모두 사라짐 (중복 제거 return 아래여야 복제본이 풀지 않음)
         if (IsSaveLocked)
         {
             IsSaveLocked = false;
@@ -107,35 +48,18 @@ public class SaveManager : MonoBehaviour
         // 클라우드 세이브 — SaveManager 와 수명을 같이 합니다 (계정 삭제·전환 때 함께 파괴되고 새로 만들어짐)
         if (GetComponent<CloudSave>() == null) gameObject.AddComponent<CloudSave>();
 
-        // ★ [게임 시작 전 저장 차단]
-        //   구독은 중복 제거 return "아래" 에서 한다 — 곧 죽을 복제본이 구독하면 안 되니까.
-        //   SceneManager.sceneLoaded 는 static 이벤트라 OnDestroy 에서 반드시 해제해야 한다.
+        // 씬 로드마다 게임 씬인지 확인 (static 이벤트라 OnDestroy 에서 해제)
         ValidatePreGameScenes();
         SceneManager.sceneLoaded += OnSceneLoaded;
 
-        // 내가 태어난 씬도 한 번 확인한다.
-        // (에디터에서 SaveManager 가 있는 게임 씬으로 바로 실행한 경우 → 처음부터 게임 씬이므로 바로 true)
-        //
-        // ★ [재검토 수정] 예전에는 SceneManager.GetActiveScene() 을 봤는데, 그건 "지금 활성 씬" 입니다.
-        //   계정 삭제(AccountReset)는 빈 임시 씬을 만들어 활성으로 둔 채 LoginScene 을 불러옵니다.
-        //   그 사이 새 SaveManager 의 Awake 가 돌면 활성 씬이 아직 임시 씬일 수 있고,
-        //   임시 씬은 preGameScenes 에 없으니 "게임 씬" 으로 판단 → 차단이 풀린 채로 LoginScene 이 시작됩니다.
-        //   그러면 계정 삭제 직후 LoginScene 에서 홈 버튼만 눌러도 초기값 세이브가 만들어지는
-        //   바로 그 문제(공격력 0)가 되살아납니다.
-        //   "내가 놓여 있던 씬" 은 씬 전환 타이밍과 상관없이 항상 LoginScene 이므로 이쪽이 정확합니다.
+        // 태어난 씬도 확인 — ⚠ GetActiveScene 을 쓰면 AccountReset 의 임시 빈 씬을 게임 씬으로 오인해 차단이 풀림
         CheckGameplayScene(bornScene);
     }
 
-    // ★ [계정 삭제] 다른 매니저(ManagerRoot, HapticManager ...)와 같은 패턴.
-    //   없으면 파괴된 인스턴스를 static 이 계속 가리킵니다.
-    //   'SaveManager.Instance?.Save()' 의 ?. 는 파괴 여부를 검사하지 못하므로,
-    //   정리해 두지 않으면 죽은 인스턴스의 Save() 가 그대로 실행됩니다.
+    // Instance 정리 — 안 하면 ?. 가 파괴를 못 걸러 죽은 인스턴스의 Save() 가 실행됨
     void OnDestroy()
     {
-        // ★ [게임 시작 전 저장 차단] static 이벤트 구독 해제.
-        //   계정 삭제로 이 SaveManager 가 파괴된 뒤에도 구독이 남으면, 다음 씬 로드 때
-        //   죽은 오브젝트의 함수가 불린다. (구독하지 않은 복제본에서 해제해도 아무 일 없음)
-        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded -= OnSceneLoaded;   // 남으면 다음 씬 로드 때 죽은 오브젝트가 불림
 
         if (Instance == this) Instance = null;
     }
@@ -143,18 +67,14 @@ public class SaveManager : MonoBehaviour
     // ── 저장 ───────────────────────────────────────
     public void Save()
     {
-        // ★ [계정 삭제] CaptureTo() 를 돌기 "전에" 막습니다.
-        //   아래 WriteToDisk 에도 같은 검사가 있지만, 여기서 먼저 막으면
-        //   초기화 도중 파괴되는 매니저들의 CaptureTo 를 건드리지 않아도 됩니다.
+        // 잠금 중이면 CaptureTo 전에 막음 (파괴 중인 매니저를 건드리지 않게)
         if (IsSaveLocked)
         {
             GameLog.Info("[SaveManager] 저장 잠금 중 — Save() 무시");
             return;
         }
 
-        // ★ [게임 시작 전 저장 차단] 매니저들이 ApplyFrom 전이면 CaptureTo 가 초기값을 모은다.
-        //   이 시점에 바뀐 값은 이름뿐인데, 이름은 PlayerProfile 이 WriteCurrentToDisk() 로 이미 저장했다.
-        //   그래서 여기서 건너뛰어도 잃는 데이터가 없다.
+        // ApplyFrom 전이면 CaptureTo 가 초기값을 모으므로 무시 (이때 바뀌는 이름은 WriteCurrentToDisk 로 이미 저장됨)
         if (!IsGameplayStarted)
         {
             GameLog.Info("[SaveManager] 게임 시작 전(매니저 ApplyFrom 전) — Save() 무시");
@@ -181,25 +101,17 @@ public class SaveManager : MonoBehaviour
         WriteToDisk(data);
     }
 
-    /// <summary>
-    /// 매니저들의 CaptureTo() 를 거치지 않고, 지금 Current 를 그대로 파일에 씁니다.
-    /// 매니저들이 아직 세이브를 적용(ApplyFrom)하기 전인 LoginScene 에서
-    /// 이름처럼 "SaveData 에 직접 넣은 값" 만 확정할 때 사용합니다. (PlayerProfile 참고)
-    /// Save() 를 부르면 준비 안 된 매니저의 기본값이 파일을 덮어쓸 수 있기 때문입니다.
-    /// </summary>
+    /// <summary>CaptureTo 없이 Current 를 그대로 씀 — LoginScene 에서 이름처럼 SaveData 에 직접 넣은 값만 확정할 때 (Save 는 준비 안 된 매니저 기본값으로 덮을 수 있어서).</summary>
     public void WriteCurrentToDisk()
     {
         if (Current == null) Load();
         WriteToDisk(Current);
     }
 
-    // 실제 파일 쓰기는 이 함수 한 곳에만 있음 (Save / WriteCurrentToDisk / MarkCloudSynced 공용)
-    //   contentChanged = false 는 내용은 그대로 두고 클라우드 표시만 적을 때 — savedAt(버전)을 바꾸지 않고 올리지도 않음
+    // 유일한 파일 쓰기 출입구 — contentChanged=false 는 클라우드 표시만 적을 때(버전 유지, 업로드 안 함)
     private void WriteToDisk(SaveData data, bool contentChanged = true)
     {
-        // ★ [계정 삭제] 파일 쓰기의 "유일한 출입구" 에서 한 번 더 막습니다.
-        //   Save() 를 거치지 않는 WriteCurrentToDisk() 경로(PlayerProfile.Persist)도 여기로 모이므로,
-        //   이 한 줄이 모든 파일 쓰기를 덮습니다. 쓰기를 한 곳에 모아 둔 덕분입니다.
+        // 모든 쓰기 경로가 여기로 모이므로 이 한 줄로 잠금을 보장
         if (IsSaveLocked)
         {
             GameLog.Info("[SaveManager] 저장 잠금 중 — 파일 쓰기 무시");
@@ -225,15 +137,7 @@ public class SaveManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 클라우드와 맞춘 버전(cloudSyncedAt)을 적어 둡니다. 내용·버전(savedAt)은 바꾸지 않습니다. (CloudSave 전용)
-    ///
-    /// 파일에도 바로 적어서, 이 직후 앱이 꺼져도 다음 실행 때 "이미 맞춘 상태" 로 판단되게 합니다.
-    ///   게임 시작 전(LoginScene 의 확인) — Current 가 파일 그대로라 Current 를 씀
-    ///   게임 중 — ★ 파일의 그 값 하나만 고침. 게임 중의 Current 에는 StageRecord·소환권처럼 직접 바꾼 값이 파일보다 앞서 있어서,
-    ///             Current 를 버전 그대로 쓰면 "버전은 클라우드와 같은데 내용은 다른" 파일이 생깁니다.
-    /// 파일이 없으면(새 세이브) 다음 저장 때 Current 와 함께 기록됩니다.
-    /// </summary>
+    /// <summary>클라우드와 맞춘 버전(cloudSyncedAt)만 파일에 바로 기록 (CloudSave 전용) — ★ 게임 중엔 Current 가 파일보다 앞서 있어 통째로 쓰면 '버전은 같고 내용은 다른' 파일이 되므로 그 값 하나만 고침.</summary>
     public void MarkCloudSynced(long cloudSavedAt)
     {
         if (Current == null || Current.cloudSyncedAt == cloudSavedAt) return;
@@ -260,12 +164,7 @@ public class SaveManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 클라우드에서 받은 세이브를 그 계정의 파일로 씁니다. (CloudSave 전용)
-    /// ⚠ 저장 잠금을 무시합니다 — 호출하는 쪽이 먼저 잠그고(AccountReset.TryBeginAccountSwitch), 이 파일을 쓴 뒤
-    ///   매니저를 새로 만들어(RestartFromLogin) 새 SaveManager 가 이 파일을 읽게 합니다.
-    ///   잠금을 거는 이유는 옛 매니저가 옛 값으로 이 파일을 덮어쓰지 못하게 하려는 것이라, 이 쓰기만은 통과해야 합니다.
-    /// </summary>
+    /// <summary>클라우드 세이브를 그 계정 파일로 씀 (CloudSave 전용) — ⚠ 잠금을 무시: 호출 쪽이 잠근 뒤 쓰고 RestartFromLogin 으로 새 SaveManager 가 읽게 함.</summary>
     public static bool TryWriteDownloadedSave(string accountId, string json, out string error)
     {
         error = string.Empty;
@@ -315,12 +214,7 @@ public class SaveManager : MonoBehaviour
             if (Current.dailyDungeon.records == null)
                 Current.dailyDungeon.records = new List<DailyDungeonRecord>();
 
-            // ★ 튜토리얼 마이그레이션 — 세이브 파일은 있는데 tutorialDone 키가 없다
-            //   = 튜토리얼 기능이 생기기 전부터 플레이하던 기존 유저 → 이미 본 것으로 처리.
-            //   bool 은 null 이 될 수 없어서 위의 리스트처럼 "== null" 로는 구분이 안 됩니다.
-            //   그래서 "JSON 문자열에 키가 있었는가"로 판단합니다.
-            //   다음 저장부터는 키가 파일에 들어가므로 이 분기는 유저당 한 번만 탑니다.
-            //   (계정 삭제 후에는 파일 자체가 없으므로 이 분기를 타지 않고 → 튜토리얼이 다시 뜹니다)
+            // 튜토리얼 이관: 파일에 tutorialDone 키가 없으면 기능 이전 유저라 본 것으로 처리 (bool 은 null 검사가 안 돼 키 존재로 판단)
             if (!json.Contains("\"tutorialDone\""))
                 Current.tutorialDone = true;
 
@@ -348,11 +242,7 @@ public class SaveManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 에디터 테스트용 (컴포넌트 우클릭). 파일과 Current 만 지우고, 살아 있는 매니저는 그대로입니다.
-    /// → 플레이 중에 누르면 다음 Save() 때 매니저의 옛 값으로 파일이 다시 생깁니다.
-    ///   게임 안의 '계정 삭제' 는 이 함수가 아니라 AccountReset 을 씁니다.
-    /// </summary>
+    /// <summary>에디터 테스트용(우클릭) 파일·Current 삭제 — 매니저는 그대로라 플레이 중 누르면 다음 Save 때 옛 값으로 다시 생김 (게임의 계정 삭제는 AccountReset).</summary>
     [ContextMenu("세이브 삭제")]
     public void DeleteSave()
     {
@@ -364,14 +254,22 @@ public class SaveManager : MonoBehaviour
     }
 
     // ── 세이브 삭제 후 랭킹 초기화 표시 ─────────────────
-    //   세이브 파일과 함께 지워지면 안 되므로 PlayerPrefs 에 계정별로 둡니다.
-    //   새 기기·재설치처럼 "파일이 없을 뿐" 인 경우와 구분하려고, 세이브 삭제(TryDeleteSaveFile)를 거쳤을 때만 켭니다.
-    //   (에디터의 '세이브 삭제' 와 설정의 '계정 삭제' 가 모두 TryDeleteSaveFile 을 지납니다)
+    // 파일과 함께 지워지면 안 돼 PlayerPrefs 에 계정별로 두고, '파일이 없을 뿐'(새 기기)과 구분하려고 TryDeleteSaveFile 때만 켬
     private const string RANKING_RESET_PREF_KEY = "RANKING_RESET_AFTER_SAVE_DELETE_V1";
+
+    // RankingManager.Update 가 매 프레임 물어서 메모리 캐시 (PlayerPrefs 레지스트리 읽기·문자열 할당 방지) — ⚠ 쓰기는 꼭 SetRankingResetPending 으로
+    private static readonly Dictionary<string, bool> rankingResetCache = new Dictionary<string, bool>();
 
     /// <summary>이 계정이 세이브 삭제 후 서버 랭킹 초기화를 기다리는 중인가.</summary>
     public static bool IsRankingResetPending(string accountId)
-        => PlayerPrefs.GetInt(RANKING_RESET_PREF_KEY + KeySuffixFor(accountId), 0) == 1;
+    {
+        string cacheKey = accountId ?? string.Empty;
+        if (rankingResetCache.TryGetValue(cacheKey, out bool pending)) return pending;
+
+        pending = PlayerPrefs.GetInt(RANKING_RESET_PREF_KEY + KeySuffixFor(accountId), 0) == 1;
+        rankingResetCache[cacheKey] = pending;
+        return pending;
+    }
 
     public static void SetRankingResetPending(string accountId, bool on)
     {
@@ -379,14 +277,14 @@ public class SaveManager : MonoBehaviour
         if (on) PlayerPrefs.SetInt(key, 1);
         else    PlayerPrefs.DeleteKey(key);
         PlayerPrefs.Save();   // 바로 앱이 꺼져도 표시가 남거나 지워지도록 즉시 기록
+        rankingResetCache[accountId ?? string.Empty] = on;
     }
 
     // ── 자동 저장 ──────────────────────────────────
 
     void OnApplicationPause(bool paused)
     {
-        // 모바일: 백그라운드 전환 시. 구글 로그인 계정 선택 창이 떠도 여기로 온다.
-        // (잠금 중이거나 게임 시작 전이면 Save() 가 알아서 무시)
+        // 백그라운드 전환(구글 로그인 창 포함) 시 저장 — 잠금·게임 시작 전이면 Save 가 무시
         if (paused) Save();
     }
 
@@ -395,9 +293,7 @@ public class SaveManager : MonoBehaviour
         Save();
     }
 
-    // ─────────────────────────────────────────────
-    // ★ [게임 시작 전 저장 차단]
-    // ─────────────────────────────────────────────
+    // ── ★ [게임 시작 전 저장 차단] ──
 
     // sceneLoaded 로 불리는 함수. 씬이 로드될 때마다 "게임 씬인가" 를 확인한다.
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -414,10 +310,7 @@ public class SaveManager : MonoBehaviour
         GameLog.Info($"[SaveManager] 게임 씬 진입('{scene.name}') — 이제부터 Save() 허용");
     }
 
-    /// <summary>
-    /// 오타 방어. 목록의 이름이 실제 씬 이름과 다르면(예: "Loading" vs "LoadingScene")
-    /// 그 씬이 '게임 씬' 으로 취급되어 차단이 조용히 풀린다. 에러는 안 나고 저장만 망가지는 종류라 로그로 알린다.
-    /// </summary>
+    /// <summary>preGameScenes 오타 경고 — 이름이 틀리면 그 씬이 게임 씬으로 취급돼 차단이 조용히 풀림.</summary>
     private void ValidatePreGameScenes()
     {
         if (preGameScenes == null || preGameScenes.Length == 0)
@@ -443,25 +336,16 @@ public class SaveManager : MonoBehaviour
         return false;
     }
 
-    // ─────────────────────────────────────────────
-    // ★ [계정별 세이브] 계정 → 파일
-    // ─────────────────────────────────────────────
+    // ── ★ [계정별 세이브] 계정 → 파일 ──
 
-    // 마지막으로 쓴 계정을 기억하는 PlayerPrefs 키.
-    // [왜 기억하나] SaveManager 는 Awake 에서 바로 세이브를 읽는데, 그때는 로그인 확인(AuthManager)이 아직 끝나기 전이라
-    //   "지금 누가 로그인돼 있는지" 모릅니다. 지난번 계정을 기억해 두면, 평소처럼 같은 계정으로 다시 켠 경우
-    //   처음부터 맞는 파일을 읽어서 계정 전환(매니저 재시작)이 일어나지 않습니다.
+    // 마지막 계정 기억 — Awake 때는 로그인 확인 전이라, 기억해 두면 같은 계정으로 다시 켤 때 재시작 없이 맞는 파일을 읽음
     private const string ACTIVE_ACCOUNT_PREF_KEY = "SAVE_ACTIVE_ACCOUNT_V1";
     private const string GUEST_FILE_NAME = "save.json";   // 예전 파일 이름 그대로 — 기존 유저 데이터를 옮기지 않아도 됨
 
     private static string activeAccountId;
     private static bool   activeAccountLoaded;   // PlayerPrefs 에서 한 번 읽었는가 (매번 읽지 않게)
 
-    /// <summary>
-    /// 지금 세이브 파일의 주인. 빈 문자열("") = 게스트(로그인 안 함), 그 외 = 뒤끝 UID (gamer inDate).
-    /// static 인 이유: 계정 전환·계정 삭제 때 SaveManager 자신이 파괴·재생성되는데, 새 SaveManager 가
-    /// Awake 에서 "어느 파일을 읽을지" 알아야 하기 때문입니다 (IsSaveLocked 가 static 인 것과 같은 이유).
-    /// </summary>
+    /// <summary>지금 세이브 주인(""=게스트, 그 외 뒤끝 inDate) — 재생성된 SaveManager 가 Awake 에서 읽을 파일을 알도록 static.</summary>
     public static string ActiveAccountId
     {
         get
@@ -481,10 +365,7 @@ public class SaveManager : MonoBehaviour
 
     public static bool IsGuestAccount(string accountId) => string.IsNullOrEmpty(accountId);
 
-    /// <summary>
-    /// 계정별로 PlayerPrefs 키 뒤에 붙일 꼬리표. 게스트는 "" (= 예전 키 그대로), 계정은 "_UID".
-    /// 세이브 파일 이름과 같은 규칙을 PlayerPrefs 저장(증강)에도 쓰게 하려고 공개합니다.
-    /// </summary>
+    /// <summary>계정별 PlayerPrefs 키 꼬리표(게스트 "" = 예전 키, 계정 "_UID") — 세이브 파일 이름과 같은 규칙을 증강 저장에도 쓰려고 공개.</summary>
     public static string KeySuffixFor(string accountId) =>
         IsGuestAccount(accountId) ? string.Empty : "_" + SanitizeForFileName(accountId);
 
@@ -497,10 +378,7 @@ public class SaveManager : MonoBehaviour
 
     public static bool SaveFileExists(string accountId) => File.Exists(PathFor(accountId));
 
-    /// <summary>
-    /// 지금 계정을 바꾸고 기억합니다 (다음 앱 실행 때도 이 계정 파일부터 읽음).
-    /// ⚠ 파일을 다시 읽지는 않습니다. 메모리(Current, 매니저들)를 어떻게 맞출지는 AccountSwitch 가 정합니다.
-    /// </summary>
+    /// <summary>사용 계정을 바꾸고 기억 — ⚠ 파일을 다시 읽지 않음 (메모리를 맞추는 건 AccountSwitch 몫).</summary>
     public static void SetActiveAccount(string accountId)
     {
         activeAccountId     = accountId ?? string.Empty;
@@ -510,13 +388,7 @@ public class SaveManager : MonoBehaviour
         GameLog.Info($"[SaveManager] 사용 계정 변경 → {ActiveAccountLabel} ({PathFor(activeAccountId)})");
     }
 
-    /// <summary>
-    /// 한 계정의 세이브 파일을 다른 계정 이름으로 "옮깁니다" (복사 아님 — 원본은 사라짐).
-    /// 게스트 진행을 처음 로그인한 계정이 가져갈 때 씁니다.
-    ///   - 대상 파일이 이미 있으면 덮어쓰지 않고 실패 (그 계정의 진행을 지우면 안 되므로)
-    ///   - 원본 파일이 없으면 옮길 것이 없으므로 성공 (새 게임 상태 그대로 넘어감)
-    /// File.Move 는 같은 저장소 안에서 이름만 바꾸는 동작이라, 중간에 앱이 꺼져도 "반쯤 복사된 파일" 이 생기지 않습니다.
-    /// </summary>
+    /// <summary>게스트 진행을 계정 파일로 '이동'(File.Move 라 반쯤 복사된 파일이 안 생김) — 대상이 이미 있으면 덮지 않고 실패, 원본이 없으면 성공.</summary>
     public static bool TryMoveSaveFile(string fromAccountId, string toAccountId, out string error)
     {
         error = string.Empty;
@@ -541,10 +413,7 @@ public class SaveManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// UID 를 파일 이름에 넣기 전에 안전한 글자만 남깁니다. (뒤끝 UID 에는 ":" "." 같은 글자가 들어 있고,
-    /// 파일 이름에 쓸 수 없는 글자가 섞이면 저장이 조용히 실패하므로 방어)
-    /// </summary>
+    /// <summary>UID 의 ':' '.' 등을 '_' 로 바꿔 파일 이름에 안전하게 (못 쓰는 글자면 저장이 조용히 실패해서).</summary>
     private static string SanitizeForFileName(string id)
     {
         var sb = new System.Text.StringBuilder(id.Length);
@@ -553,31 +422,12 @@ public class SaveManager : MonoBehaviour
         return sb.ToString();
     }
 
-    // ─────────────────────────────────────────────
-    // ★ [계정 삭제] 저장 잠금
-    // ─────────────────────────────────────────────
+    // ── ★ [계정 삭제] 저장 잠금 ──
 
-    /// <summary>
-    /// true 인 동안에는 Save() / WriteCurrentToDisk() 가 파일에 아무것도 쓰지 않습니다.
-    ///
-    /// [왜 필요한가 — 이 기능의 핵심]
-    ///   세이브 파일을 지워도, 매니저들은 옛 값(레벨·골드·동료)을 메모리에 들고 살아 있습니다.
-    ///   그 상태에서 누군가 Save() 를 한 번이라도 부르면(앱 백그라운드 전환, 씬 정리 중의 OnDestroy 등)
-    ///   CaptureTo() 가 옛 값을 모아 "방금 지운 파일을 그대로 다시 만듭니다".
-    ///   에러도 안 나고, 유저 눈에는 "계정 삭제를 눌렀는데 아무것도 안 지워졌다" 로 보입니다.
-    ///
-    /// [왜 static 인가]
-    ///   초기화 도중에 SaveManager 자신도 파괴되고 새로 만들어집니다.
-    ///   인스턴스 필드에 두면 "옛 SaveManager 는 잠겼는데 새 SaveManager 는 안 잠긴" 틈이 생깁니다.
-    ///   static 은 인스턴스가 바뀌어도 그대로 남으므로 잠금이 끊기지 않습니다.
-    /// </summary>
+    /// <summary>true 동안 모든 파일 쓰기 차단 — 지운 뒤에도 매니저의 옛 값이 Save 로 파일을 되살리므로, SaveManager 재생성 중에도 끊기지 않게 static.</summary>
     public static bool IsSaveLocked { get; private set; }
 
-    /// <summary>
-    /// Enter Play Mode Options 에서 "Reload Domain" 을 끄면 static 값이 이전 플레이에서 넘어옵니다.
-    /// 초기화 도중에 플레이를 멈췄다면 잠긴 채로 다음 플레이가 시작되어 "저장이 영영 안 되는" 상태가 됩니다.
-    /// 플레이 시작 직전에 비웁니다. (PlayerProfile.ResetStatics 와 같은 이유)
-    /// </summary>
+    /// <summary>Reload Domain 을 끈 에디터에서 이전 플레이의 static(잠금 등)이 남지 않게 플레이 시작 직전에 비움.</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -586,6 +436,7 @@ public class SaveManager : MonoBehaviour
         // ★ [계정별 세이브] 메모리 값은 비우고 다음에 PlayerPrefs 에서 다시 읽게 함 (실제 앱 재시작과 같은 상태)
         activeAccountId     = null;
         activeAccountLoaded = false;
+        rankingResetCache.Clear();
     }
 
     /// <summary>저장을 잠급니다. 매니저를 새로 만드는 쪽(AccountReset — 계정 삭제·계정 전환)만 호출하세요.</summary>
@@ -595,10 +446,7 @@ public class SaveManager : MonoBehaviour
         GameLog.Info("[SaveManager] 저장 잠금 — 매니저 재시작(계정 삭제/전환) 시작");
     }
 
-    /// <summary>
-    /// 잠금을 풉니다. 정상 흐름에서는 새 SaveManager 의 Awake 가 풀어 주므로
-    /// AccountReset 은 "초기화가 도중에 실패했을 때" 와 "안전망" 용도로만 부릅니다.
-    /// </summary>
+    /// <summary>잠금 해제 — 보통은 새 SaveManager.Awake 가 풀고, AccountReset 은 실패·안전망 때만 호출.</summary>
     public static void UnlockAfterReset()
     {
         if (!IsSaveLocked) return;
@@ -606,10 +454,7 @@ public class SaveManager : MonoBehaviour
         GameLog.Info("[SaveManager] 저장 잠금 해제");
     }
 
-    /// <summary>
-    /// 세이브 파일을 지우고, 살아 있는 SaveManager 의 Current 도 빈 데이터로 바꿉니다.
-    /// 실패하면 false + 사유. (파일을 못 지웠는데 성공이라고 넘어가면 다음 실행에 옛 데이터가 그대로 뜹니다)
-    /// </summary>
+    /// <summary>세이브 파일 삭제 + Current 비움 + 클라우드 대기분 폐기 + 랭킹 초기화 표시, 실패하면 false + 사유.</summary>
     public static bool TryDeleteSaveFile(out string error)
     {
         error = string.Empty;
@@ -620,23 +465,18 @@ public class SaveManager : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            // 외부 저장소는 우리가 통제할 수 없는 입력이라 try-catch 를 둡니다.
-            // (AugmentManager.Load 의 "학습 포인트" 주석과 같은 기준)
+            // 외부 저장소는 통제할 수 없어 try-catch
             error = e.Message;
             Debug.LogError($"[SaveManager] 세이브 파일 삭제 실패: {e.Message}");
             return false;
         }
 
-        // ★ 메모리 쪽도 비웁니다.
-        //   PlayerProfile.Name 처럼 Current 를 직접 읽는 코드가 있어서,
-        //   파일만 지우고 Current 를 두면 씬이 바뀌기 전까지 옛 이름이 계속 보입니다.
-        //   (Instance 는 Unity 식 null 검사 — 파괴된 인스턴스도 걸러냅니다)
+        // Current 도 비움 — Current 를 직접 읽는 코드(PlayerProfile.Name 등)에 옛 값이 남지 않게
         if (Instance != null)
             Instance.Current = new SaveData();
         CloudSave.Instance?.DiscardPending();   // 지우기 전 내용이 클라우드로 올라가지 않게
 
-        // 다시 1-1 부터 시작하면 서버 랭킹도 지움 (RankingManager.TryResetAfterSaveDelete).
-        //   계정 삭제는 서버 랭킹을 먼저 지우지만, 그 삭제가 늦게 반영되거나 사이에 다시 올라간 기록까지 정리하는 안전망입니다.
+        // 1-1 부터 다시 하면 서버 랭킹도 0 으로 (RankingManager — 계정 삭제가 늦게 반영된 경우까지 정리하는 안전망)
         SetRankingResetPending(ActiveAccountId, true);
 
         GameLog.Info($"[SaveManager] 세이브 파일 삭제 완료: {SavePath}");

@@ -1,9 +1,4 @@
-/// <summary>
-/// 진화 스테이지 입장과 복귀 사이에 정보를 전달하는 정적 보관소.
-/// 씬을 완전히 전환해도 static 값은 앱이 실행되는 동안 유지됩니다.
-///   - SelectedData : 어떤 티어로 입장했는지 (보스 배율/보상)
-///   - ReturnWorld/ReturnStage : 클리어 후 돌아갈 원래 스테이지 위치
-/// </summary>
+/// <summary>진화 스테이지 입장↔복귀 사이 정보(입장 티어, 복귀할 월드·스테이지)를 static 으로 보관 — 씬 전환에도 유지.</summary>
 public static class EvolveStageContext
 {
     public static EvolveStageData SelectedData;

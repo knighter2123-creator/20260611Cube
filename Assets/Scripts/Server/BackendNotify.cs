@@ -2,16 +2,8 @@ using System;
 using BackEnd;
 using UnityEngine;
 
-/// <summary>
-/// 뒤끝 실시간 알림 (Backend.Notification) — 친구 요청이 오거나 수락·거절되면, 쪽지가 오면 바로 알려 줍니다.
-/// 알림에는 내용이 없어서 받는 쪽(친구 · 개인 메시지 서비스)이 목록을 다시 받습니다.
-///
-/// [연결]  ChatManager.Update 가 매 프레임 Tick(지금 계정 uid 또는 null) 을 부릅니다.
-///   uid 가 바뀌면(로그아웃·계정 전환) 끊고 새 계정으로 다시 연결합니다. 실패하면 retrySeconds 뒤 다시 시도합니다.
-/// [알림이 안 와도]  친구·개인 메시지는 느린 주기로 다시 받는 대비가 있습니다 (ChatManager.Friends / Direct).
-///   IsConnected 가 true 면 그 주기를 길게 잡습니다.
-/// [스레드]  알림은 소켓 스레드에서 올 수 있어 BackendManager.Post 로 메인 스레드에 넘겨 이벤트를 보냅니다.
-/// </summary>
+/// <summary>뒤끝 실시간 알림: ChatManager 가 매 프레임 Tick(uid) → 계정이 바뀌면 재연결, 친구·쪽지 알림을 메인 스레드 이벤트로 넘김 (내용이 없어 받는 쪽이 목록을 다시 받음).</summary>
+// 알림이 안 와도 ChatManager.Friends/Direct 가 느린 주기로 다시 받음 (IsConnected 면 주기를 길게)
 public static class BackendNotify
 {
     /// <summary>친구 요청을 받음 · 내 요청이 수락됨 · 거절됨 (메인 스레드)</summary>
@@ -23,7 +15,7 @@ public static class BackendNotify
     /// <summary>실시간 알림이 연결·인증까지 됐는가.</summary>
     public static bool IsConnected => connectedUid != null && authorized;
 
-    // 실패할 때마다 다시 시도 간격을 두 배로 (콘솔에서 실시간 알림이 꺼져 있으면 경고가 계속 쌓이지 않게). 인증되면 처음 값으로.
+    // 실패마다 재시도 간격 2배(콘솔에서 꺼져 있을 때 경고가 쌓이지 않게), 인증되면 처음 값으로
     private const float FirstRetrySeconds = 60f;
     private const float MaxRetrySeconds   = 900f;
     private static float RetrySeconds = FirstRetrySeconds;
