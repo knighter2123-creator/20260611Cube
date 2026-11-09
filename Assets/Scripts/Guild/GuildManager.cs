@@ -422,8 +422,12 @@ public static class GuildManager
     /// <summary>길드 소개 수정 (customGuildInfo 의 intro) — 구버전 API ModifyGuildV5 (V3·V4 는 SDK 에서 obsolete).</summary>
     public static void UpdateIntro(string intro, Action<string> onDone)
     {
+        intro = intro?.Trim() ?? string.Empty;
+        // 바뀐 게 없으면 서버에 보내지 않음 (뒤끝 호출 절약 — 같은 값으로 수정하면 서버가 실패로 돌려줄 수도 있음)
+        if (MyGuild != null && intro == (MyGuild.intro ?? string.Empty)) { onDone?.Invoke(null); return; }
+
         var param = new Param();
-        param.Add(INTRO_KEY, intro?.Trim() ?? string.Empty);
+        param.Add(INTRO_KEY, intro);
         if (!TryBegin(onDone, out string uid)) return;
 
         BackendManager.Call(cb => Backend.Guild.ModifyGuildV5(param, cb), bro => Finish(uid, bro, GameMessages.Guild.actionIntro, onDone, null));
@@ -480,7 +484,7 @@ public static class GuildManager
         info.memberCount    = g.memberCount;
         info.autoApprove    = g._immediateRegistration;
         if (g.customGuildInfo != null && g.customGuildInfo.TryGetValue(INTRO_KEY, out string intro) && intro != null)
-            info.intro = intro;
+            info.intro = DecodeCustom(intro);
         // 부길드장 목록이 {inDate: 닉네임} 인지 {닉네임: inDate} 인지 문서에 없어 양쪽 다 넣음 (inDate 와 닉네임이 겹칠 일은 없음)
         if (g.viceMasterList != null)
             foreach (KeyValuePair<string, string> pair in g.viceMasterList)
@@ -489,6 +493,16 @@ public static class GuildManager
                 if (!string.IsNullOrEmpty(pair.Value)) info.viceMasters.Add(pair.Value);
             }
         return info;
+    }
+
+    // SDK 가 customGuildInfo 값을 JSON 그대로(JsonMapper.ToJson) 넣어 줘서 글자는 "테스트" 처럼 따옴표·이스케이프가 붙어 옴 → 풀어서 씀
+    [Serializable] private class StringBox { public string v; }
+
+    private static string DecodeCustom(string raw)
+    {
+        if (raw == null || raw.Length < 2 || raw[0] != '"' || raw[raw.Length - 1] != '"') return raw;
+        try { return JsonUtility.FromJson<StringBox>("{\"v\":" + raw + "}")?.v ?? raw; }
+        catch { return raw; }
     }
 
     private static GuildRole RoleOf(GuildInfo guild, string uid)
