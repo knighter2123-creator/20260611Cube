@@ -8,8 +8,11 @@ public class LogoutButtonUI : AuthStateUI
 {
     [SerializeField] private Button logoutButton;
 
-    [Tooltip("(선택) 로그인된 계정 표시. 예: \"Google · user@gmail.com\"")]
+    [Tooltip("(선택) 로그인된 계정 표시. 예: \"Google | user@gmail.com\"")]
     [SerializeField] private TMP_Text accountText;
+
+    [Tooltip("로그인 방법과 계정 사이 글자 (⚠ 폰트에 있는 글자만 — BMJUA 에는 · 가 없음)")]
+    [SerializeField] private string separator = " | ";
 
     [Tooltip("체크: 로그인 안 됐을 때 버튼을 숨김 / 해제: 숨기지 않고 회색(비활성)으로만 둠")]
     [SerializeField] private bool hideWhenSignedOut = true;
@@ -65,10 +68,10 @@ public class LogoutButtonUI : AuthStateUI
         SetText(accountText, a.SignedIn ? AccountLabel(a.Auth) : string.Empty);
     }
 
-    private static string AccountLabel(AuthManager auth)
+    private string AccountLabel(AuthManager auth)
     {
         string provider = auth.SignInProviderLabel;
         string who      = !string.IsNullOrEmpty(auth.Email) ? auth.Email : auth.DisplayName;
-        return string.IsNullOrEmpty(provider) ? who : $"{provider} · {who}";
+        return string.IsNullOrEmpty(provider) ? who : provider + separator + who;
     }
 }

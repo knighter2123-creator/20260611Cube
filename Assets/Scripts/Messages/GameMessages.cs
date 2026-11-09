@@ -257,6 +257,58 @@ public class GameMessages : ScriptableObject
     }
 
     [Serializable]
+    public class GuildTexts
+    {
+        [Header("상태")]
+        public string loginRequired  = "로그인하면 길드를 이용할 수 있습니다.";
+        public string loadFailed     = "길드 정보를 불러오지 못했습니다.";
+        public string listFailed     = "길드 목록을 불러오지 못했습니다.";
+        public string busy           = "처리 중입니다. 잠시 후 다시 시도해 주세요.";
+
+        [Header("만들기")]
+        public string enterName      = "길드 이름을 입력해 주세요.";
+        [Tooltip("{cost} = 필요한 보석")]
+        public string notEnoughGem   = "보석이 부족합니다. (필요: {cost})";
+        [Tooltip("만들기 409")]
+        public string nameTaken      = "이미 있는 길드 이름입니다.";
+        [Tooltip("만들기 400")]
+        public string badName        = "사용할 수 없는 길드 이름입니다.";
+        [Tooltip("만들기·가입 412 — 이미 길드에 있음")]
+        public string alreadyInGuild = "이미 길드에 가입되어 있습니다.";
+
+        [Header("검색 · 가입")]
+        public string guildNotFound  = "길드를 찾을 수 없습니다.";
+        [Tooltip("가입 신청 409")]
+        public string alreadyApplied = "이미 가입 신청한 길드입니다.";
+        [Tooltip("가입 신청 412")]
+        public string cannotJoin     = "가입할 수 없습니다. 이미 길드에 있거나 길드 인원이 가득 찼습니다.";
+        public string applied        = "가입 신청을 보냈습니다.";
+
+        [Header("관리")]
+        [Tooltip("승인 412")]
+        public string approveFailed  = "승인할 수 없습니다. 길드 인원이 가득 찼거나 이미 다른 길드에 가입한 유저입니다.";
+        [Tooltip("승인·거절 404")]
+        public string applicantGone  = "가입 신청이 취소되었거나 이미 처리되었습니다.";
+        [Tooltip("길드장 탈퇴 403·412")]
+        public string masterCannotLeave = "길드장은 다른 멤버에게 길드장을 넘긴 뒤 탈퇴할 수 있습니다.";
+        [Tooltip("{action} = 작업 이름, {code} = 서버 상태 코드")]
+        public string actionFailed   = "{action}에 실패했습니다. ({code})";
+
+        [Header("작업 이름 ({action} 자리)")]
+        public string actionCreate   = "길드 만들기";
+        public string actionJoin     = "가입 신청";
+        public string actionLeave    = "길드 탈퇴";
+        public string actionKick     = "추방";
+        public string actionApprove  = "가입 승인";
+        public string actionDecline  = "가입 거절";
+        public string actionMaster   = "길드장 위임";
+        public string actionVice     = "부길드장 임명";
+        public string actionUnvice   = "부길드장 해제";
+        public string actionIntro    = "소개 수정";
+        public string actionAuto     = "자동 승인 설정";
+    }
+
+    [Serializable]
     public class AccountTexts
     {
         public string deleteFailed     = "계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
@@ -279,6 +331,7 @@ public class GameMessages : ScriptableObject
     [SerializeField] private NicknameTexts nickname = new NicknameTexts();
     [SerializeField] private AuthTexts     auth     = new AuthTexts();
     [SerializeField] private AccountTexts  account  = new AccountTexts();
+    [SerializeField] private GuildTexts    guild    = new GuildTexts();
 
     // ───────────────────────────── 읽기 ─────────────────────────────
 
@@ -292,6 +345,7 @@ public class GameMessages : ScriptableObject
     public static NicknameTexts Nickname => Current.nickname;
     public static AuthTexts     Auth     => Current.auth;
     public static AccountTexts  Account  => Current.account;
+    public static GuildTexts    Guild    => Current.guild;
 
     private static GameMessages current;
 

@@ -12,6 +12,9 @@ public static class BackendNotify
     /// <summary>쪽지(개인 메시지)를 받음 (메인 스레드)</summary>
     public static event Action MessageReceived;
 
+    /// <summary>콘솔에서 새 공지사항이 게시됨 (메인 스레드) — NoticeManager 가 목록을 다시 받음</summary>
+    public static event Action NoticeCreated;
+
     /// <summary>실시간 알림이 연결·인증까지 됐는가.</summary>
     public static bool IsConnected => connectedUid != null && authorized;
 
@@ -30,6 +33,7 @@ public static class BackendNotify
     {
         FriendsChanged  = null;
         MessageReceived = null;
+        NoticeCreated   = null;
         connectedUid    = null;
         authorized      = false;
         hooked          = false;
@@ -112,5 +116,6 @@ public static class BackendNotify
         Backend.Notification.OnAcceptedFriendRequest = () => BackendManager.Post(() => FriendsChanged?.Invoke());
         Backend.Notification.OnRejectedFriendRequest = () => BackendManager.Post(() => FriendsChanged?.Invoke());
         Backend.Notification.OnReceivedMessage       = () => BackendManager.Post(() => MessageReceived?.Invoke());
+        Backend.Notification.OnNewNoticeCreated      = (title, content) => BackendManager.Post(() => NoticeCreated?.Invoke());
     }
 }
