@@ -20,6 +20,10 @@ public class BackendChatService : IChatService, IChatClientListener
     private const float  JoinTimeout  = 8f;
     private const float  SendTimeout  = 5f;
 
+    // ChatClient.SendJoinGuildChannel 이 쓰는 채널 그룹 (BackndChat.dll 1.4.4) — 어느 길드인지는 뒤끝챗 서버가 뒤끝 길드 가입 정보로 정함
+    private const string GuildGroup      = "guild";
+    private const float  GuildRetryDelay = 30f;   // 길드 채널 입장 실패·퇴장 뒤 다시 시도까지
+
     private readonly string channelGroup;
     private readonly string channelName;
 
@@ -33,6 +37,17 @@ public class BackendChatService : IChatService, IChatClientListener
     private ulong  joinedNumber;
     private float  nextJoinTime;
 
+    // 길드 채널 — wantGuild = 들어가 있어야 할 길드 (ChatManager 가 SetGuild 로 알려 줌, null = 길드 없음)
+    private string wantGuild;
+    private bool   guildJoined;
+    private string guildName;
+    private ulong  guildNumber;
+    private float  nextGuildJoinTime;
+    private float  guildJoinWaitUntil;   // 길드 입장 응답을 기다리는 중 — 이 사이의 채널 오류는 길드 입장 실패로 봄
+
+    public bool   GuildReady      => client != null && guildJoined;
+    public string GuildFailReason { get; private set; }
+
     // 내 메타데이터로 보낸 마지막 값 — 바뀌면 UpdateMetadata / UpdateNickname
     private int    sentProgress = -1;
     private string sentName;
@@ -42,6 +57,7 @@ public class BackendChatService : IChatService, IChatClientListener
     // 보내는 중인 메시지 (한 번에 하나 — ChatManager 가 sending 으로 막음)
     private Action<string> pendingSend;
     private string         pendingText;
+    private bool           pendingGuild;
     private float          pendingUntil;
 
     /// <param name="channelGroup">뒤끝챗 콘솔의 공개 채널 그룹 이름</param>
@@ -119,6 +135,30 @@ public class BackendChatService : IChatService, IChatClientListener
         joinedName  = null;
         myUid       = null;
         failReason  = null;
+
+        // wantGuild 는 남겨 둠 — 다시 연결되면 Tick 이 길드 채널에 다시 들어감
+        guildJoined        = false;
+        guildJoinWaitUntil = 0f;
+        nextGuildJoinTime  = 0f;
+        GuildFailReason    = null;
+    }
+
+    public void SetGuild(string guildKey)
+    {
+        if (guildKey == wantGuild) return;
+
+        if (pendingGuild) FinishPending(GameMessages.Chat.guildJoining);
+        if (guildJoined && client != null)
+        {
+            try { client.SendLeaveGuildChannel(); }   // 길드를 나감 · 다른 길드로 옮김
+            catch (Exception e) { Debug.LogWarning($"[Chat] 길드 채널 나가기 실패 (무시): {e.Message}"); }
+        }
+
+        wantGuild          = guildKey;
+        guildJoined        = false;
+        guildJoinWaitUntil = 0f;
+        nextGuildJoinTime  = Time.unscaledTime + 1f;   // 나가기가 먼저 처리되게 잠깐 뒤에 입장
+        GuildFailReason    = null;
     }
 
     public void Tick()
@@ -138,6 +178,8 @@ public class BackendChatService : IChatService, IChatClientListener
         }
 
         if (joinedGroup == null && Time.unscaledTime >= nextJoinTime) RequestJoin();
+        // 길드 채널은 전체 채널에 들어간 뒤에 — 입장 오류가 어느 채널 것인지 가리기 쉽게
+        if (wantGuild != null && !guildJoined && joinedGroup != null && Time.unscaledTime >= nextGuildJoinTime) RequestGuildJoin();
         if (pendingSend != null && Time.unscaledTime >= pendingUntil) FinishPending(null);
     }
 
@@ -148,11 +190,24 @@ public class BackendChatService : IChatService, IChatClientListener
         catch (Exception e) { Debug.LogWarning($"[Chat] 채널 입장 요청 실패 — 잠시 뒤 다시: {e.Message}"); }
     }
 
+    private void RequestGuildJoin()
+    {
+        nextGuildJoinTime  = Time.unscaledTime + JoinTimeout;
+        guildJoinWaitUntil = Time.unscaledTime + JoinTimeout;
+        try { client.SendJoinGuildChannel(); }
+        catch (Exception e) { Debug.LogWarning($"[Chat] 길드 채널 입장 요청 실패 — 잠시 뒤 다시: {e.Message}"); }
+    }
+
     // ───────────────────────────── 보내기 ─────────────────────────────
 
     public void Send(ChatMessage message, Action<string> onDone)
     {
-        if (client == null || joinedGroup == null) { onDone?.Invoke(GameMessages.Chat.joiningChannel); return; }
+        bool guild = message.Guild;
+        if (client == null || (guild ? !guildJoined : joinedGroup == null))
+        {
+            onDone?.Invoke(guild ? GameMessages.Chat.guildJoining : GameMessages.Chat.joiningChannel);
+            return;
+        }
 
         try
         {
@@ -175,9 +230,11 @@ public class BackendChatService : IChatService, IChatClientListener
             FinishPending(null);   // 혹시 남은 것 정리 (ChatManager 가 막으므로 보통 없음)
             pendingSend  = onDone;
             pendingText  = message.Text;
+            pendingGuild = guild;
             pendingUntil = Time.unscaledTime + SendTimeout;
 
-            client.SendChatMessage(joinedGroup, joinedName, joinedNumber, message.Text);
+            if (guild) client.SendChatMessage(GuildGroup, guildName, guildNumber, message.Text);
+            else       client.SendChatMessage(joinedGroup, joinedName, joinedNumber, message.Text);
         }
         catch (Exception e)
         {
@@ -190,8 +247,9 @@ public class BackendChatService : IChatService, IChatClientListener
     {
         if (pendingSend == null) return;
         Action<string> done = pendingSend;
-        pendingSend = null;
-        pendingText = null;
+        pendingSend  = null;
+        pendingText  = null;
+        pendingGuild = false;
         done(error);
     }
 
@@ -199,36 +257,67 @@ public class BackendChatService : IChatService, IChatClientListener
 
     public void OnJoinChannel(ChannelInfo channelInfo)
     {
-        if (channelInfo == null || channelInfo.ChannelGroup != channelGroup) return;
+        if (channelInfo == null) return;
 
-        joinedGroup  = channelInfo.ChannelGroup;
-        joinedName   = channelInfo.ChannelName;
-        joinedNumber = channelInfo.ChannelNumber;
-        GameLog.Info($"[Chat] 뒤끝챗 채널 입장: {joinedGroup}/{joinedName}#{joinedNumber}");
+        bool guild = channelInfo.ChannelGroup == GuildGroup;
+        if (guild)
+        {
+            if (wantGuild == null)   // 응답이 오기 전에 길드를 나감
+            {
+                try { client.SendLeaveGuildChannel(); } catch (Exception e) { Debug.LogWarning($"[Chat] 길드 채널 나가기 실패 (무시): {e.Message}"); }
+                return;
+            }
+            guildJoined        = true;
+            guildName          = channelInfo.ChannelName;
+            guildNumber        = channelInfo.ChannelNumber;
+            guildJoinWaitUntil = 0f;
+            GuildFailReason    = null;
+            GameLog.Info($"[Chat] 뒤끝챗 길드 채널 입장: {GuildGroup}/{guildName}#{guildNumber}");
+        }
+        else
+        {
+            if (channelInfo.ChannelGroup != channelGroup) return;
+            joinedGroup  = channelInfo.ChannelGroup;
+            joinedName   = channelInfo.ChannelName;
+            joinedNumber = channelInfo.ChannelNumber;
+            GameLog.Info($"[Chat] 뒤끝챗 채널 입장: {joinedGroup}/{joinedName}#{joinedNumber}");
+        }
 
         var history = new List<ChatMessage>();
         if (channelInfo.Messages != null)
         {
             int start = Math.Max(0, channelInfo.Messages.Count - historyCount);
             for (int i = start; i < channelInfo.Messages.Count; i++)
-                if (TryConvert(channelInfo.Messages[i], out ChatMessage m)) history.Add(m);
+                if (TryConvert(channelInfo.Messages[i], guild, out ChatMessage m)) history.Add(m);
         }
         if (history.Count > 0) MessagesReceived?.Invoke(history);
     }
 
     public void OnLeaveChannel(ChannelInfo channelInfo)
     {
-        if (channelInfo == null || channelInfo.ChannelGroup != joinedGroup) return;
+        if (channelInfo == null) return;
+
+        if (channelInfo.ChannelGroup == GuildGroup)
+        {
+            // 서버가 내보냄(추방 등) — 길드 정보가 바뀌었을 수 있으니 ChatManager 가 GuildReady 가 꺼진 것을 보고 길드를 다시 받음
+            if (!guildJoined || channelInfo.ChannelNumber != guildNumber) return;
+            guildJoined       = false;
+            nextGuildJoinTime = Time.unscaledTime + GuildRetryDelay;
+            if (pendingGuild) FinishPending(GameMessages.Chat.guildJoining);
+            return;
+        }
+
+        if (channelInfo.ChannelGroup != joinedGroup) return;
         joinedGroup = null;   // Tick 이 다시 입장 요청
         nextJoinTime = Time.unscaledTime + 1f;
     }
 
     public void OnChatMessage(MessageInfo messageInfo)
     {
-        if (!IsMyChannel(messageInfo) || !TryConvert(messageInfo, out ChatMessage m)) return;
+        if (!TryChannel(messageInfo, out bool guild) || !TryConvert(messageInfo, guild, out ChatMessage m)) return;
 
         // 내가 보낸 메시지가 돌아옴 → 보내기 성공
-        if (pendingSend != null && m.Uid == myUid && m.Text == pendingText) FinishPending(null);
+        if (pendingSend != null && pendingGuild == guild && m.Uid == myUid && m.Text == pendingText) FinishPending(null);
 
         MessagesReceived?.Invoke(new[] { m });
     }
@@ -238,7 +327,7 @@ public class BackendChatService : IChatService, IChatClientListener
 
     private void Remove(MessageInfo messageInfo)
     {
-        if (!IsMyChannel(messageInfo)) return;
+        if (!TryChannel(messageInfo, out _)) return;
         MessagesRemoved?.Invoke(new[] { IdOf(messageInfo) });
     }
 
@@ -257,12 +346,25 @@ public class BackendChatService : IChatService, IChatClientListener
                 FinishPending(ToMessage(error, param));
                 failReason = ToMessage(error, param);   // Tick 에서 client.Update 가 끝난 뒤 Failed
                 return;
+        }
 
+        // 길드 채널 입장을 기다리는 중의 채널 오류 → 길드 입장 실패 (길드가 없음·콘솔에서 길드 채널이 꺼짐 등). 전체 채널은 그대로.
+        if (Time.unscaledTime < guildJoinWaitUntil && IsChannelError(error))
+        {
+            guildJoinWaitUntil = 0f;
+            nextGuildJoinTime  = Time.unscaledTime + GuildRetryDelay;
+            GuildFailReason    = ToMessage(error, param);
+            return;
+        }
+
+        switch (error)
+        {
             // 채널 문제 → 다시 입장 시도
             case ERROR_MESSAGE.DISABLED_CHANNEL:
             case ERROR_MESSAGE.CHANNEL_FULL:
             case ERROR_MESSAGE.NOT_JOIN_CHANNEL:
-                joinedGroup = null;
+                if (pendingGuild) { guildJoined = false; nextGuildJoinTime = Time.unscaledTime + 1f; }   // 길드 채널로 보내다 난 오류
+                else              joinedGroup = null;
                 FinishPending(ToMessage(error, param));
                 return;
 
@@ -314,12 +416,26 @@ public class BackendChatService : IChatService, IChatClientListener
 
     // ───────────────────────────── 변환 ─────────────────────────────
 
-    private bool IsMyChannel(MessageInfo m)
-        => m != null && joinedGroup != null && m.ChannelGroup == joinedGroup && m.ChannelName == joinedName && m.ChannelNumber == joinedNumber;
+    private static bool IsChannelError(ERROR_MESSAGE error)
+        => error == ERROR_MESSAGE.DISABLED_CHANNEL || error == ERROR_MESSAGE.CHANNEL_FULL || error == ERROR_MESSAGE.NOT_JOIN_CHANNEL
+        || error == ERROR_MESSAGE.INVALID_PARAMETER || error == ERROR_MESSAGE.UNKNOWN_ERROR;
+
+    /// <summary>들어가 있는 전체·길드 채널의 메시지인가 (guild = 길드 채널).</summary>
+    private bool TryChannel(MessageInfo m, out bool guild)
+    {
+        guild = false;
+        if (m == null) return false;
+        if (guildJoined && m.ChannelGroup == GuildGroup && m.ChannelName == guildName && m.ChannelNumber == guildNumber)
+        {
+            guild = true;
+            return true;
+        }
+        return joinedGroup != null && m.ChannelGroup == joinedGroup && m.ChannelName == joinedName && m.ChannelNumber == joinedNumber;
+    }
 
     private static string IdOf(MessageInfo m) => $"{m.ChannelGroup}/{m.ChannelName}/{m.ChannelNumber}/{m.Index}";
 
-    private static bool TryConvert(MessageInfo m, out ChatMessage message)
+    private static bool TryConvert(MessageInfo m, bool guild, out ChatMessage message)
     {
         message = default;
         if (m == null) return false;
@@ -341,6 +457,7 @@ public class BackendChatService : IChatService, IChatClientListener
             Progress = int.TryParse(progress, NumberStyles.Integer, CultureInfo.InvariantCulture, out int p) ? p : 0,
             Text     = m.Message ?? string.Empty,
             SentAt   = ParseTime(m.Time),
+            Guild    = guild,
         };
         return true;
     }

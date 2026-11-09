@@ -52,6 +52,13 @@ public class GameMessages : ScriptableObject
         public string joiningChannel   = "채팅 채널에 들어가는 중입니다. 잠시 후 다시 보내 주세요.";
         public string sendFailed       = "메시지를 보내지 못했습니다.";
 
+        [Header("길드 채팅")]
+        public string guildNone        = "길드에 가입하면 길드 채팅을 쓸 수 있습니다.";
+        public string guildLoading     = "길드 정보를 불러오는 중입니다...";
+        public string guildJoining     = "길드 채팅에 들어가는 중입니다...";
+        [Tooltip("길드 채널에 못 들어갔을 때. {reason} = 이유")]
+        public string guildJoinFailed  = "길드 채팅에 들어가지 못했습니다. ({reason}) 잠시 후 다시 시도합니다.";
+
         [Header("뒤끝챗 서버 오류")]
         public string filtered          = "사용할 수 없는 단어가 들어 있습니다.";
         public string banned            = "채팅이 제한되었습니다.";

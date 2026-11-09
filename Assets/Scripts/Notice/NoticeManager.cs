@@ -31,7 +31,10 @@ public static class NoticeManager
     public const int PAGE_SIZE = 10;
 
     /// <summary>창을 열지 않아도 이 간격(초)이 지나면 버튼이 다시 받아 옴 (안 읽은 개수 표시용).</summary>
-    public const float STALE_SECONDS = 30f;
+    public const float STALE_SECONDS = 120f;
+
+    /// <summary>실시간 알림이 연결돼 있을 때의 간격 — 새 공지는 알림(NoticeCreated)으로 바로 받으므로 놓침 대비로만.</summary>
+    public const float STALE_SECONDS_REALTIME = 600f;
 
     private const string LastSeenKey = "notice.lastSeenMs";
 
@@ -46,7 +49,7 @@ public static class NoticeManager
     public static bool   HasLoaded  { get; private set; }
     /// <summary>다음 페이지가 있는가.</summary>
     public static bool   HasMore    => !string.IsNullOrEmpty(nextOffset);
-    /// <summary>마지막 받기 실패 사유 (화면 표시용). 성공하면 null.</summary>
+    /// <summary>마지막 받기가 실패했는가 (LastFailedOffline = 그 원인이 네트워크). 성공하면 false.</summary>
     public static bool   LastFailed { get; private set; }
     public static bool   LastFailedOffline { get; private set; }
 
@@ -90,10 +93,11 @@ public static class NoticeManager
         Fetch(nextOffset);
     }
 
-    /// <summary>마지막으로 받은 지 STALE_SECONDS 가 지났으면 다시 받음 (열기 버튼이 부름).</summary>
+    /// <summary>마지막으로 받은 지 STALE_SECONDS(실시간 알림 연결 중이면 STALE_SECONDS_REALTIME)가 지났으면 다시 받음 (열기 버튼이 부름).</summary>
     public static void RefreshIfStale()
     {
-        if (IsLoading || Time.unscaledTime - lastFetchTime < STALE_SECONDS) return;
+        float stale = BackendNotify.IsConnected ? STALE_SECONDS_REALTIME : STALE_SECONDS;
+        if (IsLoading || Time.unscaledTime - lastFetchTime < stale) return;
         Refresh();
     }
 
@@ -152,9 +156,6 @@ public static class NoticeManager
         });
     }
     
-    
-    
-
     private static NoticeItem ToNotice(JsonData row)
     {
         string inDate = BackendJson.Str(row, "inDate");

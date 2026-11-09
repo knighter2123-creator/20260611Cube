@@ -53,15 +53,22 @@ public partial class ChatPanel : MonoBehaviour
         public string emptyPublic = "아직 메시지가 없습니다. 첫 인사를 남겨 보세요!";
         [Tooltip("{name} = 상대 닉네임")]
         public string emptyDirect = "{name} 님에게 첫 메시지를 보내 보세요.";
+        public string emptyGuild  = "아직 길드 메시지가 없습니다. 길드원에게 인사를 남겨 보세요!";
 
         [Header("미리보기 (창을 닫았을 때 한 줄)")]
         public string previewLabel  = "채팅";
         [Tooltip("{count} = 안 읽은 개인 메시지 수")]
         public string previewUnread = "개인 메시지 {count}";
+        [Tooltip("{count} = 안 읽은 길드 메시지 수")]
+        public string previewGuildUnread = "길드 {count}";
         public string previewEmpty  = "눌러서 대화에 참여해 보세요!";
 
         [Header("채널 탭 · 창 제목")]
         public string publicTabName = "전체 채팅";
+        [Tooltip("길드에 들어가 있을 때만 보이는 탭")]
+        public string guildTabName  = "길드 채팅";
+        [Tooltip("{name} = 길드 이름")]
+        public string guildTitle    = "{name} 길드 채팅";
         [Tooltip("{name} = 상대 닉네임")]
         public string directTitle   = "{name} 님과 개인 채팅";
         [Tooltip("탭 이름 뒤 안 읽은 수. {count} = 개수")]
@@ -164,6 +171,8 @@ public partial class ChatPanel : MonoBehaviour
     private void OnDestroy()
     {
         if (subscribed != null) subscribed.Changed -= OnChanged;
+        // 창을 연 채 씬이 바뀌면 ChatManager(씬 밖)가 계속 그 방을 짧은 주기로 받거나 길드 메시지를 읽음 처리하지 않게
+        StopWatching();   // (IsOpen 은 쓰지 않음 — 씬을 내릴 때 panel 이 먼저 파괴돼 있을 수 있음)
     }
 
     private void Update()
@@ -234,8 +243,17 @@ public partial class ChatPanel : MonoBehaviour
     {
         CloseUserMenu();
         panel.SetActive(false);   // 미리보기는 LateUpdate 가 다시 켬
-        if (ChatManager.Instance != null) ChatManager.Instance.WatchConversation(null);
+        StopWatching();
         UpdatePreview();
+    }
+
+    /// <summary>보던 개인 대화방·길드 탭을 놓음 — 창을 닫거나 씬이 바뀌어 이 창이 사라질 때.</summary>
+    private void StopWatching()
+    {
+        ChatManager chat = ChatManager.Instance;
+        if (chat == null) return;
+        chat.WatchConversation(null);
+        chat.WatchGuild(false);
     }
 
     private void OnChanged()
@@ -265,7 +283,7 @@ public partial class ChatPanel : MonoBehaviour
 
             // 서버가 나중에 거절하면(도배·길이·금칙어) 비운 글을 되돌림 — 그사이 새 글을 쓰기 시작했으면 덮지 않음
             if (cleared && input.text.Length == 0) input.text = text;
-        }, currentPeer);
+        }, currentPeer, currentGuild);
 
         // 클라이언트 검사에 걸리면(콜백 즉시) 글을 남기고, 아니면 응답을 기다리지 않고 비움 (연달아 입력 가능)
         if (!rejected)
@@ -298,12 +316,14 @@ public partial class ChatPanel : MonoBehaviour
         if (chat != null)
         {
             chat.WatchConversation(currentPeer);   // 개인 탭이면 그 방의 메시지를 받기 시작
+            chat.WatchGuild(currentGuild);         // 길드 탭이면 보는 동안 온 메시지는 읽음
             if (direct) chat.MarkRead(currentPeer);
         }
 
-        string reason = chat == null ? ChatText.NoManager
-                      : direct       ? chat.DirectUnavailableReason
-                                     : chat.UnavailableReason;
+        string reason = chat == null  ? ChatText.NoManager
+                      : direct        ? chat.DirectUnavailableReason
+                      : currentGuild  ? chat.GuildUnavailableReason
+                                      : chat.UnavailableReason;
 
         // 맨 아래를 보고 있었으면 새 메시지가 와도 맨 아래를 유지, 위로 올려 읽는 중이면 그대로 둠
         bool wasAtBottom = scroll.verticalNormalizedPosition <= 0.01f;
@@ -324,8 +344,9 @@ public partial class ChatPanel : MonoBehaviour
     {
         if (reason != null) return reason;
         if (shown > 0)      return string.Empty;
-        return direct ? ChatText.Fill(texts.emptyDirect, "name", ChatText.Plain(currentPeerName))
-                      : texts.emptyPublic;
+        return direct       ? ChatText.Fill(texts.emptyDirect, "name", ChatText.Plain(currentPeerName))
+             : currentGuild ? texts.emptyGuild
+                            : texts.emptyPublic;
     }
 
     private void SetInputState(bool usable, bool direct)
@@ -356,7 +377,9 @@ public partial class ChatPanel : MonoBehaviour
         if (chat != null)
         {
             string myUid = chat.MyUid;
-            IReadOnlyList<ChatMessage> list = currentPeer != null ? chat.DirectMessagesWith(currentPeer) : chat.Messages;
+            IReadOnlyList<ChatMessage> list = currentPeer != null ? chat.DirectMessagesWith(currentPeer)
+                                            : currentGuild        ? chat.GuildMessages
+                                                                  : chat.Messages;
             foreach (ChatMessage m in list)
             {
                 if (chat.IsBlocked(m.Uid)) continue;
@@ -432,6 +455,8 @@ public partial class ChatPanel : MonoBehaviour
         {
             int unread = chat.TotalUnread;
             if (unread > 0) sb.AppendColored(colors.unread, ChatText.Fill(texts.previewUnread, "count", unread.ToString())).Append("  ");
+            int guildUnread = chat.GuildUnread;
+            if (guildUnread > 0) sb.AppendColored(colors.unread, ChatText.Fill(texts.previewGuildUnread, "count", guildUnread.ToString())).Append("  ");
 
             if (TryGetLastVisible(chat, out ChatMessage last)) AppendLine(sb, last, last.Uid == chat.MyUid);
             else                                               sb.Append(chat.UnavailableReason ?? texts.previewEmpty);

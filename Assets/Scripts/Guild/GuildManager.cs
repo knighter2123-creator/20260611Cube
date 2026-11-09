@@ -116,7 +116,8 @@ public static class GuildManager
         }
         if (problem == null) return true;
 
-        State = GuildState.Failed;
+        // 잠깐 오프라인 등 — 이미 받은 내 길드는 그대로 둠 (길드 채팅이 끊기거나 길드 창이 목록 화면으로 바뀌지 않게)
+        if (MyGuild == null) State = GuildState.Failed;
         LastError = problem;
         Changed();
         return false;
@@ -124,8 +125,9 @@ public static class GuildManager
 
     // ───────────────────────────── 내 길드 ─────────────────────────────
 
-    /// <summary>내 길드 → (있으면) 멤버·신청 목록, (없으면) 길드 목록을 다시 받음.</summary>
-    public static void Refresh()
+    /// <summary>내 길드 → (있으면) 멤버·신청 목록, (없으면 · loadBrowse) 길드 목록을 다시 받음.</summary>
+    /// <param name="loadBrowse">false = 길드가 없어도 길드 목록은 받지 않음 (길드 창을 열지 않은 채 길드 여부만 알고 싶을 때 — 뒤끝 호출 절약)</param>
+    public static void Refresh(bool loadBrowse = true)
     {
         if (!TryAccount(out _)) return;
 
@@ -146,7 +148,7 @@ public static class GuildManager
                 State = GuildState.NoGuild;
                 LastError = null;
                 Changed();
-                if (browse.Count == 0 || IsSearchResult) LoadGuildList();
+                if (loadBrowse && (browse.Count == 0 || IsSearchResult)) LoadGuildList();
                 return;
             }
             if (bro == null || !bro.IsSuccess())
@@ -205,6 +207,7 @@ public static class GuildManager
             {
                 MyRole = me.role;
                 if (MyRole >= GuildRole.ViceMaster) LoadApplicants(gen);
+                else applicants.Clear();   // 부길드장에서 내려옴 — 볼 수 없는 신청 목록이 버튼에 남지 않게
             }
             Changed();
         });

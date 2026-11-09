@@ -15,6 +15,9 @@ public static class BackendNotify
     /// <summary>콘솔에서 새 공지사항이 게시됨 (메인 스레드) — NoticeManager 가 목록을 다시 받음</summary>
     public static event Action NoticeCreated;
 
+    /// <summary>길드 가입이 승인·거절됨 · 내 길드에 가입 신청이 옴 (메인 스레드) — 길드 정보를 다시 받음</summary>
+    public static event Action GuildChanged;
+
     /// <summary>실시간 알림이 연결·인증까지 됐는가.</summary>
     public static bool IsConnected => connectedUid != null && authorized;
 
@@ -34,6 +37,7 @@ public static class BackendNotify
         FriendsChanged  = null;
         MessageReceived = null;
         NoticeCreated   = null;
+        GuildChanged    = null;
         connectedUid    = null;
         authorized      = false;
         hooked          = false;
@@ -117,5 +121,8 @@ public static class BackendNotify
         Backend.Notification.OnRejectedFriendRequest = () => BackendManager.Post(() => FriendsChanged?.Invoke());
         Backend.Notification.OnReceivedMessage       = () => BackendManager.Post(() => MessageReceived?.Invoke());
         Backend.Notification.OnNewNoticeCreated      = (title, content) => BackendManager.Post(() => NoticeCreated?.Invoke());
+        Backend.Notification.OnApprovedGuildJoin      = () => BackendManager.Post(() => GuildChanged?.Invoke());
+        Backend.Notification.OnRejectedGuildJoin      = () => BackendManager.Post(() => GuildChanged?.Invoke());
+        Backend.Notification.OnReceivedGuildApplicant = () => BackendManager.Post(() => GuildChanged?.Invoke());
     }
 }

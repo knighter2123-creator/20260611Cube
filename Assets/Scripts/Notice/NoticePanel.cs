@@ -4,10 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>공지사항 창: 목록(줄을 누르면 내용) ↔ 내용 보기 두 화면. 읽기 전용 — 공지는 뒤끝 콘솔에서만 씀.</summary>
-// [UI] StageScene 에서 Tools/UI 굽기/공지사항(UIBaker) → 창·버튼 생성 후 씬 저장
+// [UI] Assets/Prefabs/UI/NoticeCanvas 프리팹 (StageScene 에 배치) — 모양은 프리팹에서 직접 고침
 public class NoticePanel : MonoBehaviour
 {
-    [Header("UI (Tools/UI 굽기/공지사항 이 채움)")]
+    [Header("UI (NoticeCanvas 프리팹)")]
     [SerializeField] private GameObject      root;
     [SerializeField] private Button          dimButton;
     [SerializeField] private Button          closeButton;
@@ -62,7 +62,7 @@ public class NoticePanel : MonoBehaviour
              && detailView != null && detailTitle != null && detailBody != null;
         if (!ready)
         {
-            Debug.LogError("[NoticePanel] UI 칸이 비어 있습니다. StageScene 을 열고 Tools/UI 굽기/공지사항 메뉴로 만든 뒤 씬을 저장하세요.", this);
+            Debug.LogError("[NoticePanel] UI 칸이 비어 있습니다. NoticeCanvas 프리팹(Assets/Prefabs/UI)의 NoticePanel 칸이 모두 연결돼 있는지 확인하세요.", this);
             return;
         }
 

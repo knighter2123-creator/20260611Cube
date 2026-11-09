@@ -3,7 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>공지 목록 한 줄 — [NEW] 표시 / 제목 / 날짜, 누르면 내용 보기. Tools/UI 굽기/공지사항 이 칸을 채웁니다.</summary>
+/// <summary>공지 목록 한 줄 — [NEW] 표시 / 제목 / 날짜, 누르면 내용 보기. 칸은 NoticeCanvas 프리팹의 Row 템플릿에서 연결.</summary>
 [RequireComponent(typeof(Button))]
 public class NoticeRow : MonoBehaviour
 {

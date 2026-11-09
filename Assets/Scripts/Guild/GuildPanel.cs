@@ -134,8 +134,14 @@ public class GuildPanel : MonoBehaviour
     public static readonly Color MasterColor = new Color(1f, 0.85f, 0.2f);
     public static readonly Color ViceColor   = new Color(0.55f, 0.8f, 1f);
 
-    private readonly List<GameObject> browseRows = new List<GameObject>();
-    private readonly List<GameObject> memberRows = new List<GameObject>();
+    // 줄은 지우지 않고 다시 씀 (Refresh 한 번에 OnChanged 가 여러 번 오고 멤버는 최대 100줄)
+    private sealed class RowPool
+    {
+        public readonly List<GuildRow> Rows = new List<GuildRow>();
+        public int Used;
+    }
+    private readonly RowPool browseRows = new RowPool();
+    private readonly RowPool memberRows = new RowPool();
     private bool   ready;
     private bool   creating;            // 만들기 화면
     private bool   showApplicants;      // 가입 신청 탭
@@ -237,7 +243,7 @@ public class GuildPanel : MonoBehaviour
     private void DrawBrowse()
     {
         SetTitle(titleNoGuild);
-        Clear(browseRows);
+        browseRows.Used = 0;
 
         bool busy = GuildManager.IsBusy;
         foreach (GuildInfo g in GuildManager.Browse)
@@ -249,6 +255,8 @@ public class GuildPanel : MonoBehaviour
                    ChatText.Fill(guildRowSub, "master", ChatText.Plain(guild.masterNickname ?? string.Empty), "count", guild.memberCount.ToString()),
                    new GuildRow.RowAction(label, () => GuildManager.Join(guild.inDate, e => Report(e, GameMessages.Guild.applied)), !busy && !applied));
         }
+
+        HideUnused(browseRows);
 
         bool empty = GuildManager.Browse.Count == 0;
         string status = GuildManager.State == GuildState.Failed       ? GuildManager.LastError
@@ -309,9 +317,10 @@ public class GuildPanel : MonoBehaviour
         }
         if (leaveButton != null) leaveButton.interactable = !busy;
 
-        Clear(memberRows);
+        memberRows.Used = 0;
         if (showApplicants) DrawApplicants(busy);
         else                DrawMembers(me, busy);
+        HideUnused(memberRows);
     }
 
     private void DrawMembers(GuildRole me, bool busy)
@@ -440,18 +449,25 @@ public class GuildPanel : MonoBehaviour
         if (titleText != null) titleText.text = ChatText.Plain(text ?? string.Empty);
     }
 
-    private void AddRow(RectTransform parent, List<GameObject> into, string title, string sub, params GuildRow.RowAction[] actions)
+    private void AddRow(RectTransform parent, RowPool pool, string title, string sub, params GuildRow.RowAction[] actions)
     {
-        GuildRow row = Instantiate(rowTemplate, parent);
-        row.gameObject.SetActive(true);
+        GuildRow row;
+        if (pool.Used < pool.Rows.Count) row = pool.Rows[pool.Used];
+        else
+        {
+            row = Instantiate(rowTemplate, parent);
+            pool.Rows.Add(row);
+        }
+        pool.Used++;
+
+        if (!row.gameObject.activeSelf) row.gameObject.SetActive(true);   // 만든 순서 = 그리는 순서라 자리를 옮길 필요 없음
         row.Set(title, sub, actions);
-        into.Add(row.gameObject);
     }
 
-    private static void Clear(List<GameObject> rows)
+    private static void HideUnused(RowPool pool)
     {
-        foreach (GameObject row in rows) Destroy(row);
-        rows.Clear();
+        for (int i = pool.Used; i < pool.Rows.Count; i++)
+            if (pool.Rows[i].gameObject.activeSelf) pool.Rows[i].gameObject.SetActive(false);
     }
 
     private static void SetStatus(TextMeshProUGUI status, string text)

@@ -13,6 +13,7 @@ public struct ChatMessage
     public int    Progress;   // StageRecord.BestProgress → StageRecord.Format 으로 "2-3"
     public string Text;
     public long   SentAt;     // 보낸 시각 (UTC ms) — 정렬 기준
+    public bool   Guild;      // 길드 채팅 메시지 (false = 전체 채팅)
 
     /// <summary>진짜 유저의 uid 인가 — 아니면(공지 · uid 모름) 친구 요청 · 개인 메시지 · 차단을 할 수 없음.</summary>
     public bool HasPlayerUid

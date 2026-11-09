@@ -20,19 +20,21 @@ public partial class ChatPanel
 
     private Color tabNormalColor = TabColor;   // Tab 템플릿에서 읽어 둔 색 (AwakeTabs)
 
-    private string currentPeer;       // 보고 있는 개인 채팅 상대 (null = 전체 채팅)
+    private string currentPeer;       // 보고 있는 개인 채팅 상대 (null = 전체·길드 채팅)
     private string currentPeerName;
+    private bool   currentGuild;      // 길드 채팅을 보고 있음 (이때 currentPeer 는 null)
 
     /// <summary>탭 오브젝트 하나와 그 탭이 가리키는 채널.</summary>
     private sealed class Tab
     {
         public Button          Button;
         public TextMeshProUGUI Label;
-        public string          Peer;   // null = 전체 채팅
+        public string          Peer;    // null = 전체·길드 채팅
+        public bool            Guild;
         public string          Name;
     }
 
-    // 탭 풀 — [0] 은 항상 전체 채팅. 대화가 줄면 남는 탭은 꺼 둠
+    // 탭 풀 — [0] 은 항상 전체 채팅, 길드에 있으면 [1] 이 길드 채팅. 대화가 줄면 남는 탭은 꺼 둠
     private readonly List<Tab> tabs = new List<Tab>();
 
     private bool HasTabs => tabList != null && tabTemplate != null;
@@ -71,16 +73,24 @@ public partial class ChatPanel
         SetChannel(peerUid, peerName);
     }
 
-    private void SelectChannel(Tab tab)
+    /// <summary>길드 채팅 탭을 엽니다 (창이 닫혀 있으면 창도 엶). 길드 창 등에서 부를 수 있습니다.</summary>
+    public void OpenGuild()
     {
-        if (tab.Peer == currentPeer) return;
-        SetChannel(tab.Peer, tab.Name);
+        if (!IsOpen) Open();
+        SetChannel(null, null, guild: true);
     }
 
-    private void SetChannel(string peer, string name)
+    private void SelectChannel(Tab tab)
+    {
+        if (tab.Peer == currentPeer && tab.Guild == currentGuild) return;
+        SetChannel(tab.Peer, tab.Name, tab.Guild);
+    }
+
+    private void SetChannel(string peer, string name, bool guild = false)
     {
         currentPeer     = peer;
         currentPeerName = name;
+        currentGuild    = guild && peer == null;
         noticeText.gameObject.SetActive(false);
         CloseUserMenu();
         Redraw(true);
@@ -109,12 +119,14 @@ public partial class ChatPanel
             currentPeer     = null;
             currentPeerName = null;
         }
+        if (currentGuild && (chat == null || !chat.HasGuild)) currentGuild = false;   // 길드를 나감 · 계정 전환
 
         if (HasTabs) SyncTabList(chat);
 
         if (titleText != null)
-            titleText.text = currentPeer == null ? texts.publicTabName
-                                                 : ChatText.Fill(texts.directTitle, "name", ChatText.Plain(currentPeerName));
+            titleText.text = currentPeer != null ? ChatText.Fill(texts.directTitle, "name", ChatText.Plain(currentPeerName))
+                           : currentGuild        ? ChatText.Fill(texts.guildTitle, "name", ChatText.Plain(chat.GuildName ?? string.Empty))
+                                                 : texts.publicTabName;
 
         bool showLeave = currentPeer != null;
         if (leaveButton != null && leaveButton.gameObject.activeSelf != showLeave)
@@ -125,6 +137,13 @@ public partial class ChatPanel
     {
         int count = 0;
         SetTab(count++, null, texts.publicTabName, texts.publicTabName);
+        if (chat != null && chat.HasGuild)
+        {
+            int unread = currentGuild ? 0 : chat.GuildUnread;
+            string label = texts.guildTabName;
+            if (unread > 0) label += " " + ChatText.Colored(colors.unread, ChatText.Fill(texts.tabUnread, "count", unread.ToString()));
+            SetTab(count++, null, texts.guildTabName, label, guild: true);
+        }
 
         if (chat != null)
         {
@@ -142,19 +161,20 @@ public partial class ChatPanel
         for (int i = count; i < tabs.Count; i++) tabs[i].Button.gameObject.SetActive(false);
     }
 
-    private void SetTab(int index, string peer, string name, string label)
+    private void SetTab(int index, string peer, string name, string label, bool guild = false)
     {
         while (tabs.Count <= index) tabs.Add(CreateTab());
 
         Tab tab = tabs[index];
-        tab.Peer = peer;
-        tab.Name = name;
+        tab.Peer  = peer;
+        tab.Guild = guild;
+        tab.Name  = name;
         tab.Button.gameObject.SetActive(true);
 
         if (tab.Label != null && tab.Label.text != label) tab.Label.text = label;   // 같으면 메시 재생성 안 함
 
         Graphic background = tab.Button.targetGraphic;
-        if (background != null) background.color = peer == currentPeer ? colors.tabSelected : tabNormalColor;
+        if (background != null) background.color = peer == currentPeer && guild == currentGuild ? colors.tabSelected : tabNormalColor;
     }
 
     private Tab CreateTab()

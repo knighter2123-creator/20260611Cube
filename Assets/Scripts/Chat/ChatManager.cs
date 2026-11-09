@@ -74,6 +74,7 @@ public partial class ChatManager : MonoBehaviour
 
         AwakeFriends();
         AwakeDirect();
+        AwakeGuild();
 
         usesBackendSocial = friendService is BackendFriendService || directService is BackendDirectService;
         BackendNotify.FriendsChanged  += OnRealtimeFriends;
@@ -92,6 +93,7 @@ public partial class ChatManager : MonoBehaviour
 
         DestroyFriends();
         DestroyDirect();
+        DestroyGuild();
 
         BackendNotify.FriendsChanged  -= OnRealtimeFriends;
         BackendNotify.MessageReceived -= OnRealtimeMessage;
@@ -184,6 +186,8 @@ public partial class ChatManager : MonoBehaviour
             changed = true;
         }
 
+        UpdateGuild();   // UnavailableReason 을 쓰므로 그 뒤에
+
         if (changed)
         {
             changed = false;
@@ -196,6 +200,7 @@ public partial class ChatManager : MonoBehaviour
     {
         ClearDirect();
         ClearFriends();
+        ClearGuild();
     }
 
     private void OnServiceFailed(string reason)
@@ -208,21 +213,26 @@ public partial class ChatManager : MonoBehaviour
 
     private void OnMessagesReceived(IReadOnlyList<ChatMessage> received)
     {
+        // 한 번에 오는 메시지는 모두 같은 채널 것 (채널 입장 기록 · 새 메시지 하나)
+        if (received.Count > 0 && received[0].Guild) { OnGuildMessagesReceived(received); return; }
         if (messages.Add(received, historyCount)) changed = true;
     }
 
     private void OnMessagesRemoved(IReadOnlyList<string> removed)
     {
-        if (messages.Remove(removed)) changed = true;
+        if (messages.Remove(removed))      changed = true;
+        if (guildMessages.Remove(removed)) changed = true;
     }
 
     // ───────────────────────────── 보내기 ─────────────────────────────
 
-    /// <summary>메시지 전송(toUid 가 있으면 개인 대화방) — 결과는 onDone(오류 문구, 성공이면 null), 검사에 걸리면 서버에 안 보내고 바로 onDone.</summary>
-    public void Send(string raw, Action<string> onDone, string toUid = null)
+    /// <summary>메시지 전송(toUid 가 있으면 개인 대화방, guild 면 길드 채팅) — 결과는 onDone(오류 문구, 성공이면 null), 검사에 걸리면 서버에 안 보내고 바로 onDone.</summary>
+    public void Send(string raw, Action<string> onDone, string toUid = null, bool guild = false)
     {
         string text  = (raw ?? string.Empty).Replace('\n', ' ').Replace('\r', ' ').Trim();
+        if (toUid != null) guild = false;
         string error = CheckSend(text, toUid, out string uid);
+        if (error == null && guild) error = GuildUnavailableReason;   // 길드 없음 · 길드 채널에 들어가는 중
         if (error != null) { onDone?.Invoke(error); return; }
 
         var message = new ChatMessage
@@ -232,6 +242,7 @@ public partial class ChatManager : MonoBehaviour
             Progress = StageRecord.BestProgress,
             Text     = text,
             SentAt   = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            Guild    = guild,
         };
 
         sending = true;   // 한 번에 하나 — 서비스가 보내는 중인 메시지를 하나만 추적함

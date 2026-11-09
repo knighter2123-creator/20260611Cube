@@ -30,6 +30,12 @@ public class LocalChatService : IChatService
         MessagesReceived?.Invoke(new[] { message });
         onDone?.Invoke(null);
     }
+
+    // 길드에 들어가 있으면 길드 채널도 바로 쓸 수 있는 것으로 (보낸 메시지가 나에게만 돌아옴)
+    private string guild;
+    public void   SetGuild(string guildKey) => guild = guildKey;
+    public bool   GuildReady      => guild != null;
+    public string GuildFailReason => null;
 }
 
 /// <summary>LocalChatService 의 친구·차단 — 상대가 없으므로 요청을 보내면 바로 수락된 것으로 칩니다 (UI 확인용).</summary>

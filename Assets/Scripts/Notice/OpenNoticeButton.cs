@@ -2,7 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>공지사항 열기 버튼 — 안 읽은 공지 수를 글자 옆에 표시 (Tools/UI 굽기/공지사항 이 만듦).</summary>
+/// <summary>공지사항 열기 버튼 — 안 읽은 공지 수를 글자 옆에 표시.</summary>
 [RequireComponent(typeof(Button))]
 public class OpenNoticeButton : MonoBehaviour
 {
