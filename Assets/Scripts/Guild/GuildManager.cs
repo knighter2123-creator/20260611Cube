@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using BackEnd;
-using BackEnd.Functions;
 using UnityEngine;
 using GuildApi = BackEnd.Functions.GuildFunctions;
 
