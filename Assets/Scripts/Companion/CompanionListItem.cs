@@ -7,6 +7,7 @@ public class CompanionListItem : MonoBehaviour
     [Header("기본 UI")]
     [SerializeField] private Image           iconImage;
     [SerializeField] private TextMeshProUGUI nameText;
+    [Tooltip("예전 조각 표시 — 항상 숨김 (지워도 됨)")]
     [SerializeField] private TextMeshProUGUI fragmentText;
     [Tooltip("시너지 계열 배지 ([딜러] 등). 카드 모서리에 따로 두어 이름이 길어도 카드 밖으로 밀려나지 않게 합니다.")]
     [SerializeField] private TextMeshProUGUI tagText;
@@ -31,19 +32,6 @@ public class CompanionListItem : MonoBehaviour
         if (iconButton   != null) iconButton.onClick.AddListener(ToggleActionButtons);
         if (placeButton  != null) placeButton.onClick.AddListener(OnPlaceClicked);
         if (cancelButton != null) cancelButton.onClick.AddListener(OnCancelClicked);
-    }
-
-    void OnEnable()
-    {
-        // 조각 수가 바뀌면 (가챠 중복 등) 목록을 다시 열지 않아도 숫자가 갱신되게 합니다.
-        CompanionFragment fragment = CompanionFragment.Instance;
-        if (fragment != null) fragment.OnFragmentChanged += HandleFragmentChanged;
-    }
-
-    void OnDisable()
-    {
-        CompanionFragment fragment = CompanionFragment.Instance;
-        if (fragment != null) fragment.OnFragmentChanged -= HandleFragmentChanged;
     }
 
     void OnDestroy()
@@ -80,23 +68,10 @@ public class CompanionListItem : MonoBehaviour
             nameText.color = CompanionGradeStyle.GetColorOnLight(data.grade);
         }
 
-        CompanionFragment fragment = CompanionFragment.Instance;
-        SetFragmentText(fragment != null ? fragment.GetFragment(data) : 0);
+        if (fragmentText != null) fragmentText.gameObject.SetActive(false);
 
         if (actionButtons != null) actionButtons.SetActive(false);
         RefreshActionButtons();
-    }
-
-    private void HandleFragmentChanged(string companionId, int count)
-    {
-        if (_data != null && _data.id == companionId)
-            SetFragmentText(count);
-    }
-
-    // 상세 패널과 같은 "조각 37 / 100" (목록엔 진화 풀이 없어 최대 성급이어도 / 100)
-    private void SetFragmentText(int count)
-    {
-        if (fragmentText != null) fragmentText.text = CompanionStar.FragmentLabel(count);
     }
 
     public void RefreshActionButtons()

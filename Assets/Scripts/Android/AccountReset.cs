@@ -47,6 +47,7 @@ public class AccountReset : MonoBehaviour
         // ② PlayerPrefs 의 진행 데이터 삭제 (설정값은 건드리지 않음)
         AugmentManager.DeleteAllSavesForReset();   // 증강 카드 스택
         PlayerProfile.DeleteLegacyPrefsForReset(); // 예전 방식 이름 — 안 지우면 LoginScene 에서 옛 이름이 이관돼 되살아남
+        Inventory.DeleteLocalForReset();           // 기기 인벤토리 파일 (서버 행은 뒤끝 탈퇴로 함께 지워짐)
         PlayerPrefs.Save();                        // PlayerPrefs 는 Save() 전까지 메모리에만 있음 → 바로 앱이 꺼져도 안전하게
 
         GameLog.Info("[AccountReset] 진행 데이터 삭제 완료. RestartFromLogin() 으로 매니저를 새로 만듭니다.");

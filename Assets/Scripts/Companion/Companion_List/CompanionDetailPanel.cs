@@ -4,7 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>도감 상세창: 이름·등급·성급·조각·능력치(이 등급·성급 값)·스킬을 보여 주고 조각 100개 이상이면 [성급 올리기]/[진화] — 대미지는 "플레이어 공격력 + N" 으로 표기.</summary>
+/// <summary>도감 상세창 (보여 주기만) — 이름·등급·성급·능력치·성급별 스펙·스킬.</summary>
 // [붙이는 곳] Codex_Content 아래 DetailPanel (탭이 가려지면 CompanionCodexUI 가 닫음)
 public class CompanionDetailPanel : MonoBehaviour
 {
@@ -23,20 +23,25 @@ public class CompanionDetailPanel : MonoBehaviour
     [Tooltip("\"보유 중\" / \"미획득\" (선택)")]
     [SerializeField] private TMP_Text ownedText;
 
-    [Header("성급 · 조각 (보유 중일 때만 표시)")]
+    [Header("성급 (보유 중일 때만 표시)")]
     [Tooltip("\"★★☆☆☆\" 성급 표시 (선택). 폰트에 ★☆ 글리프가 있어야 합니다")]
     [SerializeField] private TMP_Text starText;
-    [Tooltip("\"조각 37 / 100\" 표시 (선택)")]
+
+    [Header("예전 성장 UI — 항상 숨김 (지워도 됨)")]
     [SerializeField] private TMP_Text fragmentText;
-    [Tooltip("[성급 올리기] 버튼 (선택). 조각이 충분할 때만 눌립니다")]
     [SerializeField] private Button   starUpButton;
-    [Tooltip("[진화] 버튼 (선택). 최대 성급이고 위 등급 · 같은 스킬 동료가 풀에 있을 때 보이고, 조각이 충분하면 눌립니다")]
     [SerializeField] private Button   evolveButton;
-    [Tooltip("(선택) 진화 버튼 글자. \"진화 → 희귀 공격\" 처럼 진화 대상 이름을 보여줍니다")]
-    [SerializeField] private TMP_Text evolveButtonLabel;
 
     [Header("기본 능력치")]
     [SerializeField] private TMP_Text statsText;
+
+    [Header("성급별 상세 스펙")]
+    [SerializeField] private TMP_Text starTableText;
+    [Tooltip("{star} {stars} {damage} {cooldown}")]
+    [SerializeField] private string starTableLine = "{star}성  피해 +{damage}  재사용 {cooldown}초";
+    [SerializeField] private Color  starTableCurrentColor = new Color(1f, 0.85f, 0.3f);
+    [SerializeField] private Color  starTableOtherColor   = new Color(0.67f, 0.67f, 0.67f);
+    [SerializeField] private string starTableNoSkill      = "성급에 따라 바뀌는 능력치가 없습니다.";
 
     [Header("스킬")]
     [SerializeField] private Image    skillIconImage;
@@ -50,14 +55,6 @@ public class CompanionDetailPanel : MonoBehaviour
     // 문자열을 여러 번 이어 붙일 때 쓰는 버퍼. 매번 new 하지 않고 재사용합니다.
     private readonly StringBuilder sb = new StringBuilder(128);
 
-    // 지금 보여주는 동료 — 성급을 올린 뒤 같은 내용으로 다시 그릴 때 씁니다.
-    private CompanionData      shownData;
-    private bool               shownOwned;
-    private CompanionPoolAsset pool;   // 진화 대상을 찾을 풀 (도감이 Show 때 넘겨줌)
-
-    /// <summary>진화로 보유 목록이 바뀌었을 때 — 도감 격자 다시 그리기용 (성급만 오르면 발생 안 함).</summary>
-    public event Action OnOwnedChanged;
-
     private GameObject Root => root != null ? root : gameObject;
 
     // ── Unity 생명주기 ──
@@ -66,8 +63,10 @@ public class CompanionDetailPanel : MonoBehaviour
         // 리스너는 Awake 에서 한 번만 (Show 에서 걸면 쌓임) — ⚠ 인스펙터 On Click 은 비울 것
         if (closeButton  != null) closeButton.onClick.AddListener(Hide);
         if (dimmedButton != null) dimmedButton.onClick.AddListener(Hide);
-        if (starUpButton != null) starUpButton.onClick.AddListener(OnClickStarUp);
-        if (evolveButton != null) evolveButton.onClick.AddListener(OnClickEvolve);
+
+        SetActive(fragmentText, false);
+        SetActive(starUpButton, false);
+        SetActive(evolveButton, false);
 
         // root 는 자신·부모·자식 중 하나여야 함 (무관하면 이 오브젝트가 꺼진 채 남아 ✕ 가 조용히 안 됨)
         bool related = root == null
@@ -84,42 +83,12 @@ public class CompanionDetailPanel : MonoBehaviour
     {
         if (closeButton  != null) closeButton.onClick.RemoveListener(Hide);
         if (dimmedButton != null) dimmedButton.onClick.RemoveListener(Hide);
-        if (starUpButton != null) starUpButton.onClick.RemoveListener(OnClickStarUp);
-        if (evolveButton != null) evolveButton.onClick.RemoveListener(OnClickEvolve);
-    }
-
-    // ── 성급 올리기 ──
-
-    /// <summary>조각 100개를 써서 성급 +1. 성공하면 바뀐 성급·조각·능력치로 창을 다시 그립니다.</summary>
-    private void OnClickStarUp()
-    {
-        CompanionFragment growth = CompanionFragment.Instance;
-        if (growth == null || shownData == null) return;
-
-        // 버튼을 막아 두지만, 조건 검사는 매니저가 한 번 더 합니다 (화면 상태가 늦게 갱신됐을 때 대비).
-        if (growth.TryStarUp(shownData))
-            Fill(shownData, shownOwned);
-    }
-
-    /// <summary>진화 — 성공하면 창을 진화한 동료로 바꾸고 도감에 보유 목록 변경을 알림 (원래 동료는 사라짐).</summary>
-    private void OnClickEvolve()
-    {
-        CompanionFragment growth = CompanionFragment.Instance;
-        if (growth == null || shownData == null) return;
-
-        if (!growth.TryEvolve(shownData, pool, out CompanionData target)) return;
-
-        Fill(target, owned: true);
-        OnOwnedChanged?.Invoke();
     }
 
     // ── 열기 / 닫기 ──
-    /// <param name="evolutionPool">진화 대상을 찾을 풀. null 이면 진화 버튼을 숨깁니다.</param>
-    public void Show(CompanionData data, bool owned, CompanionPoolAsset evolutionPool)
+    public void Show(CompanionData data, bool owned)
     {
         if (data == null) return;
-
-        pool = evolutionPool;
 
         Fill(data, owned);
 
@@ -139,9 +108,6 @@ public class CompanionDetailPanel : MonoBehaviour
     // ── 내용 채우기 ──
     private void Fill(CompanionData data, bool owned)
     {
-        shownData  = data;
-        shownOwned = owned;
-
         CompanionFragment growth = CompanionFragment.Instance;
         int star = growth != null ? growth.GetStar(data) : CompanionStar.MIN_STAR;
 
@@ -162,10 +128,12 @@ public class CompanionDetailPanel : MonoBehaviour
 
         if (ownedText  != null) ownedText.text   = owned ? "보유 중" : "<color=#888888>미획득</color>";
 
-        FillGrowth(data, owned, star, growth);
+        SetActive(starText, owned);
+        if (owned && starText != null) starText.text = $"{CompanionStar.ToStars(star)}  {star}성";
 
         // ── 기본 능력치 ──
         ActiveSkill skill = data.ownedSkill;
+        FillStarTable(data, skill, owned ? star : 0);
 
         if (statsText != null)
         {
@@ -221,37 +189,32 @@ public class CompanionDetailPanel : MonoBehaviour
         }
     }
 
-    /// <summary>성급·조각 줄과 버튼(최대 전 = [성급 올리기], 최대 + 진화 대상 = [진화 → …], 없으면 버튼 없음) — 조각 100개 이상일 때만 눌림, 미획득은 숨김.</summary>
-    private void FillGrowth(CompanionData data, bool owned, int star, CompanionFragment growth)
+    /// <summary>1성~최대 성급의 피해·재사용 대기 (currentStar 줄 강조, 0 = 강조 없음).</summary>
+    private void FillStarTable(CompanionData data, ActiveSkill skill, int currentStar)
     {
-        bool isMax = star >= CompanionStar.MAX_STAR;
+        if (starTableText == null) return;
 
-        CompanionData evolveTarget = null;
-        bool canEvolve = owned && isMax && growth != null && growth.CanEvolve(data, pool, out evolveTarget);
-        bool hasNext   = !isMax || evolveTarget != null;   // 조각을 더 모을 이유가 있는가
+        if (skill == null) { starTableText.text = starTableNoSkill; return; }
 
-        SetActive(starText,     owned);
-        SetActive(fragmentText, owned);
-        if (starUpButton != null) starUpButton.gameObject.SetActive(owned && !isMax);
-        if (evolveButton != null) evolveButton.gameObject.SetActive(owned && evolveTarget != null);
-        if (!owned) return;
+        string cur   = ColorUtility.ToHtmlStringRGB(starTableCurrentColor);
+        string other = ColorUtility.ToHtmlStringRGB(starTableOtherColor);
 
-        int fragments = growth != null ? growth.GetFragment(data) : 0;
+        sb.Clear();
+        for (int s = CompanionStar.MIN_STAR; s <= CompanionStar.MAX_STAR; s++)
+        {
+            if (sb.Length > 0) sb.Append('\n');
+            string line = ChatText.Fill(starTableLine,
+                "star",     s.ToString(),
+                "stars",    CompanionStar.ToStars(s),
+                "damage",   skill.GetDamage(data.grade, s).ToString("0.#"),
+                "cooldown", skill.GetCooldown(data.grade, s).ToString("0.#"));
 
-        if (starText != null)
-            starText.text = $"{CompanionStar.ToStars(star)}  {star}성";
-
-        if (fragmentText != null)
-            fragmentText.text = CompanionStar.FragmentLabel(fragments, hasNext);
-
-        if (starUpButton != null)
-            starUpButton.interactable = growth != null && growth.CanStarUp(data);
-
-        if (evolveButton != null)
-            evolveButton.interactable = canEvolve;
-
-        if (evolveButtonLabel != null && evolveTarget != null)
-            evolveButtonLabel.text = $"진화 → {CompanionGradeStyle.GetColoredName(evolveTarget.grade)} {evolveTarget.companionName}";
+            sb.Append("<color=#").Append(s == currentStar ? cur : other).Append('>');
+            if (s == currentStar) sb.Append("<b>").Append(line).Append("</b>");
+            else                  sb.Append(line);
+            sb.Append("</color>");
+        }
+        starTableText.text = sb.ToString();
     }
 
     /// <summary>배치 중이고 시너지가 켜져 있으면 시너지 반영 수치를 한 줄 덧붙임 (기본 수치는 그대로, 쿨다운은 전투와 같은 상수로).</summary>

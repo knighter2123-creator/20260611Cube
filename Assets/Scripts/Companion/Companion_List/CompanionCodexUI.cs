@@ -46,20 +46,10 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
     private void Awake()
     {
         // 상세창은 닫힌 채 시작 (켜 둔 채 저장해도) — Unity 오브젝트라 ?. 대신 != null (?. 는 파괴를 못 거름)
-        if (detailPanel != null)
-        {
-            detailPanel.Hide();
-            // 진화로 보유 목록이 바뀌면 격자(보유 표시 · 수집 수)를 다시 그립니다.
-            detailPanel.OnOwnedChanged += Refresh;
-        }
+        if (detailPanel != null) detailPanel.Hide();
     }
 
-    private void OnDestroy()
-    {
-        if (detailPanel != null) detailPanel.OnOwnedChanged -= Refresh;
-    }
-
-    /// <summary>도감 풀 — 칸이 비면 가챠의 풀 (진화 대상도 여기서 찾음).</summary>
+    /// <summary>도감 풀 — 칸이 비면 가챠의 풀.</summary>
     private CompanionPoolAsset Pool
         => poolAsset != null ? poolAsset
          : GachaSystem.Instance != null ? GachaSystem.Instance.Pool : null;
@@ -247,6 +237,6 @@ public class CompanionCodexUI : MonoBehaviour, ITabPage
             Debug.LogWarning("[CompanionCodexUI] Detail Panel 이 연결되지 않아 상세정보를 열 수 없습니다.", this);
             return;
         }
-        detailPanel.Show(data, isOwned, Pool);
+        detailPanel.Show(data, isOwned);
     }
 }

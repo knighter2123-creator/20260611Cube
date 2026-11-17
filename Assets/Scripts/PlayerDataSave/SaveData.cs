@@ -83,6 +83,7 @@ public class SaveData
 
     // ── 동료 보유 목록 (CompanionData.id 목록) ──
     public List<string> ownedCompanionIds = new List<string>();
+    // 예전 조각 칸 — Inventory 가 1회 옮기고 비움
     public List<FragmentEntry> companionFragments = new List<FragmentEntry>();
     public List<StarEntry>     companionStars     = new List<StarEntry>();   // 2성 이상만 기록 (없으면 1성)
 
@@ -92,7 +93,7 @@ public class SaveData
     public int gold = 0;
     public int gem  = 0;
 
-    // ── 소환권 (GachaTicket 이 직접 읽고 씀, 예전 세이브는 0 장으로 읽혀 이관 불필요) ──
+    // ── 예전 소환권 칸 — Inventory 가 1회 옮기고 0 으로 ──
     public int gachaTicket = 0;
 
     // ── 기타 ──

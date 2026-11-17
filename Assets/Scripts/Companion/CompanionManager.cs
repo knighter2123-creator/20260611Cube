@@ -422,6 +422,9 @@ public partial class CompanionManager : MonoBehaviour
     public IReadOnlyList<CompanionData> GetOwnedCompanionData() => ownedCompanionData;
     public int                          MaxCompanions           => maxCompanions;   // 배치 가능한 최대 수 (읽기 전용)
 
+    /// <summary>id → 동료 에셋 (보유와 무관). 없으면 null.</summary>
+    public CompanionData FindData(string id) => database != null ? database.GetById(id) : null;
+
     /// <summary>이 id 의 동료를 보유(도감 등록)했는가.</summary>
     public bool IsOwned(string id)
     {
