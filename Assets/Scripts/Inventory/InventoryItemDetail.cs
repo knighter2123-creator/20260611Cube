@@ -49,19 +49,21 @@ public class InventoryItemDetail : MonoBehaviour
 
     private void Awake()
     {
-        if (closeButton  != null) closeButton.onClick.AddListener(Hide);
-        if (dimmedButton != null) dimmedButton.onClick.AddListener(Hide);
-        if (starUpButton != null) starUpButton.onClick.AddListener(OnClickStarUp);
-        if (evolveButton != null) evolveButton.onClick.AddListener(OnClickEvolve);
+        Listener();
     }
 
     private void OnDestroy()
+    {
+        Listener();
+        Inventory.OnItemChanged -= HandleItemChanged;
+    }
+
+    void Listener()
     {
         if (closeButton  != null) closeButton.onClick.RemoveListener(Hide);
         if (dimmedButton != null) dimmedButton.onClick.RemoveListener(Hide);
         if (starUpButton != null) starUpButton.onClick.RemoveListener(OnClickStarUp);
         if (evolveButton != null) evolveButton.onClick.RemoveListener(OnClickEvolve);
-        Inventory.OnItemChanged -= HandleItemChanged;
     }
 
     // ── 열기 / 닫기 ──
