@@ -26,6 +26,7 @@ public static class Mailbox
 
     private static readonly List<MailItem> serverMails = new List<MailItem>();
     private static string serverUid;   // serverMails 가 어느 계정 것인가
+    private static bool   refreshAgain; // 받아 오는 중에 새 우편 알림이 옴 → 끝나면 한 번 더
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -34,9 +35,28 @@ public static class Mailbox
         LastError    = null;
         IsClaiming   = false;
         IsRefreshing = false;
+        refreshAgain = false;
         serverMails.Clear();
         serverUid = null;
     }
+
+    // BackendNotify.ResetStatics(SubsystemRegistration) 뒤에 붙여야 이벤트가 지워지지 않음
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void HookRealtime()
+    {
+        BackendNotify.MailReceived -= OnRealtimeMail;
+        BackendNotify.MailReceived += OnRealtimeMail;
+    }
+
+    // 바로 받지 않고 표시만 — MailboxSync 가 로그인·받기 중이 아닌지 확인하고 다음 프레임에 받음
+    private static void OnRealtimeMail()
+    {
+        GameLog.Info("[Mailbox] 실시간 알림: 새 우편 — 목록을 다시 받습니다");
+        refreshAgain = true;
+    }
+
+    /// <summary>실시간 알림이 와서 다시 받아야 함 (MailboxSync 가 확인).</summary>
+    public static bool RefreshPending => refreshAgain;
 
     /// <summary>지금 세이브의 로컬 우편함. 세이브를 읽을 수 없으면 null.</summary>
     public static MailboxSaveData Data
@@ -124,6 +144,7 @@ public static class Mailbox
         if (!CanUseServer(out string uid)) return;
 
         IsRefreshing = true;
+        refreshAgain = false;
         ServerServices.Mail.Fetch((mails, error) =>
         {
             IsRefreshing = false;

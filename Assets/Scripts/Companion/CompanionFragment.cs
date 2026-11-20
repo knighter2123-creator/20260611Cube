@@ -68,7 +68,18 @@ public class CompanionFragment : MonoBehaviour
 
     public bool IsMaxStar(CompanionData data) => GetStar(data) >= CompanionStar.MAX_STAR;
 
-    /// <summary>지금 성급을 올릴 수 있는가 — 보유 중 + 최대 성급 아님 + 조각 충분.</summary>
+    public enum StarUpOutcome { NotAllowed, Success, Failed }
+
+    /// <summary>성급 올리기 결과 — Failed 면 spent 개 소모, refunded 개는 돌려받음(애초에 빼지 않음).</summary>
+    public struct StarUpResult
+    {
+        public StarUpOutcome outcome;
+        public int newStar;
+        public int spent;
+        public int refunded;
+    }
+
+    /// <summary>지금 성급을 올릴 수 있는가 — 보유 중 + 최대 성급 아님 + 조각 충분 + 서버 확률을 받음.</summary>
     public bool CanStarUp(CompanionData data)
     {
         if (data == null || string.IsNullOrEmpty(data.id)) return false;
@@ -76,25 +87,68 @@ public class CompanionFragment : MonoBehaviour
         CompanionManager cm = CompanionManager.Instance;
         if (cm == null || !cm.IsOwned(data.id)) return false;   // 조각만 있고 동료는 없는 경우는 막음
 
-        return !IsMaxStar(data) && GetFragment(data) >= CompanionStar.FRAGMENTS_PER_STAR;
+        return !IsMaxStar(data)
+            && GetFragment(data) >= CompanionStar.FRAGMENTS_PER_STAR
+            && StarUpChart.TryGet(data.grade, GetStar(data), out _);
     }
 
-    /// <summary>조각을 써서 성급 +1 하고 바로 저장.</summary>
-    public bool TryStarUp(CompanionData data)
+    /// <summary>이번 성급 올리기의 성공 확률 % (차트에 없으면 false).</summary>
+    public bool TryGetStarUpRate(CompanionData data, out float rate)
     {
-        if (!CanStarUp(data)) return false;
-        if (!Inventory.TrySpend(ItemIds.Fragment(data.id), CompanionStar.FRAGMENTS_PER_STAR)) return false;
+        rate = 0f;
+        if (data == null || !StarUpChart.TryGet(data.grade, GetStar(data), out StarUpRow row)) return false;
+        rate = row.rate;
+        return true;
+    }
 
-        int nextStar = GetStar(data) + 1;
-        stars[data.id] = nextStar;
-        OnStarChanged?.Invoke(data.id, nextStar);
+    /// <summary>
+    /// 조각 FRAGMENTS_PER_STAR 개를 걸고 차트 확률로 성급 +1 시도 후 바로 저장.
+    /// 실패하면 refundMin~refundMax 중 랜덤 개수를 돌려받고 나머지만 소모.
+    /// </summary>
+    public StarUpResult TryStarUp(CompanionData data)
+    {
+        var result = new StarUpResult { outcome = StarUpOutcome.NotAllowed };
+        if (!CanStarUp(data) || !StarUpChart.TryGet(data.grade, GetStar(data), out StarUpRow row)) return result;
+
+        int  cost    = CompanionStar.FRAGMENTS_PER_STAR;
+        bool success = UnityEngine.Random.value * 100f < row.rate;   // rate 100 이면 항상, 0 이면 절대 성공 안 함
+
+        int refund = 0;
+        if (!success)
+        {
+            int min = Mathf.Clamp(row.refundMin, 0, cost);
+            int max = Mathf.Clamp(row.refundMax, min, cost);
+            refund  = UnityEngine.Random.Range(min, max + 1);
+        }
+        int spent = cost - refund;
+
+        // 환급분은 빼지 않음 — 뺐다가 다시 넣으면 인벤토리 '새 아이템' 레드닷이 켜짐
+        if (spent > 0 && !Inventory.TrySpend(ItemIds.Fragment(data.id), spent)) return result;
+
+        result.spent    = spent;
+        result.refunded = refund;
+
+        if (success)
+        {
+            int nextStar = GetStar(data) + 1;
+            stars[data.id] = nextStar;
+            OnStarChanged?.Invoke(data.id, nextStar);
+            result.outcome = StarUpOutcome.Success;
+            result.newStar = nextStar;
+        }
+        else
+        {
+            result.outcome = StarUpOutcome.Failed;
+            result.newStar = GetStar(data);
+        }
 
         SaveManager.Instance?.Save();
         Inventory.FlushSoon();   // 조각 차감도 서버에 바로
 
-        GameLog.Info($"[Fragment] {data.companionName}({data.id}) 성급 상승 → {nextStar}성 " +
-                  $"(조각 -{CompanionStar.FRAGMENTS_PER_STAR}, 남은 조각 {GetFragment(data)})");
-        return true;
+        GameLog.Info(success
+            ? $"[Fragment] {data.companionName}({data.id}) 성급 상승 성공({row.rate}%) → {result.newStar}성 (조각 -{spent}, 남은 조각 {GetFragment(data)})"
+            : $"[Fragment] {data.companionName}({data.id}) 성급 상승 실패({row.rate}%) — 조각 -{spent}, 환급 {refund} (남은 조각 {GetFragment(data)})");
+        return result;
     }
 
     // ── 진화 ──

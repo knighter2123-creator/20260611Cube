@@ -15,6 +15,8 @@ public class InventorySlot : MonoBehaviour
     [SerializeField] private TMP_Text countText;
     [Tooltip("{count} = 수량")]
     [SerializeField] private string   countFormat = "x{count}";
+    [Tooltip("(선택) 새로 들어온 아이템이면 켜는 레드닷 (Tools/UI 굽기/레드닷 붙이기 가 만듦)")]
+    [SerializeField] private GameObject newMark;
 
     private ItemDef def;
     private Button  button;
@@ -33,9 +35,10 @@ public class InventorySlot : MonoBehaviour
         if (button != null) button.onClick.RemoveListener(HandleClick);
     }
 
-    public void Bind(ItemDef item, int count)
+    public void Bind(ItemDef item, int count, bool isNew = false)
     {
         def = item;
+        if (newMark    != null) newMark.SetActive(isNew);
         ItemChart.ApplyIcon(iconImage, item);
         if (gradeFrame != null) gradeFrame.color = ItemChart.FrameColor(item, defaultFrameColor);
         if (nameText   != null) nameText.text    = item.name;

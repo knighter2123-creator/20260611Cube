@@ -1,0 +1,17 @@
+grade,star,rate,refundMin,refundMax
+Normal,1,90,40,70
+Normal,2,80,40,70
+Normal,3,70,40,70
+Normal,4,60,40,70
+Rare,1,80,35,65
+Rare,2,70,35,65
+Rare,3,60,35,65
+Rare,4,50,35,65
+Epic,1,38,30,55
+Epic,2,27,30,55
+Epic,3,16,30,55
+Epic,4,10,30,55
+Legendary,1,30,20,40
+Legendary,2,26,20,40
+Legendary,3,14,20,40
+Legendary,4,5,20,40

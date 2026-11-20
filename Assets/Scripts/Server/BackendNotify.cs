@@ -2,10 +2,14 @@ using System;
 using BackEnd;
 using UnityEngine;
 
-/// <summary>뒤끝 실시간 알림: ChatManager 가 매 프레임 Tick(uid) → 계정이 바뀌면 재연결, 친구·쪽지 알림을 메인 스레드 이벤트로 넘김 (내용이 없어 받는 쪽이 목록을 다시 받음).</summary>
-// 알림이 안 와도 ChatManager.Friends/Direct 가 느린 주기로 다시 받음 (IsConnected 면 주기를 길게)
+/// <summary>뒤끝 실시간 알림: 로그인(온라인)돼 있으면 스스로 연결 · 계정이 바뀌면 재연결 · 로그아웃이면 끊고, 알림을 메인 스레드 이벤트로 넘김 (내용이 없어 받는 쪽이 목록을 다시 받음).</summary>
+// 알림이 안 와도 ChatManager.Friends/Direct · MailboxSync 가 느린 주기로 다시 받음 (IsConnected 면 주기를 길게)
+// ⚠ 뒤끝 콘솔 > 실시간 알림이 켜져 있어야 OnAuthorize 가 성공함
 public static class BackendNotify
 {
+    /// <summary>우편이 옴 — 콘솔에서 우편 발송 · 유저 우편 (메인 스레드) — Mailbox 가 목록을 다시 받음</summary>
+    public static event Action MailReceived;
+
     /// <summary>친구 요청을 받음 · 내 요청이 수락됨 · 거절됨 (메인 스레드)</summary>
     public static event Action FriendsChanged;
 
@@ -30,10 +34,13 @@ public static class BackendNotify
     private static bool   authorized;
     private static bool   hooked;
     private static float  nextTryTime;
+    private static BackendNotifyRunner runner;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
+        runner          = null;
+        MailReceived    = null;
         FriendsChanged  = null;
         MessageReceived = null;
         NoticeCreated   = null;
@@ -45,8 +52,35 @@ public static class BackendNotify
         RetrySeconds    = FirstRetrySeconds;
     }
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Bootstrap()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        EnsureRunner();
+    }
+
+    // AccountReset 이 DDOL 을 지우므로 씬마다 다시 만듦
+    private static void OnSceneLoaded(UnityEngine.SceneManagement.Scene s, UnityEngine.SceneManagement.LoadSceneMode m) => EnsureRunner();
+
+    private static void EnsureRunner()
+    {
+        if (runner != null) return;
+        var go = new GameObject("[BackendNotify]");
+        UnityEngine.Object.DontDestroyOnLoad(go);
+        runner = go.AddComponent<BackendNotifyRunner>();
+    }
+
+    /// <summary>매 프레임 (BackendNotifyRunner) — 로그인·온라인이면 그 계정으로, 아니면 끊음.</summary>
+    internal static void AutoTick()
+    {
+        AuthManager auth = AuthManager.Instance;
+        bool online = BackendManager.IsInitialized && auth != null && auth.IsOnline;
+        Tick(online ? auth.Uid : null);
+    }
+
     /// <summary>uid = 알림을 받을 계정 (뒤끝 세션이 그 계정일 때만), null = 끊기.</summary>
-    public static void Tick(string uid)
+    private static void Tick(string uid)
     {
         if (uid != null && uid != Backend.UserInDate) uid = null;   // 세션이 다른 계정이면 연결하지 않음
 
@@ -124,5 +158,13 @@ public static class BackendNotify
         Backend.Notification.OnApprovedGuildJoin      = () => BackendManager.Post(() => GuildChanged?.Invoke());
         Backend.Notification.OnRejectedGuildJoin      = () => BackendManager.Post(() => GuildChanged?.Invoke());
         Backend.Notification.OnReceivedGuildApplicant = () => BackendManager.Post(() => GuildChanged?.Invoke());
+        Backend.Notification.OnNewPostCreated         = (type, title, content, author) => BackendManager.Post(() => MailReceived?.Invoke());
+        Backend.Notification.OnReceivedUserPost       = () => BackendManager.Post(() => MailReceived?.Invoke());
     }
+}
+
+/// <summary>BackendNotify.AutoTick 을 매 프레임 부르는 DDOL 오브젝트 (BackendNotify 가 자동으로 만듦).</summary>
+public sealed class BackendNotifyRunner : MonoBehaviour
+{
+    private void Update() => BackendNotify.AutoTick();
 }

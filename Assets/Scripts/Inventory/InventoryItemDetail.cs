@@ -27,6 +27,8 @@ public class InventoryItemDetail : MonoBehaviour
     [SerializeField] private Button     evolveButton;
     [SerializeField] private TMP_Text   evolveButtonLabel;
     [SerializeField] private TMP_Text   noticeText;
+    [Tooltip("'상승 확률 nn%' 글자 (Tools/UI 굽기/인벤토리 상세 - 성급 확률 글자 가 만듦). 비우면 조각 수 줄 뒤에 붙임")]
+    [SerializeField] private TMP_Text   starUpRateText;
     [Tooltip("진화 대상을 찾을 풀. 비우면 GachaSystem 의 풀")]
     [SerializeField] private CompanionPoolAsset pool;
 
@@ -37,6 +39,12 @@ public class InventoryItemDetail : MonoBehaviour
     [SerializeField] private string notOwnedNotice   = "동료를 보유해야 조각을 쓸 수 있습니다.";
     [SerializeField] private string maxStarNotice    = "최대 성급입니다. 더 이상 성장할 수 없습니다.";
     [SerializeField] private string starUpDone       = "{name} {star}성이 되었습니다!";
+    [Tooltip("{spent} = 소모한 조각, {refund} = 돌려받은 조각")]
+    [SerializeField] private string starUpFailed     = "성급 상승에 실패하였습니다.\n조각 {spent}개 소모, {refund}개 환급";
+    [Tooltip("{rate} = 성공 확률 (예: 60, 12.5)")]
+    [SerializeField] private string starUpRateFormat = "상승 확률 {rate}%";
+    [Tooltip("서버에서 확률을 아직 못 받았을 때 (이때는 성급 올리기를 막음)")]
+    [SerializeField] private string starUpRateLoading = "상승 확률 확인 중...";
     [SerializeField] private string evolveDone       = "{name}(으)로 진화했습니다!";
 
     private string shownId;
@@ -49,16 +57,21 @@ public class InventoryItemDetail : MonoBehaviour
 
     private void Awake()
     {
-        Listener();
+        RemoveListeners();   // 두 번 붙지 않게 먼저 뗌
+        if (closeButton  != null) closeButton.onClick.AddListener(Hide);
+        if (dimmedButton != null) dimmedButton.onClick.AddListener(Hide);
+        if (starUpButton != null) starUpButton.onClick.AddListener(OnClickStarUp);
+        if (evolveButton != null) evolveButton.onClick.AddListener(OnClickEvolve);
     }
 
     private void OnDestroy()
     {
-        Listener();
+        RemoveListeners();
         Inventory.OnItemChanged -= HandleItemChanged;
+        StarUpChart.OnChanged   -= Fill;
     }
 
-    void Listener()
+    private void RemoveListeners()
     {
         if (closeButton  != null) closeButton.onClick.RemoveListener(Hide);
         if (dimmedButton != null) dimmedButton.onClick.RemoveListener(Hide);
@@ -76,6 +89,8 @@ public class InventoryItemDetail : MonoBehaviour
 
         Inventory.OnItemChanged -= HandleItemChanged;
         Inventory.OnItemChanged += HandleItemChanged;
+        StarUpChart.OnChanged   -= Fill;   // 확률을 늦게 받아도 바로 표시
+        StarUpChart.OnChanged   += Fill;
 
         GameObject r = Root;
         r.SetActive(true);
@@ -85,6 +100,7 @@ public class InventoryItemDetail : MonoBehaviour
     public void Hide()
     {
         Inventory.OnItemChanged -= HandleItemChanged;
+        StarUpChart.OnChanged   -= Fill;
         shownId = null;
         GameObject r = Root;
         if (r.activeSelf) r.SetActive(false);
@@ -112,7 +128,15 @@ public class InventoryItemDetail : MonoBehaviour
         if (descriptionText != null) descriptionText.text = def.description ?? string.Empty;
 
         if (fragmentSection != null) fragmentSection.SetActive(companion != null);
+        if (starUpRateText  != null) starUpRateText.gameObject.SetActive(false);   // 성급 올리기가 보일 때만 FillFragment 가 켬
         if (companion != null) FillFragment(companion, count);
+    }
+
+    /// <summary>'상승 확률 nn%' — 서버 확률이 없으면 '확인 중'.</summary>
+    private string StarUpRateLabel(CompanionFragment growth, CompanionData c)
+    {
+        if (growth == null || !growth.TryGetStarUpRate(c, out float rate)) return starUpRateLoading;
+        return ChatText.Fill(starUpRateFormat, "rate", rate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     private void FillFragment(CompanionData c, int count)
@@ -135,11 +159,25 @@ public class InventoryItemDetail : MonoBehaviour
                 "star",  star.ToString(),
                 "name",  c.companionName);
 
-        if (progressText != null) progressText.text = CompanionStar.FragmentLabel(count, !isMax || target != null);
+        bool   showStarUp = owned && !isMax;
+        string rateLabel  = showStarUp ? StarUpRateLabel(growth, c) : null;
+
+        if (progressText != null)
+        {
+            string label = CompanionStar.FragmentLabel(count, !isMax || target != null);
+            if (showStarUp && starUpRateText == null) label += "   " + rateLabel;   // 확률 글자가 없으면 조각 줄 뒤에
+            progressText.text = label;
+        }
+
+        if (starUpRateText != null)
+        {
+            starUpRateText.gameObject.SetActive(showStarUp);
+            if (showStarUp) starUpRateText.text = rateLabel;
+        }
 
         if (starUpButton != null)
         {
-            starUpButton.gameObject.SetActive(owned && !isMax);
+            starUpButton.gameObject.SetActive(showStarUp);
             starUpButton.interactable = canStarUp;
         }
         if (evolveButton != null)
@@ -164,9 +202,20 @@ public class InventoryItemDetail : MonoBehaviour
     {
         CompanionFragment growth = CompanionFragment.Instance;
         CompanionData c = ShownCompanion();
-        if (growth == null || c == null || !growth.TryStarUp(c)) return;
+        if (growth == null || c == null) return;
 
-        resultMessage = ChatText.Fill(starUpDone, "name", c.companionName, "star", growth.GetStar(c).ToString());
+        CompanionFragment.StarUpResult r = growth.TryStarUp(c);
+        switch (r.outcome)
+        {
+            case CompanionFragment.StarUpOutcome.Success:
+                resultMessage = ChatText.Fill(starUpDone, "name", c.companionName, "star", r.newStar.ToString());
+                break;
+            case CompanionFragment.StarUpOutcome.Failed:
+                resultMessage = ChatText.Fill(starUpFailed, "spent", r.spent.ToString(), "refund", r.refunded.ToString());
+                break;
+            default:
+                return;
+        }
         Fill();
     }
 

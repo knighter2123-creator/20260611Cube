@@ -40,6 +40,7 @@ public class InventoryPanel : MonoBehaviour, ITabPage
     private readonly List<(ItemDef def, int count)> rows = new List<(ItemDef, int)>();
     private int  filterIndex = -1;   // -1 = 전체
     private bool dirty;
+    private bool viewed;             // 켜진 뒤 한 번이라도 그려졌나 (새 아이템 표시 지우기 판단)
 
     private void Awake()
     {
@@ -68,16 +69,20 @@ public class InventoryPanel : MonoBehaviour, ITabPage
 
     private void OnEnable()
     {
-        Inventory.OnChanged += MarkDirty;
-        ItemChart.OnChanged += MarkDirty;
+        Inventory.OnChanged         += MarkDirty;
+        ItemChart.OnChanged         += MarkDirty;
+        InventoryNewItems.OnChanged += MarkDirty;
+        viewed = false;
         Refresh();
     }
 
     private void OnDisable()
     {
-        Inventory.OnChanged -= MarkDirty;
-        ItemChart.OnChanged -= MarkDirty;
+        Inventory.OnChanged         -= MarkDirty;
+        ItemChart.OnChanged         -= MarkDirty;
+        InventoryNewItems.OnChanged -= MarkDirty;
         if (detail != null) detail.Hide();
+        MarkSeenIfViewed();   // 창을 닫으면 새 아이템 표시를 모두 지움
     }
 
     // 한 프레임에 여러 번 바뀌어도 1번만 그림
@@ -85,11 +90,24 @@ public class InventoryPanel : MonoBehaviour, ITabPage
 
     private void LateUpdate()
     {
+        viewed = true;   // 한 프레임이라도 화면에 그려졌음
         if (dirty) Refresh();
     }
 
+    // 씬 시작 때 TabWindow.Start 가 바로 끄는 경우처럼 사용자가 보지도 않았는데 지우지 않게
+    private void MarkSeenIfViewed()
+    {
+        if (!viewed) return;
+        viewed = false;
+        InventoryNewItems.MarkAllSeen();
+    }
+
     public void OnTabShow() => MarkDirty();   // 켜질 때 OnEnable 이 이미 그림
-    public void OnTabHide() { if (detail != null) detail.Hide(); }
+    public void OnTabHide()
+    {
+        if (detail != null) detail.Hide();
+        MarkSeenIfViewed();
+    }
 
     private void SelectFilter(int index)
     {
@@ -133,7 +151,7 @@ public class InventoryPanel : MonoBehaviour, ITabPage
         {
             bool on = i < rows.Count;
             slots[i].gameObject.SetActive(on);
-            if (on) slots[i].Bind(rows[i].def, rows[i].count);
+            if (on) slots[i].Bind(rows[i].def, rows[i].count, InventoryNewItems.IsNew(rows[i].def.itemId));
         }
 
         if (emptyMark   != null) emptyMark.SetActive(rows.Count == 0);
@@ -151,5 +169,6 @@ public class InventoryPanel : MonoBehaviour, ITabPage
             return;
         }
         detail.Show(def.itemId);
+        InventoryNewItems.MarkSeen(def.itemId);
     }
 }

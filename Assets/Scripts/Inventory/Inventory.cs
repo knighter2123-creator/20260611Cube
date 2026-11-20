@@ -10,6 +10,8 @@ public static class Inventory
 {
     public static event Action<string, int> OnItemChanged;
     public static event Action OnChanged;
+    /// <summary>이 기기에서 아이템이 늘었을 때 (id, 늘기 전 수량) — 서버에서 받은 값으로 바뀐 것은 부르지 않음 (레드닷용).</summary>
+    public static event Action<string, int> OnItemGained;
 
     public static bool IsServerLoaded => serverLoaded;
     public static bool HasPending     => pending.Count > 0;
@@ -34,6 +36,7 @@ public static class Inventory
     {
         OnItemChanged = null;
         OnChanged     = null;
+        OnItemGained  = null;
         ClearState();
         account    = null;
         opened     = false;
@@ -106,10 +109,13 @@ public static class Inventory
     private static void Change(string itemId, int delta)
     {
         if (delta == 0) return;
+        int before = CountRaw(itemId);
         AddTo(pending, itemId, delta);
         localDirty = true;
         if (uploadAt < 0f) uploadAt = Time.unscaledTime + InventorySettings.Get().uploadDelay;
-        RaiseItem(itemId, CountRaw(itemId));
+        int after = CountRaw(itemId);
+        RaiseItem(itemId, after);
+        if (after > before) OnItemGained?.Invoke(itemId, before);
         OnChanged?.Invoke();
     }
 
@@ -146,6 +152,7 @@ public static class Inventory
         string path = LocalPath(SaveManager.ActiveAccountId);
         try { if (File.Exists(path)) File.Delete(path); }
         catch (Exception e) { Debug.LogWarning($"[Inventory] 기기 인벤토리 파일 삭제 실패: {e.Message}"); }
+        InventoryNewItems.DeleteForReset();
 
         generation++;
         ClearState();
@@ -172,6 +179,7 @@ public static class Inventory
         Sync();
         bool can = CanUseServer();
         ItemChart.Tick(can);
+        StarUpChart.Tick(can);
         WriteLocalIfDirty();
 
         if (!can || busy) return;

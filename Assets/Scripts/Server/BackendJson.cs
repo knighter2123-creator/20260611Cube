@@ -29,6 +29,10 @@ public static class BackendJson
     public static long Long(JsonData obj, string key, long fallback = 0)
         => long.TryParse(Str(obj, key), NumberStyles.Integer, CultureInfo.InvariantCulture, out long r) ? r : fallback;
 
+    /// <summary>소수 (예: 확률 "12.5"). 읽지 못하면 fallback.</summary>
+    public static double Double(JsonData obj, string key, double fallback = 0)
+        => double.TryParse(Str(obj, key), NumberStyles.Float, CultureInfo.InvariantCulture, out double r) ? r : fallback;
+
     /// <summary>뒤끝 날짜 문자열("2026-11-09T06:00:00.123Z") → UTC unix ms. 읽지 못하면 fallback.</summary>
     public static long DateMs(JsonData obj, string key, long fallback = 0)
     {

@@ -40,6 +40,9 @@ public partial class ChatPanel : MonoBehaviour
     [Tooltip("OpenChatButton 오른쪽에 붙을 때 버튼과의 간격 (1920x1080 기준)")]
     [SerializeField] private float previewGap = 16f;
 
+    [Tooltip("미리보기 캔버스 정렬 = 채팅 버튼이 있는 캔버스 정렬 + 이 값 (실행 중 자동). 작게 두어야 인벤토리·우편 같은 창이 미리보기를 가림")]
+    [SerializeField] private int previewSortingOffset = 1;
+
     /// <summary>실행 중 넣는 글자({name}{max}{count} 는 값으로 치환) — 모양은 하이어라키(ChatCanvas 프리팹)에서 고침.</summary>
     [Serializable]
     private class Texts
@@ -200,6 +203,7 @@ public partial class ChatPanel : MonoBehaviour
         if (previewBar.gameObject.activeSelf != visible) previewBar.gameObject.SetActive(visible);
         if (!visible || previewFollow == null) return;
 
+        MatchPreviewSorting();
         Camera cam = EventCamera(previewFollow);
 
         previewFollow.GetWorldCorners(corners);   // 0 왼쪽 아래, 1 왼쪽 위, 2 오른쪽 위, 3 오른쪽 아래
@@ -215,6 +219,27 @@ public partial class ChatPanel : MonoBehaviour
         // 화면 오른쪽 밖으로 나가지 않게 폭을 줄임
         float room = canvasRt.rect.width * 0.5f - previewBar.anchoredPosition.x - previewGap;
         previewBar.sizeDelta = new Vector2(Mathf.Clamp(room, 0f, previewWidth), previewBar.sizeDelta.y);
+    }
+
+    /// <summary>
+    /// 미리보기 캔버스를 채팅 버튼 캔버스 바로 위 순서로 맞춤 — 씬에 높은 값(예: 100)으로 저장돼 있으면
+    /// 그보다 낮은 창(인벤토리 40 등)을 열었을 때 미리보기가 창 앞에 그려지므로.
+    /// </summary>
+    private void MatchPreviewSorting()
+    {
+        Canvas follow = previewFollow.GetComponentInParent<Canvas>();
+        if (follow == null) return;
+        if (!follow.isRootCanvas && !follow.overrideSorting) follow = follow.rootCanvas;   // 정렬을 정하는 캔버스
+
+        Canvas preview = previewBar.GetComponentInParent<Canvas>();
+        if (preview == null || preview == follow) return;
+
+        int order = follow.sortingOrder + previewSortingOffset;
+        if (preview.sortingLayerID == follow.sortingLayerID && preview.sortingOrder == order) return;
+
+        if (!preview.isRootCanvas) preview.overrideSorting = true;
+        preview.sortingLayerID = follow.sortingLayerID;
+        preview.sortingOrder   = order;
     }
 
     /// <summary>이 UI 가 속한 캔버스의 화면 변환 카메라 (Overlay 면 null).</summary>

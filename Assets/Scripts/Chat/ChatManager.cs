@@ -76,7 +76,6 @@ public partial class ChatManager : MonoBehaviour
         AwakeDirect();
         AwakeGuild();
 
-        usesBackendSocial = friendService is BackendFriendService || directService is BackendDirectService;
         BackendNotify.FriendsChanged  += OnRealtimeFriends;
         BackendNotify.MessageReceived += OnRealtimeMessage;
     }
@@ -97,20 +96,10 @@ public partial class ChatManager : MonoBehaviour
 
         BackendNotify.FriendsChanged  -= OnRealtimeFriends;
         BackendNotify.MessageReceived -= OnRealtimeMessage;
-        if (usesBackendSocial) BackendNotify.Tick(null);   // 실시간 알림 끊기
     }
 
     // ───────────────────────────── 뒤끝 실시간 알림 ─────────────────────────────
-
-    private bool usesBackendSocial;   // 친구·개인 메시지가 뒤끝이면 실시간 알림을 씀
-
-    /// <summary>친구나 개인 메시지가 연결돼 있는 동안 그 계정으로 실시간 알림을 받음 (BackendNotify 주석).</summary>
-    private void UpdateRealtime()
-    {
-        if (!usesBackendSocial) return;
-        string uid = friendsLink.Key ?? directLink.Key;
-        BackendNotify.Tick(uid == "local" ? null : uid);
-    }
+    // 연결은 BackendNotify 가 로그인 상태를 보고 스스로 함 — 여기서는 알림이 오면 목록만 다시 받음
 
     private void OnRealtimeFriends()
     {
@@ -175,7 +164,6 @@ public partial class ChatManager : MonoBehaviour
 
         UpdateFriendsConnection();
         UpdateDirectConnection();
-        UpdateRealtime();
 
         if (reason == null && chatLink.Key == null)
             reason = chatLink.FailReason ?? GameMessages.Chat.connecting;
