@@ -165,21 +165,27 @@ public class CompanionFragment : MonoBehaviour
         return IsMaxStar(data) && GetFragment(data) >= CompanionStar.FRAGMENTS_PER_STAR;
     }
 
-    /// <summary>원래 동료는 사라지고 대상 1성이 됨 (이미 있으면 대상 조각 지급).</summary>
+    /// <summary>
+    /// 대상 1성을 얻음 (이미 있으면 대상 조각 지급).
+    /// 진화 뒤에도 원래 동료 조각이 남으면 원래 동료는 1성으로 남고, 조각이 0개가 될 때만 사라짐.
+    /// </summary>
     public bool TryEvolve(CompanionData data, CompanionPoolAsset pool, out CompanionData target)
     {
         if (!CanEvolve(data, pool, out target)) return false;
 
         CompanionManager cm = CompanionManager.Instance;
         bool alreadyOwned = cm.IsOwned(target.id);
+        bool keepOriginal = GetFragment(data) - CompanionStar.FRAGMENTS_PER_STAR > 0;   // 남은 조각을 계속 쓸 수 있게
 
         // 동료 목록부터 — 실패하면 조각·성급은 그대로
-        bool changed = alreadyOwned ? cm.RemoveCompanion(data) : cm.ReplaceCompanion(data, target);
+        bool changed;
+        if (keepOriginal) changed = alreadyOwned || cm.AddCompanion(target);   // 원래 동료는 그대로, 대상만 추가
+        else              changed = alreadyOwned ? cm.RemoveCompanion(data) : cm.ReplaceCompanion(data, target);
         if (!changed) return false;
 
         Inventory.TrySpend(ItemIds.Fragment(data.id), CompanionStar.FRAGMENTS_PER_STAR);
 
-        // 다시 뽑으면 1성부터
+        // 남았든 사라졌든 원래 동료는 1성부터
         if (stars.Remove(data.id)) OnStarChanged?.Invoke(data.id, CompanionStar.MIN_STAR);
 
         int gained = 0;
@@ -195,6 +201,8 @@ public class CompanionFragment : MonoBehaviour
         GameLog.Info(alreadyOwned
             ? $"[Fragment] {data.companionName} 진화 → 이미 보유한 {target.companionName} 조각 +{gained}"
             : $"[Fragment] {data.companionName} 진화 → {target.companionName} 1성 획득");
+        if (keepOriginal)
+            GameLog.Info($"[Fragment] {data.companionName} 조각 {GetFragment(data)}개가 남아 1성으로 유지");
         return true;
     }
 

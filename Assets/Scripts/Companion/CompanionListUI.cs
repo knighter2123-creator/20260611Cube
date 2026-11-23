@@ -8,6 +8,12 @@ public class CompanionListUI : MonoBehaviour, ITabPage
     [SerializeField] private Transform  companionListContent;
     [SerializeField] private GameObject companionItemPrefab;
 
+    [Header("정렬 (보여주는 순서만 — 보유 순서·배치 기억은 그대로)")]
+    [Tooltip("배치된 동료를 앞에")]
+    [SerializeField] private bool placedFirst = true;
+    [Tooltip("등급이 높은 순, 같은 등급이면 성급이 높은 순")]
+    [SerializeField] private bool sortByGradeAndStar = true;
+
     // ── ITabPage — TabWindow 가 부른다 ──
 
     /// <summary>이 탭이 선택됐다 (창을 열 때, 배치가 끝나 창이 되살아날 때 포함) → 목록을 다시 만든다.</summary>
@@ -47,10 +53,8 @@ public class CompanionListUI : MonoBehaviour, ITabPage
             return;
         }
 
-        foreach (CompanionData data in owned)
+        foreach (CompanionData data in SortedForDisplay(cm, owned))
         {
-            if (data == null) continue;
-
             GameObject item = Instantiate(companionItemPrefab, companionListContent);
 
             // TryGetComponent — 에디터의 GetComponent '가짜 null' 은 ?. 를 통과하므로
@@ -59,5 +63,36 @@ public class CompanionListUI : MonoBehaviour, ITabPage
             else
                 Debug.LogWarning("[CompanionListUI] 아이템 프리팹에 CompanionListItem 이 없습니다.", companionItemPrefab);
         }
+    }
+
+    /// <summary>표시 순서 — 배치 → 등급 → 성급, 나머지는 보유 순 (List.Sort 는 순서가 안 지켜져 원래 인덱스로 마무리).</summary>
+    private List<CompanionData> SortedForDisplay(CompanionManager cm, IReadOnlyList<CompanionData> owned)
+    {
+        CompanionFragment growth = CompanionFragment.Instance;
+
+        var rows = new List<(CompanionData data, int index, bool placed, int star)>(owned.Count);
+        for (int i = 0; i < owned.Count; i++)
+        {
+            CompanionData d = owned[i];
+            if (d == null) continue;
+            rows.Add((d, i, cm.IsPlaced(d.id), growth != null ? growth.GetStar(d) : CompanionStar.MIN_STAR));
+        }
+
+        rows.Sort((a, b) =>
+        {
+            if (placedFirst && a.placed != b.placed) return a.placed ? -1 : 1;
+            if (sortByGradeAndStar)
+            {
+                int g = ((int)b.data.grade).CompareTo((int)a.data.grade);
+                if (g != 0) return g;
+                int s = b.star.CompareTo(a.star);
+                if (s != 0) return s;
+            }
+            return a.index.CompareTo(b.index);
+        });
+
+        var result = new List<CompanionData>(rows.Count);
+        foreach (var r in rows) result.Add(r.data);
+        return result;
     }
 }

@@ -1,20 +1,20 @@
 ﻿itemId,itemType,name,iconKey,targetId,description,sortOrder
-gacha_ticket,gachaTicket,소환권,gacha_ticket,,동료 소환 1회에 1장을 씁니다.,0
-fragment_le_armbreak,fragment,성기사 방패 조각,,le_armbreak,성기사 방패의 성급을 올리거나 진화할 때 씁니다.,101
-fragment_le_atk,fragment,순금 도검 조각,,le_atk,순금 도검의 성급을 올리거나 진화할 때 씁니다.,102
-fragment_le_explosion,fragment,반짝이는 폭발 지팡이 조각,,le_explosion,반짝이는 폭발 지팡이의 성급을 올리거나 진화할 때 씁니다.,103
-fragment_le_poison,fragment,보라 지팡이 조각,,le_poison,보라 지팡이의 성급을 올리거나 진화할 때 씁니다.,104
-fragment_le_stun,fragment,다이아 해머 조각,,le_stun,다이아 해머의 성급을 올리거나 진화할 때 씁니다.,105
-fragment_ep_Armbreak,fragment,기사 방패 조각,,ep_Armbreak,기사 방패의 성급을 올리거나 진화할 때 씁니다.,206
-fragment_ep_atk,fragment,은 단검 조각,,ep_atk,은 단검의 성급을 올리거나 진화할 때 씁니다.,207
-fragment_ep_Explosion,fragment,폭발 지팡이 조각,,ep_Explosion,폭발 지팡이의 성급을 올리거나 진화할 때 씁니다.,208
-fragment_ep_stun,fragment,순금 망치 조각,,ep_stun,순금 망치의 성급을 올리거나 진화할 때 씁니다.,209
-fragment_ra_armbreak,fragment,철 방패 조각,,ra_armbreak,철 방패의 성급을 올리거나 진화할 때 씁니다.,310
-fragment_ra_atk,fragment,철검 조각,,ra_atk,철검의 성급을 올리거나 진화할 때 씁니다.,311
-fragment_ra_explosion,fragment,토파즈 스태프 조각,,ra_explosion,토파즈 스태프의 성급을 올리거나 진화할 때 씁니다.,312
-fragment_ra_Slow,fragment,사파이어 스태프 조각,,ra_Slow,사파이어 스태프의 성급을 올리거나 진화할 때 씁니다.,313
-fragment_ra_stun,fragment,은 망치 조각,,ra_stun,은 망치의 성급을 올리거나 진화할 때 씁니다.,314
-fragment_nm_armbreak,fragment,나무 방패 조각,,nm_armbreak,나무 방패의 성급을 올리거나 진화할 때 씁니다.,415
-fragment_nm_atk,fragment,목검 조각,,nm_atk,목검의 성급을 올리거나 진화할 때 씁니다.,416
-fragment_nm_explosion,fragment,나무 지팡이 조각,,nm_explosion,나무 지팡이의 성급을 올리거나 진화할 때 씁니다.,417
-fragment_nm_Stun,fragment,워 해머 조각,,nm_Stun,워 해머의 성급을 올리거나 진화할 때 씁니다.,418
+gacha_ticket,gachaTicket,소환권,gacha_ticket,,동료 소환에 사용한다.,0
+fragment_le_armbreak,fragment,성기사 방패 조각,,le_armbreak,성기사 방패의 성급을 올리거나 진화할 때 사용한다.,101
+fragment_le_atk,fragment,순금 도검 조각,,le_atk,순금 도검의 성급을 올리거나 진화할 때 사용한다.,102
+fragment_le_explosion,fragment,반짝이는 폭발 지팡이 조각,,le_explosion,반짝이는 폭발 지팡이의 성급을 올리거나 진화할 때 사용한다.,103
+fragment_le_poison,fragment,보라 지팡이 조각,,le_poison,보라 지팡이의 성급을 올리거나 진화할 때 사용한다.,104
+fragment_le_stun,fragment,다이아 해머 조각,,le_stun,다이아 해머의 성급을 올리거나 진화할 때 사용한다.,105
+fragment_ep_Armbreak,fragment,기사 방패 조각,,ep_Armbreak,기사 방패의 성급을 올리거나 진화할 때 사용한다.,206
+fragment_ep_atk,fragment,은 단검 조각,,ep_atk,은 단검의 성급을 올리거나 진화할 때 사용한다.,207
+fragment_ep_Explosion,fragment,폭발 지팡이 조각,,ep_Explosion,폭발 지팡이의 성급을 올리거나 진화할 때 사용한다.,208
+fragment_ep_stun,fragment,순금 망치 조각,,ep_stun,순금 망치의 성급을 올리거나 진화할 때 사용한다.,209
+fragment_ra_armbreak,fragment,철 방패 조각,,ra_armbreak,철 방패의 성급을 올리거나 진화할 때 사용한다.,310
+fragment_ra_atk,fragment,철검 조각,,ra_atk,철검의 성급을 올리거나 진화할 때 사용한다.,311
+fragment_ra_explosion,fragment,토파즈 스태프 조각,,ra_explosion,토파즈 스태프의 성급을 올리거나 진화할 때 사용한다.,312
+fragment_ra_Slow,fragment,사파이어 스태프 조각,,ra_Slow,사파이어 스태프의 성급을 올리거나 진화할 때 사용한다.,313
+fragment_ra_stun,fragment,은 망치 조각,,ra_stun,은 망치의 성급을 올리거나 진화할 때 사용한다.,314
+fragment_nm_armbreak,fragment,나무 방패 조각,,nm_armbreak,나무 방패의 성급을 올리거나 진화할 때 사용한다.,415
+fragment_nm_atk,fragment,목검 조각,,nm_atk,목검의 성급을 올리거나 진화할 때 사용한다.,416
+fragment_nm_explosion,fragment,나무 지팡이 조각,,nm_explosion,나무 지팡이의 성급을 올리거나 진화할 때 사용한다.,417
+fragment_nm_Stun,fragment,워 해머 조각,,nm_Stun,워 해머의 성급을 올리거나 진화할 때 사용한다.,418

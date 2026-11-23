@@ -13,6 +13,19 @@ public class CompanionListItem : MonoBehaviour
     [SerializeField] private TextMeshProUGUI tagText;
     [SerializeField] private Button          iconButton;    // 미연결 시 자동 탐색
 
+    [Header("한눈에 보기 (Tools/UI 굽기/동료 목록 카드 - 상태 표시 가 만듦)")]
+    [Tooltip("카드 뒤 테두리 — 등급 색으로 칠함")]
+    [SerializeField] private Image           gradeFrame;
+    [Tooltip("비우면 CompanionGradeStyle 의 밝은 배경용 등급 색. 채우면 [일반, 희귀, 영웅, 전설] 순서")]
+    [SerializeField] private Color[]         gradeFrameColors;
+    [SerializeField] private TextMeshProUGUI starText;
+    [Tooltip("{stars} = ★★★☆☆, {star} = 숫자")]
+    [SerializeField] private string          starFormat = "{stars}";
+    [Tooltip("배치된 동료에만 켜지는 '배치 중' 배지")]
+    [SerializeField] private GameObject      placedBadge;
+    [Tooltip("배치된 동료 카드를 살짝 어둡게 덮는 판")]
+    [SerializeField] private GameObject      placedDim;
+
     [Header("배치/취소 버튼")]
     [SerializeField] private GameObject actionButtons;      // 버튼 묶음 루트 (기본 비활성)
     [SerializeField] private Button     placeButton;        // 배치 버튼
@@ -70,15 +83,34 @@ public class CompanionListItem : MonoBehaviour
 
         if (fragmentText != null) fragmentText.gameObject.SetActive(false);
 
+        if (gradeFrame != null) gradeFrame.color = FrameColor(data.grade);
+
+        if (starText != null)
+        {
+            CompanionFragment growth = CompanionFragment.Instance;
+            int star = growth != null ? growth.GetStar(data) : CompanionStar.MIN_STAR;
+            starText.text = ChatText.Fill(starFormat, "stars", CompanionStar.ToStars(star), "star", star.ToString());
+        }
+
         if (actionButtons != null) actionButtons.SetActive(false);
         RefreshActionButtons();
     }
 
+    private Color FrameColor(CompanionGrade grade)
+    {
+        int i = (int)grade;
+        if (gradeFrameColors != null && i >= 0 && i < gradeFrameColors.Length) return gradeFrameColors[i];
+        return CompanionGradeStyle.GetColorOnLight(grade);
+    }
+
+    /// <summary>배치/취소 버튼과 '배치 중' 표시를 지금 배치 상태에 맞춤.</summary>
     public void RefreshActionButtons()
     {
         bool isPlaced = IsCurrentlyPlaced();
         if (placeButton  != null) placeButton.gameObject.SetActive(!isPlaced);
         if (cancelButton != null) cancelButton.gameObject.SetActive(isPlaced);
+        if (placedBadge  != null) placedBadge.SetActive(isPlaced);
+        if (placedDim    != null) placedDim.SetActive(isPlaced);
     }
 
     private void ToggleActionButtons()
